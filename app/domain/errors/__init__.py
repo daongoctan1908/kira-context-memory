@@ -1,6 +1,7 @@
 """Typed errors exposed by outbound domain ports."""
 
 from app.domain.errors.conversation import (
+    ConversationStoreConfigurationError,
     ConversationStoreConnectionError,
     ConversationStoreError,
     ConversationStoreOperationError,
@@ -17,6 +18,7 @@ from app.domain.errors.kira import (
 )
 
 __all__ = [
+    "ConversationStoreConfigurationError",
     "ConversationStoreConnectionError",
     "ConversationStoreError",
     "ConversationStoreOperationError",

@@ -3,11 +3,16 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import httpx
-from redis.exceptions import ConnectionError as RedisConnectionError
+import pytest
+from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 
 from app.config.settings import Settings
+from app.domain.errors.conversation import ConversationStoreConfigurationError
 from app.domain.errors.kira import KiraHttpError, KiraTimeoutError
+from app.domain.models.conversation import ConversationMessage
 from app.domain.models.kira import KiraAuthResult, KiraEventKind, KiraStreamEvent
+from app.infrastructure.postgres import PostgresConversationStoreAdapter
+from app.infrastructure.postgres.schema import EXPECTED_SCHEMA_REVISION
 from app.presentation.api.main import create_app
 
 
@@ -68,9 +73,64 @@ class FakeKiraClient:
         return self.last_stream
 
 
-class UnavailableRedisClient:
-    async def ping(self) -> bool:
-        raise RedisConnectionError("private Redis endpoint")
+class FakeConversationStore:
+    async def read_recent(
+        self,
+        session_id: str,
+        limit: int,
+    ) -> tuple[ConversationMessage, ...]:
+        return ()
+
+    async def append_turn(
+        self,
+        user_message: ConversationMessage,
+        assistant_message: ConversationMessage,
+    ) -> bool:
+        return True
+
+
+class UnavailableConnectionContext:
+    async def __aenter__(self) -> None:
+        raise SqlAlchemyTimeoutError("private PostgreSQL endpoint")
+
+    async def __aexit__(self, *args: object) -> None:
+        return None
+
+
+class UnavailablePostgresEngine:
+    def connect(self) -> UnavailableConnectionContext:
+        return UnavailableConnectionContext()
+
+
+class AvailablePostgresConnection:
+    def __init__(self, revision: str = EXPECTED_SCHEMA_REVISION) -> None:
+        self.revision = revision
+
+    async def scalar(self, statement: object) -> str:
+        return self.revision
+
+
+class AvailableConnectionContext:
+    def __init__(self, connection: AvailablePostgresConnection) -> None:
+        self.connection = connection
+
+    async def __aenter__(self) -> AvailablePostgresConnection:
+        return self.connection
+
+    async def __aexit__(self, *args: object) -> None:
+        return None
+
+
+class AvailablePostgresEngine:
+    def __init__(self, revision: str = EXPECTED_SCHEMA_REVISION) -> None:
+        self.connection = AvailablePostgresConnection(revision)
+        self.disposed = False
+
+    def connect(self) -> AvailableConnectionContext:
+        return AvailableConnectionContext(self.connection)
+
+    async def dispose(self) -> None:
+        self.disposed = True
 
 
 def kira_event(raw_data: str, text: str | None = None) -> KiraStreamEvent:
@@ -86,7 +146,11 @@ def kira_event(raw_data: str, text: str | None = None) -> KiraStreamEvent:
 
 @asynccontextmanager
 async def gateway_client(kira_client: FakeKiraClient) -> AsyncIterator[httpx.AsyncClient]:
-    app = create_app(settings=make_settings(), kira_client=kira_client)
+    app = create_app(
+        settings=make_settings(),
+        kira_client=kira_client,
+        conversation_store=FakeConversationStore(),
+    )
     async with app.router.lifespan_context(app):
         transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
         async with httpx.AsyncClient(transport=transport, base_url="http://gateway.test") as client:
@@ -118,11 +182,13 @@ async def test_ready_is_503_before_lifespan_initialization() -> None:
     assert response.json() == {"status": "not_ready"}
 
 
-async def test_redis_startup_failure_keeps_gateway_ready_in_degraded_mode() -> None:
+async def test_postgres_startup_failure_keeps_gateway_ready_in_degraded_mode() -> None:
+    settings = make_settings()
+    settings_with_redis = settings.model_copy(update={"redis_url": "redis://127.0.0.1:6379/0"})
     app = create_app(
-        settings=make_settings(),
+        settings=settings_with_redis,
         kira_client=FakeKiraClient(),
-        redis_client=UnavailableRedisClient(),  # type: ignore[arg-type]
+        postgres_engine=UnavailablePostgresEngine(),  # type: ignore[arg-type]
     )
 
     async with app.router.lifespan_context(app):
@@ -132,8 +198,45 @@ async def test_redis_startup_failure_keeps_gateway_ready_in_degraded_mode() -> N
 
         assert response.status_code == 200
         assert response.json() == {"status": "ready"}
-        assert app.state.redis_status == "degraded"
+        assert app.state.postgres_status == "degraded"
         assert app.state.conversation_store is not None
+
+
+async def test_missing_postgres_configuration_fails_startup() -> None:
+    app = create_app(settings=make_settings(), kira_client=FakeKiraClient())
+
+    with pytest.raises(ConversationStoreConfigurationError):
+        async with app.router.lifespan_context(app):
+            pass
+
+
+async def test_postgres_is_the_default_conversation_store() -> None:
+    settings = make_settings().model_copy(update={"redis_url": "redis://127.0.0.1:6379/0"})
+    engine = AvailablePostgresEngine()
+    app = create_app(
+        settings=settings,
+        kira_client=FakeKiraClient(),
+        postgres_engine=engine,  # type: ignore[arg-type]
+    )
+
+    async with app.router.lifespan_context(app):
+        assert isinstance(app.state.conversation_store, PostgresConversationStoreAdapter)
+        assert app.state.postgres_status == "available"
+
+
+async def test_owned_postgres_engine_is_disposed_when_schema_is_invalid(monkeypatch) -> None:
+    engine = AvailablePostgresEngine("old-revision")
+    monkeypatch.setattr(
+        "app.presentation.api.main.create_postgres_engine",
+        lambda settings: engine,
+    )
+    app = create_app(settings=make_settings(), kira_client=FakeKiraClient())
+
+    with pytest.raises(ConversationStoreConfigurationError):
+        async with app.router.lifespan_context(app):
+            pass
+
+    assert engine.disposed is True
 
 
 async def test_chat_proxies_raw_kira_frames_and_sets_stream_headers() -> None:

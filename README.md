@@ -7,7 +7,7 @@ thuộc trực tiếp vào FastAPI, HTTPX, Redis, Mem0 hoặc vLLM.
 ## Trạng thái
 
 Batch A-D của Tuần 1 cung cấp Gateway baseline hoàn chỉnh để live smoke với KiRa Test.
-Batch A của Tuần 2 bổ sung Redis recent-conversation infrastructure:
+Batch A-B của Tuần 2 bổ sung Redis adapter và PostgreSQL durable conversation store:
 
 - cấu trúc presentation, application, domain, infrastructure, config và worker;
 - dependency/tooling bằng Python 3.11, `uv`, Ruff và pytest;
@@ -20,6 +20,9 @@ Batch A của Tuần 2 bổ sung Redis recent-conversation infrastructure:
 - `ConversationStorePort` và message schema version 1 độc lập Redis SDK;
 - Redis connection pool với timeout/health handling theo degraded policy;
 - atomic append user/assistant, `turn_id` dedup, bounded 10-message window và sliding TTL.
+- PostgreSQL source of truth với migration, transactional pair append, deterministic ordering
+  và indexed recent read;
+- Redis adapter được giữ làm optional cache candidate, không được Gateway chọn mặc định.
 
 Automated test dùng mock transport vì laptop cá nhân không có route tới KiRa Test. T1.18 chỉ
 được xác nhận sau khi chạy [live smoke runbook](docs/week1-smoke-test.md) trên PC công ty.
@@ -55,7 +58,22 @@ uv run ruff format --check .
 uv run pytest
 ```
 
-Khởi động Redis 7.2 local và chạy contract test thật:
+Khởi động PostgreSQL local, apply migration và chạy integration test thật:
+
+```powershell
+docker compose up -d postgres
+$env:DATABASE_URL="postgresql+asyncpg://kira:replace_me@127.0.0.1:5432/kira_context"
+uv run alembic upgrade head
+$env:POSTGRES_TEST_URL=$env:DATABASE_URL
+uv run pytest -m postgres_integration
+Remove-Item Env:POSTGRES_TEST_URL
+```
+
+`DATABASE_URL` phải khớp `POSTGRES_DB`, `POSTGRES_USER` và `POSTGRES_PASSWORD` trong `.env`.
+Gateway không tự chạy migration. Cấu hình hoặc schema sai làm startup fail; connection timeout
+tạm thời chỉ đặt PostgreSQL ở degraded state và `/ready` vẫn trả 200.
+
+Khởi động Redis 7.2 local và chạy integration test cho optional adapter:
 
 ```powershell
 docker compose up -d redis
@@ -74,8 +92,8 @@ kira:session:{session_id}:seen_turns
 ```
 
 `REDIS_SESSION_TTL_SECONDS`, `MAX_RECENT_MESSAGES` và pool/timeouts lấy từ environment.
-Gateway vẫn ready nếu Redis tạm unavailable. Batch A mới chỉ cung cấp infrastructure;
-`HandleChatUseCase` sẽ đọc/ghi recent conversation ở Batch C.
+Redis không được wire vào Gateway dù `REDIS_URL` có cấu hình. Batch B mới chỉ cung cấp
+PostgreSQL infrastructure; `HandleChatUseCase` sẽ đọc/ghi conversation ở Batch D.
 
 Chạy Gateway sau khi đã cấu hình `.env`:
 
@@ -116,7 +134,8 @@ xảy ra sau khi response đã bắt đầu, Gateway phát `event: gateway_error
 schema với HTTP 502; timeout trả HTTP 504.
 
 - `GET /health`: liveness của process.
-- `GET /ready`: dependency graph local đã khởi tạo; không probe KiRa.
+- `GET /ready`: dependency graph local đã khởi tạo; không probe KiRa. PostgreSQL connection
+  outage tạm thời là degraded capability, còn configuration/schema mismatch làm startup fail.
 
 ## Cấu trúc chính
 

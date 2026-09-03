@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import AnyHttpUrl, Field, RedisDsn, Secret, SecretStr
+from pydantic import AnyHttpUrl, Field, PostgresDsn, RedisDsn, Secret, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,6 +28,13 @@ class Settings(BaseSettings):
     kira_connect_timeout_seconds: float = Field(default=5.0, gt=0)
     kira_read_timeout_seconds: float = Field(default=300.0, gt=0)
     kira_token_expiry_skew_seconds: float = Field(default=60.0, ge=0)
+
+    database_url: Secret[PostgresDsn] | None = None
+    postgres_pool_size: int = Field(default=10, ge=1)
+    postgres_max_overflow: int = Field(default=10, ge=0)
+    postgres_pool_timeout_seconds: float = Field(default=2.0, gt=0)
+    postgres_connect_timeout_seconds: float = Field(default=2.0, gt=0)
+    postgres_command_timeout_seconds: float = Field(default=5.0, gt=0)
 
     redis_url: Secret[RedisDsn] | None = None
     redis_max_connections: int = Field(default=20, ge=1)

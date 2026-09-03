@@ -12,6 +12,13 @@ class ConversationStoreConnectionError(ConversationStoreError):
         super().__init__("Conversation store is unavailable")
 
 
+class ConversationStoreConfigurationError(ConversationStoreError):
+    """The conversation store is wired with invalid configuration or schema."""
+
+    def __init__(self) -> None:
+        super().__init__("Conversation store configuration is invalid")
+
+
 class ConversationStoreOperationError(ConversationStoreError):
     """The store rejected an otherwise valid operation."""
 

@@ -13,6 +13,8 @@ WORKDIR /app
 COPY --from=uv /uv /uvx /bin/
 COPY pyproject.toml uv.lock README.md ./
 COPY app ./app
+COPY alembic.ini ./
+COPY migrations ./migrations
 COPY worker ./worker
 
 RUN uv sync --frozen --no-dev --no-editable
@@ -36,6 +38,8 @@ RUN groupadd --system --gid 10001 kira \
 
 COPY --from=builder --chown=kira:kira /app/.venv /app/.venv
 COPY --chown=kira:kira app ./app
+COPY --chown=kira:kira alembic.ini ./
+COPY --chown=kira:kira migrations ./migrations
 COPY --chown=kira:kira worker ./worker
 
 USER kira

@@ -9,11 +9,14 @@ description = "Context and long-term memory middleware for Viettel KiRa"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
+    "alembic>=1.16,<2.0",
+    "asyncpg>=0.30,<1.0",
     "fastapi>=0.115,<1.0",
     "httpx>=0.28,<1.0",
     "pydantic>=2.10,<3.0",
     "pydantic-settings>=2.7,<3.0",
     "redis>=5,<7",
+    "sqlalchemy[asyncio]>=2.0,<2.1",
     "uvicorn[standard]>=0.34,<1.0",
 ]
 
@@ -34,6 +37,7 @@ addopts = "--strict-markers --strict-config --cov=app --cov=worker --cov-report=
 asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
+    "postgres_integration: requires POSTGRES_TEST_URL pointing to a disposable PostgreSQL database",
     "redis_integration: requires REDIS_TEST_URL pointing to a disposable Redis database",
 ]
 

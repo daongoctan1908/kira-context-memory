@@ -14,7 +14,15 @@ def test_conversation_store_port_is_a_protocol() -> None:
 
 
 def test_core_layers_do_not_import_infrastructure_frameworks() -> None:
-    forbidden_roots = {"fastapi", "httpx", "pydantic_settings", "redis"}
+    forbidden_roots = {
+        "alembic",
+        "asyncpg",
+        "fastapi",
+        "httpx",
+        "pydantic_settings",
+        "redis",
+        "sqlalchemy",
+    }
     core_roots = [Path("app/domain"), Path("app/application")]
 
     violations: list[str] = []
