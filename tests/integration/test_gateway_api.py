@@ -3,6 +3,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import httpx
+from redis.exceptions import ConnectionError as RedisConnectionError
 
 from app.config.settings import Settings
 from app.domain.errors.kira import KiraHttpError, KiraTimeoutError
@@ -67,6 +68,11 @@ class FakeKiraClient:
         return self.last_stream
 
 
+class UnavailableRedisClient:
+    async def ping(self) -> bool:
+        raise RedisConnectionError("private Redis endpoint")
+
+
 def kira_event(raw_data: str, text: str | None = None) -> KiraStreamEvent:
     return KiraStreamEvent(
         kind=KiraEventKind.TEXT if text is not None else KiraEventKind.STATUS,
@@ -110,6 +116,24 @@ async def test_ready_is_503_before_lifespan_initialization() -> None:
 
     assert response.status_code == 503
     assert response.json() == {"status": "not_ready"}
+
+
+async def test_redis_startup_failure_keeps_gateway_ready_in_degraded_mode() -> None:
+    app = create_app(
+        settings=make_settings(),
+        kira_client=FakeKiraClient(),
+        redis_client=UnavailableRedisClient(),  # type: ignore[arg-type]
+    )
+
+    async with app.router.lifespan_context(app):
+        transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+        async with httpx.AsyncClient(transport=transport, base_url="http://gateway.test") as client:
+            response = await client.get("/ready")
+
+        assert response.status_code == 200
+        assert response.json() == {"status": "ready"}
+        assert app.state.redis_status == "degraded"
+        assert app.state.conversation_store is not None
 
 
 async def test_chat_proxies_raw_kira_frames_and_sets_stream_headers() -> None:

@@ -1,6 +1,7 @@
 import ast
 from pathlib import Path
 
+from app.domain.ports.conversation_store import ConversationStorePort
 from app.domain.ports.kira_client import KiraClientPort
 
 
@@ -8,8 +9,12 @@ def test_kira_client_port_is_a_protocol() -> None:
     assert KiraClientPort.__name__ == "KiraClientPort"
 
 
+def test_conversation_store_port_is_a_protocol() -> None:
+    assert ConversationStorePort.__name__ == "ConversationStorePort"
+
+
 def test_core_layers_do_not_import_infrastructure_frameworks() -> None:
-    forbidden_roots = {"fastapi", "httpx", "pydantic_settings"}
+    forbidden_roots = {"fastapi", "httpx", "pydantic_settings", "redis"}
     core_roots = [Path("app/domain"), Path("app/application")]
 
     violations: list[str] = []

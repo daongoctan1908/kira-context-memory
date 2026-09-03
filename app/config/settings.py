@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import AnyHttpUrl, Field, SecretStr
+from pydantic import AnyHttpUrl, Field, RedisDsn, Secret, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,6 +28,14 @@ class Settings(BaseSettings):
     kira_connect_timeout_seconds: float = Field(default=5.0, gt=0)
     kira_read_timeout_seconds: float = Field(default=300.0, gt=0)
     kira_token_expiry_skew_seconds: float = Field(default=60.0, ge=0)
+
+    redis_url: Secret[RedisDsn] | None = None
+    redis_max_connections: int = Field(default=20, ge=1)
+    redis_connect_timeout_seconds: float = Field(default=1.0, gt=0)
+    redis_read_timeout_seconds: float = Field(default=1.0, gt=0)
+    redis_health_check_interval_seconds: int = Field(default=30, ge=0)
+    redis_session_ttl_seconds: int = Field(default=86400, ge=1)
+    max_recent_messages: int = Field(default=10, ge=2, multiple_of=2)
 
     app_host: str = Field(default="0.0.0.0", min_length=1)
     app_port: int = Field(default=8000, ge=1, le=65535)

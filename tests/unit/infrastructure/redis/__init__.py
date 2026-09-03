@@ -1,0 +1,1 @@
+"""Redis adapter unit tests."""

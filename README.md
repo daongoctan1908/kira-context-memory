@@ -6,7 +6,8 @@ thuộc trực tiếp vào FastAPI, HTTPX, Redis, Mem0 hoặc vLLM.
 
 ## Trạng thái
 
-Batch A-D của Tuần 1 cung cấp Gateway baseline hoàn chỉnh để live smoke với KiRa Test:
+Batch A-D của Tuần 1 cung cấp Gateway baseline hoàn chỉnh để live smoke với KiRa Test.
+Batch A của Tuần 2 bổ sung Redis recent-conversation infrastructure:
 
 - cấu trúc presentation, application, domain, infrastructure, config và worker;
 - dependency/tooling bằng Python 3.11, `uv`, Ruff và pytest;
@@ -16,6 +17,9 @@ Batch A-D của Tuần 1 cung cấp Gateway baseline hoàn chỉnh để live sm
 - token cache concurrency-safe và parser cho KiRa `data:` frames;
 - `HandleChatUseCase`, FastAPI `POST /chat`, SSE proxy và health/readiness probes;
 - Docker image non-root, automated test gate và manual smoke client.
+- `ConversationStorePort` và message schema version 1 độc lập Redis SDK;
+- Redis connection pool với timeout/health handling theo degraded policy;
+- atomic append user/assistant, `turn_id` dedup, bounded 10-message window và sliding TTL.
 
 Automated test dùng mock transport vì laptop cá nhân không có route tới KiRa Test. T1.18 chỉ
 được xác nhận sau khi chạy [live smoke runbook](docs/week1-smoke-test.md) trên PC công ty.
@@ -50,6 +54,28 @@ uv run ruff check .
 uv run ruff format --check .
 uv run pytest
 ```
+
+Khởi động Redis 7.2 local và chạy contract test thật:
+
+```powershell
+docker compose up -d redis
+$env:REDIS_TEST_URL="redis://127.0.0.1:6379/15"
+uv run pytest -m redis_integration
+Remove-Item Env:REDIS_TEST_URL
+```
+
+Test dùng key prefix ngẫu nhiên và chỉ dọn các key do chính test tạo; không `FLUSHDB`.
+
+Redis recent store dùng các key cùng cluster hash slot:
+
+```text
+kira:session:{session_id}:messages
+kira:session:{session_id}:seen_turns
+```
+
+`REDIS_SESSION_TTL_SECONDS`, `MAX_RECENT_MESSAGES` và pool/timeouts lấy từ environment.
+Gateway vẫn ready nếu Redis tạm unavailable. Batch A mới chỉ cung cấp infrastructure;
+`HandleChatUseCase` sẽ đọc/ghi recent conversation ở Batch C.
 
 Chạy Gateway sau khi đã cấu hình `.env`:
 
@@ -111,5 +137,6 @@ implement các port của domain. Domain/application không import framework ho�
 ## Branch strategy
 
 - `main` luôn là baseline đã qua kiểm tra.
-- Mỗi feature dùng branch ngắn hạn `feat/<feature>`; Week 1 dùng `feat/kira-baseline`.
+- Mỗi feature dùng branch ngắn hạn `feat/<feature>`; Week 2 dùng
+  `feat/short-term-context` trên baseline Week 1.
 - Commit theo checkpoint có thể review; merge về `main` sau khi lint và test pass.

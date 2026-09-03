@@ -1,7 +1,10 @@
+from datetime import UTC, datetime
+
 import pytest
 from pydantic import ValidationError
 
 from app.domain.models.chat import ChatCommand
+from app.domain.models.conversation import ConversationMessage, ConversationRole
 from app.domain.models.kira import KiraAuthResult
 from app.presentation.schemas.chat import ChatRequest
 
@@ -39,3 +42,43 @@ def test_auth_result_hides_token_from_repr() -> None:
 def test_auth_result_rejects_empty_token() -> None:
     with pytest.raises(ValueError, match="token"):
         KiraAuthResult(token="")
+
+
+def test_conversation_message_accepts_versioned_timezone_aware_content() -> None:
+    message = ConversationMessage(
+        session_id="session-1",
+        turn_id="turn-1",
+        role=ConversationRole.USER,
+        content="Hưng Yên thì sao?",
+        timestamp=datetime(2026, 9, 3, tzinfo=UTC),
+    )
+
+    assert message.schema_version == 1
+    assert message.role is ConversationRole.USER
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"session_id": " "},
+        {"turn_id": ""},
+        {"content": "\t"},
+        {"timestamp": datetime(2026, 9, 3)},
+        {"role": "system"},
+        {"schema_version": 2},
+        {"schema_version": True},
+        {"content": 123},
+    ],
+)
+def test_conversation_message_rejects_invalid_values(changes: dict[str, object]) -> None:
+    values: dict[str, object] = {
+        "session_id": "session-1",
+        "turn_id": "turn-1",
+        "role": ConversationRole.USER,
+        "content": "question",
+        "timestamp": datetime(2026, 9, 3, tzinfo=UTC),
+    }
+    values.update(changes)
+
+    with pytest.raises(ValueError):
+        ConversationMessage(**values)  # type: ignore[arg-type]
