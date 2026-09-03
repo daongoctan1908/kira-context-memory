@@ -1,0 +1,1 @@
+"""External contract tests."""
