@@ -1,4 +1,4 @@
-"""Chat endpoint for the Week 1 KiRa baseline."""
+"""Context-aware chat endpoint with the unchanged Week 1 SSE contract."""
 
 from uuid import uuid4
 
@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from app.application.use_cases.handle_chat import HandleChatUseCase
-from app.presentation.api.sse import stream_gateway_events
+from app.presentation.api.sse import ChatStreamingResponse
 from app.presentation.schemas.chat import ChatRequest
 from app.presentation.schemas.errors import GatewayError
 
@@ -26,11 +26,11 @@ async def chat(body: ChatRequest, request: Request) -> StreamingResponse:
     correlation_id = uuid4().hex
     request.state.correlation_id = correlation_id
     use_case: HandleChatUseCase = request.app.state.handle_chat
-    session = await use_case.execute(body.to_command())
+    session = await use_case.execute(body.to_command(), correlation_id=correlation_id)
 
-    return StreamingResponse(
-        stream_gateway_events(session, correlation_id),
-        media_type="text/event-stream",
+    return ChatStreamingResponse(
+        session,
+        correlation_id,
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",

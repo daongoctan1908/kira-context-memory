@@ -7,7 +7,7 @@ thuộc trực tiếp vào FastAPI, HTTPX, Redis, Mem0 hoặc vLLM.
 ## Trạng thái
 
 Batch A-D của Tuần 1 cung cấp Gateway baseline hoàn chỉnh để live smoke với KiRa Test.
-Batch A-C của Tuần 2 bổ sung conversation infrastructure và các component rewrite độc lập:
+Batch A-D của Tuần 2 tích hợp short-term context qua PostgreSQL và vLLM:
 
 - cấu trúc presentation, application, domain, infrastructure, config và worker;
 - dependency/tooling bằng Python 3.11, `uv`, Ruff và pytest;
@@ -24,10 +24,12 @@ Batch A-C của Tuần 2 bổ sung conversation infrastructure và các componen
   và indexed recent read;
 - Redis adapter được giữ làm optional cache candidate, không được Gateway chọn mặc định.
 - ContextBuilder, estimated token budget, QueryRewriterPort, prompt v1 và vLLM HTTP adapter;
-  chưa tích hợp các component này vào `/chat` (phần đó thuộc Batch D).
+- `/chat` đọc recent từ PostgreSQL → rewrite → KiRa SSE → lưu completed turn;
+- fallback original query, structured logs an toàn và Prometheus `/metrics`.
 
-Automated test dùng mock transport vì laptop cá nhân không có route tới KiRa Test. T1.18 chỉ
-được xác nhận sau khi chạy [live smoke runbook](docs/week1-smoke-test.md) trên PC công ty.
+PostgreSQL/Redis integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
+Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem
+[Week 2 runbook và evidence](docs/week2-acceptance.md).
 
 ## KiRa contract assumptions
 
@@ -94,8 +96,8 @@ kira:session:{session_id}:seen_turns
 ```
 
 `REDIS_SESSION_TTL_SECONDS`, `MAX_RECENT_MESSAGES` và pool/timeouts lấy từ environment.
-Redis không được wire vào Gateway dù `REDIS_URL` có cấu hình. Batch B mới chỉ cung cấp
-PostgreSQL infrastructure; `HandleChatUseCase` sẽ đọc/ghi conversation ở Batch D.
+Redis không được wire vào Gateway dù `REDIS_URL` có cấu hình. PostgreSQL là source of truth;
+recent window không xóa full history và không có inactivity TTL như Redis.
 
 ## Context Builder và Query Rewriter (Week 2 Batch C)
 
@@ -116,13 +118,13 @@ PostgreSQL infrastructure; `HandleChatUseCase` sẽ đọc/ghi conversation ở 
 - Timeout/connection/non-2xx/malformed output được map thành typed errors. Empty, oversized,
   truncated (`finish_reason=length`) hoặc tool-call response bị từ chối. Adapter không log dữ liệu.
 
-Batch C không khởi tạo vLLM ở startup, không đổi `/chat`, SSE hoặc `/ready`. Settings vLLM có thể
-để trống đến khi wiring Batch D. QueryRewriterPort không tự thực hiện fallback; đó là trách nhiệm
-orchestration ở Batch D.
+Gateway khởi tạo adapter vLLM ở startup; bắt buộc cấu hình base URL và model nhưng không gọi
+model để probe. Empty/fully-trimmed recent bỏ qua rewriter. PostgreSQL recent-read hoặc rewriter
+lỗi sẽ fallback current query nguyên bản. KiRa vẫn là dependency bắt buộc.
 
 Test prompt bao phủ location/time/metric/reference/comparison, standalone, topic switch và
 injection trong recent data. Đây là unit/HTTP contract tests với mock, **không chứng minh chất lượng
-rewrite của Qwen thật**. Dev-case gate trên model nội bộ được giữ cho Batch D khi endpoint khả dụng.
+rewrite của Qwen thật**. Dev-case gate trên model nội bộ chỉ chạy khi endpoint khả dụng.
 
 Chạy riêng checkpoint Batch C:
 
@@ -151,14 +153,14 @@ uv run python scripts/smoke_gateway.py `
 Build và chạy Docker image versioned:
 
 ```powershell
-docker build --build-arg APP_VERSION=0.1.0 -t kira-context:0.1.0 .
-docker run -d --name kira-context --env-file .env -p 8000:8000 kira-context:0.1.0
+docker build --build-arg APP_VERSION=0.2.0 -t kira-context:0.2.0 .
+docker run -d --name kira-context-v2 --env-file .env -p 8000:8000 kira-context:0.2.0
 docker ps --filter "name=kira-context"
 ```
 
 ## Gateway API baseline
 
-`POST /chat` nhận current query, chưa thêm recent context, memory hoặc query rewriting:
+`POST /chat` giữ request contract cũ, nội bộ bổ sung bounded recent context và query rewriting:
 
 ```json
 {
@@ -174,7 +176,26 @@ schema với HTTP 502; timeout trả HTTP 504.
 
 - `GET /health`: liveness của process.
 - `GET /ready`: dependency graph local đã khởi tạo; không probe KiRa. PostgreSQL connection
-  outage tạm thời là degraded capability, còn configuration/schema mismatch làm startup fail.
+  outage tạm thời là degraded capability. Configuration/schema mismatch làm startup fail;
+  nếu phát hiện mismatch lúc runtime, trả 503 đến khi schema được xác minh lại thành công.
+- `GET /metrics`: recent count/estimated tokens, rewrite latency/outcome, degradation và write outcome.
+
+Turn ID do Gateway sinh; client không được gửi `turn_id`/`user_id`. Chỉ persist khi downstream
+EOF bình thường và có assistant text; lưu original user query + exact concatenated assistant text.
+Không ghi partial turn khi lỗi hoặc disconnect được phát hiện. Write lỗi chỉ log/metric, không thêm
+`gateway_error` vào response đã trả text. Xem runbook về giới hạn durability/cancellation.
+
+`CONVERSATION_OPERATION_TIMEOUT_SECONDS=5` giới hạn tổng thời gian mỗi read/write (kể cả chờ pool).
+Để chạy ngay stack cô lập với mock KiRa/vLLM và DB thật:
+
+```powershell
+docker compose -f compose.week2-smoke.yaml build gateway
+docker compose -f compose.week2-smoke.yaml up -d --no-build
+```
+
+Docker Desktop hiển thị project `kira-context-week2`; Gateway ở `http://127.0.0.1:18000`.
+Các credential cố định của stack này chỉ dành cho dữ liệu tổng hợp local, không dùng production.
+Không copy tests/mock vào runtime image; Compose mount tests read-only cho hai mock services.
 
 ## Cấu trúc chính
 

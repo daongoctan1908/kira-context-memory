@@ -1,6 +1,8 @@
 import json
 from collections.abc import AsyncIterator
 
+import anyio
+import anyio.lowlevel
 import httpx
 import pytest
 
@@ -311,3 +313,24 @@ async def test_closing_iterator_before_first_event_closes_downstream_stream() ->
         await iterator.aclose()  # type: ignore[attr-defined]
 
     assert stream.closed
+
+
+async def test_cancel_scope_does_not_interrupt_http_connection_cleanup():
+    class CheckpointCloseStream(TrackingStream):
+        async def aclose(self):
+            await anyio.lowlevel.checkpoint()
+            self.closed = True
+
+    stream = CheckpointCloseStream(b"data: {}\n\n")
+
+    async def handler(request):
+        if request.url.path == "/authenticate":
+            return httpx.Response(200, json=auth_response(), request=request)
+        return httpx.Response(200, stream=stream, request=request)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        iterator = await KiraHttpAdapter(client, make_settings()).chat_stream("question")
+        with anyio.CancelScope() as scope:
+            scope.cancel()
+            await iterator.aclose()
+        assert stream.closed

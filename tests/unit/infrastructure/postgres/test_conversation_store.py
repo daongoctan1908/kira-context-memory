@@ -363,6 +363,8 @@ def test_sqlstate_helpers_detect_nested_configuration_and_connection_errors() ->
 
 def test_error_mapping_distinguishes_configuration_connection_and_operation() -> None:
     with pytest.raises(ConversationStoreConfigurationError):
+        PostgresConversationStoreAdapter._raise_mapped(SqlStateError("42703"))
+    with pytest.raises(ConversationStoreConfigurationError):
         PostgresConversationStoreAdapter._raise_mapped(SqlStateError("28P01"))
 
     connection_error = DBAPIError("statement", {}, SqlStateError("08006"), True)

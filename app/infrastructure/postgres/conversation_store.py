@@ -31,6 +31,7 @@ _CONFIGURATION_SQLSTATES = {
     "3D000",  # invalid catalog name
     "42501",  # insufficient privilege
     "42P01",  # undefined table
+    "42703",  # undefined column (runtime schema mismatch)
 }
 
 

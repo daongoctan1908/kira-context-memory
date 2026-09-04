@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager
 from typing import Any, Self
 
+import anyio
 import httpx
 
 from app.config.settings import Settings
@@ -197,7 +198,10 @@ class _KiraResponseStream(AsyncIterator[KiraStreamEvent]):
         if self._closed:
             return
         self._closed = True
-        await self._stream_context.__aexit__(None, None, None)
+        # ASGI disconnect cancels the surrounding AnyIO scope. Shield only release
+        # of the HTTP connection so cancellation cannot leak a checked-out stream.
+        with anyio.CancelScope(shield=True):
+            await self._stream_context.__aexit__(None, None, None)
 
 
 def _optional_number(value: object) -> float | None:

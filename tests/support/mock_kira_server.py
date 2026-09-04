@@ -2,12 +2,21 @@
 
 import asyncio
 import json
+from collections import deque
 from collections.abc import AsyncIterator
+from hashlib import sha256
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 app = FastAPI(title="Local KiRa Contract Stub")
+query_hashes: deque[str] = deque(maxlen=100)
+
+
+@app.get("/_test/requests")
+async def observed_requests() -> dict[str, object]:
+    """Test-only evidence, hashes of synthetic input instead of raw conversation text."""
+    return {"stub": "kira-week2-local-only", "query_hashes": list(query_hashes)}
 
 
 @app.post("/authenticate")
@@ -30,6 +39,7 @@ async def chat(request: Request) -> Response:
     payload = await request.json()
     if payload.get("token") != "local-runtime-token" or payload.get("stream") is not True:
         return JSONResponse(status_code=401, content={"status": "unauthorized"})
+    query_hashes.append(sha256(payload["message"]["text"].encode()).hexdigest())
 
     async def events() -> AsyncIterator[bytes]:
         frames = [

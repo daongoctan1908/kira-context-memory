@@ -25,6 +25,7 @@ def test_core_layers_do_not_import_infrastructure_frameworks() -> None:
         "fastapi",
         "httpx",
         "pydantic_settings",
+        "prometheus_client",
         "redis",
         "sqlalchemy",
     }

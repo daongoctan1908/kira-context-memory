@@ -1,0 +1,83 @@
+# Isolated, synthetic-only acceptance stack. Never reuse its credentials in production.
+name: kira-context-week2
+
+x-runtime: &runtime
+  image: kira-context:0.2.0
+
+services:
+  postgres:
+    image: postgres:16-bookworm
+    environment:
+      POSTGRES_DB: kira_smoke
+      POSTGRES_USER: kira
+      POSTGRES_PASSWORD: local-smoke-only
+    ports:
+      - "127.0.0.1:15432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kira -d kira_smoke"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  redis:
+    image: redis:7.2-bookworm
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "127.0.0.1:16379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  migrate:
+    <<: *runtime
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://kira:local-smoke-only@postgres:5432/kira_smoke
+    healthcheck:
+      disable: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  mock-kira:
+    <<: *runtime
+    command: ["uvicorn", "tests.support.mock_kira_server:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+    volumes:
+      - ./tests:/app/tests:ro
+    ports:
+      - "127.0.0.1:18122:8000"
+    healthcheck:
+      disable: true
+
+  mock-vllm:
+    <<: *runtime
+    command: ["uvicorn", "tests.support.mock_vllm_server:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+    volumes:
+      - ./tests:/app/tests:ro
+    healthcheck:
+      disable: true
+
+  gateway:
+    <<: *runtime
+    build:
+      context: .
+      args:
+        APP_VERSION: 0.2.0
+    environment:
+      KIRA_BASE_URL: http://mock-kira:8000
+      KIRA_USERNAME: local-smoke
+      KIRA_BASIC_AUTH: local-stub-credential
+      DATABASE_URL: postgresql+asyncpg://kira:local-smoke-only@postgres:5432/kira_smoke
+      VLLM_BASE_URL: http://mock-vllm:8000
+      VLLM_MODEL: local-contract-stub
+    ports:
+      - "127.0.0.1:18000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mock-kira:
+        condition: service_started
+      mock-vllm:
+        condition: service_started

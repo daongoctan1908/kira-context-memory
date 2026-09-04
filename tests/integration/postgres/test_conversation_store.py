@@ -3,6 +3,7 @@ import os
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+import httpx
 import pytest
 from alembic import command
 from alembic.config import Config
@@ -17,6 +18,12 @@ from app.infrastructure.postgres.schema import (
     conversation_messages,
     conversations,
 )
+from app.presentation.api.main import create_app
+from tests.integration.test_gateway_api import make_settings
+from tests.support.mock_kira_server import app as mock_kira_app
+from tests.support.mock_kira_server import query_hashes
+from tests.support.mock_vllm_server import app as mock_vllm_app
+from tests.support.week2_cases import CASES
 
 pytestmark = pytest.mark.postgres_integration
 
@@ -252,3 +259,76 @@ async def test_malformed_persisted_schema_maps_to_protocol_error(
 
     with pytest.raises(ConversationStoreProtocolError):
         await PostgresConversationStoreAdapter(engine).read_recent(session_id, 10)
+
+
+@pytest.mark.parametrize("case", CASES, ids=lambda case: case.name)
+async def test_full_flow_with_real_postgres_and_mock_http_adapters(engine, session_id, case):
+    """Fixture-driven plumbing gate, not an evaluation of real Qwen semantics."""
+    from hashlib import sha256
+
+    settings = make_settings().model_copy(
+        update={
+            "kira_username": "local-smoke",
+            "vllm_model": "local-contract-stub",
+        }
+    )
+    async with (
+        httpx.AsyncClient(transport=httpx.ASGITransport(app=mock_kira_app)) as kira_http,
+        httpx.AsyncClient(transport=httpx.ASGITransport(app=mock_vllm_app)) as vllm_http,
+    ):
+        # Rebuild the Gateway between requests: history must survive in PostgreSQL.
+        for query in (case.previous, case.current):
+            app = create_app(
+                settings=settings,
+                http_client=kira_http,
+                rewriter_http_client=vllm_http,
+                postgres_engine=engine,
+            )
+            async with (
+                app.router.lifespan_context(app),
+                httpx.AsyncClient(
+                    transport=httpx.ASGITransport(app=app),
+                    base_url="http://gateway.test",
+                ) as client,
+            ):
+                response = await client.post(
+                    "/chat", json={"session_id": session_id, "message": query}
+                )
+                assert response.status_code == 200
+                assert "gateway_error" not in response.text
+                assert (await client.get("/ready")).status_code == 200
+                metrics = (await client.get("/metrics")).text
+        assert 'kira_context_rewrite_total{outcome="success"} 1.0' in metrics
+        assert query_hashes[-1] == sha256(case.expected.encode()).hexdigest()
+    recent = await PostgresConversationStoreAdapter(engine).read_recent(session_id, 10)
+    assert [message.content for message in recent] == [
+        case.previous,
+        "Mock KiRa answer",
+        case.current,
+        "Mock KiRa answer",
+    ]
+    assert recent[0].turn_id == recent[1].turn_id != recent[2].turn_id == recent[3].turn_id
+
+
+async def test_cancellation_rolls_back_inflight_turn_and_allows_next_write(engine, session_id):
+    adapter = PostgresConversationStoreAdapter(engine)
+    locked = asyncio.Event()
+    original_lock = adapter._lock_conversation
+
+    async def paused_lock(connection, requested_session):
+        result = await original_lock(connection, requested_session)
+        locked.set()
+        await asyncio.Event().wait()
+        return result
+
+    adapter._lock_conversation = paused_lock
+    task = asyncio.create_task(_append(adapter, session_id, 1))
+    await asyncio.wait_for(locked.wait(), 5)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert await adapter.read_recent(session_id, 10) == ()
+    adapter._lock_conversation = original_lock
+    async with asyncio.timeout(5):
+        assert await _append(adapter, session_id, 2)
+    assert len(await adapter.read_recent(session_id, 10)) == 2

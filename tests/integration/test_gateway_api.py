@@ -11,7 +11,7 @@ from app.domain.errors.conversation import ConversationStoreConfigurationError
 from app.domain.errors.kira import KiraHttpError, KiraTimeoutError
 from app.domain.models.conversation import ConversationMessage
 from app.domain.models.kira import KiraAuthResult, KiraEventKind, KiraStreamEvent
-from app.infrastructure.postgres import PostgresConversationStoreAdapter
+from app.infrastructure.postgres.managed_store import ManagedPostgresConversationStore
 from app.infrastructure.postgres.schema import EXPECTED_SCHEMA_REVISION
 from app.presentation.api.main import create_app
 
@@ -22,6 +22,8 @@ def make_settings() -> Settings:
         kira_base_url="http://kira.test:8122",
         kira_username="service-account",
         kira_basic_auth="basic-credential",
+        vllm_base_url="http://rewriter.test",
+        vllm_model="test-model",
     )
 
 
@@ -220,7 +222,7 @@ async def test_postgres_is_the_default_conversation_store() -> None:
     )
 
     async with app.router.lifespan_context(app):
-        assert isinstance(app.state.conversation_store, PostgresConversationStoreAdapter)
+        assert isinstance(app.state.conversation_store, ManagedPostgresConversationStore)
         assert app.state.postgres_status == "available"
 
 

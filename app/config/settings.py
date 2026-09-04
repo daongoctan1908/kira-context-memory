@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     postgres_pool_timeout_seconds: float = Field(default=2.0, gt=0)
     postgres_connect_timeout_seconds: float = Field(default=2.0, gt=0)
     postgres_command_timeout_seconds: float = Field(default=5.0, gt=0)
+    conversation_operation_timeout_seconds: float = Field(default=5.0, gt=0)
 
     redis_url: Secret[RedisDsn] | None = None
     redis_max_connections: int = Field(default=20, ge=1)
