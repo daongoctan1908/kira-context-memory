@@ -15,8 +15,6 @@ def test_settings_read_kira_values_from_environment(monkeypatch) -> None:
         "postgresql+asyncpg://gateway:db-secret@postgres.test.internal:5432/kira",
     )
     monkeypatch.setenv("POSTGRES_POOL_SIZE", "12")
-    monkeypatch.setenv("REDIS_URL", "redis://redis.test.internal:6379/2")
-    monkeypatch.setenv("REDIS_SESSION_TTL_SECONDS", "7200")
     monkeypatch.setenv("MAX_RECENT_MESSAGES", "8")
 
     settings = Settings()
@@ -28,9 +26,6 @@ def test_settings_read_kira_values_from_environment(monkeypatch) -> None:
     assert settings.kira_connect_timeout_seconds == 2.5
     assert settings.database_url is not None
     assert settings.postgres_pool_size == 12
-    assert settings.redis_url is not None
-    assert str(settings.redis_url.get_secret_value()) == "redis://redis.test.internal:6379/2"
-    assert settings.redis_session_ttl_seconds == 7200
     assert settings.max_recent_messages == 8
     assert isinstance(settings.kira_basic_auth, SecretStr)
     assert settings.kira_basic_auth.get_secret_value() == "top-secret"
@@ -56,12 +51,6 @@ def test_settings_have_safe_baseline_defaults(monkeypatch) -> None:
     assert settings.postgres_pool_timeout_seconds == 2.0
     assert settings.postgres_connect_timeout_seconds == 2.0
     assert settings.postgres_command_timeout_seconds == 5.0
-    assert settings.redis_url is None
-    assert settings.redis_max_connections == 20
-    assert settings.redis_connect_timeout_seconds == 1.0
-    assert settings.redis_read_timeout_seconds == 1.0
-    assert settings.redis_health_check_interval_seconds == 30
-    assert settings.redis_session_ttl_seconds == 86400
     assert settings.max_recent_messages == 10
     assert settings.recent_context_token_budget == 3000
     assert settings.vllm_base_url is None
@@ -70,17 +59,6 @@ def test_settings_have_safe_baseline_defaults(monkeypatch) -> None:
     assert settings.vllm_connect_timeout_seconds == 2.0
     assert settings.vllm_read_timeout_seconds == 8.0
     assert settings.vllm_max_output_chars == 2048
-
-
-def test_settings_hide_redis_credentials_from_repr(monkeypatch) -> None:
-    monkeypatch.setenv("KIRA_BASE_URL", "http://127.0.0.1:8122")
-    monkeypatch.setenv("KIRA_USERNAME", "service-account")
-    monkeypatch.setenv("KIRA_BASIC_AUTH", "secret")
-    monkeypatch.setenv("REDIS_URL", "redis://:redis-password@127.0.0.1:6379/0")
-
-    settings = Settings()
-
-    assert "redis-password" not in repr(settings)
 
 
 def test_settings_hide_postgres_credentials_from_repr(monkeypatch) -> None:

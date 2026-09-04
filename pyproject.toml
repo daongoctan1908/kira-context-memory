@@ -17,7 +17,6 @@ dependencies = [
     "prometheus-client>=0.21,<1.0",
     "pydantic>=2.10,<3.0",
     "pydantic-settings>=2.7,<3.0",
-    "redis>=5,<7",
     "sqlalchemy[asyncio]>=2.0,<2.1",
     "uvicorn[standard]>=0.34,<1.0",
 ]
@@ -40,7 +39,6 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
     "postgres_integration: requires POSTGRES_TEST_URL pointing to a disposable PostgreSQL database",
-    "redis_integration: requires REDIS_TEST_URL pointing to a disposable Redis database",
 ]
 
 [tool.ruff]

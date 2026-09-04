@@ -14,16 +14,3 @@ services:
       timeout: 3s
       retries: 10
       start_period: 5s
-
-  redis:
-    image: redis:7.2-bookworm
-    container_name: kira-context-redis
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 5s

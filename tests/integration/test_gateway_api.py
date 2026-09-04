@@ -186,9 +186,8 @@ async def test_ready_is_503_before_lifespan_initialization() -> None:
 
 async def test_postgres_startup_failure_keeps_gateway_ready_in_degraded_mode() -> None:
     settings = make_settings()
-    settings_with_redis = settings.model_copy(update={"redis_url": "redis://127.0.0.1:6379/0"})
     app = create_app(
-        settings=settings_with_redis,
+        settings=settings,
         kira_client=FakeKiraClient(),
         postgres_engine=UnavailablePostgresEngine(),  # type: ignore[arg-type]
     )
@@ -213,7 +212,7 @@ async def test_missing_postgres_configuration_fails_startup() -> None:
 
 
 async def test_postgres_is_the_default_conversation_store() -> None:
-    settings = make_settings().model_copy(update={"redis_url": "redis://127.0.0.1:6379/0"})
+    settings = make_settings()
     engine = AvailablePostgresEngine()
     app = create_app(
         settings=settings,

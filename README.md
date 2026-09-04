@@ -2,7 +2,7 @@
 
 Context Gateway bổ sung ngữ cảnh hội thoại cho KiRa. Repository được tổ chức theo
 Modular Service Architecture và Hexagonal Architecture để application/domain không phụ
-thuộc trực tiếp vào FastAPI, HTTPX, Redis, Mem0 hoặc vLLM.
+thuộc trực tiếp vào FastAPI, HTTPX, PostgreSQL SDK hoặc vLLM.
 
 ## Trạng thái
 
@@ -17,17 +17,14 @@ Batch A-D của Tuần 2 tích hợp short-term context qua PostgreSQL và vLLM:
 - token cache concurrency-safe và parser cho KiRa `data:` frames;
 - `HandleChatUseCase`, FastAPI `POST /chat`, SSE proxy và health/readiness probes;
 - Docker image non-root, automated test gate và manual smoke client.
-- `ConversationStorePort` và message schema version 1 độc lập Redis SDK;
-- Redis connection pool với timeout/health handling theo degraded policy;
-- atomic append user/assistant, `turn_id` dedup, bounded 10-message window và sliding TTL.
+- `ConversationStorePort` và message schema version 1 độc lập database SDK;
 - PostgreSQL source of truth với migration, transactional pair append, deterministic ordering
-  và indexed recent read;
-- Redis adapter được giữ làm optional cache candidate, không được Gateway chọn mặc định.
+  và indexed recent read, dedup theo `turn_id`;
 - ContextBuilder, estimated token budget, QueryRewriterPort, prompt v1 và vLLM HTTP adapter;
 - `/chat` đọc recent từ PostgreSQL → rewrite → KiRa SSE → lưu completed turn;
 - fallback original query, structured logs an toàn và Prometheus `/metrics`.
 
-PostgreSQL/Redis integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
+PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem
 [Week 2 runbook và evidence](docs/week2-acceptance.md).
 
@@ -77,27 +74,8 @@ Remove-Item Env:POSTGRES_TEST_URL
 Gateway không tự chạy migration. Cấu hình hoặc schema sai làm startup fail; connection timeout
 tạm thời chỉ đặt PostgreSQL ở degraded state và `/ready` vẫn trả 200.
 
-Khởi động Redis 7.2 local và chạy integration test cho optional adapter:
-
-```powershell
-docker compose up -d redis
-$env:REDIS_TEST_URL="redis://127.0.0.1:6379/15"
-uv run pytest -m redis_integration --no-cov
-Remove-Item Env:REDIS_TEST_URL
-```
-
-Test dùng key prefix ngẫu nhiên và chỉ dọn các key do chính test tạo; không `FLUSHDB`.
-
-Redis recent store dùng các key cùng cluster hash slot:
-
-```text
-kira:session:{session_id}:messages
-kira:session:{session_id}:seen_turns
-```
-
-`REDIS_SESSION_TTL_SECONDS`, `MAX_RECENT_MESSAGES` và pool/timeouts lấy từ environment.
-Redis không được wire vào Gateway dù `REDIS_URL` có cấu hình. PostgreSQL là source of truth;
-recent window không xóa full history và không có inactivity TTL như Redis.
+PostgreSQL là conversation store duy nhất. Recent window không xóa full history và không có
+inactivity TTL; `MAX_RECENT_MESSAGES` và token budget chỉ giới hạn context gửi tới rewriter.
 
 ## Context Builder và Query Rewriter (Week 2 Batch C)
 

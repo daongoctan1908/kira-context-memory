@@ -19,17 +19,6 @@ services:
       timeout: 2s
       retries: 20
 
-  redis:
-    image: redis:7.2-bookworm
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
-    ports:
-      - "127.0.0.1:16379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 2s
-      timeout: 2s
-      retries: 20
-
   migrate:
     <<: *runtime
     command: ["alembic", "upgrade", "head"]

@@ -4,18 +4,19 @@
 
 `POST /chat → PostgreSQL recent → ContextBuilder → vLLM rewrite → KiRa SSE → PostgreSQL completed turn`
 
-- Batch A Redis (`8d6497d`) giữ nguyên adapter/config/schema/Lua và regression tests;
-  không được wire vào Gateway, không có auto-switch sang Redis khi PostgreSQL lỗi.
+- Redis Batch A đã được gỡ theo quyết định bỏ adapter không sử dụng: code, dependency,
+  config, Compose service và các test riêng. Implementation cũ vẫn có trong commit `8d6497d`.
+  PostgreSQL là conversation store duy nhất; không tự chuyển sang cache khác khi DB lỗi.
 - Batch B PostgreSQL (`542d177`) giữ schema/migration, indexed recent read, transactional pair,
   dedup và full persistent history. Thêm wrapper quản lý runtime health/schema ở Batch D.
 - Batch C (`7c9d64c`) giữ ContextBuilder, estimator, rewriter port/prompt/HTTP contract.
 - Batch D nối orchestration, persistence-on-completion, degraded paths, metrics và E2E.
-- Không thêm Mem0/LTM, exact tokenizer, full-history API, queue, Redis Stream hoặc worker logic.
+- Không thêm Mem0/LTM, exact tokenizer, full-history API, queue hoặc worker logic.
 
 ## Invariants và giới hạn
 
 - Recent mặc định 10 messages, 3.000 **estimated** tokens; current query không tính vào budget.
-  PostgreSQL không trim/xóa history khi đọc. Redis TTL không áp dụng cho PostgreSQL.
+  PostgreSQL không trim/xóa history khi đọc và không áp dụng inactivity TTL.
 - History rỗng hoặc bị loại hết bởi budget thì không gọi rewriter. Read/rewrite lỗi dùng current
   query nguyên bản. Không có answer fallback: KiRa lỗi vẫn trả typed JSON/SSE Week 1.
 - Original query là message sau validation API sẵn có (strip outer whitespace); không phải rewrite.
@@ -75,21 +76,19 @@ docker compose -f compose.week2-smoke.yaml up -d --no-build
 docker compose -f compose.week2-smoke.yaml ps
 
 $env:POSTGRES_TEST_URL="postgresql+asyncpg://kira:local-smoke-only@127.0.0.1:15432/kira_smoke"
-$env:REDIS_TEST_URL="redis://127.0.0.1:16379/15"
 uv run ruff check .
 uv run ruff format --check .
 uv run pytest
 uv run python -m scripts.smoke_week2
 Remove-Item Env:POSTGRES_TEST_URL
-Remove-Item Env:REDIS_TEST_URL
 ```
 
 Gateway: `http://127.0.0.1:18000`; `/health`, `/ready`, `/metrics` và `/docs` có thể mở trên máy.
 Container `migrate` exit 0 là bình thường: đây là one-shot job, không phải service bị crash.
 Mock servers chỉ mount tests read-only trong Compose; image runtime không chứa tests/.env/.git/cache.
 
-Test DB URL phải trỏ DB dành riêng để kiểm thử. Tests apply migration rồi chỉ xóa những session/key
-ngẫu nhiên của chính test; không `FLUSHDB` hoặc truncate conversation của người dùng.
+Test DB URL phải trỏ DB dành riêng để kiểm thử. Tests apply migration rồi chỉ xóa những session
+ngẫu nhiên của chính test; không truncate conversation của người dùng.
 Smoke client cũng chỉ dọn sessions do nó vừa tạo; evidence in ra case ID/outcome/count, không content.
 Dừng stack mà không xóa dữ liệu/container:
 
@@ -124,7 +123,7 @@ uv run python scripts/smoke_gateway.py --session-id approved-dev-session --messa
 uv run python scripts/smoke_gateway.py --session-id approved-dev-session --message "<approved follow-up>"
 ```
 
-## Evidence local — 2026-09-04
+## Evidence local Batch D — 2026-09-04 (trước khi gỡ Redis)
 
 - Ruff lint/format: pass.
 - PostgreSQL 16 + Redis 7.2 thật, full pytest: **280 pass, 0 skip; coverage 97,53%**.
@@ -135,3 +134,30 @@ uv run python scripts/smoke_gateway.py --session-id approved-dev-session --messa
 - Cancellation rollback trên PG thật, dedup/order/index/persistence và Redis regression pass.
 - KiRa Test/Qwen nội bộ thật: **NOT RUN** — cần endpoint/model/credential và route nội bộ.
   Local checkpoint hoàn tất không đồng nghĩa gate nội bộ đã đạt.
+
+## Checkpoint gỡ Redis — 2026-09-04
+
+- Không còn Redis adapter, dependency, settings hoặc Compose service. Port/message models,
+  PostgreSQL persistence, context budget và SSE contract được giữ nguyên.
+- Full pytest với PostgreSQL thật: **248 pass, 0 skip; coverage 97,80%**. Các test riêng của
+  adapter đã gỡ không còn chạy; evidence 280 tests phía trên thuộc checkpoint Batch D cũ.
+- Ruff lint/format pass; image `kira-context:0.2.0` đã rebuild không cài Redis SDK.
+- Các lệnh xóa Docker/cache local bị môi trường thực thi chặn. Hai container Redis cũ và
+  anonymous volumes chưa bị xóa; không có dữ liệu PostgreSQL nào bị dọn. Compose có thể cảnh báo
+  orphan Redis cho đến khi người vận hành thực hiện cleanup thủ công.
+- Code đã xóa có thể khôi phục từ Git (`8d6497d` hoặc checkpoint trước khi gỡ).
+
+Đã xác minh hai container dưới đây thuộc workspace này; volume không dùng chung với container
+khác, cấu hình tắt persistence và instance đang chạy không có key tại thời điểm kiểm tra.
+Lệnh thủ công sau chỉ dọn Redis local của KiRa, bao gồm anonymous volumes (không thể khôi phục
+cache sau khi xóa); không dùng system/volume prune:
+
+```powershell
+docker stop kira-context-week2-redis-1
+docker rm -v kira-context-redis kira-context-week2-redis-1
+docker image rm redis:7.2-bookworm
+```
+
+Ba thư mục đã hết source nhưng còn cache `.pyc` bị Git ignore: `app/infrastructure/redis`,
+`tests/unit/infrastructure/redis`, `tests/integration/redis`. Có thể xóa các thư mục cache này
+thủ công trong workspace; chúng không được đưa vào runtime image.

@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import AnyHttpUrl, Field, PostgresDsn, RedisDsn, Secret, SecretStr
+from pydantic import AnyHttpUrl, Field, PostgresDsn, Secret, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -37,14 +37,7 @@ class Settings(BaseSettings):
     postgres_command_timeout_seconds: float = Field(default=5.0, gt=0)
     conversation_operation_timeout_seconds: float = Field(default=5.0, gt=0)
 
-    redis_url: Secret[RedisDsn] | None = None
-    redis_max_connections: int = Field(default=20, ge=1)
-    redis_connect_timeout_seconds: float = Field(default=1.0, gt=0)
-    redis_read_timeout_seconds: float = Field(default=1.0, gt=0)
-    redis_health_check_interval_seconds: int = Field(default=30, ge=0)
-    redis_session_ttl_seconds: int = Field(default=86400, ge=1)
     max_recent_messages: int = Field(default=10, ge=2, multiple_of=2)
-
     recent_context_token_budget: int = Field(default=3000, ge=1)
     vllm_base_url: AnyHttpUrl | None = None
     vllm_model: str | None = Field(default=None, min_length=1)
