@@ -44,6 +44,14 @@ class Settings(BaseSettings):
     redis_session_ttl_seconds: int = Field(default=86400, ge=1)
     max_recent_messages: int = Field(default=10, ge=2, multiple_of=2)
 
+    recent_context_token_budget: int = Field(default=3000, ge=1)
+    vllm_base_url: AnyHttpUrl | None = None
+    vllm_model: str | None = Field(default=None, min_length=1)
+    vllm_api_key: SecretStr | None = None
+    vllm_connect_timeout_seconds: float = Field(default=2.0, gt=0)
+    vllm_read_timeout_seconds: float = Field(default=8.0, gt=0)
+    vllm_max_output_chars: int = Field(default=2048, ge=1)
+
     app_host: str = Field(default="0.0.0.0", min_length=1)
     app_port: int = Field(default=8000, ge=1, le=65535)
     app_log_level: Literal["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"] = "INFO"

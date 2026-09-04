@@ -7,7 +7,7 @@ thuộc trực tiếp vào FastAPI, HTTPX, Redis, Mem0 hoặc vLLM.
 ## Trạng thái
 
 Batch A-D của Tuần 1 cung cấp Gateway baseline hoàn chỉnh để live smoke với KiRa Test.
-Batch A-B của Tuần 2 bổ sung Redis adapter và PostgreSQL durable conversation store:
+Batch A-C của Tuần 2 bổ sung conversation infrastructure và các component rewrite độc lập:
 
 - cấu trúc presentation, application, domain, infrastructure, config và worker;
 - dependency/tooling bằng Python 3.11, `uv`, Ruff và pytest;
@@ -23,6 +23,8 @@ Batch A-B của Tuần 2 bổ sung Redis adapter và PostgreSQL durable conversa
 - PostgreSQL source of truth với migration, transactional pair append, deterministic ordering
   và indexed recent read;
 - Redis adapter được giữ làm optional cache candidate, không được Gateway chọn mặc định.
+- ContextBuilder, estimated token budget, QueryRewriterPort, prompt v1 và vLLM HTTP adapter;
+  chưa tích hợp các component này vào `/chat` (phần đó thuộc Batch D).
 
 Automated test dùng mock transport vì laptop cá nhân không có route tới KiRa Test. T1.18 chỉ
 được xác nhận sau khi chạy [live smoke runbook](docs/week1-smoke-test.md) trên PC công ty.
@@ -65,7 +67,7 @@ docker compose up -d postgres
 $env:DATABASE_URL="postgresql+asyncpg://kira:replace_me@127.0.0.1:5432/kira_context"
 uv run alembic upgrade head
 $env:POSTGRES_TEST_URL=$env:DATABASE_URL
-uv run pytest -m postgres_integration
+uv run pytest -m postgres_integration --no-cov
 Remove-Item Env:POSTGRES_TEST_URL
 ```
 
@@ -78,7 +80,7 @@ Khởi động Redis 7.2 local và chạy integration test cho optional adapter:
 ```powershell
 docker compose up -d redis
 $env:REDIS_TEST_URL="redis://127.0.0.1:6379/15"
-uv run pytest -m redis_integration
+uv run pytest -m redis_integration --no-cov
 Remove-Item Env:REDIS_TEST_URL
 ```
 
@@ -94,6 +96,43 @@ kira:session:{session_id}:seen_turns
 `REDIS_SESSION_TTL_SECONDS`, `MAX_RECENT_MESSAGES` và pool/timeouts lấy từ environment.
 Redis không được wire vào Gateway dù `REDIS_URL` có cấu hình. Batch B mới chỉ cung cấp
 PostgreSQL infrastructure; `HandleChatUseCase` sẽ đọc/ghi conversation ở Batch D.
+
+## Context Builder và Query Rewriter (Week 2 Batch C)
+
+- `ContextBuilder` nhận history đã được store sắp xếp cũ → mới, không sort lại timestamp.
+- Giữ tối đa `MAX_RECENT_MESSAGES` (mặc định 10) và `RECENT_CONTEXT_TOKEN_BUDGET` (3.000).
+  Bỏ orphan assistant ở đầu window và loại turn cũ nhất theo nguyên nhóm; không truncate text.
+- Estimator là `ceil(UTF-8 bytes / 4) + 8/message`, không phải số token Qwen chính xác.
+  Current query và system prompt không tính vào recent budget; current query không bị sửa/trim.
+- Prompt v1 tách system instructions khỏi JSON recent/current untrusted data. Chỉ rewrite;
+  explicit current query thắng context, không invent KPI/date/location/service, giữ nguyên query
+  standalone/topic switch và phần reference chưa resolve được.
+- `VllmQueryRewriterAdapter` dùng HTTPX client do caller quản lý và không tự retry.
+  Contract là [vLLM Chat Completions](https://docs.vllm.ai/en/latest/serving/online_serving/openai_compatible_server/):
+  `POST /v1/chat/completions`, `temperature=0`, `stream=false`, `max_tokens=256`.
+- Khi tạo adapter cần `VLLM_BASE_URL` và `VLLM_MODEL` đúng tên model được serve; không có model
+  hardcode. Base URL chấp nhận origin hoặc kết thúc bằng `/v1`. `VLLM_API_KEY` tùy chọn.
+  Connect/read timeout mặc định 2s/8s; giới hạn output `VLLM_MAX_OUTPUT_CHARS=2048`.
+- Timeout/connection/non-2xx/malformed output được map thành typed errors. Empty, oversized,
+  truncated (`finish_reason=length`) hoặc tool-call response bị từ chối. Adapter không log dữ liệu.
+
+Batch C không khởi tạo vLLM ở startup, không đổi `/chat`, SSE hoặc `/ready`. Settings vLLM có thể
+để trống đến khi wiring Batch D. QueryRewriterPort không tự thực hiện fallback; đó là trách nhiệm
+orchestration ở Batch D.
+
+Test prompt bao phủ location/time/metric/reference/comparison, standalone, topic switch và
+injection trong recent data. Đây là unit/HTTP contract tests với mock, **không chứng minh chất lượng
+rewrite của Qwen thật**. Dev-case gate trên model nội bộ được giữ cho Batch D khi endpoint khả dụng.
+
+Chạy riêng checkpoint Batch C:
+
+```powershell
+uv run pytest tests/unit/application tests/contract/llm --no-cov
+```
+
+`--no-cov` chỉ dành cho focused test subset; full `uv run pytest` vẫn bắt buộc coverage ≥90%.
+
+### Chạy Gateway
 
 Chạy Gateway sau khi đã cấu hình `.env`:
 

@@ -16,6 +16,14 @@ from app.domain.errors.kira import (
     KiraProtocolError,
     KiraTimeoutError,
 )
+from app.domain.errors.query_rewriter import (
+    QueryRewriterConfigurationError,
+    QueryRewriterConnectionError,
+    QueryRewriterError,
+    QueryRewriterHttpError,
+    QueryRewriterProtocolError,
+    QueryRewriterTimeoutError,
+)
 
 __all__ = [
     "ConversationStoreConfigurationError",
@@ -30,4 +38,10 @@ __all__ = [
     "KiraMalformedSseError",
     "KiraProtocolError",
     "KiraTimeoutError",
+    "QueryRewriterConfigurationError",
+    "QueryRewriterConnectionError",
+    "QueryRewriterError",
+    "QueryRewriterHttpError",
+    "QueryRewriterProtocolError",
+    "QueryRewriterTimeoutError",
 ]
