@@ -12,6 +12,8 @@ WORKDIR /app
 
 COPY --from=uv /uv /uvx /bin/
 COPY pyproject.toml uv.lock README.md ./
+COPY packages/viettel-mem0/pyproject.toml packages/viettel-mem0/README.md packages/viettel-mem0/LICENSE ./packages/viettel-mem0/
+COPY packages/viettel-mem0/mem0 ./packages/viettel-mem0/mem0
 COPY app ./app
 COPY alembic.ini ./
 COPY migrations ./migrations
