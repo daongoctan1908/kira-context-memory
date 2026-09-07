@@ -7,8 +7,11 @@ call `Memory.add()` and cannot write to pgvector. The gate sends the exact Mem0 
 prompt sections, and KiRa `custom_instructions` to the configured OpenAI-compatible memory model,
 then scores only its JSON response in memory.
 
-- Policy version: `kira-memory-policy-v1`.
-- Evaluation corpus version: `kira-memory-policy-eval-v1`.
+- Policy version: `kira-memory-policy-v2`.
+- Evaluation corpus version: `kira-memory-policy-eval-v2`.
+- Source handling follows native Mem0 V3: user and assistant messages can both contribute durable
+  information. The policy preserves attribution instead of requiring every detail to be repeated
+  in a user message.
 - Every model call uses `temperature=0`, `stream=false`, and JSON response mode.
 - Conversation messages occur before the custom policy in the generated prompt. The policy occurs
   before the output marker, and explicitly wins over conflicting general Mem0 guidance.
@@ -19,7 +22,7 @@ then scores only its JSON response in memory.
 
 ## Acceptance matrix
 
-The corpus contains 17 completed synthetic conversations.
+The corpus contains 18 completed synthetic conversations.
 
 | Dimension | Required behavior |
 | --- | --- |
@@ -29,7 +32,8 @@ The corpus contains 17 completed synthetic conversations.
 | `USER_DEFINED_CONVENTION` | Store the user convention and preserve names such as `MTD`. |
 | `TEMPORARY_FOCUS` | Store the focus together with its explicit validity window. |
 | `EPISODIC_ANALYSIS_CONTEXT` | Store only an analytical conclusion explicitly confirmed by the user. |
-| Assistant-reference confirmation | Use assistant content only after an explicit user confirmation. |
+| Assistant-reference confirmation | Resolve the adopted proposal without requiring the user to repeat its details. |
+| Confirmed assistant threshold | Preserve `threshold = 10%` when the user answers `Đúng`. |
 | Mixed context and query | Keep the explicit user context but exclude ordinary query entities/time. |
 | Greeting/filler | Extract no memory. |
 | Ordinary query entity | Extract no memory. |
@@ -43,9 +47,9 @@ The corpus contains 17 completed synthetic conversations.
 
 All cases must pass. In addition to the expected fact-count range, the scorer checks required
 semantic terms, case-sensitive formula/name fragments, accepted source-form or ISO dates,
-forbidden query contamination, absence of taxonomy prefixes/metadata, and user-only attribution.
-A malformed OpenAI or Mem0 JSON envelope is a dependency/protocol failure, not a passing negative
-case.
+forbidden query contamination, absence of taxonomy prefixes/metadata, and valid native V3 source
+attribution (`user` or `assistant`). A malformed OpenAI or Mem0 JSON envelope is a
+dependency/protocol failure, not a passing negative case.
 
 ## Commands
 
@@ -62,7 +66,7 @@ optional `MEMORY_LLM_API_KEY`, and `MEMORY_OPERATION_TIMEOUT_SECONDS`:
 
 ```powershell
 uv run python -m scripts.check_live_memory_policy `
-  --report artifacts/memory-policy-eval-v1.json
+  --report artifacts/memory-policy-eval-v2.json
 ```
 
 One case can be isolated without changing the corpus:
@@ -104,12 +108,12 @@ ADD-only adapter contract; well-formed lifecycle outcomes remain provider-owned.
 ## Local checkpoint evidence — 2026-09-07
 
 - Ruff lint and format checks pass.
-- B1/B2 policy, scorer, adapter, and pristine-contract gate: 51 passed; the real-model test was
+- B1/B2 policy, scorer, adapter, and pristine-contract gate: 53 passed; the real-model test was
   skipped because no memory LLM endpoint/model is configured on this host.
-- Full repository suite: 311 passed, 17 environment-gated tests skipped; coverage 91.63%.
+- Full repository suite: 313 passed, 17 environment-gated tests skipped; coverage 91.63%.
 - PostgreSQL/pgvector integration suite against the isolated synthetic database: 16 passed.
 - Internal Mem0 pgvector provider suite: 91 passed.
 - Docker image `kira-context:0.3.0` rebuilds successfully and contains the precedence-hardened
-  policy v1; the dev-only evaluator and synthetic cases remain outside the runtime image.
-- Real Qwen/vLLM semantic gate: **NOT RUN**. B2 is not accepted for deployment until all 17 cases
+  policy v2; the dev-only evaluator and synthetic cases remain outside the runtime image.
+- Real Qwen/vLLM semantic gate: **NOT RUN**. B2 is not accepted for deployment until all 18 cases
   pass against the approved internal model deployment.

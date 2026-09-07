@@ -9,7 +9,8 @@ thuộc trực tiếp vào FastAPI, HTTPX, PostgreSQL SDK hoặc vLLM.
 Batch A-D của Tuần 1 cung cấp Gateway baseline hoàn chỉnh để live smoke với KiRa Test.
 Batch A-D của Tuần 2 tích hợp short-term context qua PostgreSQL và vLLM. Tuần 3
 Batch A1 bổ sung identity/user scope và nền tảng Mem0/pgvector; Batch B1-B2 thêm taxonomy policy
-versioned cùng synthetic acceptance gate cho memory extraction. LTM vẫn chưa được wire vào `/chat`:
+versioned theo native Mem0 V3 dual-source cùng synthetic acceptance gate cho memory extraction.
+LTM vẫn chưa được wire vào `/chat`:
 
 - cấu trúc presentation, application, domain, infrastructure, config và worker;
 - dependency/tooling bằng Python 3.11, `uv`, Ruff và pytest;

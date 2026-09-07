@@ -5,8 +5,8 @@ from app.application.services.memory_policy import (
 )
 
 
-def test_memory_policy_v1_has_the_approved_taxonomy() -> None:
-    assert MEMORY_POLICY_VERSION == "kira-memory-policy-v1"
+def test_memory_policy_v2_has_the_approved_taxonomy() -> None:
+    assert MEMORY_POLICY_VERSION == "kira-memory-policy-v2"
     assert MEMORY_TAXONOMY == (
         "USER_CONTEXT",
         "ANALYSIS_PREFERENCE",
@@ -24,18 +24,29 @@ def test_taxonomy_is_prompt_guidance_not_a_persisted_prefix() -> None:
     assert "do not emit taxonomy metadata" in MEMORY_EXTRACTION_INSTRUCTIONS.lower()
 
 
-def test_policy_requires_user_grounding_and_treats_assistant_as_context_only() -> None:
-    assert "grounded in explicit user-provided information" in MEMORY_EXTRACTION_INSTRUCTIONS
-    assert "Durable memories must be supported by user messages" in MEMORY_EXTRACTION_INSTRUCTIONS
-    assert "Assistant messages may only be used as context" in MEMORY_EXTRACTION_INSTRUCTIONS
-    assert "exists only in assistant messages" in MEMORY_EXTRACTION_INSTRUCTIONS
+def test_policy_preserves_native_mem0_v3_dual_source_handling() -> None:
+    assert "grounded in conversation evidence" in MEMORY_EXTRACTION_INSTRUCTIONS
+    assert (
+        "both user and assistant messages can contain extractable" in MEMORY_EXTRACTION_INSTRUCTIONS
+    )
+    assert "Preserve source attribution" in MEMORY_EXTRACTION_INSTRUCTIONS
+    assert (
+        "does not need to repeat the assistant's details verbatim" in MEMORY_EXTRACTION_INSTRUCTIONS
+    )
+    assert "Resolve references, confirmations, and ellipsis" in MEMORY_EXTRACTION_INSTRUCTIONS
+    assert (
+        "Durable memories must be supported by user messages" not in MEMORY_EXTRACTION_INSTRUCTIONS
+    )
+    assert (
+        "factual evidence exists only in assistant messages" not in MEMORY_EXTRACTION_INSTRUCTIONS
+    )
 
 
 def test_policy_rejects_unsafe_and_non_durable_memory_candidates() -> None:
     for excluded_content in (
         "greetings or filler",
         "entities that only appear in an ordinary query",
-        "KiRa/assistant-generated KPI values",
+        "transient KiRa/assistant-generated KPI values",
         "assistant guesses or inferred preferences",
         "passwords, tokens, credentials, or secrets",
         "inferred roles, permissions, or authorization",

@@ -35,7 +35,7 @@ def case(name: str):
 def test_acceptance_matrix_covers_taxonomy_and_negative_rules() -> None:
     validate_case_matrix()
 
-    assert len(CASES) == 17
+    assert len(CASES) == 18
     negative_tags = {
         tag for item in CASES if not item.expectation.should_extract for tag in item.tags
     }
@@ -74,12 +74,20 @@ def test_parse_memory_facts_matches_mem0_json_envelope() -> None:
         '{"memory": [{}]}',
         '{"memory": [{"text": "  "}]}',
         '{"memory": [{"text": "fact", "taxonomy": "USER_CONTEXT"}]}',
-        '{"memory": [{"text": "assistant fact", "attributed_to": "assistant"}]}',
+        '{"memory": [{"text": "fact", "attributed_to": "unknown"}]}',
     ),
 )
 def test_parse_memory_facts_rejects_malformed_provider_output(content: str) -> None:
     with pytest.raises(PolicyEvalProtocolError):
         parse_memory_facts(content)
+
+
+def test_parse_memory_facts_preserves_native_assistant_attribution() -> None:
+    content = (
+        '{"memory": [{"text": "Assistant proposed threshold = 10%", "attributed_to": "assistant"}]}'
+    )
+
+    assert parse_memory_facts(content) == ("Assistant proposed threshold = 10%",)
 
 
 def test_score_requires_exact_formula_and_rejects_query_contamination() -> None:
@@ -99,6 +107,14 @@ def test_score_requires_exact_formula_and_rejects_query_contamination() -> None:
     result = score_case(mixed_case, (contaminated,))
     assert result.passed is False
     assert result.reason_codes == ("forbidden_term",)
+
+
+def test_score_accepts_assistant_detail_adopted_by_explicit_user_confirmation() -> None:
+    confirmed_case = case("assistant_threshold_explicitly_confirmed")
+
+    accepted = "Assistant proposed threshold = 10%, and the user explicitly confirmed it."
+
+    assert score_case(confirmed_case, (accepted,)).passed is True
 
 
 def test_score_accepts_source_or_iso_date_but_requires_the_full_time_window() -> None:

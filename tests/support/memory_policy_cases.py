@@ -6,7 +6,7 @@ from typing import Literal
 
 from app.application.services.memory_policy import MEMORY_TAXONOMY
 
-MEMORY_POLICY_EVAL_VERSION = "kira-memory-policy-eval-v1"
+MEMORY_POLICY_EVAL_VERSION = "kira-memory-policy-eval-v2"
 
 
 @dataclass(frozen=True, slots=True)
@@ -205,6 +205,23 @@ CASES: tuple[MemoryPolicyCase, ...] = (
         ),
     ),
     MemoryPolicyCase(
+        name="assistant_threshold_explicitly_confirmed",
+        taxonomy="USER_DEFINED_CONVENTION",
+        tags=("positive", "assistant_context", "explicit_confirmation", "native_v3_source"),
+        messages=(
+            user("Tôi muốn chốt ngưỡng cảnh báo mặc định."),
+            assistant("Từ giờ threshold = 10% đúng không?"),
+            user("Đúng."),
+            assistant("Đã xác nhận ngưỡng mặc định."),
+        ),
+        expectation=PolicyExpectation(
+            True,
+            required_exact_fragments=("threshold = 10%",),
+            min_facts=1,
+            max_facts=1,
+        ),
+    ),
+    MemoryPolicyCase(
         name="mixed_explicit_context_and_ordinary_query",
         taxonomy="USER_CONTEXT",
         tags=("positive", "mixed_query_context"),
@@ -340,7 +357,12 @@ def validate_case_matrix(cases: tuple[MemoryPolicyCase, ...] = CASES) -> None:
         raise ValueError("negative cases do not cover every required exclusion")
 
     all_tags = {tag for case in cases for tag in case.tags}
-    for required_tag in ("formula_preservation", "explicit_confirmation", "mixed_query_context"):
+    for required_tag in (
+        "formula_preservation",
+        "explicit_confirmation",
+        "mixed_query_context",
+        "native_v3_source",
+    ):
         if required_tag not in all_tags:
             raise ValueError(f"policy cases are missing {required_tag}")
 

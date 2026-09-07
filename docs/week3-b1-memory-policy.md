@@ -1,5 +1,8 @@
 # Week 3 Batch B1 memory policy
 
+> Superseded by the native Mem0 V3 dual-source policy in Batch B2. The active policy and corpus
+> versions are documented in `docs/week3-b2-policy-evaluation.md`.
+
 ## Delivered boundary
 
 - Memory extraction policy is versioned in code as `kira-memory-policy-v1`.

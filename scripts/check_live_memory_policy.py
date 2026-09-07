@@ -119,7 +119,7 @@ def parse_memory_facts(content: object) -> tuple[str, ...]:
         if not isinstance(text, str) or not text.strip():
             raise PolicyEvalProtocolError
         attributed_to = item.get("attributed_to")
-        if attributed_to is not None and attributed_to not in ("user",):
+        if attributed_to is not None and attributed_to not in ("user", "assistant"):
             raise PolicyEvalProtocolError
         facts.append(text.strip())
     return tuple(facts)
