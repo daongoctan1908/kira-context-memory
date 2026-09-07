@@ -2,7 +2,9 @@ import ast
 from pathlib import Path
 
 from app.domain.ports.conversation_store import ConversationStorePort
+from app.domain.ports.identity import IdentityPort
 from app.domain.ports.kira_client import KiraClientPort
+from app.domain.ports.long_term_memory import LongTermMemoryPort
 from app.domain.ports.query_rewriter import QueryRewriterPort
 
 
@@ -18,13 +20,20 @@ def test_query_rewriter_port_is_a_protocol() -> None:
     assert QueryRewriterPort.__name__ == "QueryRewriterPort"
 
 
+def test_identity_and_long_term_memory_ports_are_protocols() -> None:
+    assert IdentityPort.__name__ == "IdentityPort"
+    assert LongTermMemoryPort.__name__ == "LongTermMemoryPort"
+
+
 def test_core_layers_do_not_import_infrastructure_frameworks() -> None:
     forbidden_roots = {
         "alembic",
         "asyncpg",
         "fastapi",
         "httpx",
+        "mem0",
         "pydantic_settings",
+        "psycopg",
         "prometheus_client",
         "redis",
         "sqlalchemy",

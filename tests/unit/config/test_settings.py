@@ -59,6 +59,10 @@ def test_settings_have_safe_baseline_defaults(monkeypatch) -> None:
     assert settings.vllm_connect_timeout_seconds == 2.0
     assert settings.vllm_read_timeout_seconds == 8.0
     assert settings.vllm_max_output_chars == 2048
+    assert settings.dev_static_identity_enabled is False
+    assert settings.ltm_enabled is False
+    assert settings.memory_schema == "memory"
+    assert settings.memory_collection_name == "memories"
 
 
 def test_settings_hide_postgres_credentials_from_repr(monkeypatch) -> None:
@@ -117,3 +121,44 @@ def test_rewriter_limits_must_be_positive(field: str) -> None:
             kira_basic_auth="secret",
             **{field: 0},
         )
+
+
+def test_static_identity_is_forbidden_in_production() -> None:
+    with pytest.raises(ValidationError, match="static development identity"):
+        Settings(
+            _env_file=None,
+            kira_base_url="http://kira.test",
+            kira_username="service-account",
+            kira_basic_auth="secret",
+            app_environment="production",
+            dev_static_identity_enabled=True,
+            dev_static_user_id="unsafe-user",
+        )
+
+
+def test_enabled_ltm_requires_all_runtime_dependencies() -> None:
+    with pytest.raises(ValidationError, match="MEMORY_DATABASE_URL"):
+        Settings(
+            _env_file=None,
+            kira_base_url="http://kira.test",
+            kira_username="service-account",
+            kira_basic_auth="secret",
+            ltm_enabled=True,
+        )
+
+
+def test_memory_secrets_are_redacted() -> None:
+    settings = Settings(
+        _env_file=None,
+        kira_base_url="http://kira.test",
+        kira_username="service-account",
+        kira_basic_auth="secret",
+        memory_database_url="postgresql://user:memory-password@db/memory",
+        memory_embedding_api_key="embedding-secret",
+        memory_llm_api_key="llm-secret",
+    )
+
+    rendered = repr(settings)
+    assert "memory-password" not in rendered
+    assert "embedding-secret" not in rendered
+    assert "llm-secret" not in rendered

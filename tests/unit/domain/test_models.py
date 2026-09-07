@@ -1,11 +1,19 @@
 from datetime import UTC, datetime
+from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
 
 from app.domain.models.chat import ChatCommand
-from app.domain.models.conversation import ConversationMessage, ConversationRole
+from app.domain.models.conversation import (
+    AppendTurnResult,
+    CompletedTurnReference,
+    ConversationMessage,
+    ConversationRole,
+)
+from app.domain.models.identity import AuthenticatedPrincipal
 from app.domain.models.kira import KiraAuthResult
+from app.domain.models.memory import LongTermMemory, MemoryProcessResult, MemorySource
 from app.presentation.schemas.chat import ChatRequest
 
 
@@ -82,3 +90,48 @@ def test_conversation_message_rejects_invalid_values(changes: dict[str, object])
 
     with pytest.raises(ValueError):
         ConversationMessage(**values)  # type: ignore[arg-type]
+
+
+def test_identity_turn_reference_and_add_only_memory_models() -> None:
+    user = ConversationMessage(
+        "session-1",
+        "turn-1",
+        ConversationRole.USER,
+        "Tôi thích biểu đồ",
+        datetime(2026, 9, 6, tzinfo=UTC),
+    )
+    assistant = ConversationMessage(
+        "session-1",
+        "turn-1",
+        ConversationRole.ASSISTANT,
+        "Đã rõ",
+        datetime(2026, 9, 6, tzinfo=UTC),
+    )
+    reference = CompletedTurnReference("user-1", "session-1", uuid4(), "turn-1", 2)
+
+    assert AuthenticatedPrincipal("user-1").user_id == "user-1"
+    assert AppendTurnResult(True, reference).reference == reference
+    assert MemorySource(reference, (user, assistant)).messages == (user, assistant)
+    assert LongTermMemory("memory-1", "Thích biểu đồ", 0.9).score == 0.9
+    assert MemoryProcessResult(("memory-1",)).added is True
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        lambda: AuthenticatedPrincipal(" "),
+        lambda: CompletedTurnReference("user", "session", uuid4(), "turn", 0),
+        lambda: LongTermMemory("memory", "content", 1.1),
+        lambda: MemorySource(
+            CompletedTurnReference("user", "session", uuid4(), "turn", 2),
+            (
+                ConversationMessage(
+                    "other", "turn", ConversationRole.USER, "content", datetime.now(UTC)
+                ),
+            ),
+        ),
+    ],
+)
+def test_identity_and_memory_models_reject_invalid_boundaries(factory) -> None:
+    with pytest.raises(ValueError):
+        factory()

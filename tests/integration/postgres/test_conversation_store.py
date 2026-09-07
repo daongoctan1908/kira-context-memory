@@ -26,6 +26,7 @@ from tests.support.mock_vllm_server import app as mock_vllm_app
 from tests.support.week2_cases import CASES
 
 pytestmark = pytest.mark.postgres_integration
+USER_ID = "test-user"
 
 
 def _test_url() -> str:
@@ -97,7 +98,8 @@ async def _append(
     turn_id: str | None = None,
 ) -> bool:
     resolved_turn_id = turn_id or f"{session_id}-turn-{turn_number}"
-    return await adapter.append_turn(
+    result = await adapter.append_turn(
+        USER_ID,
         _message(
             session_id,
             resolved_turn_id,
@@ -113,6 +115,7 @@ async def _append(
             turn_number * 2 + 1,
         ),
     )
+    return result.inserted
 
 
 async def test_migration_revision_and_recent_index_exist(engine: AsyncEngine) -> None:
@@ -145,7 +148,7 @@ async def test_full_history_is_retained_while_recent_read_is_bounded(
     for turn_number in range(1, 7):
         assert await _append(adapter, session_id, turn_number) is True
 
-    recent = await adapter.read_recent(session_id, 10)
+    recent = await adapter.read_recent(USER_ID, session_id, 10)
     async with engine.connect() as connection:
         persisted_count = await connection.scalar(
             select(text("count(*)"))
@@ -192,11 +195,12 @@ async def test_duplicate_is_idempotent_and_collision_is_rejected(
 
     with pytest.raises(ConversationStoreProtocolError):
         await adapter.append_turn(
+            USER_ID,
             _message(session_id, turn_id, ConversationRole.USER, "different", 2),
             _message(session_id, turn_id, ConversationRole.ASSISTANT, "answer", 3),
         )
 
-    assert len(await adapter.read_recent(session_id, 10)) == 2
+    assert len(await adapter.read_recent(USER_ID, session_id, 10)) == 2
 
 
 async def test_concurrent_append_preserves_pair_order_and_session_isolation(
@@ -212,8 +216,8 @@ async def test_concurrent_append_preserves_pair_order_and_session_isolation(
         )
 
         assert all(results)
-        recent = await adapter.read_recent(session_id, 10)
-        other_recent = await adapter.read_recent(other_session, 10)
+        recent = await adapter.read_recent(USER_ID, session_id, 10)
+        other_recent = await adapter.read_recent(USER_ID, other_session, 10)
         assert len(recent) == 10
         assert len(other_recent) == 2
         for index in range(0, len(recent), 2):
@@ -227,6 +231,54 @@ async def test_concurrent_append_preserves_pair_order_and_session_isolation(
             )
 
 
+async def test_same_session_is_isolated_by_user_and_boundary_is_exact(
+    engine: AsyncEngine,
+    session_id: str,
+) -> None:
+    adapter = PostgresConversationStoreAdapter(engine)
+    other_user = f"user-{uuid4()}"
+    first_turn = f"turn-{uuid4()}"
+    first = await adapter.append_turn(
+        USER_ID,
+        _message(session_id, first_turn, ConversationRole.USER, "first question", 1),
+        _message(session_id, first_turn, ConversationRole.ASSISTANT, "first answer", 2),
+    )
+    later_turn = f"turn-{uuid4()}"
+    await adapter.append_turn(
+        USER_ID,
+        _message(session_id, later_turn, ConversationRole.USER, "later", 3),
+        _message(session_id, later_turn, ConversationRole.ASSISTANT, "later", 4),
+    )
+    other_turn = f"turn-{uuid4()}"
+    await adapter.append_turn(
+        other_user,
+        _message(session_id, other_turn, ConversationRole.USER, "private question", 5),
+        _message(session_id, other_turn, ConversationRole.ASSISTANT, "private answer", 6),
+    )
+
+    exact = await adapter.read_through_boundary(
+        USER_ID,
+        first.reference.conversation_id,
+        first.reference.boundary_message_id,
+        10,
+    )
+
+    assert [message.content for message in exact] == ["first question", "first answer"]
+    assert [
+        message.content for message in await adapter.read_recent(other_user, session_id, 10)
+    ] == [
+        "private question",
+        "private answer",
+    ]
+    with pytest.raises(ConversationStoreProtocolError):
+        await adapter.read_through_boundary(
+            other_user,
+            first.reference.conversation_id,
+            first.reference.boundary_message_id,
+            10,
+        )
+
+
 async def test_malformed_persisted_schema_maps_to_protocol_error(
     engine: AsyncEngine,
     session_id: str,
@@ -236,6 +288,7 @@ async def test_malformed_persisted_schema_maps_to_protocol_error(
         await connection.execute(
             insert(conversations).values(
                 conversation_id=conversation_id,
+                user_id=USER_ID,
                 session_id=session_id,
                 next_turn_sequence=2,
             )
@@ -258,7 +311,7 @@ async def test_malformed_persisted_schema_maps_to_protocol_error(
         )
 
     with pytest.raises(ConversationStoreProtocolError):
-        await PostgresConversationStoreAdapter(engine).read_recent(session_id, 10)
+        await PostgresConversationStoreAdapter(engine).read_recent(USER_ID, session_id, 10)
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case.name)
@@ -300,7 +353,7 @@ async def test_full_flow_with_real_postgres_and_mock_http_adapters(engine, sessi
                 metrics = (await client.get("/metrics")).text
         assert 'kira_context_rewrite_total{outcome="success"} 1.0' in metrics
         assert query_hashes[-1] == sha256(case.expected.encode()).hexdigest()
-    recent = await PostgresConversationStoreAdapter(engine).read_recent(session_id, 10)
+    recent = await PostgresConversationStoreAdapter(engine).read_recent(USER_ID, session_id, 10)
     assert [message.content for message in recent] == [
         case.previous,
         "Mock KiRa answer",
@@ -315,8 +368,8 @@ async def test_cancellation_rolls_back_inflight_turn_and_allows_next_write(engin
     locked = asyncio.Event()
     original_lock = adapter._lock_conversation
 
-    async def paused_lock(connection, requested_session):
-        result = await original_lock(connection, requested_session)
+    async def paused_lock(connection, requested_user, requested_session):
+        result = await original_lock(connection, requested_user, requested_session)
         locked.set()
         await asyncio.Event().wait()
         return result
@@ -327,8 +380,8 @@ async def test_cancellation_rolls_back_inflight_turn_and_allows_next_write(engin
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
-    assert await adapter.read_recent(session_id, 10) == ()
+    assert await adapter.read_recent(USER_ID, session_id, 10) == ()
     adapter._lock_conversation = original_lock
     async with asyncio.timeout(5):
         assert await _append(adapter, session_id, 2)
-    assert len(await adapter.read_recent(session_id, 10)) == 2
+    assert len(await adapter.read_recent(USER_ID, session_id, 10)) == 2

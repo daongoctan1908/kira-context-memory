@@ -2,7 +2,7 @@
 
 from typing import Literal, Protocol
 
-ContextOperation = Literal["postgres_read", "postgres_write", "rewriter"]
+ContextOperation = Literal["identity", "postgres_read", "postgres_write", "rewriter"]
 RewriteOutcome = Literal["success", "error", "bypass"]
 WriteOutcome = Literal["inserted", "duplicate", "error"]
 

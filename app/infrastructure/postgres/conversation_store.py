@@ -18,7 +18,12 @@ from app.domain.errors.conversation import (
     ConversationStoreOperationError,
     ConversationStoreProtocolError,
 )
-from app.domain.models.conversation import ConversationMessage, ConversationRole
+from app.domain.models.conversation import (
+    AppendTurnResult,
+    CompletedTurnReference,
+    ConversationMessage,
+    ConversationRole,
+)
 from app.infrastructure.postgres.schema import (
     EXPECTED_SCHEMA_REVISION,
     conversation_messages,
@@ -54,10 +59,13 @@ class PostgresConversationStoreAdapter:
 
     async def read_recent(
         self,
+        user_id: str,
         session_id: str,
         limit: int,
     ) -> tuple[ConversationMessage, ...]:
         """Read the latest messages in chronological order without trimming history."""
+        if not user_id.strip():
+            raise ValueError("user_id must not be empty")
         if not session_id.strip():
             raise ValueError("session_id must not be empty")
         if limit < 1:
@@ -79,7 +87,10 @@ class PostgresConversationStoreAdapter:
                     conversation_messages.c.conversation_id == conversations.c.conversation_id,
                 )
             )
-            .where(conversations.c.session_id == session_id)
+            .where(
+                conversations.c.user_id == user_id,
+                conversations.c.session_id == session_id,
+            )
             .order_by(
                 conversation_messages.c.turn_sequence.desc(),
                 conversation_messages.c.message_index.desc(),
@@ -103,46 +114,142 @@ class PostgresConversationStoreAdapter:
         except (KeyError, TypeError, ValueError) as error:
             raise ConversationStoreProtocolError from error
 
+    async def read_through_boundary(
+        self,
+        user_id: str,
+        conversation_id: UUID,
+        boundary_message_id: int,
+        limit: int,
+    ) -> tuple[ConversationMessage, ...]:
+        """Read a chronological window ending at an owned assistant message."""
+        if not user_id.strip():
+            raise ValueError("user_id must not be empty")
+        if (
+            isinstance(boundary_message_id, bool)
+            or not isinstance(boundary_message_id, int)
+            or boundary_message_id < 1
+        ):
+            raise ValueError("boundary_message_id must be positive")
+        if limit < 1:
+            raise ValueError("limit must be positive")
+
+        owner_query = (
+            select(conversations.c.session_id)
+            .select_from(
+                conversations.join(
+                    conversation_messages,
+                    conversations.c.conversation_id == conversation_messages.c.conversation_id,
+                )
+            )
+            .where(
+                conversations.c.user_id == user_id,
+                conversations.c.conversation_id == conversation_id,
+                conversation_messages.c.message_id == boundary_message_id,
+                conversation_messages.c.message_index == 1,
+            )
+        )
+        recent_desc = (
+            select(
+                conversation_messages.c.turn_id,
+                conversation_messages.c.role,
+                conversation_messages.c.content,
+                conversation_messages.c.message_timestamp,
+                conversation_messages.c.schema_version,
+                conversation_messages.c.turn_sequence,
+                conversation_messages.c.message_index,
+            )
+            .where(
+                conversation_messages.c.conversation_id == conversation_id,
+                conversation_messages.c.message_id <= boundary_message_id,
+            )
+            .order_by(
+                conversation_messages.c.turn_sequence.desc(),
+                conversation_messages.c.message_index.desc(),
+            )
+            .limit(limit)
+            .subquery("boundary_messages")
+        )
+        chronological = select(recent_desc).order_by(
+            recent_desc.c.turn_sequence.asc(),
+            recent_desc.c.message_index.asc(),
+        )
+
+        try:
+            async with self._engine.connect() as connection:
+                session_id = await connection.scalar(owner_query)
+                if session_id is None:
+                    raise ConversationStoreProtocolError
+                rows = (await connection.execute(chronological)).mappings().all()
+        except ConversationStoreProtocolError:
+            raise
+        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+            self._raise_mapped(error)
+
+        try:
+            return tuple(self._to_domain_message(session_id, row) for row in rows)
+        except (KeyError, TypeError, ValueError) as error:
+            raise ConversationStoreProtocolError from error
+
     async def append_turn(
         self,
+        user_id: str,
         user_message: ConversationMessage,
         assistant_message: ConversationMessage,
-    ) -> bool:
+    ) -> AppendTurnResult:
         """Atomically append one completed pair and preserve idempotency by turn ID."""
+        if not user_id.strip():
+            raise ValueError("user_id must not be empty")
         self._validate_turn(user_message, assistant_message)
 
         try:
             async with self._engine.begin() as connection:
                 conversation_id, turn_sequence = await self._lock_conversation(
                     connection,
+                    user_id,
                     user_message.session_id,
                 )
                 existing = await self._read_existing_turn(connection, user_message.turn_id)
                 if existing:
                     return self._validate_duplicate(
                         existing,
+                        user_id,
                         conversation_id,
                         user_message,
                         assistant_message,
                     )
 
-                await connection.execute(
-                    insert(conversation_messages),
-                    [
-                        self._message_values(
-                            conversation_id,
-                            turn_sequence,
-                            0,
-                            user_message,
-                        ),
-                        self._message_values(
-                            conversation_id,
-                            turn_sequence,
-                            1,
-                            assistant_message,
-                        ),
-                    ],
+                inserted_rows = (
+                    (
+                        await connection.execute(
+                            insert(conversation_messages).returning(
+                                conversation_messages.c.message_id,
+                                conversation_messages.c.message_index,
+                            ),
+                            [
+                                self._message_values(
+                                    conversation_id,
+                                    turn_sequence,
+                                    0,
+                                    user_message,
+                                ),
+                                self._message_values(
+                                    conversation_id,
+                                    turn_sequence,
+                                    1,
+                                    assistant_message,
+                                ),
+                            ],
+                        )
+                    )
+                    .mappings()
+                    .all()
                 )
+                boundary_message_id = next(
+                    (row["message_id"] for row in inserted_rows if row["message_index"] == 1),
+                    None,
+                )
+                if not isinstance(boundary_message_id, int):
+                    raise ConversationStoreProtocolError
                 await connection.execute(
                     update(conversations)
                     .where(conversations.c.conversation_id == conversation_id)
@@ -156,11 +263,21 @@ class PostgresConversationStoreAdapter:
         except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
             self._raise_mapped(error)
 
-        return True
+        return AppendTurnResult(
+            inserted=True,
+            reference=CompletedTurnReference(
+                user_id=user_id,
+                session_id=user_message.session_id,
+                conversation_id=conversation_id,
+                turn_id=user_message.turn_id,
+                boundary_message_id=boundary_message_id,
+            ),
+        )
 
     async def _lock_conversation(
         self,
         connection: AsyncConnection,
+        user_id: str,
         session_id: str,
     ) -> tuple[UUID, int]:
         candidate_id = uuid4()
@@ -168,10 +285,13 @@ class PostgresConversationStoreAdapter:
             postgres_insert(conversations)
             .values(
                 conversation_id=candidate_id,
+                user_id=user_id,
                 session_id=session_id,
                 next_turn_sequence=1,
             )
-            .on_conflict_do_nothing(index_elements=[conversations.c.session_id])
+            .on_conflict_do_nothing(
+                index_elements=[conversations.c.user_id, conversations.c.session_id]
+            )
         )
         row = (
             await connection.execute(
@@ -179,7 +299,10 @@ class PostgresConversationStoreAdapter:
                     conversations.c.conversation_id,
                     conversations.c.next_turn_sequence,
                 )
-                .where(conversations.c.session_id == session_id)
+                .where(
+                    conversations.c.user_id == user_id,
+                    conversations.c.session_id == session_id,
+                )
                 .with_for_update()
             )
         ).one_or_none()
@@ -195,6 +318,7 @@ class PostgresConversationStoreAdapter:
         result = await connection.execute(
             select(
                 conversation_messages.c.conversation_id,
+                conversation_messages.c.message_id,
                 conversation_messages.c.message_index,
                 conversation_messages.c.role,
                 conversation_messages.c.content,
@@ -208,10 +332,11 @@ class PostgresConversationStoreAdapter:
     @staticmethod
     def _validate_duplicate(
         existing: list[Mapping[str, Any]],
+        user_id: str,
         conversation_id: UUID,
         user_message: ConversationMessage,
         assistant_message: ConversationMessage,
-    ) -> bool:
+    ) -> AppendTurnResult:
         expected = (user_message, assistant_message)
         if len(existing) != 2:
             raise ConversationStoreProtocolError
@@ -225,7 +350,19 @@ class PostgresConversationStoreAdapter:
                 or row["schema_version"] != message.schema_version
             ):
                 raise ConversationStoreProtocolError
-        return False
+        boundary_message_id = existing[1].get("message_id")
+        if not isinstance(boundary_message_id, int):
+            raise ConversationStoreProtocolError
+        return AppendTurnResult(
+            inserted=False,
+            reference=CompletedTurnReference(
+                user_id=user_id,
+                session_id=user_message.session_id,
+                conversation_id=conversation_id,
+                turn_id=user_message.turn_id,
+                boundary_message_id=boundary_message_id,
+            ),
+        )
 
     @staticmethod
     def _message_values(

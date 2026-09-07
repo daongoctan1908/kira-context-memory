@@ -4,13 +4,14 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Literal
+from uuid import UUID
 
 from app.domain.errors.conversation import (
     ConversationStoreConfigurationError,
     ConversationStoreConnectionError,
     ConversationStoreError,
 )
-from app.domain.models.conversation import ConversationMessage
+from app.domain.models.conversation import AppendTurnResult, ConversationMessage
 from app.infrastructure.postgres.conversation_store import PostgresConversationStoreAdapter
 
 
@@ -46,16 +47,38 @@ class ManagedPostgresConversationStore:
                 await self._adapter.validate_schema()
                 self.status = "available"
 
-    async def read_recent(self, session_id: str, limit: int) -> tuple[ConversationMessage, ...]:
+    async def read_recent(
+        self,
+        user_id: str,
+        session_id: str,
+        limit: int,
+    ) -> tuple[ConversationMessage, ...]:
         async with self._operation():
             await self.validate_schema()
-            return await self._adapter.read_recent(session_id, limit)
+            return await self._adapter.read_recent(user_id, session_id, limit)
 
     async def append_turn(
         self,
+        user_id: str,
         user_message: ConversationMessage,
         assistant_message: ConversationMessage,
-    ) -> bool:
+    ) -> AppendTurnResult:
         async with self._operation():
             await self.validate_schema()
-            return await self._adapter.append_turn(user_message, assistant_message)
+            return await self._adapter.append_turn(user_id, user_message, assistant_message)
+
+    async def read_through_boundary(
+        self,
+        user_id: str,
+        conversation_id: UUID,
+        boundary_message_id: int,
+        limit: int,
+    ) -> tuple[ConversationMessage, ...]:
+        async with self._operation():
+            await self.validate_schema()
+            return await self._adapter.read_through_boundary(
+                user_id,
+                conversation_id,
+                boundary_message_id,
+                limit,
+            )

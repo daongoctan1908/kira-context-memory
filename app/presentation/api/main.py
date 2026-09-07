@@ -14,8 +14,10 @@ from app.config.settings import Settings, get_settings
 from app.domain.errors.conversation import ConversationStoreConnectionError
 from app.domain.errors.kira import KiraClientError
 from app.domain.ports.conversation_store import ConversationStorePort
+from app.domain.ports.identity import IdentityPort
 from app.domain.ports.kira_client import KiraClientPort
 from app.domain.ports.query_rewriter import QueryRewriterPort
+from app.infrastructure.identity import NullIdentityAdapter, StaticIdentityAdapter
 from app.infrastructure.kira.http_kira_client import KiraHttpAdapter
 from app.infrastructure.llm.vllm_query_rewriter import VllmQueryRewriterAdapter
 from app.infrastructure.observability.context import ContextTelemetry, configure_app_logging
@@ -41,6 +43,7 @@ def create_app(
     postgres_engine: AsyncEngine | None = None,
     query_rewriter: QueryRewriterPort | None = None,
     rewriter_http_client: httpx.AsyncClient | None = None,
+    identity_provider: IdentityPort | None = None,
 ) -> FastAPI:
     """Create a Gateway app with optional dependency injection for tests."""
 
@@ -102,12 +105,22 @@ def create_app(
                     resolved_settings,
                 )
 
+            resolved_identity = identity_provider
+            if resolved_identity is None:
+                if resolved_settings.dev_static_identity_enabled:
+                    resolved_identity = StaticIdentityAdapter(
+                        resolved_settings.dev_static_user_id or ""
+                    )
+                else:
+                    resolved_identity = NullIdentityAdapter()
+
             application.state.settings = resolved_settings
             application.state.kira_client = resolved_kira_client
             application.state.conversation_store = resolved_conversation_store
             application.state.postgres_status = postgres_status
             application.state.query_rewriter = resolved_rewriter
             application.state.telemetry = telemetry
+            application.state.identity_provider = resolved_identity
             application.state.handle_chat = HandleChatUseCase(
                 resolved_kira_client,
                 conversation_store=resolved_conversation_store,
@@ -133,7 +146,7 @@ def create_app(
 
     application = FastAPI(
         title="KiRa Context Gateway",
-        version="0.2.0",
+        version="0.3.0",
         lifespan=lifespan,
     )
     application.state.ready = False

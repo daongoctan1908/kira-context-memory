@@ -160,6 +160,8 @@ class PGVector(VectorStoreBase):
         sslmode=None,
         connection_string=None,
         connection_pool=None,
+        schema_name="public",
+        auto_create=True,
     ):
         """
         Initialize the PGVector database.
@@ -181,6 +183,8 @@ class PGVector(VectorStoreBase):
             connection_pool (Any, optional): psycopg2 connection pool object (overrides connection string and individual parameters)
         """
         self.collection_name = collection_name
+        self.schema_name = schema_name
+        self.auto_create = auto_create
         self.use_diskann = diskann
         self.use_hnsw = hnsw
         self.embedding_model_dims = embedding_model_dims
@@ -218,8 +222,16 @@ class PGVector(VectorStoreBase):
             return
         collections = self.list_cols()
         if self.collection_name not in collections:
+            self._require_ddl_allowed("create missing collection")
             self.create_col()
         self._collection_ensured = True
+
+    def _require_ddl_allowed(self, operation):
+        if not self.auto_create:
+            raise RuntimeError(
+                f"PGVector DDL is disabled for {self.schema_name}.{self.collection_name}; "
+                f"cannot {operation}"
+            )
 
     @contextmanager
     def _get_cursor(self, commit: bool = False):
@@ -257,15 +269,21 @@ class PGVector(VectorStoreBase):
 
     def _col(self) -> "sql.Identifier":
         """Return a safely-quoted SQL identifier for the collection table."""
-        return sql.Identifier(self.collection_name)
+        return sql.Identifier(self.schema_name, self.collection_name)
 
     def create_col(self) -> None:
         """
         Create a new collection (table in PostgreSQL).
         Will also initialize vector search index if specified.
         """
+        self._require_ddl_allowed("create collection")
         with self._get_cursor(commit=True) as cur:
             cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
+            cur.execute(
+                sql.SQL("CREATE SCHEMA IF NOT EXISTS {}").format(
+                    sql.Identifier(self.schema_name)
+                )
+            )
             cur.execute(
                 sql.SQL("""
                 CREATE TABLE IF NOT EXISTS {} (
@@ -479,11 +497,15 @@ class PGVector(VectorStoreBase):
             List[str]: List of collection names.
         """
         with self._get_cursor() as cur:
-            cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
+            cur.execute(
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = %s",
+                (self.schema_name,),
+            )
             return [row[0] for row in cur.fetchall()]
 
     def delete_col(self) -> None:
         """Delete a collection."""
+        self._require_ddl_allowed("delete collection")
         with self._get_cursor(commit=True) as cur:
             cur.execute(sql.SQL("DROP TABLE IF EXISTS {}").format(self._col()))
 
@@ -503,9 +525,12 @@ class PGVector(VectorStoreBase):
                     (SELECT COUNT(*) FROM {}) as row_count,
                     (SELECT pg_size_pretty(pg_total_relation_size({}::regclass))) as total_size
                 FROM information_schema.tables
-                WHERE table_schema = 'public' AND table_name = %s
-            """).format(self._col(), sql.Literal(self.collection_name)),
-                (self.collection_name,),
+                WHERE table_schema = %s AND table_name = %s
+            """).format(
+                    self._col(),
+                    sql.Literal(f"{self.schema_name}.{self.collection_name}"),
+                ),
+                (self.schema_name, self.collection_name),
             )
             result = cur.fetchone()
         return {"name": result[0], "count": result[1], "size": result[2]}
@@ -542,21 +567,26 @@ class PGVector(VectorStoreBase):
             results = cur.fetchall()
         return [[OutputData(id=str(r[0]), score=None, payload=r[1]) for r in results]]
 
-    def __del__(self) -> None:
-        """
-        Close the database connection pool when the object is deleted.
-        """
+    def close(self) -> None:
+        """Close the database connection pool deterministically."""
         try:
-            # Close pool appropriately
+            if self.connection_pool is None:
+                return
             if PSYCOPG_VERSION == 3:
                 self.connection_pool.close()
             else:
                 self.connection_pool.closeall()
+            self.connection_pool = None
         except Exception:
             pass
 
+    def __del__(self) -> None:
+        """Best-effort fallback when the owner did not close the provider."""
+        self.close()
+
     def reset(self) -> None:
         """Reset the index by deleting and recreating it."""
+        self._require_ddl_allowed("reset collection")
         self._ensure_collection()
         logger.warning(f"Resetting index {self.collection_name}...")
         self.delete_col()

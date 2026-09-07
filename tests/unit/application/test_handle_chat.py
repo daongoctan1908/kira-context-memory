@@ -2,7 +2,7 @@ from collections.abc import AsyncIterator
 
 from app.domain.models.chat import ChatCommand
 from app.domain.models.kira import KiraAuthResult, KiraEventKind, KiraStreamEvent
-from tests.support.context_fakes import make_use_case
+from tests.support.context_fakes import PRINCIPAL, make_use_case
 
 
 def event(text: str) -> KiraStreamEvent:
@@ -50,7 +50,10 @@ async def test_use_case_forwards_only_current_message_and_accumulates_final_text
     client = FakeKiraClient(source)
     use_case = make_use_case(client)
 
-    session = await use_case.execute(ChatCommand(session_id="session-1", message="question"))
+    session = await use_case.execute(
+        ChatCommand(session_id="session-1", message="question"),
+        principal=PRINCIPAL,
+    )
     received = [item async for item in session]
 
     assert client.messages == ["question"]
@@ -61,7 +64,8 @@ async def test_use_case_forwards_only_current_message_and_accumulates_final_text
 async def test_session_close_propagates_to_downstream_iterator() -> None:
     source = FakeEventStream([event("unused")])
     session = await make_use_case(FakeKiraClient(source)).execute(
-        ChatCommand(session_id="session-1", message="question")
+        ChatCommand(session_id="session-1", message="question"),
+        principal=PRINCIPAL,
     )
 
     await session.aclose()

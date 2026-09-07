@@ -1,11 +1,13 @@
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class PGVectorConfig(BaseModel):
     dbname: str = Field("postgres", description="Default name for the database")
     collection_name: str = Field("mem0", description="Default name for the collection")
+    schema_name: str = Field("public", description="PostgreSQL schema containing the collection")
+    auto_create: bool = Field(True, description="Allow the runtime provider to create database objects")
     embedding_model_dims: Optional[int] = Field(1536, description="Dimensions of the embedding model")
     user: Optional[str] = Field(None, description="Database user")
     password: Optional[str] = Field(None, description="Database password")
@@ -52,3 +54,10 @@ class PGVectorConfig(BaseModel):
         return values
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @field_validator("schema_name", "collection_name")
+    @classmethod
+    def validate_identifier(cls, value: str) -> str:
+        if not value or not value.replace("_", "a").isalnum() or value[0].isdigit():
+            raise ValueError("PostgreSQL identifiers must contain letters, digits, or underscores")
+        return value

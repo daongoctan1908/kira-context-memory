@@ -142,22 +142,11 @@ uv run python scripts/smoke_gateway.py --session-id approved-dev-session --messa
 - Full pytest với PostgreSQL thật: **248 pass, 0 skip; coverage 97,80%**. Các test riêng của
   adapter đã gỡ không còn chạy; evidence 280 tests phía trên thuộc checkpoint Batch D cũ.
 - Ruff lint/format pass; image `kira-context:0.2.0` đã rebuild không cài Redis SDK.
-- Các lệnh xóa Docker/cache local bị môi trường thực thi chặn. Hai container Redis cũ và
-  anonymous volumes chưa bị xóa; không có dữ liệu PostgreSQL nào bị dọn. Compose có thể cảnh báo
-  orphan Redis cho đến khi người vận hành thực hiện cleanup thủ công.
+- Cleanup được hoàn tất ngày 2026-09-07: hai container Redis cũ, anonymous volume gắn với
+  `kira-context-redis`, và local image tag `redis:7.2-bookworm` đã được xóa. Không có dữ liệu
+  PostgreSQL nào bị dọn và Compose không còn cảnh báo orphan Redis.
 - Code đã xóa có thể khôi phục từ Git (`8d6497d` hoặc checkpoint trước khi gỡ).
 
-Đã xác minh hai container dưới đây thuộc workspace này; volume không dùng chung với container
-khác, cấu hình tắt persistence và instance đang chạy không có key tại thời điểm kiểm tra.
-Lệnh thủ công sau chỉ dọn Redis local của KiRa, bao gồm anonymous volumes (không thể khôi phục
-cache sau khi xóa); không dùng system/volume prune:
-
-```powershell
-docker stop kira-context-week2-redis-1
-docker rm -v kira-context-redis kira-context-week2-redis-1
-docker image rm redis:7.2-bookworm
-```
-
 Ba thư mục đã hết source nhưng còn cache `.pyc` bị Git ignore: `app/infrastructure/redis`,
-`tests/unit/infrastructure/redis`, `tests/integration/redis`. Có thể xóa các thư mục cache này
-thủ công trong workspace; chúng không được đưa vào runtime image.
+`tests/unit/infrastructure/redis`, `tests/integration/redis`. Sandbox chặn recursive filesystem
+delete; có thể xóa thủ công. Chúng không được Git track hoặc đưa vào runtime image.

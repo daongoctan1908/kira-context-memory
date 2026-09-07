@@ -34,6 +34,10 @@ def configure_app_logging(level: str) -> None:
     # HTTPX logs complete URLs at INFO; dependency details do not belong in app logs.
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
+    # Mem0 upstream can log prompt/provider details. The application emits only
+    # sanitized dependency outcomes at its own boundary.
+    logging.getLogger("mem0").setLevel(logging.CRITICAL)
+    logging.getLogger("mem0").propagate = False
 
 
 class ContextTelemetry:
@@ -93,7 +97,10 @@ class ContextTelemetry:
         error_class: str,
         fallback_mode: str,
     ) -> None:
-        dependency = "vllm" if operation == "rewriter" else "postgresql"
+        dependency = {
+            "identity": "identity",
+            "rewriter": "vllm",
+        }.get(operation, "postgresql")
         self.degradations.labels(dependency, operation).inc()
         logger.warning(
             "Context capability degraded",

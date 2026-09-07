@@ -12,6 +12,7 @@ from app.domain.errors.conversation import ConversationStoreError, ConversationS
 from app.domain.errors.query_rewriter import QueryRewriterError
 from app.domain.models.chat import ChatCommand
 from app.domain.models.conversation import ConversationMessage, ConversationRole
+from app.domain.models.identity import AuthenticatedPrincipal
 from app.domain.models.kira import KiraStreamEvent
 from app.domain.ports.context_observer import ContextObserverPort
 from app.domain.ports.conversation_store import ConversationStorePort
@@ -95,13 +96,25 @@ class HandleChatUseCase:
         self,
         command: ChatCommand,
         *,
+        principal: AuthenticatedPrincipal | None = None,
         correlation_id: str | None = None,
     ) -> ChatStreamSession:
         """Never persist a rewritten user query or a partial/failed assistant turn."""
         correlation_id = correlation_id or uuid4().hex
         turn_id = uuid4().hex
         started_at = datetime.now(UTC)
-        query = await self._resolve_query(command, correlation_id)
+        if principal is None:
+            self._observer.degraded(
+                correlation_id,
+                "identity",
+                "IdentityUnavailable",
+                "current_query_only",
+            )
+            self._observer.context_observed(0, 0)
+            self._observer.rewrite_observed("bypass", None)
+            return ChatStreamSession(await self._kira_client.chat_stream(command.message))
+
+        query = await self._resolve_query(command, principal.user_id, correlation_id)
         source = await self._kira_client.chat_stream(query)
 
         async def persist(final_text: str) -> None:
@@ -121,7 +134,7 @@ class HandleChatUseCase:
                     datetime.now(UTC),
                 )
                 async with asyncio.timeout(self._store_timeout):
-                    inserted = await self._store.append_turn(user, assistant)
+                    result = await self._store.append_turn(principal.user_id, user, assistant)
             except Exception as error:
                 # Never turn a persistence failure into a synthetic SSE error. Cancellation
                 # intentionally propagates and must roll back an in-flight transaction.
@@ -133,14 +146,25 @@ class HandleChatUseCase:
                 )
                 self._observer.conversation_write_observed("error")
             else:
-                self._observer.conversation_write_observed("inserted" if inserted else "duplicate")
+                self._observer.conversation_write_observed(
+                    "inserted" if result.inserted else "duplicate"
+                )
 
         return ChatStreamSession(source, on_complete=persist)
 
-    async def _resolve_query(self, command: ChatCommand, correlation_id: str) -> str:
+    async def _resolve_query(
+        self,
+        command: ChatCommand,
+        user_id: str,
+        correlation_id: str,
+    ) -> str:
         try:
             async with asyncio.timeout(self._store_timeout):
-                recent = await self._store.read_recent(command.session_id, self._recent_limit)
+                recent = await self._store.read_recent(
+                    user_id,
+                    command.session_id,
+                    self._recent_limit,
+                )
             if any(message.session_id != command.session_id for message in recent):
                 raise ConversationStoreProtocolError()
             context = self._builder.build(recent, command.message)

@@ -7,7 +7,8 @@ thuộc trực tiếp vào FastAPI, HTTPX, PostgreSQL SDK hoặc vLLM.
 ## Trạng thái
 
 Batch A-D của Tuần 1 cung cấp Gateway baseline hoàn chỉnh để live smoke với KiRa Test.
-Batch A-D của Tuần 2 tích hợp short-term context qua PostgreSQL và vLLM:
+Batch A-D của Tuần 2 tích hợp short-term context qua PostgreSQL và vLLM. Tuần 3
+Batch A1 bổ sung identity/user scope và nền tảng Mem0/pgvector, chưa wire LTM vào `/chat`:
 
 - cấu trúc presentation, application, domain, infrastructure, config và worker;
 - dependency/tooling bằng Python 3.11, `uv`, Ruff và pytest;
@@ -23,6 +24,13 @@ Batch A-D của Tuần 2 tích hợp short-term context qua PostgreSQL và vLLM:
 - ContextBuilder, estimated token budget, QueryRewriterPort, prompt v1 và vLLM HTTP adapter;
 - `/chat` đọc recent từ PostgreSQL → rewrite → KiRa SSE → lưu completed turn;
 - fallback original query, structured logs an toàn và Prometheus `/metrics`.
+- `IdentityPort` với static adapter chỉ dành cho dev/test; thiếu trusted identity sẽ không
+  đọc/ghi contextual data nhưng KiRa current query vẫn hoạt động;
+- conversation được scope bởi `(user_id, session_id)` và completed append trả exact
+  `boundary_message_id` để worker tương lai đọc đúng snapshot từ PostgreSQL;
+- `LongTermMemoryPort`, Mem0 adapter user-scoped và pristine V3 ADD-only formation;
+- pgvector `0.8.6` dev image, embedding dimension probe và admin-owned memory schema;
+  Gateway/worker runtime cấu hình `auto_create=false` và không chạy DDL.
 
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem
@@ -69,6 +77,18 @@ $env:POSTGRES_TEST_URL=$env:DATABASE_URL
 uv run pytest -m postgres_integration --no-cov
 Remove-Item Env:POSTGRES_TEST_URL
 ```
+
+Khởi tạo pgvector memory schema sau khi cấu hình embedding endpoint/model/dimension:
+
+```powershell
+uv run python -m worker.memory_admin init
+```
+
+Lệnh này cần `MEMORY_ADMIN_DATABASE_URL` (hoặc fallback `MEMORY_DATABASE_URL`) có quyền
+`CREATE EXTENSION`/schema. Nó probe `/v1/embeddings`, kiểm tra dimension thật rồi tạo/validate
+hai collection `memory.memories` và `memory.memories_entities` cùng metadata/index. Chạy lại
+idempotent; model, dimension, Mem0 version hoặc pgvector version lệch metadata sẽ fail closed.
+Runtime service account chỉ cần DML và không được cấp quyền DDL.
 
 `DATABASE_URL` phải khớp `POSTGRES_DB`, `POSTGRES_USER` và `POSTGRES_PASSWORD` trong `.env`.
 Gateway không tự chạy migration. Cấu hình hoặc schema sai làm startup fail; connection timeout
@@ -131,8 +151,8 @@ uv run python scripts/smoke_gateway.py `
 Build và chạy Docker image versioned:
 
 ```powershell
-docker build --build-arg APP_VERSION=0.2.0 -t kira-context:0.2.0 .
-docker run -d --name kira-context-v2 --env-file .env -p 8000:8000 kira-context:0.2.0
+docker build --build-arg APP_VERSION=0.3.0 -t kira-context:0.3.0 .
+docker run -d --name kira-context-v3 --env-file .env -p 8000:8000 kira-context:0.3.0
 docker ps --filter "name=kira-context"
 ```
 
@@ -158,7 +178,10 @@ schema với HTTP 502; timeout trả HTTP 504.
   nếu phát hiện mismatch lúc runtime, trả 503 đến khi schema được xác minh lại thành công.
 - `GET /metrics`: recent count/estimated tokens, rewrite latency/outcome, degradation và write outcome.
 
-Turn ID do Gateway sinh; client không được gửi `turn_id`/`user_id`. Chỉ persist khi downstream
+Turn ID do Gateway sinh; client không được gửi `turn_id`/`user_id`. `KiRa /authenticate` chỉ
+xác thực service account với KiRa, không được dùng làm danh tính end-user. Khi chưa có real auth,
+local/test có thể bật `DEV_STATIC_IDENTITY_ENABLED`; cấu hình này bị từ chối ở production.
+Chỉ persist khi downstream
 EOF bình thường và có assistant text; lưu original user query + exact concatenated assistant text.
 Không ghi partial turn khi lỗi hoặc disconnect được phát hiện. Write lỗi chỉ log/metric, không thêm
 `gateway_error` vào response đã trả text. Xem runbook về giới hạn durability/cancellation.

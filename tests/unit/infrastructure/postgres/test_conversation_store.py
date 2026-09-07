@@ -21,6 +21,8 @@ from app.infrastructure.postgres.conversation_store import (
 )
 from app.infrastructure.postgres.schema import EXPECTED_SCHEMA_REVISION
 
+USER_ID = "user-1"
+
 
 class FakeMappings:
     def __init__(self, rows: list[dict[str, Any]]) -> None:
@@ -170,32 +172,65 @@ async def test_read_recent_returns_chronological_domain_messages() -> None:
     ]
     connection = FakeConnection([FakeResult(rows=rows)])
 
-    result = await adapter(connection).read_recent("session-1", 10)
+    result = await adapter(connection).read_recent(USER_ID, "session-1", 10)
 
     assert [item.role for item in result] == [ConversationRole.USER, ConversationRole.ASSISTANT]
     assert [item.content for item in result] == ["Xin chào", "Chào bạn"]
     assert all(item.session_id == "session-1" for item in result)
     assert "LIMIT" in str(connection.calls[0][0])
+    assert "conversations.user_id" in str(connection.calls[0][0])
 
 
-@pytest.mark.parametrize("session_id,limit", [("", 1), ("session-1", 0)])
-async def test_read_recent_validates_arguments(session_id: str, limit: int) -> None:
+async def test_read_through_boundary_requires_owned_assistant_and_orders_messages() -> None:
+    rows = [
+        {
+            "turn_id": "turn-1",
+            "role": role,
+            "content": role,
+            "message_timestamp": datetime(2026, 9, 3, 8, index, tzinfo=UTC),
+            "schema_version": 1,
+            "turn_sequence": 1,
+            "message_index": index,
+        }
+        for index, role in enumerate(("user", "assistant"))
+    ]
+    connection = FakeConnection([FakeResult(rows=rows)], scalar="session-1")
+
+    result = await adapter(connection).read_through_boundary(USER_ID, uuid4(), 42, 10)
+
+    assert [message.role for message in result] == [
+        ConversationRole.USER,
+        ConversationRole.ASSISTANT,
+    ]
+    assert "message_id <=" in str(connection.calls[1][0])
+
+
+async def test_read_through_boundary_rejects_unowned_boundary() -> None:
+    with pytest.raises(ConversationStoreProtocolError):
+        await adapter(FakeConnection(scalar=None)).read_through_boundary(USER_ID, uuid4(), 42, 10)
+
+
+@pytest.mark.parametrize(
+    "user_id,session_id,limit",
+    [("", "session-1", 1), (USER_ID, "", 1), (USER_ID, "session-1", 0)],
+)
+async def test_read_recent_validates_arguments(user_id: str, session_id: str, limit: int) -> None:
     with pytest.raises(ValueError):
-        await adapter(FakeConnection()).read_recent(session_id, limit)
+        await adapter(FakeConnection()).read_recent(user_id, session_id, limit)
 
 
 async def test_read_recent_maps_malformed_row() -> None:
     connection = FakeConnection([FakeResult(rows=[{"message_timestamp": "not-a-date"}])])
 
     with pytest.raises(ConversationStoreProtocolError):
-        await adapter(connection).read_recent("session-1", 10)
+        await adapter(connection).read_recent(USER_ID, "session-1", 10)
 
 
 async def test_read_recent_maps_database_failure() -> None:
     connection = FakeConnection(error=IntegrityError("statement", {}, Exception("failure")))
 
     with pytest.raises(ConversationStoreOperationError):
-        await adapter(connection).read_recent("session-1", 10)
+        await adapter(connection).read_recent(USER_ID, "session-1", 10)
 
 
 async def test_append_turn_inserts_atomic_pair_and_advances_sequence() -> None:
@@ -205,17 +240,25 @@ async def test_append_turn_inserts_atomic_pair_and_advances_sequence() -> None:
             FakeResult(),
             FakeResult(one=SimpleNamespace(conversation_id=conversation_id, next_turn_sequence=3)),
             FakeResult(rows=[]),
-            FakeResult(),
+            FakeResult(
+                rows=[
+                    {"message_id": 10, "message_index": 0},
+                    {"message_id": 11, "message_index": 1},
+                ]
+            ),
             FakeResult(),
         ]
     )
 
-    inserted = await adapter(connection).append_turn(
+    result = await adapter(connection).append_turn(
+        USER_ID,
         message(ConversationRole.USER, content="Câu hỏi"),
         message(ConversationRole.ASSISTANT, content="Trả lời"),
     )
 
-    assert inserted is True
+    assert result.inserted is True
+    assert result.reference.boundary_message_id == 11
+    assert result.reference.user_id == USER_ID
     assert len(connection.calls) == 5
     pair = connection.calls[3][1]
     assert isinstance(pair, list)
@@ -229,6 +272,7 @@ async def test_append_turn_returns_false_for_matching_duplicate() -> None:
     existing = [
         {
             "conversation_id": conversation_id,
+            "message_id": 10,
             "message_index": 0,
             "role": "user",
             "content": "Câu hỏi",
@@ -236,6 +280,7 @@ async def test_append_turn_returns_false_for_matching_duplicate() -> None:
         },
         {
             "conversation_id": conversation_id,
+            "message_id": 11,
             "message_index": 1,
             "role": "assistant",
             "content": "Trả lời",
@@ -250,12 +295,14 @@ async def test_append_turn_returns_false_for_matching_duplicate() -> None:
         ]
     )
 
-    inserted = await adapter(connection).append_turn(
+    result = await adapter(connection).append_turn(
+        USER_ID,
         message(ConversationRole.USER, content="Câu hỏi"),
         message(ConversationRole.ASSISTANT, content="Trả lời"),
     )
 
-    assert inserted is False
+    assert result.inserted is False
+    assert result.reference.boundary_message_id == 11
     assert len(connection.calls) == 3
 
 
@@ -295,6 +342,7 @@ async def test_append_turn_rejects_partial_or_conflicting_duplicate(
 
     with pytest.raises(ConversationStoreProtocolError):
         await adapter(connection).append_turn(
+            USER_ID,
             message(ConversationRole.USER),
             message(ConversationRole.ASSISTANT),
         )
@@ -305,6 +353,7 @@ async def test_append_turn_rejects_missing_conversation_after_lock() -> None:
 
     with pytest.raises(ConversationStoreProtocolError):
         await adapter(connection).append_turn(
+            USER_ID,
             message(ConversationRole.USER),
             message(ConversationRole.ASSISTANT),
         )
@@ -330,7 +379,7 @@ async def test_append_turn_validates_pair(
     assistant: ConversationMessage,
 ) -> None:
     with pytest.raises(ValueError):
-        await adapter(FakeConnection()).append_turn(user, assistant)
+        await adapter(FakeConnection()).append_turn(USER_ID, user, assistant)
 
 
 async def test_append_turn_maps_database_integrity_error() -> None:
@@ -338,6 +387,7 @@ async def test_append_turn_maps_database_integrity_error() -> None:
 
     with pytest.raises(ConversationStoreOperationError):
         await adapter(FakeConnection(error=error)).append_turn(
+            USER_ID,
             message(ConversationRole.USER),
             message(ConversationRole.ASSISTANT),
         )

@@ -16,6 +16,8 @@ from app.infrastructure.postgres.schema import conversations
 from scripts.smoke_gateway import iter_sse_events
 from tests.support.week2_cases import CASES
 
+SMOKE_USER_ID = "local-smoke-user"
+
 
 async def run(gateway_url: str, mock_kira_url: str, database_url: str) -> None:
     engine = create_async_engine(database_url)
@@ -53,7 +55,7 @@ async def run(gateway_url: str, mock_kira_url: str, database_url: str) -> None:
                         if item["type"] == "text"
                     )
                     assert text == "Mock KiRa answer"
-                recent = await store.read_recent(session_id, 10)
+                recent = await store.read_recent(SMOKE_USER_ID, session_id, 10)
                 assert [message.content for message in recent] == [
                     case.previous,
                     "Mock KiRa answer",

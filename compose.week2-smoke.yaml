@@ -2,11 +2,11 @@
 name: kira-context-week2
 
 x-runtime: &runtime
-  image: kira-context:0.2.0
+  image: kira-context:0.3.0
 
 services:
   postgres:
-    image: postgres:16-bookworm
+    image: pgvector/pgvector:0.8.6-pg16-bookworm
     environment:
       POSTGRES_DB: kira_smoke
       POSTGRES_USER: kira
@@ -53,7 +53,7 @@ services:
     build:
       context: .
       args:
-        APP_VERSION: 0.2.0
+        APP_VERSION: 0.3.0
     environment:
       KIRA_BASE_URL: http://mock-kira:8000
       KIRA_USERNAME: local-smoke
@@ -61,6 +61,9 @@ services:
       DATABASE_URL: postgresql+asyncpg://kira:local-smoke-only@postgres:5432/kira_smoke
       VLLM_BASE_URL: http://mock-vllm:8000
       VLLM_MODEL: local-contract-stub
+      APP_ENVIRONMENT: test
+      DEV_STATIC_IDENTITY_ENABLED: "true"
+      DEV_STATIC_USER_ID: local-smoke-user
     ports:
       - "127.0.0.1:18000:8000"
     depends_on:

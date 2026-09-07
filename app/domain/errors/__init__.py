@@ -16,6 +16,14 @@ from app.domain.errors.kira import (
     KiraProtocolError,
     KiraTimeoutError,
 )
+from app.domain.errors.memory import (
+    LongTermMemoryConfigurationError,
+    LongTermMemoryConnectionError,
+    LongTermMemoryError,
+    LongTermMemoryOperationError,
+    LongTermMemoryProtocolError,
+    LongTermMemoryTimeoutError,
+)
 from app.domain.errors.query_rewriter import (
     QueryRewriterConfigurationError,
     QueryRewriterConnectionError,
@@ -38,6 +46,12 @@ __all__ = [
     "KiraMalformedSseError",
     "KiraProtocolError",
     "KiraTimeoutError",
+    "LongTermMemoryConfigurationError",
+    "LongTermMemoryConnectionError",
+    "LongTermMemoryError",
+    "LongTermMemoryOperationError",
+    "LongTermMemoryProtocolError",
+    "LongTermMemoryTimeoutError",
     "QueryRewriterConfigurationError",
     "QueryRewriterConnectionError",
     "QueryRewriterError",

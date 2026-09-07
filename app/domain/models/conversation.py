@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
+from uuid import UUID
 
 CONVERSATION_MESSAGE_SCHEMA_VERSION = 1
 
@@ -46,3 +47,42 @@ class ConversationMessage:
             or self.schema_version != CONVERSATION_MESSAGE_SCHEMA_VERSION
         ):
             raise ValueError("unsupported conversation message schema version")
+
+
+@dataclass(frozen=True, slots=True)
+class CompletedTurnReference:
+    """Stable database boundary for one fully persisted user/assistant turn."""
+
+    user_id: str
+    session_id: str
+    conversation_id: UUID
+    turn_id: str
+    boundary_message_id: int
+
+    def __post_init__(self) -> None:
+        for field_name in ("user_id", "session_id", "turn_id"):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{field_name} must not be empty")
+        if not isinstance(self.conversation_id, UUID):
+            raise ValueError("conversation_id must be a UUID")
+        if (
+            isinstance(self.boundary_message_id, bool)
+            or not isinstance(self.boundary_message_id, int)
+            or self.boundary_message_id < 1
+        ):
+            raise ValueError("boundary_message_id must be positive")
+
+
+@dataclass(frozen=True, slots=True)
+class AppendTurnResult:
+    """Transactional append outcome including its exact persisted boundary."""
+
+    inserted: bool
+    reference: CompletedTurnReference
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.inserted, bool):
+            raise ValueError("inserted must be a boolean")
+        if not isinstance(self.reference, CompletedTurnReference):
+            raise ValueError("reference must be a completed turn reference")

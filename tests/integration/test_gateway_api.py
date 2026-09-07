@@ -1,6 +1,7 @@
 import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from uuid import UUID, uuid4
 
 import httpx
 import pytest
@@ -9,7 +10,11 @@ from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 from app.config.settings import Settings
 from app.domain.errors.conversation import ConversationStoreConfigurationError
 from app.domain.errors.kira import KiraHttpError, KiraTimeoutError
-from app.domain.models.conversation import ConversationMessage
+from app.domain.models.conversation import (
+    AppendTurnResult,
+    CompletedTurnReference,
+    ConversationMessage,
+)
 from app.domain.models.kira import KiraAuthResult, KiraEventKind, KiraStreamEvent
 from app.infrastructure.postgres.managed_store import ManagedPostgresConversationStore
 from app.infrastructure.postgres.schema import EXPECTED_SCHEMA_REVISION
@@ -24,6 +29,9 @@ def make_settings() -> Settings:
         kira_basic_auth="basic-credential",
         vllm_base_url="http://rewriter.test",
         vllm_model="test-model",
+        app_environment="test",
+        dev_static_identity_enabled=True,
+        dev_static_user_id="test-user",
     )
 
 
@@ -78,6 +86,7 @@ class FakeKiraClient:
 class FakeConversationStore:
     async def read_recent(
         self,
+        user_id: str,
         session_id: str,
         limit: int,
     ) -> tuple[ConversationMessage, ...]:
@@ -85,10 +94,29 @@ class FakeConversationStore:
 
     async def append_turn(
         self,
+        user_id: str,
         user_message: ConversationMessage,
         assistant_message: ConversationMessage,
-    ) -> bool:
-        return True
+    ) -> AppendTurnResult:
+        return AppendTurnResult(
+            True,
+            CompletedTurnReference(
+                user_id,
+                user_message.session_id,
+                uuid4(),
+                user_message.turn_id,
+                2,
+            ),
+        )
+
+    async def read_through_boundary(
+        self,
+        user_id: str,
+        conversation_id: UUID,
+        boundary_message_id: int,
+        limit: int,
+    ) -> tuple[ConversationMessage, ...]:
+        return ()
 
 
 class UnavailableConnectionContext:

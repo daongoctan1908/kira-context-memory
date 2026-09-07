@@ -1,12 +1,21 @@
 """In-memory test doubles only; never used as runtime persistence or business answers."""
 
 from datetime import UTC, datetime
+from uuid import UUID, uuid4
 
 from app.application.services.context_builder import ContextBuilder
 from app.application.use_cases.handle_chat import HandleChatUseCase
 from app.domain.models.context import ConversationContext
-from app.domain.models.conversation import ConversationMessage, ConversationRole
+from app.domain.models.conversation import (
+    AppendTurnResult,
+    CompletedTurnReference,
+    ConversationMessage,
+    ConversationRole,
+)
+from app.domain.models.identity import AuthenticatedPrincipal
 from app.infrastructure.observability.context import ContextTelemetry
+
+PRINCIPAL = AuthenticatedPrincipal("test-user")
 
 
 def pair(session_id="session-1", turn_id="old-turn", user="old query", assistant="old answer"):
@@ -24,20 +33,45 @@ class MemoryStore:
         self.write_error = write_error
         self.inserted = inserted
         self.reads = []
+        self.read_users = []
         self.writes = []
+        self.write_users = []
+        self.conversation_id = uuid4()
 
-    async def read_recent(self, session_id, limit):
+    async def read_recent(self, user_id, session_id, limit):
         self.reads.append((session_id, limit))
+        self.read_users.append(user_id)
         if self.read_error:
             raise self.read_error
         return self.recent[-limit:]
 
-    async def append_turn(self, user, assistant):
+    async def append_turn(self, user_id, user, assistant):
         if self.write_error:
             raise self.write_error
         self.writes.append((user, assistant))
+        self.write_users.append(user_id)
         self.recent += (user, assistant)
-        return self.inserted
+        return AppendTurnResult(
+            self.inserted,
+            CompletedTurnReference(
+                user_id,
+                user.session_id,
+                self.conversation_id,
+                user.turn_id,
+                len(self.recent),
+            ),
+        )
+
+    async def read_through_boundary(
+        self,
+        user_id: str,
+        conversation_id: UUID,
+        boundary_message_id: int,
+        limit: int,
+    ):
+        if user_id != PRINCIPAL.user_id or conversation_id != self.conversation_id:
+            return ()
+        return self.recent[:boundary_message_id][-limit:]
 
 
 class FakeRewriter:

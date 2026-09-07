@@ -36,6 +36,106 @@ class TestPGVector(unittest.TestCase):
         self.test_payloads = [{"key": "value1"}, {"key": "value2"}]
         self.test_ids = [str(uuid.uuid4()), str(uuid.uuid4())]
 
+    def test_runtime_mode_rejects_missing_collection_without_ddl(self):
+        pgvector = PGVector(
+            dbname="unused",
+            collection_name="memories",
+            embedding_model_dims=3,
+            user=None,
+            password=None,
+            host=None,
+            port=None,
+            diskann=False,
+            hnsw=True,
+            connection_pool=self.mock_pool_psycopg,
+            schema_name="memory",
+            auto_create=False,
+        )
+
+        with (
+            patch.object(pgvector, "list_cols", return_value=[]),
+            patch.object(pgvector, "create_col") as create_col,
+            self.assertRaisesRegex(RuntimeError, "DDL is disabled"),
+        ):
+            pgvector._ensure_collection()
+
+        create_col.assert_not_called()
+
+    def test_runtime_mode_blocks_all_explicit_ddl_methods(self):
+        pgvector = PGVector(
+            dbname="unused",
+            collection_name="memories",
+            embedding_model_dims=3,
+            user=None,
+            password=None,
+            host=None,
+            port=None,
+            diskann=False,
+            hnsw=True,
+            connection_pool=self.mock_pool_psycopg,
+            schema_name="memory",
+            auto_create=False,
+        )
+
+        for operation in (pgvector.create_col, pgvector.delete_col, pgvector.reset):
+            with self.subTest(operation=operation.__name__), self.assertRaisesRegex(
+                RuntimeError, "DDL is disabled"
+            ):
+                operation()
+
+        self.mock_pool_psycopg.connection.assert_not_called()
+
+    def test_runtime_mode_accepts_initialized_collection(self):
+        pgvector = PGVector(
+            dbname="unused",
+            collection_name="memories",
+            embedding_model_dims=3,
+            user=None,
+            password=None,
+            host=None,
+            port=None,
+            diskann=False,
+            hnsw=True,
+            connection_pool=self.mock_pool_psycopg,
+            schema_name="memory",
+            auto_create=False,
+        )
+
+        with (
+            patch.object(pgvector, "list_cols", return_value=["memories"]),
+            patch.object(pgvector, "create_col") as create_col,
+        ):
+            pgvector._ensure_collection()
+
+        self.assertTrue(pgvector._collection_ensured)
+        create_col.assert_not_called()
+
+    def test_schema_qualified_collection_and_discovery(self):
+        pgvector = PGVector(
+            dbname="unused",
+            collection_name="memories",
+            embedding_model_dims=3,
+            user=None,
+            password=None,
+            host=None,
+            port=None,
+            diskann=False,
+            hnsw=True,
+            connection_pool=self.mock_pool_psycopg,
+            schema_name="memory",
+            auto_create=False,
+        )
+        self.mock_cursor.fetchall.return_value = [("memories",)]
+
+        self.assertIn("Identifier('memory', 'memories')", repr(pgvector._col()))
+        with patch.object(pgvector, "_get_cursor") as get_cursor:
+            get_cursor.return_value.__enter__.return_value = self.mock_cursor
+            self.assertEqual(pgvector.list_cols(), ["memories"])
+        self.mock_cursor.execute.assert_called_once_with(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = %s",
+            ("memory",),
+        )
+
     @patch('mem0.vector_stores.pgvector.PSYCOPG_VERSION', 3)
     @patch('mem0.vector_stores.pgvector.ConnectionPool')
     def test_init_with_individual_params_psycopg3(self, mock_psycopg_pool):
