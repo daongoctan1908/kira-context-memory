@@ -20,6 +20,7 @@ venv/
 # Build artifacts
 build/
 dist/
+artifacts/
 *.egg-info/
 
 # IDE and OS files

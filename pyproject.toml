@@ -42,6 +42,7 @@ addopts = "--strict-markers --strict-config --cov=app --cov=worker --cov-report=
 asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
+    "memory_llm_integration: requires RUN_MEMORY_POLICY_EVAL=1 and a configured memory LLM",
     "postgres_integration: requires POSTGRES_TEST_URL pointing to a disposable PostgreSQL database",
 ]
 

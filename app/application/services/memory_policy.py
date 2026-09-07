@@ -14,6 +14,7 @@ MEMORY_TAXONOMY: tuple[str, ...] = (
 MEMORY_EXTRACTION_INSTRUCTIONS = f"""Policy version: {MEMORY_POLICY_VERSION}
 
 Extract only durable, reusable memories that are grounded in explicit user-provided information.
+If this policy conflicts with general Mem0 extraction guidance, this policy takes precedence.
 
 Use this taxonomy only as internal extraction guidance:
 - USER_CONTEXT: explicit user responsibility, business scope, region, domain, or service context.
