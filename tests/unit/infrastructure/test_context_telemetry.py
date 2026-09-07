@@ -33,12 +33,9 @@ def test_metrics_have_bounded_labels_and_per_application_registry():
     telemetry.rewrite_observed("success", 0.12)
     telemetry.degraded("private-correlation", "rewriter", "PrivateError", "original_query")
     telemetry.conversation_write_observed("inserted")
-    telemetry.memory_formation_observed("processed", 0.25, 2)
     payload = generate_latest(telemetry.registry).decode()
     assert "private-correlation" not in payload
     assert "PrivateError" not in payload
     assert "session_id" not in payload and "turn_id" not in payload
     assert "kira_context_estimated_recent_tokens_sum 45.0" in payload
-    assert 'kira_memory_formation_total{outcome="processed"} 1.0' in payload
-    assert "kira_memory_formation_events_sum 2.0" in payload
     assert ContextTelemetry().registry is not telemetry.registry

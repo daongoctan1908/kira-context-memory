@@ -2,18 +2,9 @@
 
 from typing import Literal, Protocol
 
-ContextOperation = Literal[
-    "identity",
-    "postgres_read",
-    "postgres_write",
-    "rewriter",
-    "memory_dispatch",
-    "memory_source_read",
-    "memory_formation",
-]
+ContextOperation = Literal["identity", "postgres_read", "postgres_write", "rewriter"]
 RewriteOutcome = Literal["success", "error", "bypass"]
 WriteOutcome = Literal["inserted", "duplicate", "error"]
-MemoryFormationOutcome = Literal["processed", "no_change", "error", "cancelled"]
 
 
 class ContextObserverPort(Protocol):
@@ -30,10 +21,3 @@ class ContextObserverPort(Protocol):
     ) -> None: ...
 
     def conversation_write_observed(self, outcome: WriteOutcome) -> None: ...
-
-    def memory_formation_observed(
-        self,
-        outcome: MemoryFormationOutcome,
-        seconds: float,
-        event_count: int,
-    ) -> None: ...

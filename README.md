@@ -10,7 +10,8 @@ Batch A-D của Tuần 1 cung cấp Gateway baseline hoàn chỉnh để live sm
 Batch A-D của Tuần 2 tích hợp short-term context qua PostgreSQL và vLLM. Tuần 3
 Batch A1 bổ sung identity/user scope và nền tảng Mem0/pgvector; Batch B1-B2 thêm taxonomy policy
 versioned theo native Mem0 V3 dual-source cùng synthetic acceptance gate cho memory extraction.
-Batch B3 nối completed-turn formation vào `/chat`; online retrieval vẫn để Batch C:
+Batch B3 bổ sung direct completed-turn formation use case; Batch B4 nghiệm thu formation trên
+PostgreSQL/pgvector thật với provider doubles deterministic. LTM vẫn chưa wire vào `/chat`:
 
 - cấu trúc presentation, application, domain, infrastructure, config và worker;
 - dependency/tooling bằng Python 3.11, `uv`, Ruff và pytest;
@@ -34,12 +35,12 @@ Batch B3 nối completed-turn formation vào `/chat`; online retrieval vẫn đ�
   vẫn có hành vi additive nhưng adapter không ép kết quả thành ADD-only;
 - `ProcessMemoryUseCase` đọc bounded snapshot kết thúc đúng PostgreSQL
   `boundary_message_id`, sau đó giao lifecycle formation cho native Mem0 V3;
-- chỉ pair mới commit thành công mới schedule formation trong background; duplicate, partial stream,
-  PostgreSQL write lỗi và request thiếu trusted identity không được schedule;
-- formation/read-source lỗi chỉ log và metric ở chế độ degraded, không đổi KiRa SSE; task được drain
-  có deadline khi shutdown nhưng chưa có durable queue/delivery guarantee;
+- use case được gọi trực tiếp bởi test/dev harness từ reference đã persist; Gateway SSE không gọi
+  formation và repository chưa có queue, worker loop hay delivery guarantee;
 - pgvector `0.8.6` dev image, embedding dimension probe và admin-owned memory schema;
   Gateway/worker runtime cấu hình `auto_create=false` và không chạy DDL.
+- B4 kiểm tra sáu taxonomy positive, sáu negative case, formula exact, duplicate boundary và
+  cross-user isolation bằng conversation store + Mem0 adapter + pgvector thật.
 
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem
@@ -141,6 +142,17 @@ uv run pytest tests/unit/application tests/contract/llm --no-cov
 
 `--no-cov` chỉ dành cho focused test subset; full `uv run pytest` vẫn bắt buộc coverage ≥90%.
 
+Chạy Week 3 B4 formation gate trên PostgreSQL/pgvector disposable:
+
+```powershell
+$env:POSTGRES_TEST_URL="postgresql+asyncpg://kira:replace_me@127.0.0.1:5432/kira_context"
+uv run pytest tests/integration/postgres/test_memory_formation.py --no-cov
+```
+
+Gate này dùng deterministic in-process doubles cho embedding và memory LLM để kiểm tra pipeline,
+DB persistence, metadata, dedup và isolation ổn định. Nó không thay thế semantic gate B2 trên model
+nội bộ thật; policy quality vẫn là `NOT_RUN` nếu chưa cấu hình endpoint được phê duyệt.
+
 ### Chạy Gateway
 
 Chạy Gateway sau khi đã cấu hình `.env`:
@@ -185,8 +197,7 @@ schema với HTTP 502; timeout trả HTTP 504.
 - `GET /ready`: dependency graph local đã khởi tạo; không probe KiRa. PostgreSQL connection
   outage tạm thời là degraded capability. Configuration/schema mismatch làm startup fail;
   nếu phát hiện mismatch lúc runtime, trả 503 đến khi schema được xác minh lại thành công.
-- `GET /metrics`: recent count/estimated tokens, rewrite latency/outcome, degradation, conversation
-  write outcome và background memory-formation outcome/latency/event count.
+- `GET /metrics`: recent count/estimated tokens, rewrite latency/outcome, degradation và write outcome.
 
 Turn ID do Gateway sinh; client không được gửi `turn_id`/`user_id`. `KiRa /authenticate` chỉ
 xác thực service account với KiRa, không được dùng làm danh tính end-user. Khi chưa có real auth,
@@ -196,12 +207,11 @@ EOF bình thường và có assistant text; lưu original user query + exact con
 Không ghi partial turn khi lỗi hoặc disconnect được phát hiện. Write lỗi chỉ log/metric, không thêm
 `gateway_error` vào response đã trả text. Xem runbook về giới hạn durability/cancellation.
 
-Khi `LTM_ENABLED=true`, một completed turn mới được schedule để formation sau khi PostgreSQL append
-trả về exact boundary. `MEMORY_FORMATION_MESSAGE_LIMIT` là số message chẵn (mặc định 10), nhờ đó
-snapshot chỉ chứa nguyên pair user/assistant và current completed turn luôn ở cuối. Gateway gửi cả
-user lẫn assistant message cho native Mem0 V3 để giữ đúng ngữ cảnh xác nhận/reference; không gọi
-`update()`/`delete()` có chủ đích và không ép action provider thành ADD. Background runner không phải
-queue: process crash có thể làm mất work đang chờ, nên B3 chưa tuyên bố exactly-once/durable delivery.
+`MEMORY_FORMATION_MESSAGE_LIMIT` là số message chẵn (mặc định 10), nhờ đó direct formation snapshot
+chỉ chứa nguyên pair user/assistant và current completed turn luôn ở cuối. Harness gửi cả user lẫn
+assistant message cho native Mem0 V3 để giữ đúng ngữ cảnh xác nhận/reference; không gọi
+`update()`/`delete()` có chủ đích và không ép action provider thành ADD. Gateway chưa tự gọi
+formation; online lifecycle wiring và durable delivery đều nằm ngoài Batch B.
 
 `CONVERSATION_OPERATION_TIMEOUT_SECONDS=5` giới hạn tổng thời gian mỗi read/write (kể cả chờ pool).
 Để chạy ngay stack cô lập với mock KiRa/vLLM và DB thật:

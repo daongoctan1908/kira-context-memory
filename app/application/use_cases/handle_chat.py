@@ -11,11 +11,7 @@ from app.application.services.context_builder import ContextBuilder
 from app.domain.errors.conversation import ConversationStoreError, ConversationStoreProtocolError
 from app.domain.errors.query_rewriter import QueryRewriterError
 from app.domain.models.chat import ChatCommand
-from app.domain.models.conversation import (
-    CompletedTurnReference,
-    ConversationMessage,
-    ConversationRole,
-)
+from app.domain.models.conversation import ConversationMessage, ConversationRole
 from app.domain.models.identity import AuthenticatedPrincipal
 from app.domain.models.kira import KiraStreamEvent
 from app.domain.ports.context_observer import ContextObserverPort
@@ -87,7 +83,6 @@ class HandleChatUseCase:
         observer: ContextObserverPort,
         max_recent_messages: int = 10,
         store_timeout_seconds: float = 5.0,
-        on_turn_completed: Callable[[CompletedTurnReference, str], None] | None = None,
     ) -> None:
         self._kira_client = kira_client
         self._store = conversation_store
@@ -96,7 +91,6 @@ class HandleChatUseCase:
         self._observer = observer
         self._recent_limit = max_recent_messages
         self._store_timeout = store_timeout_seconds
-        self._on_turn_completed = on_turn_completed
 
     async def execute(
         self,
@@ -155,18 +149,6 @@ class HandleChatUseCase:
                 self._observer.conversation_write_observed(
                     "inserted" if result.inserted else "duplicate"
                 )
-                if result.inserted and self._on_turn_completed is not None:
-                    try:
-                        self._on_turn_completed(result.reference, correlation_id)
-                    except Exception as error:
-                        # Dispatch is optional and must never alter the KiRa answer contract.
-                        self._observer.memory_formation_observed("error", 0, 0)
-                        self._observer.degraded(
-                            correlation_id,
-                            "memory_dispatch",
-                            type(error).__name__,
-                            "answer_without_ltm_write",
-                        )
 
         return ChatStreamSession(source, on_complete=persist)
 
