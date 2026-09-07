@@ -56,16 +56,42 @@ class MemorySource:
 
 
 @dataclass(frozen=True, slots=True)
-class MemoryProcessResult:
-    """ADD-only formation outcome; this is not the legacy Mem0 action engine."""
+class MemoryLifecycleEvent:
+    """One provider-neutral lifecycle result returned by memory formation."""
 
-    added_memory_ids: tuple[str, ...] = ()
+    action: str
+    memory_id: str | None = None
+    content: str | None = None
 
     def __post_init__(self) -> None:
-        if any(not isinstance(value, str) or not value.strip() for value in self.added_memory_ids):
-            raise ValueError("added memory IDs must not be empty")
-        if len(set(self.added_memory_ids)) != len(self.added_memory_ids):
-            raise ValueError("added memory IDs must be unique")
+        if not isinstance(self.action, str) or not self.action.strip():
+            raise ValueError("memory lifecycle action must not be empty")
+        for field_name in ("memory_id", "content"):
+            value = getattr(self, field_name)
+            if value is not None and (not isinstance(value, str) or not value.strip()):
+                raise ValueError(f"{field_name} must be a non-empty string when present")
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryProcessResult:
+    """Ordered lifecycle events produced by one memory-formation operation."""
+
+    events: tuple[MemoryLifecycleEvent, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.events, tuple) or any(
+            not isinstance(event, MemoryLifecycleEvent) for event in self.events
+        ):
+            raise ValueError("events must be a tuple of memory lifecycle events")
+
+    @property
+    def added_memory_ids(self) -> tuple[str, ...]:
+        """Return ADD identifiers for compatibility with the original A1 contract."""
+        return tuple(
+            event.memory_id
+            for event in self.events
+            if event.action == "ADD" and event.memory_id is not None
+        )
 
     @property
     def added(self) -> bool:

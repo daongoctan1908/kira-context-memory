@@ -14,9 +14,10 @@
   bounded snapshot ending at that boundary.
 - `LongTermMemoryPort` keeps Mem0 outside domain/application. `Mem0Adapter` enforces a `user_id`
   filter on search and rejects any result whose owner does not match.
-- Formation calls pristine Mem0 v2.0.20 V3 `add(..., infer=True)` only. The adapter has no update
-  or delete path and rejects non-`ADD` result events. Taxonomy and custom extraction policy are
-  intentionally deferred to Batch B.
+- Formation calls pristine Mem0 v2.0.20 V3 `add(..., infer=True)` only. The current engine returns
+  `ADD` events or an empty result, but the adapter preserves any well-formed lifecycle action
+  returned by Mem0 instead of imposing an ADD-only contract. The adapter still has no explicit
+  update or delete path. Taxonomy and custom extraction policy are deferred to Batch B.
 
 ## Database ownership
 
@@ -54,7 +55,7 @@ observability remain later Week 3 checkpoints.
 ## Local checkpoint evidence — 2026-09-07
 
 - Ruff lint and format checks pass.
-- Full suite: 268 passed, 16 environment-gated PostgreSQL tests skipped; coverage 91.17%.
+- Full suite: 284 passed, 16 environment-gated PostgreSQL tests skipped; coverage 91.61%.
 - PostgreSQL/pgvector suite against the pinned container: 16 passed, including user/session
   isolation, exact boundary, migration revision, and memory schema initialization.
 - Internal Mem0 pgvector provider suite: 91 passed; runtime `auto_create=false` does not issue DDL.

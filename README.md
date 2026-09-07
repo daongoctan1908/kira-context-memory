@@ -28,7 +28,8 @@ Batch A1 bổ sung identity/user scope và nền tảng Mem0/pgvector, chưa wir
   đọc/ghi contextual data nhưng KiRa current query vẫn hoạt động;
 - conversation được scope bởi `(user_id, session_id)` và completed append trả exact
   `boundary_message_id` để worker tương lai đọc đúng snapshot từ PostgreSQL;
-- `LongTermMemoryPort`, Mem0 adapter user-scoped và pristine V3 ADD-only formation;
+- `LongTermMemoryPort`, Mem0 adapter user-scoped và lifecycle-neutral; engine V3 hiện tại
+  vẫn có hành vi additive nhưng adapter không ép kết quả thành ADD-only;
 - pgvector `0.8.6` dev image, embedding dimension probe và admin-owned memory schema;
   Gateway/worker runtime cấu hình `auto_create=false` và không chạy DDL.
 

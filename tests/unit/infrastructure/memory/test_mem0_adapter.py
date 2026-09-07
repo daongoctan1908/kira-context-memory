@@ -15,7 +15,7 @@ from app.domain.models.conversation import (
     ConversationMessage,
     ConversationRole,
 )
-from app.domain.models.memory import MemorySource
+from app.domain.models.memory import MemoryLifecycleEvent, MemorySource
 from app.infrastructure.memory.mem0_adapter import (
     Mem0Adapter,
     build_mem0_config,
@@ -172,6 +172,7 @@ async def test_process_memory_calls_only_add_with_exact_boundary_metadata():
 
     result = await adapter(client).process_memory(memory_source)
 
+    assert result.events == (MemoryLifecycleEvent("ADD", "memory-1", "preference"),)
     assert result.added_memory_ids == ("memory-1",)
     messages, kwargs = client.add_calls[0]
     assert messages == [
@@ -185,8 +186,56 @@ async def test_process_memory_calls_only_add_with_exact_boundary_metadata():
     assert not hasattr(client, "delete")
 
 
-async def test_process_memory_rejects_non_add_event():
-    client = FakeMem0(add_response={"results": [{"id": "memory-1", "event": "UPDATE"}]})
+async def test_process_memory_preserves_ordered_lifecycle_actions():
+    client = FakeMem0(
+        add_response={
+            "results": [
+                {"id": "memory-1", "memory": "new", "event": "ADD"},
+                {"id": "memory-1", "memory": "updated", "event": "UPDATE"},
+                {"id": "memory-2", "event": "DELETE"},
+                {"event": "NONE"},
+                {"id": "memory-3", "event": "ARCHIVE", "provider_field": "ignored"},
+            ]
+        }
+    )
+
+    result = await adapter(client).process_memory(source())
+
+    assert result.events == (
+        MemoryLifecycleEvent("ADD", "memory-1", "new"),
+        MemoryLifecycleEvent("UPDATE", "memory-1", "updated"),
+        MemoryLifecycleEvent("DELETE", "memory-2"),
+        MemoryLifecycleEvent("NONE"),
+        MemoryLifecycleEvent("ARCHIVE", "memory-3"),
+    )
+    assert result.added_memory_ids == ("memory-1",)
+
+
+async def test_process_memory_accepts_empty_results():
+    result = await adapter(FakeMem0(add_response={"results": []})).process_memory(source())
+
+    assert result.events == ()
+    assert result.added is False
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        "not-a-response",
+        {"unexpected": []},
+        {"results": {}},
+        {"results": ["not-a-row"]},
+        {"results": [{}]},
+        {"results": [{"event": ""}]},
+        {"results": [{"event": 42}]},
+        {"results": [{"event": "ADD", "id": ""}]},
+        {"results": [{"event": "ADD", "memory": " "}]},
+        {"results": [{"event": "DELETE", "id": 42}]},
+        {"results": [{"event": "UPDATE", "memory": []}]},
+    ],
+)
+async def test_process_memory_rejects_malformed_lifecycle_rows(response):
+    client = FakeMem0(add_response=response)
 
     with pytest.raises(LongTermMemoryProtocolError):
         await adapter(client).process_memory(source())

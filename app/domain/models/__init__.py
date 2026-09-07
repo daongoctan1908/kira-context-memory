@@ -11,7 +11,12 @@ from app.domain.models.conversation import (
 )
 from app.domain.models.identity import AuthenticatedPrincipal
 from app.domain.models.kira import KiraAuthResult, KiraEventKind, KiraStreamEvent
-from app.domain.models.memory import LongTermMemory, MemoryProcessResult, MemorySource
+from app.domain.models.memory import (
+    LongTermMemory,
+    MemoryLifecycleEvent,
+    MemoryProcessResult,
+    MemorySource,
+)
 
 __all__ = [
     "CONVERSATION_MESSAGE_SCHEMA_VERSION",
@@ -26,6 +31,7 @@ __all__ = [
     "KiraEventKind",
     "KiraStreamEvent",
     "LongTermMemory",
+    "MemoryLifecycleEvent",
     "MemoryProcessResult",
     "MemorySource",
 ]

@@ -13,7 +13,12 @@ from app.domain.models.conversation import (
 )
 from app.domain.models.identity import AuthenticatedPrincipal
 from app.domain.models.kira import KiraAuthResult
-from app.domain.models.memory import LongTermMemory, MemoryProcessResult, MemorySource
+from app.domain.models.memory import (
+    LongTermMemory,
+    MemoryLifecycleEvent,
+    MemoryProcessResult,
+    MemorySource,
+)
 from app.presentation.schemas.chat import ChatRequest
 
 
@@ -92,7 +97,7 @@ def test_conversation_message_rejects_invalid_values(changes: dict[str, object])
         ConversationMessage(**values)  # type: ignore[arg-type]
 
 
-def test_identity_turn_reference_and_add_only_memory_models() -> None:
+def test_identity_turn_reference_and_memory_lifecycle_models() -> None:
     user = ConversationMessage(
         "session-1",
         "turn-1",
@@ -113,7 +118,15 @@ def test_identity_turn_reference_and_add_only_memory_models() -> None:
     assert AppendTurnResult(True, reference).reference == reference
     assert MemorySource(reference, (user, assistant)).messages == (user, assistant)
     assert LongTermMemory("memory-1", "Thích biểu đồ", 0.9).score == 0.9
-    assert MemoryProcessResult(("memory-1",)).added is True
+    result = MemoryProcessResult(
+        (
+            MemoryLifecycleEvent("ADD", "memory-1", "Thích biểu đồ"),
+            MemoryLifecycleEvent("NONE"),
+        )
+    )
+    assert result.events[1].action == "NONE"
+    assert result.added_memory_ids == ("memory-1",)
+    assert result.added is True
 
 
 @pytest.mark.parametrize(
@@ -122,6 +135,10 @@ def test_identity_turn_reference_and_add_only_memory_models() -> None:
         lambda: AuthenticatedPrincipal(" "),
         lambda: CompletedTurnReference("user", "session", uuid4(), "turn", 0),
         lambda: LongTermMemory("memory", "content", 1.1),
+        lambda: MemoryLifecycleEvent(" "),
+        lambda: MemoryLifecycleEvent("ADD", ""),
+        lambda: MemoryLifecycleEvent("ADD", content=42),
+        lambda: MemoryProcessResult([MemoryLifecycleEvent("ADD")]),
         lambda: MemorySource(
             CompletedTurnReference("user", "session", uuid4(), "turn", 2),
             (

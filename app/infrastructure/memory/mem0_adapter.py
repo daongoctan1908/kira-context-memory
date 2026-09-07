@@ -16,7 +16,12 @@ from app.domain.errors.memory import (
     LongTermMemoryProtocolError,
     LongTermMemoryTimeoutError,
 )
-from app.domain.models.memory import LongTermMemory, MemoryProcessResult, MemorySource
+from app.domain.models.memory import (
+    LongTermMemory,
+    MemoryLifecycleEvent,
+    MemoryProcessResult,
+    MemorySource,
+)
 from app.infrastructure.memory.postgres_admin import normalize_psycopg_dsn
 
 
@@ -114,7 +119,7 @@ def create_mem0_client(settings: Settings) -> AsyncMem0Client:
 
 
 class Mem0Adapter:
-    """User-scoped search and pristine V3 ADD-only formation."""
+    """User-scoped search and lifecycle-neutral Mem0 formation."""
 
     def __init__(
         self,
@@ -197,15 +202,7 @@ class Mem0Adapter:
             rows = response["results"]
             if not isinstance(rows, list):
                 raise ValueError
-            memory_ids: list[str] = []
-            for row in rows:
-                if not isinstance(row, Mapping) or row.get("event") != "ADD":
-                    raise ValueError
-                memory_id = row.get("id")
-                if not isinstance(memory_id, str) or not memory_id.strip():
-                    raise ValueError
-                memory_ids.append(memory_id)
-            return MemoryProcessResult(tuple(memory_ids))
+            return MemoryProcessResult(tuple(self._parse_lifecycle_event(row) for row in rows))
         except (KeyError, TypeError, ValueError) as error:
             raise LongTermMemoryProtocolError from error
 
@@ -251,6 +248,25 @@ class Mem0Adapter:
             content=content,
             score=float(score),
             metadata=dict(metadata_value),
+        )
+
+    @staticmethod
+    def _parse_lifecycle_event(row: object) -> MemoryLifecycleEvent:
+        if not isinstance(row, Mapping):
+            raise ValueError
+        action = row.get("event")
+        memory_id = row.get("id")
+        content = row.get("memory")
+        if not isinstance(action, str) or not action.strip():
+            raise ValueError
+        if memory_id is not None and not isinstance(memory_id, str):
+            raise ValueError
+        if content is not None and not isinstance(content, str):
+            raise ValueError
+        return MemoryLifecycleEvent(
+            action=action,
+            memory_id=memory_id,
+            content=content,
         )
 
     @staticmethod

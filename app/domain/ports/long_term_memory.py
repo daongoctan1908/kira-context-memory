@@ -18,5 +18,5 @@ class LongTermMemoryPort(Protocol):
         ...
 
     async def process_memory(self, source: MemorySource) -> MemoryProcessResult:
-        """Run the upstream ADD-only formation pipeline for one exact source."""
+        """Return the ordered lifecycle outcome for one exact persisted source."""
         ...
