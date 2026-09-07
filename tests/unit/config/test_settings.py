@@ -63,6 +63,7 @@ def test_settings_have_safe_baseline_defaults(monkeypatch) -> None:
     assert settings.ltm_enabled is False
     assert settings.memory_schema == "memory"
     assert settings.memory_collection_name == "memories"
+    assert settings.memory_formation_message_limit == 10
 
 
 def test_settings_hide_postgres_credentials_from_repr(monkeypatch) -> None:
@@ -144,6 +145,18 @@ def test_enabled_ltm_requires_all_runtime_dependencies() -> None:
             kira_username="service-account",
             kira_basic_auth="secret",
             ltm_enabled=True,
+        )
+
+
+@pytest.mark.parametrize("limit", [0, 1, 3])
+def test_memory_formation_limit_must_preserve_turn_pairs(limit: int) -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            _env_file=None,
+            kira_base_url="http://kira.test",
+            kira_username="service-account",
+            kira_basic_auth="secret",
+            memory_formation_message_limit=limit,
         )
 
 

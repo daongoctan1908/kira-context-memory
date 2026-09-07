@@ -43,10 +43,24 @@ class MemorySource:
     messages: tuple[ConversationMessage, ...]
 
     def __post_init__(self) -> None:
-        if not self.messages:
+        if (
+            not isinstance(self.messages, tuple)
+            or not self.messages
+            or any(not isinstance(message, ConversationMessage) for message in self.messages)
+        ):
             raise ValueError("memory source messages must not be empty")
+        if len(self.messages) % 2:
+            raise ValueError("memory source must contain complete turns")
         if any(message.session_id != self.reference.session_id for message in self.messages):
             raise ValueError("memory source messages must match the referenced session")
+        for index in range(0, len(self.messages), 2):
+            user, assistant = self.messages[index : index + 2]
+            if (
+                user.role is not ConversationRole.USER
+                or assistant.role is not ConversationRole.ASSISTANT
+                or user.turn_id != assistant.turn_id
+            ):
+                raise ValueError("memory source must contain ordered user/assistant turns")
         boundary = self.messages[-1]
         if (
             boundary.role is not ConversationRole.ASSISTANT

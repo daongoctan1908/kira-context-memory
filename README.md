@@ -10,7 +10,7 @@ Batch A-D của Tuần 1 cung cấp Gateway baseline hoàn chỉnh để live sm
 Batch A-D của Tuần 2 tích hợp short-term context qua PostgreSQL và vLLM. Tuần 3
 Batch A1 bổ sung identity/user scope và nền tảng Mem0/pgvector; Batch B1-B2 thêm taxonomy policy
 versioned theo native Mem0 V3 dual-source cùng synthetic acceptance gate cho memory extraction.
-LTM vẫn chưa được wire vào `/chat`:
+Batch B3 nối completed-turn formation vào `/chat`; online retrieval vẫn để Batch C:
 
 - cấu trúc presentation, application, domain, infrastructure, config và worker;
 - dependency/tooling bằng Python 3.11, `uv`, Ruff và pytest;
@@ -32,6 +32,12 @@ LTM vẫn chưa được wire vào `/chat`:
   `boundary_message_id` để worker tương lai đọc đúng snapshot từ PostgreSQL;
 - `LongTermMemoryPort`, Mem0 adapter user-scoped và lifecycle-neutral; engine V3 hiện tại
   vẫn có hành vi additive nhưng adapter không ép kết quả thành ADD-only;
+- `ProcessMemoryUseCase` đọc bounded snapshot kết thúc đúng PostgreSQL
+  `boundary_message_id`, sau đó giao lifecycle formation cho native Mem0 V3;
+- chỉ pair mới commit thành công mới schedule formation trong background; duplicate, partial stream,
+  PostgreSQL write lỗi và request thiếu trusted identity không được schedule;
+- formation/read-source lỗi chỉ log và metric ở chế độ degraded, không đổi KiRa SSE; task được drain
+  có deadline khi shutdown nhưng chưa có durable queue/delivery guarantee;
 - pgvector `0.8.6` dev image, embedding dimension probe và admin-owned memory schema;
   Gateway/worker runtime cấu hình `auto_create=false` và không chạy DDL.
 
@@ -179,7 +185,8 @@ schema với HTTP 502; timeout trả HTTP 504.
 - `GET /ready`: dependency graph local đã khởi tạo; không probe KiRa. PostgreSQL connection
   outage tạm thời là degraded capability. Configuration/schema mismatch làm startup fail;
   nếu phát hiện mismatch lúc runtime, trả 503 đến khi schema được xác minh lại thành công.
-- `GET /metrics`: recent count/estimated tokens, rewrite latency/outcome, degradation và write outcome.
+- `GET /metrics`: recent count/estimated tokens, rewrite latency/outcome, degradation, conversation
+  write outcome và background memory-formation outcome/latency/event count.
 
 Turn ID do Gateway sinh; client không được gửi `turn_id`/`user_id`. `KiRa /authenticate` chỉ
 xác thực service account với KiRa, không được dùng làm danh tính end-user. Khi chưa có real auth,
@@ -188,6 +195,13 @@ Chỉ persist khi downstream
 EOF bình thường và có assistant text; lưu original user query + exact concatenated assistant text.
 Không ghi partial turn khi lỗi hoặc disconnect được phát hiện. Write lỗi chỉ log/metric, không thêm
 `gateway_error` vào response đã trả text. Xem runbook về giới hạn durability/cancellation.
+
+Khi `LTM_ENABLED=true`, một completed turn mới được schedule để formation sau khi PostgreSQL append
+trả về exact boundary. `MEMORY_FORMATION_MESSAGE_LIMIT` là số message chẵn (mặc định 10), nhờ đó
+snapshot chỉ chứa nguyên pair user/assistant và current completed turn luôn ở cuối. Gateway gửi cả
+user lẫn assistant message cho native Mem0 V3 để giữ đúng ngữ cảnh xác nhận/reference; không gọi
+`update()`/`delete()` có chủ đích và không ép action provider thành ADD. Background runner không phải
+queue: process crash có thể làm mất work đang chờ, nên B3 chưa tuyên bố exactly-once/durable delivery.
 
 `CONVERSATION_OPERATION_TIMEOUT_SECONDS=5` giới hạn tổng thời gian mỗi read/write (kể cả chờ pool).
 Để chạy ngay stack cô lập với mock KiRa/vLLM và DB thật:

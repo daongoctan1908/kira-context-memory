@@ -167,7 +167,12 @@ async def test_unsuccessful_or_textless_stream_does_not_persist(failure):
         open_error=error if failure == "before" else None,
         stream_error=error if failure == "midstream" else None,
     )
-    use_case = make_use_case(client, conversation_store=store)
+    dispatched = []
+    use_case = make_use_case(
+        client,
+        conversation_store=store,
+        on_turn_completed=lambda *args: dispatched.append(args),
+    )
     if failure == "before":
         with pytest.raises(KiraTimeoutError):
             await use_case.execute(COMMAND, principal=PRINCIPAL)
@@ -184,6 +189,7 @@ async def test_unsuccessful_or_textless_stream_does_not_persist(failure):
             await drain(session)
         assert client.last_stream.closed
     assert store.writes == []
+    assert dispatched == []
 
 
 @pytest.mark.parametrize(
@@ -191,10 +197,12 @@ async def test_unsuccessful_or_textless_stream_does_not_persist(failure):
 )
 async def test_write_failure_is_only_observed_never_raised(write_error):
     telemetry = ContextTelemetry()
+    dispatched = []
     session = await make_use_case(
         FakeKiraClient(events=[answer()]),
         conversation_store=MemoryStore(write_error=write_error),
         observer=telemetry,
+        on_turn_completed=lambda *args: dispatched.append(args),
     ).execute(COMMAND, principal=PRINCIPAL)
     assert len(await drain(session)) == 1
     assert (
@@ -204,6 +212,7 @@ async def test_write_failure_is_only_observed_never_raised(write_error):
         )
         == 1
     )
+    assert dispatched == []
 
 
 async def test_duplicate_write_outcome():
@@ -223,21 +232,81 @@ async def test_duplicate_write_outcome():
     )
 
 
+async def test_new_completed_turn_dispatches_exact_reference_once():
+    dispatched = []
+    store = MemoryStore()
+    session = await make_use_case(
+        FakeKiraClient(events=[answer()]),
+        conversation_store=store,
+        on_turn_completed=lambda reference, correlation_id: dispatched.append(
+            (reference, correlation_id)
+        ),
+    ).execute(COMMAND, principal=PRINCIPAL, correlation_id="correlation-test")
+
+    await drain(session)
+    await drain(session)
+
+    assert len(dispatched) == 1
+    reference, correlation_id = dispatched[0]
+    assert reference.user_id == PRINCIPAL.user_id
+    assert reference.session_id == COMMAND.session_id
+    assert reference.turn_id == store.writes[0][0].turn_id
+    assert correlation_id == "correlation-test"
+
+
+async def test_duplicate_completed_turn_does_not_dispatch_memory_formation():
+    dispatched = []
+    session = await make_use_case(
+        FakeKiraClient(events=[answer()]),
+        conversation_store=MemoryStore(inserted=False),
+        on_turn_completed=lambda *args: dispatched.append(args),
+    ).execute(COMMAND, principal=PRINCIPAL)
+
+    await drain(session)
+
+    assert dispatched == []
+
+
+async def test_memory_dispatch_failure_never_changes_completed_stream():
+    telemetry = ContextTelemetry()
+
+    def fail_dispatch(*args):
+        raise RuntimeError("private payload")
+
+    session = await make_use_case(
+        FakeKiraClient(events=[answer()]),
+        observer=telemetry,
+        on_turn_completed=fail_dispatch,
+    ).execute(COMMAND, principal=PRINCIPAL, correlation_id="correlation-test")
+
+    assert len(await drain(session)) == 1
+    assert (
+        telemetry.registry.get_sample_value(
+            "kira_context_degraded_total",
+            {"dependency": "mem0", "operation": "memory_dispatch"},
+        )
+        == 1
+    )
+
+
 async def test_missing_identity_uses_current_query_without_history_or_persistence():
     store = MemoryStore(pair())
     telemetry = ContextTelemetry()
     client = FakeKiraClient(events=[answer()])
+    dispatched = []
 
     session = await make_use_case(
         client,
         conversation_store=store,
         observer=telemetry,
+        on_turn_completed=lambda *args: dispatched.append(args),
     ).execute(COMMAND, principal=None, correlation_id="anonymous-request")
     await drain(session)
 
     assert client.messages == [COMMAND.message]
     assert store.reads == []
     assert store.writes == []
+    assert dispatched == []
     assert (
         telemetry.registry.get_sample_value(
             "kira_context_degraded_total",

@@ -5,7 +5,12 @@ import logging
 
 from prometheus_client import CollectorRegistry, Counter, Histogram
 
-from app.domain.ports.context_observer import ContextOperation, RewriteOutcome, WriteOutcome
+from app.domain.ports.context_observer import (
+    ContextOperation,
+    MemoryFormationOutcome,
+    RewriteOutcome,
+    WriteOutcome,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +85,25 @@ class ContextTelemetry:
             ["outcome"],
             registry=self.registry,
         )
+        self.memory_formations = Counter(
+            "kira_memory_formation_total",
+            "Completed-turn memory formation outcomes",
+            ["outcome"],
+            registry=self.registry,
+        )
+        self.memory_formation_latency = Histogram(
+            "kira_memory_formation_duration_seconds",
+            "Background memory formation latency",
+            ["outcome"],
+            buckets=(0.05, 0.1, 0.5, 1, 2, 4, 8, 15, 30),
+            registry=self.registry,
+        )
+        self.memory_formation_events = Histogram(
+            "kira_memory_formation_events",
+            "Provider lifecycle events returned per formation operation",
+            buckets=(0, 1, 2, 4, 8, 16),
+            registry=self.registry,
+        )
 
     def context_observed(self, message_count: int, estimated_tokens: int) -> None:
         self.recent_messages.observe(message_count)
@@ -100,6 +124,8 @@ class ContextTelemetry:
         dependency = {
             "identity": "identity",
             "rewriter": "vllm",
+            "memory_formation": "mem0",
+            "memory_dispatch": "mem0",
         }.get(operation, "postgresql")
         self.degradations.labels(dependency, operation).inc()
         logger.warning(
@@ -115,3 +141,13 @@ class ContextTelemetry:
 
     def conversation_write_observed(self, outcome: WriteOutcome) -> None:
         self.writes.labels(outcome).inc()
+
+    def memory_formation_observed(
+        self,
+        outcome: MemoryFormationOutcome,
+        seconds: float,
+        event_count: int,
+    ) -> None:
+        self.memory_formations.labels(outcome).inc()
+        self.memory_formation_latency.labels(outcome).observe(seconds)
+        self.memory_formation_events.observe(event_count)
