@@ -8,6 +8,7 @@ from typing import Any, Protocol
 
 import httpx
 
+from app.application.services.memory_policy import MEMORY_EXTRACTION_INSTRUCTIONS
 from app.config.settings import Settings
 from app.domain.errors.memory import (
     LongTermMemoryConfigurationError,
@@ -64,6 +65,7 @@ def build_mem0_config(settings: Settings) -> dict[str, object]:
     return {
         "version": "v1.1",
         "history_db_path": ":memory:",
+        "custom_instructions": MEMORY_EXTRACTION_INSTRUCTIONS,
         "vector_store": {
             "provider": "pgvector",
             "config": {

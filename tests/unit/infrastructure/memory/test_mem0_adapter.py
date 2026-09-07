@@ -4,6 +4,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.application.services.memory_policy import MEMORY_EXTRACTION_INSTRUCTIONS
 from app.config.settings import Settings
 from app.domain.errors.memory import (
     LongTermMemoryConnectionError,
@@ -94,6 +95,7 @@ def test_build_config_pins_internal_endpoints_and_forbids_runtime_ddl():
     config = build_mem0_config(settings())
 
     assert config["history_db_path"] == ":memory:"
+    assert config["custom_instructions"] == MEMORY_EXTRACTION_INSTRUCTIONS
     vector = config["vector_store"]["config"]
     assert vector["schema_name"] == "memory"
     assert vector["auto_create"] is False
@@ -107,6 +109,7 @@ def test_internal_mem0_package_constructs_without_database_ddl():
     pool = client.vector_store.connection_pool
     try:
         assert type(client).__name__ == "AsyncMemory"
+        assert client.custom_instructions == MEMORY_EXTRACTION_INSTRUCTIONS
         assert client.vector_store.schema_name == "memory"
         assert client.vector_store.auto_create is False
         assert client.vector_store._collection_ensured is False
