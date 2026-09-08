@@ -28,6 +28,8 @@ async def test_startup_outage_revalidates_before_recovering_and_writes():
     assert await store.read_recent(USER_ID, "session-1", 10) == adapter.read_recent.return_value
     assert store.status == "available"
     assert await store.append_turn(USER_ID, *pair()) is result
+    assert await store.append_turn(USER_ID, *pair(), schedule_memory=True) is result
+    assert adapter.append_turn.await_args_list[-1].kwargs == {"schedule_memory": True}
     assert adapter.validate_schema.await_count == 2
 
 

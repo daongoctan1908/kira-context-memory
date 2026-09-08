@@ -410,8 +410,9 @@ async def test_context_invariant_failure_fails_closed_to_current_only():
         {"memory_search_threshold": True},
         {"memory_search_timeout_seconds": 0},
         {"memory_search_timeout_seconds": True},
+        {"memory_formation_enabled": 1},
     ],
 )
-def test_rejects_invalid_memory_search_configuration(overrides):
+def test_rejects_invalid_memory_configuration(overrides):
     with pytest.raises(ValueError):
         make_use_case(FakeKiraClient(), **overrides)

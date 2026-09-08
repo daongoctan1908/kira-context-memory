@@ -75,7 +75,8 @@ sau này ghi completed turn và job atomically; Worker claim trực tiếp bằn
 [Week 4 PostgreSQL memory job queue ADR](docs/week4-t4.1-postgresql-memory-job-queue.md).
 T4.2 bổ sung versioned domain models, sanitized queue errors và `MemoryJobQueuePort`; core chưa
 biết SQLAlchemy/PostgreSQL. T4.3 thêm migration/schema reference-only với lifecycle constraints và
-partial operational indexes. Scheduling, queue adapter và Worker vẫn được giữ cho các task kế tiếp.
+partial operational indexes. T4.4 thêm feature flag độc lập và transaction ghi completed turn +
+optional memory job atomically; queue adapter và Worker vẫn được giữ cho các task kế tiếp.
 
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem

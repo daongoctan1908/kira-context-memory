@@ -113,9 +113,12 @@ def test_identity_turn_reference_and_memory_lifecycle_models() -> None:
         datetime(2026, 9, 6, tzinfo=UTC),
     )
     reference = CompletedTurnReference("user-1", "session-1", uuid4(), "turn-1", 2)
+    event_id = uuid4()
 
     assert AuthenticatedPrincipal("user-1").user_id == "user-1"
-    assert AppendTurnResult(True, reference).reference == reference
+    append_result = AppendTurnResult(True, reference, event_id)
+    assert append_result.reference == reference
+    assert append_result.memory_job_event_id == event_id
     assert MemorySource(reference, (user, assistant)).messages == (user, assistant)
     assert LongTermMemory("memory-1", "Thích biểu đồ", 0.9).score == 0.9
     result = MemoryProcessResult(
@@ -134,6 +137,11 @@ def test_identity_turn_reference_and_memory_lifecycle_models() -> None:
     [
         lambda: AuthenticatedPrincipal(" "),
         lambda: CompletedTurnReference("user", "session", uuid4(), "turn", 0),
+        lambda: AppendTurnResult(
+            True,
+            CompletedTurnReference("user", "session", uuid4(), "turn", 2),
+            "not-a-uuid",  # type: ignore[arg-type]
+        ),
         lambda: LongTermMemory("memory", "content", 1.1),
         lambda: MemoryLifecycleEvent(" "),
         lambda: MemoryLifecycleEvent("ADD", ""),

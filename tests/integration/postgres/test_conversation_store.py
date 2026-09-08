@@ -7,16 +7,21 @@ import httpx
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import delete, insert, select, text
+from sqlalchemy import delete, func, insert, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
-from app.domain.errors.conversation import ConversationStoreProtocolError
+from app.domain.errors.conversation import (
+    ConversationStoreOperationError,
+    ConversationStoreProtocolError,
+)
 from app.domain.models.conversation import ConversationMessage, ConversationRole
+from app.infrastructure.postgres import conversation_store as conversation_store_module
 from app.infrastructure.postgres.conversation_store import PostgresConversationStoreAdapter
 from app.infrastructure.postgres.schema import (
     EXPECTED_SCHEMA_REVISION,
     conversation_messages,
     conversations,
+    memory_jobs,
 )
 from app.presentation.api.main import create_app
 from tests.integration.test_gateway_api import make_settings
@@ -201,6 +206,182 @@ async def test_duplicate_is_idempotent_and_collision_is_rejected(
         )
 
     assert len(await adapter.read_recent(USER_ID, session_id, 10)) == 2
+
+
+async def test_completed_turn_and_memory_job_are_atomic_and_idempotent(
+    engine: AsyncEngine,
+    session_id: str,
+) -> None:
+    adapter = PostgresConversationStoreAdapter(engine)
+    turn_id = f"scheduled-{uuid4()}"
+    user = _message(session_id, turn_id, ConversationRole.USER, "durable preference", 1)
+    assistant = _message(session_id, turn_id, ConversationRole.ASSISTANT, "confirmed", 2)
+
+    inserted = await adapter.append_turn(
+        USER_ID,
+        user,
+        assistant,
+        schedule_memory=True,
+    )
+    duplicate = await adapter.append_turn(
+        USER_ID,
+        user,
+        assistant,
+        schedule_memory=True,
+    )
+
+    async with engine.connect() as connection:
+        job_rows = (
+            (
+                await connection.execute(
+                    select(memory_jobs).where(
+                        memory_jobs.c.boundary_message_id == inserted.reference.boundary_message_id
+                    )
+                )
+            )
+            .mappings()
+            .all()
+        )
+        message_count = await connection.scalar(
+            select(func.count())
+            .select_from(conversation_messages)
+            .where(conversation_messages.c.turn_id == turn_id)
+        )
+
+    assert inserted.inserted is True
+    assert duplicate.inserted is False
+    assert inserted.memory_job_event_id is not None
+    assert duplicate.memory_job_event_id == inserted.memory_job_event_id
+    assert message_count == 2
+    assert len(job_rows) == 1
+    assert job_rows[0]["event_id"] == inserted.memory_job_event_id
+    assert job_rows[0]["status"] == "pending"
+    assert job_rows[0]["attempt_count"] == 0
+
+
+async def test_completed_turn_does_not_schedule_when_formation_is_disabled(
+    engine: AsyncEngine,
+    session_id: str,
+) -> None:
+    adapter = PostgresConversationStoreAdapter(engine)
+    turn_id = f"not-scheduled-{uuid4()}"
+    result = await adapter.append_turn(
+        USER_ID,
+        _message(session_id, turn_id, ConversationRole.USER, "question", 1),
+        _message(session_id, turn_id, ConversationRole.ASSISTANT, "answer", 2),
+    )
+
+    async with engine.connect() as connection:
+        event_id = await connection.scalar(
+            select(memory_jobs.c.event_id).where(
+                memory_jobs.c.boundary_message_id == result.reference.boundary_message_id
+            )
+        )
+
+    assert result.memory_job_event_id is None
+    assert event_id is None
+
+
+async def test_memory_job_insert_failure_rolls_back_new_conversation_turn(
+    engine: AsyncEngine,
+    session_id: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = PostgresConversationStoreAdapter(engine)
+    seed_turn_id = f"seed-{uuid4()}"
+    seed = await adapter.append_turn(
+        USER_ID,
+        _message(session_id, seed_turn_id, ConversationRole.USER, "seed", 1),
+        _message(session_id, seed_turn_id, ConversationRole.ASSISTANT, "seed", 2),
+        schedule_memory=True,
+    )
+    assert seed.memory_job_event_id is not None
+
+    failing_session = f"job-rollback-{uuid4()}"
+    failing_turn_id = f"job-rollback-{uuid4()}"
+    monkeypatch.setattr(
+        conversation_store_module,
+        "uuid4",
+        lambda: seed.memory_job_event_id,
+    )
+
+    with pytest.raises(ConversationStoreOperationError):
+        await adapter.append_turn(
+            USER_ID,
+            _message(failing_session, failing_turn_id, ConversationRole.USER, "question", 3),
+            _message(failing_session, failing_turn_id, ConversationRole.ASSISTANT, "answer", 4),
+            schedule_memory=True,
+        )
+
+    async with engine.connect() as connection:
+        conversation_count = await connection.scalar(
+            select(func.count())
+            .select_from(conversations)
+            .where(conversations.c.session_id == failing_session)
+        )
+        message_count = await connection.scalar(
+            select(func.count())
+            .select_from(conversation_messages)
+            .where(conversation_messages.c.turn_id == failing_turn_id)
+        )
+
+    assert conversation_count == 0
+    assert message_count == 0
+
+
+async def test_gateway_completed_stream_persists_and_schedules_atomically(
+    engine: AsyncEngine,
+    session_id: str,
+) -> None:
+    settings = make_settings().model_copy(
+        update={
+            "kira_username": "local-smoke",
+            "memory_formation_enabled": True,
+        }
+    )
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=mock_kira_app)) as kira_http:
+        app = create_app(
+            settings=settings,
+            http_client=kira_http,
+            postgres_engine=engine,
+        )
+        async with (
+            app.router.lifespan_context(app),
+            httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=app),
+                base_url="http://gateway.test",
+            ) as client,
+        ):
+            response = await client.post(
+                "/chat",
+                json={"session_id": session_id, "message": "remember completed turn"},
+            )
+
+    async with engine.connect() as connection:
+        scheduled = (
+            await connection.execute(
+                select(
+                    memory_jobs.c.event_id,
+                    memory_jobs.c.status,
+                    conversation_messages.c.message_index,
+                )
+                .select_from(
+                    memory_jobs.join(
+                        conversation_messages,
+                        memory_jobs.c.boundary_message_id == conversation_messages.c.message_id,
+                    ).join(
+                        conversations,
+                        conversation_messages.c.conversation_id == conversations.c.conversation_id,
+                    )
+                )
+                .where(conversations.c.session_id == session_id)
+            )
+        ).one()
+
+    assert response.status_code == 200
+    assert "gateway_error" not in response.text
+    assert scheduled.status == "pending"
+    assert scheduled.message_index == 1
 
 
 async def test_concurrent_append_preserves_pair_order_and_session_isolation(

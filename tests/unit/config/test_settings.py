@@ -16,6 +16,7 @@ def test_settings_read_kira_values_from_environment(monkeypatch) -> None:
     )
     monkeypatch.setenv("POSTGRES_POOL_SIZE", "12")
     monkeypatch.setenv("MAX_RECENT_MESSAGES", "8")
+    monkeypatch.setenv("MEMORY_FORMATION_ENABLED", "true")
 
     settings = Settings()
 
@@ -27,6 +28,7 @@ def test_settings_read_kira_values_from_environment(monkeypatch) -> None:
     assert settings.database_url is not None
     assert settings.postgres_pool_size == 12
     assert settings.max_recent_messages == 8
+    assert settings.memory_formation_enabled is True
     assert isinstance(settings.kira_basic_auth, SecretStr)
     assert settings.kira_basic_auth.get_secret_value() == "top-secret"
     assert "top-secret" not in repr(settings)
@@ -61,6 +63,7 @@ def test_settings_have_safe_baseline_defaults(monkeypatch) -> None:
     assert settings.vllm_max_output_chars == 2048
     assert settings.dev_static_identity_enabled is False
     assert settings.ltm_enabled is False
+    assert settings.memory_formation_enabled is False
     assert settings.memory_schema == "memory"
     assert settings.memory_collection_name == "memories"
     assert settings.memory_formation_message_limit == 10
@@ -147,6 +150,21 @@ def test_enabled_ltm_requires_all_runtime_dependencies() -> None:
             kira_basic_auth="secret",
             ltm_enabled=True,
         )
+
+
+def test_memory_formation_scheduling_is_independent_from_ltm_configuration() -> None:
+    settings = Settings(
+        _env_file=None,
+        kira_base_url="http://kira.test",
+        kira_username="service-account",
+        kira_basic_auth="secret",
+        memory_formation_enabled=True,
+        ltm_enabled=False,
+    )
+
+    assert settings.memory_formation_enabled is True
+    assert settings.ltm_enabled is False
+    assert settings.memory_database_url is None
 
 
 @pytest.mark.parametrize("limit", [0, 1, 3])

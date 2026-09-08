@@ -24,10 +24,12 @@ from app.domain.models.conversation import (
     ConversationMessage,
     ConversationRole,
 )
+from app.domain.models.memory_job import MEMORY_JOB_SCHEMA_VERSION
 from app.infrastructure.postgres.schema import (
     EXPECTED_SCHEMA_REVISION,
     conversation_messages,
     conversations,
+    memory_jobs,
 )
 
 _CONFIGURATION_SQLSTATES = {
@@ -195,10 +197,14 @@ class PostgresConversationStoreAdapter:
         user_id: str,
         user_message: ConversationMessage,
         assistant_message: ConversationMessage,
+        *,
+        schedule_memory: bool = False,
     ) -> AppendTurnResult:
-        """Atomically append one completed pair and preserve idempotency by turn ID."""
+        """Atomically append a completed pair and its optional memory job."""
         if not user_id.strip():
             raise ValueError("user_id must not be empty")
+        if not isinstance(schedule_memory, bool):
+            raise ValueError("schedule_memory must be a boolean")
         self._validate_turn(user_message, assistant_message)
 
         try:
@@ -210,12 +216,23 @@ class PostgresConversationStoreAdapter:
                 )
                 existing = await self._read_existing_turn(connection, user_message.turn_id)
                 if existing:
-                    return self._validate_duplicate(
+                    duplicate = self._validate_duplicate(
                         existing,
                         user_id,
                         conversation_id,
                         user_message,
                         assistant_message,
+                    )
+                    memory_job_event_id = None
+                    if schedule_memory:
+                        memory_job_event_id = await self._schedule_memory_job(
+                            connection,
+                            duplicate.reference.boundary_message_id,
+                        )
+                    return AppendTurnResult(
+                        inserted=False,
+                        reference=duplicate.reference,
+                        memory_job_event_id=memory_job_event_id,
                     )
 
                 inserted_rows = (
@@ -258,6 +275,12 @@ class PostgresConversationStoreAdapter:
                         updated_at=func.now(),
                     )
                 )
+                memory_job_event_id = None
+                if schedule_memory:
+                    memory_job_event_id = await self._schedule_memory_job(
+                        connection,
+                        boundary_message_id,
+                    )
         except ConversationStoreProtocolError:
             raise
         except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
@@ -272,7 +295,44 @@ class PostgresConversationStoreAdapter:
                 turn_id=user_message.turn_id,
                 boundary_message_id=boundary_message_id,
             ),
+            memory_job_event_id=memory_job_event_id,
         )
+
+    @staticmethod
+    async def _schedule_memory_job(
+        connection: AsyncConnection,
+        boundary_message_id: int,
+    ) -> UUID:
+        """Insert once per assistant boundary and return the stable event identifier."""
+        candidate_event_id = uuid4()
+        inserted = (
+            await connection.execute(
+                postgres_insert(memory_jobs)
+                .values(
+                    event_id=candidate_event_id,
+                    boundary_message_id=boundary_message_id,
+                    schema_version=MEMORY_JOB_SCHEMA_VERSION,
+                )
+                .on_conflict_do_nothing(index_elements=[memory_jobs.c.boundary_message_id])
+                .returning(memory_jobs.c.event_id)
+            )
+        ).one_or_none()
+        if inserted is not None:
+            event_id = inserted.event_id
+        else:
+            existing = (
+                await connection.execute(
+                    select(memory_jobs.c.event_id).where(
+                        memory_jobs.c.boundary_message_id == boundary_message_id
+                    )
+                )
+            ).one_or_none()
+            if existing is None:
+                raise ConversationStoreProtocolError
+            event_id = existing.event_id
+        if not isinstance(event_id, UUID):
+            raise ConversationStoreProtocolError
+        return event_id
 
     async def _lock_conversation(
         self,

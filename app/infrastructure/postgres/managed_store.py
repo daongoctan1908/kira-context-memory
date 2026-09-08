@@ -62,10 +62,17 @@ class ManagedPostgresConversationStore:
         user_id: str,
         user_message: ConversationMessage,
         assistant_message: ConversationMessage,
+        *,
+        schedule_memory: bool = False,
     ) -> AppendTurnResult:
         async with self._operation():
             await self.validate_schema()
-            return await self._adapter.append_turn(user_id, user_message, assistant_message)
+            return await self._adapter.append_turn(
+                user_id,
+                user_message,
+                assistant_message,
+                schedule_memory=schedule_memory,
+            )
 
     async def read_through_boundary(
         self,

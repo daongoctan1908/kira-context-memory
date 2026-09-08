@@ -60,6 +60,7 @@ async def test_rewrite_and_persist_original_with_exact_assistant_once():
     assert UUID(user.turn_id).version == 4
     assert user.timestamp <= assistant.timestamp
     assert user.session_id == assistant.session_id == COMMAND.session_id
+    assert store.schedule_requests == [False]
     assert rewriter.contexts[0].current_query == COMMAND.message
     assert (
         telemetry.registry.get_sample_value(
@@ -68,6 +69,20 @@ async def test_rewrite_and_persist_original_with_exact_assistant_once():
         )
         == 1
     )
+
+
+async def test_completed_turn_requests_memory_job_when_formation_is_enabled():
+    store = MemoryStore()
+    session = await make_use_case(
+        FakeKiraClient(events=[answer()]),
+        conversation_store=store,
+        memory_formation_enabled=True,
+    ).execute(COMMAND, principal=PRINCIPAL)
+
+    await drain(session)
+
+    assert len(store.writes) == 1
+    assert store.schedule_requests == [True]
 
 
 @pytest.mark.parametrize("budget,history", [(3000, ()), (1, pair())])
@@ -167,7 +182,11 @@ async def test_unsuccessful_or_textless_stream_does_not_persist(failure):
         open_error=error if failure == "before" else None,
         stream_error=error if failure == "midstream" else None,
     )
-    use_case = make_use_case(client, conversation_store=store)
+    use_case = make_use_case(
+        client,
+        conversation_store=store,
+        memory_formation_enabled=True,
+    )
     if failure == "before":
         with pytest.raises(KiraTimeoutError):
             await use_case.execute(COMMAND, principal=PRINCIPAL)
@@ -184,6 +203,7 @@ async def test_unsuccessful_or_textless_stream_does_not_persist(failure):
             await drain(session)
         assert client.last_stream.closed
     assert store.writes == []
+    assert store.schedule_requests == []
 
 
 @pytest.mark.parametrize(
@@ -195,6 +215,7 @@ async def test_write_failure_is_only_observed_never_raised(write_error):
         FakeKiraClient(events=[answer()]),
         conversation_store=MemoryStore(write_error=write_error),
         observer=telemetry,
+        memory_formation_enabled=True,
     ).execute(COMMAND, principal=PRINCIPAL)
     assert len(await drain(session)) == 1
     assert (
@@ -252,7 +273,7 @@ async def test_total_store_operation_deadline(operation):
     store = MemoryStore()
     started = asyncio.Event()
 
-    async def hang(*args):
+    async def hang(*args, **kwargs):
         started.set()
         await asyncio.Event().wait()
 
@@ -286,7 +307,7 @@ async def test_cancel_during_append_propagates_and_is_not_retried():
     started = asyncio.Event()
     cancelled = asyncio.Event()
 
-    async def append(*args):
+    async def append(*args, **kwargs):
         started.set()
         try:
             await asyncio.Event().wait()

@@ -36,7 +36,9 @@ class MemoryStore:
         self.read_users = []
         self.writes = []
         self.write_users = []
+        self.schedule_requests = []
         self.conversation_id = uuid4()
+        self.memory_job_event_id = uuid4()
 
     async def read_recent(self, user_id, session_id, limit):
         self.reads.append((session_id, limit))
@@ -45,11 +47,12 @@ class MemoryStore:
             raise self.read_error
         return self.recent[-limit:]
 
-    async def append_turn(self, user_id, user, assistant):
+    async def append_turn(self, user_id, user, assistant, *, schedule_memory=False):
         if self.write_error:
             raise self.write_error
         self.writes.append((user, assistant))
         self.write_users.append(user_id)
+        self.schedule_requests.append(schedule_memory)
         self.recent += (user, assistant)
         return AppendTurnResult(
             self.inserted,
@@ -60,6 +63,7 @@ class MemoryStore:
                 user.turn_id,
                 len(self.recent),
             ),
+            self.memory_job_event_id if schedule_memory else None,
         )
 
     async def read_through_boundary(

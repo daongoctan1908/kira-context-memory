@@ -135,6 +135,7 @@ def create_app(
             application.state.query_rewriter = resolved_rewriter
             application.state.long_term_memory = resolved_long_term_memory
             application.state.ltm_status = ltm_status
+            application.state.memory_formation_enabled = resolved_settings.memory_formation_enabled
             application.state.telemetry = telemetry
             application.state.identity_provider = resolved_identity
             application.state.handle_chat = HandleChatUseCase(
@@ -153,6 +154,7 @@ def create_app(
                 memory_search_top_k=resolved_settings.memory_search_top_k,
                 memory_search_threshold=resolved_settings.memory_search_threshold,
                 memory_search_timeout_seconds=resolved_settings.memory_search_timeout_seconds,
+                memory_formation_enabled=resolved_settings.memory_formation_enabled,
             )
             application.state.ready = True
             yield

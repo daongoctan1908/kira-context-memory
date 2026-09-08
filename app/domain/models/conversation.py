@@ -76,13 +76,16 @@ class CompletedTurnReference:
 
 @dataclass(frozen=True, slots=True)
 class AppendTurnResult:
-    """Transactional append outcome including its exact persisted boundary."""
+    """Transactional append outcome including its boundary and optional memory job."""
 
     inserted: bool
     reference: CompletedTurnReference
+    memory_job_event_id: UUID | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.inserted, bool):
             raise ValueError("inserted must be a boolean")
         if not isinstance(self.reference, CompletedTurnReference):
             raise ValueError("reference must be a completed turn reference")
+        if self.memory_job_event_id is not None and not isinstance(self.memory_job_event_id, UUID):
+            raise ValueError("memory_job_event_id must be a UUID when present")

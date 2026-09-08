@@ -95,6 +95,7 @@ class HandleChatUseCase:
         memory_search_top_k: int = 10,
         memory_search_threshold: float = 0.1,
         memory_search_timeout_seconds: float = 3.0,
+        memory_formation_enabled: bool = False,
     ) -> None:
         if (
             isinstance(memory_search_top_k, bool)
@@ -114,6 +115,8 @@ class HandleChatUseCase:
             or memory_search_timeout_seconds <= 0
         ):
             raise ValueError("memory_search_timeout_seconds must be positive")
+        if not isinstance(memory_formation_enabled, bool):
+            raise ValueError("memory_formation_enabled must be a boolean")
         self._kira_client = kira_client
         self._store = conversation_store
         self._rewriter = query_rewriter
@@ -125,6 +128,7 @@ class HandleChatUseCase:
         self._memory_search_top_k = memory_search_top_k
         self._memory_search_threshold = float(memory_search_threshold)
         self._memory_search_timeout = float(memory_search_timeout_seconds)
+        self._memory_formation_enabled = memory_formation_enabled
 
     async def execute(
         self,
@@ -169,7 +173,12 @@ class HandleChatUseCase:
                     datetime.now(UTC),
                 )
                 async with asyncio.timeout(self._store_timeout):
-                    result = await self._store.append_turn(principal.user_id, user, assistant)
+                    result = await self._store.append_turn(
+                        principal.user_id,
+                        user,
+                        assistant,
+                        schedule_memory=self._memory_formation_enabled,
+                    )
             except Exception as error:
                 # Never turn a persistence failure into a synthetic SSE error. Cancellation
                 # intentionally propagates and must roll back an in-flight transaction.

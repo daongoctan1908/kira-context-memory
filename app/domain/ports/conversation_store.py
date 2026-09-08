@@ -23,8 +23,10 @@ class ConversationStorePort(Protocol):
         user_id: str,
         user_message: ConversationMessage,
         assistant_message: ConversationMessage,
+        *,
+        schedule_memory: bool = False,
     ) -> AppendTurnResult:
-        """Atomically append one completed turn and return its stable boundary."""
+        """Atomically append a completed turn and its optional memory job."""
         ...
 
     async def read_through_boundary(

@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     vllm_max_output_chars: int = Field(default=2048, ge=1)
 
     ltm_enabled: bool = False
+    memory_formation_enabled: bool = False
     memory_database_url: Secret[PostgresDsn] | None = None
     memory_admin_database_url: Secret[PostgresDsn] | None = None
     memory_schema: str = Field(default="memory", pattern=r"^[a-z_][a-z0-9_]*$")

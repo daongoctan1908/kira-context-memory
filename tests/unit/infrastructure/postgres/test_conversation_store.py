@@ -258,6 +258,7 @@ async def test_append_turn_inserts_atomic_pair_and_advances_sequence() -> None:
 
     assert result.inserted is True
     assert result.reference.boundary_message_id == 11
+    assert result.memory_job_event_id is None
     assert result.reference.user_id == USER_ID
     assert len(connection.calls) == 5
     pair = connection.calls[3][1]
@@ -265,6 +266,85 @@ async def test_append_turn_inserts_atomic_pair_and_advances_sequence() -> None:
     assert [item["message_index"] for item in pair] == [0, 1]
     assert [item["turn_sequence"] for item in pair] == [3, 3]
     assert [item["content"] for item in pair] == ["Câu hỏi", "Trả lời"]
+
+
+async def test_append_turn_schedules_reference_only_memory_job_in_same_transaction() -> None:
+    conversation_id = uuid4()
+    event_id = uuid4()
+    connection = FakeConnection(
+        [
+            FakeResult(),
+            FakeResult(one=SimpleNamespace(conversation_id=conversation_id, next_turn_sequence=3)),
+            FakeResult(rows=[]),
+            FakeResult(
+                rows=[
+                    {"message_id": 10, "message_index": 0},
+                    {"message_id": 11, "message_index": 1},
+                ]
+            ),
+            FakeResult(),
+            FakeResult(one=SimpleNamespace(event_id=event_id)),
+        ]
+    )
+
+    result = await adapter(connection).append_turn(
+        USER_ID,
+        message(ConversationRole.USER, content="Câu hỏi"),
+        message(ConversationRole.ASSISTANT, content="Trả lời"),
+        schedule_memory=True,
+    )
+
+    assert result.inserted is True
+    assert result.memory_job_event_id == event_id
+    assert len(connection.calls) == 6
+    job_statement, job_parameters = connection.calls[-1]
+    assert "INSERT INTO memory_jobs" in str(job_statement)
+    assert "ON CONFLICT (boundary_message_id) DO NOTHING" in str(job_statement)
+    assert "content" not in str(job_statement)
+    assert job_parameters is None
+
+
+async def test_duplicate_scheduling_returns_existing_memory_event() -> None:
+    conversation_id = uuid4()
+    event_id = uuid4()
+    existing = [
+        {
+            "conversation_id": conversation_id,
+            "message_id": 10,
+            "message_index": 0,
+            "role": "user",
+            "content": "Câu hỏi",
+            "schema_version": 1,
+        },
+        {
+            "conversation_id": conversation_id,
+            "message_id": 11,
+            "message_index": 1,
+            "role": "assistant",
+            "content": "Trả lời",
+            "schema_version": 1,
+        },
+    ]
+    connection = FakeConnection(
+        [
+            FakeResult(),
+            FakeResult(one=SimpleNamespace(conversation_id=conversation_id, next_turn_sequence=2)),
+            FakeResult(rows=existing),
+            FakeResult(one=None),
+            FakeResult(one=SimpleNamespace(event_id=event_id)),
+        ]
+    )
+
+    result = await adapter(connection).append_turn(
+        USER_ID,
+        message(ConversationRole.USER, content="Câu hỏi"),
+        message(ConversationRole.ASSISTANT, content="Trả lời"),
+        schedule_memory=True,
+    )
+
+    assert result.inserted is False
+    assert result.memory_job_event_id == event_id
+    assert "SELECT memory_jobs.event_id" in str(connection.calls[-1][0])
 
 
 async def test_append_turn_returns_false_for_matching_duplicate() -> None:
@@ -303,6 +383,7 @@ async def test_append_turn_returns_false_for_matching_duplicate() -> None:
 
     assert result.inserted is False
     assert result.reference.boundary_message_id == 11
+    assert result.memory_job_event_id is None
     assert len(connection.calls) == 3
 
 
@@ -391,6 +472,29 @@ async def test_append_turn_maps_database_integrity_error() -> None:
             message(ConversationRole.USER),
             message(ConversationRole.ASSISTANT),
         )
+
+
+@pytest.mark.parametrize("value", [None, 0, 1, "yes"])
+async def test_append_turn_requires_boolean_schedule_flag(value: object) -> None:
+    with pytest.raises(ValueError, match="schedule_memory"):
+        await adapter(FakeConnection()).append_turn(
+            USER_ID,
+            message(ConversationRole.USER),
+            message(ConversationRole.ASSISTANT),
+            schedule_memory=value,  # type: ignore[arg-type]
+        )
+
+
+async def test_scheduling_rejects_missing_or_malformed_event_reference() -> None:
+    for row in (None, SimpleNamespace(event_id="not-a-uuid")):
+        results = (
+            [FakeResult(one=row), FakeResult(one=row)] if row is None else [FakeResult(one=row)]
+        )
+        with pytest.raises(ConversationStoreProtocolError):
+            await PostgresConversationStoreAdapter._schedule_memory_job(
+                FakeConnection(results),  # type: ignore[arg-type]
+                42,
+            )
 
 
 class SqlStateError(Exception):

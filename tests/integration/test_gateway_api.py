@@ -84,6 +84,9 @@ class FakeKiraClient:
 
 
 class FakeConversationStore:
+    def __init__(self) -> None:
+        self.schedule_requests: list[bool] = []
+
     async def read_recent(
         self,
         user_id: str,
@@ -97,7 +100,10 @@ class FakeConversationStore:
         user_id: str,
         user_message: ConversationMessage,
         assistant_message: ConversationMessage,
+        *,
+        schedule_memory: bool = False,
     ) -> AppendTurnResult:
+        self.schedule_requests.append(schedule_memory)
         return AppendTurnResult(
             True,
             CompletedTurnReference(
@@ -107,6 +113,7 @@ class FakeConversationStore:
                 user_message.turn_id,
                 2,
             ),
+            uuid4() if schedule_memory else None,
         )
 
     async def read_through_boundary(
@@ -287,6 +294,33 @@ async def test_chat_proxies_raw_kira_frames_and_sets_stream_headers() -> None:
     assert response.content == f"data: {status_data}\n\ndata: {text_data}\n\n".encode()
     assert kira_client.messages == ["question"]
     assert kira_client.last_stream is not None and kira_client.last_stream.closed
+
+
+async def test_gateway_wires_memory_formation_independently_from_ltm() -> None:
+    store = FakeConversationStore()
+    settings = make_settings().model_copy(
+        update={"memory_formation_enabled": True, "ltm_enabled": False}
+    )
+    kira_client = FakeKiraClient(events=[kira_event('{"text":"test"}', "answer")])
+    app = create_app(
+        settings=settings,
+        kira_client=kira_client,
+        conversation_store=store,
+    )
+
+    async with app.router.lifespan_context(app):
+        transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+        async with httpx.AsyncClient(transport=transport, base_url="http://gateway.test") as client:
+            response = await client.post(
+                "/chat",
+                json={"session_id": "session-1", "message": "question"},
+            )
+        assert response.status_code == 200
+        assert response.text == 'data: {"text":"test"}\n\n'
+        assert app.state.ltm_status == "disabled"
+        assert app.state.memory_formation_enabled is True
+
+    assert store.schedule_requests == [True]
 
 
 async def test_chat_rejects_client_supplied_user_id() -> None:
