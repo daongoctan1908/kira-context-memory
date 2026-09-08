@@ -17,6 +17,14 @@ from app.domain.models.memory import (
     MemoryProcessResult,
     MemorySource,
 )
+from app.domain.models.memory_job import (
+    MEMORY_JOB_SCHEMA_VERSION,
+    DeadMemoryJob,
+    MemoryJob,
+    MemoryJobPurgeResult,
+    MemoryJobStats,
+    MemoryJobStatus,
+)
 
 __all__ = [
     "CONVERSATION_MESSAGE_SCHEMA_VERSION",
@@ -32,6 +40,12 @@ __all__ = [
     "KiraStreamEvent",
     "LongTermMemory",
     "MemoryLifecycleEvent",
+    "MEMORY_JOB_SCHEMA_VERSION",
+    "DeadMemoryJob",
+    "MemoryJob",
+    "MemoryJobPurgeResult",
+    "MemoryJobStats",
+    "MemoryJobStatus",
     "MemoryProcessResult",
     "MemorySource",
 ]

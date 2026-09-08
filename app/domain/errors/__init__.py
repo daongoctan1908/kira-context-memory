@@ -24,6 +24,14 @@ from app.domain.errors.memory import (
     LongTermMemoryProtocolError,
     LongTermMemoryTimeoutError,
 )
+from app.domain.errors.memory_job import (
+    MemoryJobLeaseLostError,
+    MemoryJobQueueConfigurationError,
+    MemoryJobQueueConnectionError,
+    MemoryJobQueueError,
+    MemoryJobQueueOperationError,
+    MemoryJobQueueProtocolError,
+)
 from app.domain.errors.query_rewriter import (
     QueryRewriterConfigurationError,
     QueryRewriterConnectionError,
@@ -52,6 +60,12 @@ __all__ = [
     "LongTermMemoryOperationError",
     "LongTermMemoryProtocolError",
     "LongTermMemoryTimeoutError",
+    "MemoryJobLeaseLostError",
+    "MemoryJobQueueConfigurationError",
+    "MemoryJobQueueConnectionError",
+    "MemoryJobQueueError",
+    "MemoryJobQueueOperationError",
+    "MemoryJobQueueProtocolError",
     "QueryRewriterConfigurationError",
     "QueryRewriterConnectionError",
     "QueryRewriterError",

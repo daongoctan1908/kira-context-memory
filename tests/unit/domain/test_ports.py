@@ -5,6 +5,7 @@ from app.domain.ports.conversation_store import ConversationStorePort
 from app.domain.ports.identity import IdentityPort
 from app.domain.ports.kira_client import KiraClientPort
 from app.domain.ports.long_term_memory import LongTermMemoryPort
+from app.domain.ports.memory_job_queue import MemoryJobQueuePort
 from app.domain.ports.query_rewriter import QueryRewriterPort
 
 
@@ -23,6 +24,10 @@ def test_query_rewriter_port_is_a_protocol() -> None:
 def test_identity_and_long_term_memory_ports_are_protocols() -> None:
     assert IdentityPort.__name__ == "IdentityPort"
     assert LongTermMemoryPort.__name__ == "LongTermMemoryPort"
+
+
+def test_memory_job_queue_port_is_a_protocol() -> None:
+    assert MemoryJobQueuePort.__name__ == "MemoryJobQueuePort"
 
 
 def test_core_layers_do_not_import_infrastructure_frameworks() -> None:
