@@ -3,8 +3,9 @@
 from collections.abc import Sequence
 from itertools import groupby
 
-from app.domain.models.context import ConversationContext
+from app.domain.models.context import MAX_LONG_TERM_MEMORIES, ConversationContext
 from app.domain.models.conversation import ConversationMessage, ConversationRole
+from app.domain.models.memory import LongTermMemory
 
 
 def estimate_recent_tokens(messages: Sequence[ConversationMessage]) -> int:
@@ -24,6 +25,7 @@ class ContextBuilder:
         *,
         max_recent_messages: int = 10,
         recent_token_budget: int = 3000,
+        max_long_term_memories: int = MAX_LONG_TERM_MEMORIES,
     ) -> None:
         if (
             isinstance(max_recent_messages, bool)
@@ -38,13 +40,23 @@ class ContextBuilder:
             or recent_token_budget < 1
         ):
             raise ValueError("recent_token_budget must be a positive integer")
+        if (
+            isinstance(max_long_term_memories, bool)
+            or not isinstance(max_long_term_memories, int)
+            or not 1 <= max_long_term_memories <= MAX_LONG_TERM_MEMORIES
+        ):
+            raise ValueError(
+                f"max_long_term_memories must be between 1 and {MAX_LONG_TERM_MEMORIES}"
+            )
         self._max_recent_messages = max_recent_messages
         self._recent_token_budget = recent_token_budget
+        self._max_long_term_memories = max_long_term_memories
 
     def build(
         self,
         recent_messages: Sequence[ConversationMessage],
         current_query: str,
+        long_term_memories: Sequence[LongTermMemory] = (),
     ) -> ConversationContext:
         """Use store order (oldest to newest), not wall-clock timestamp order.
 
@@ -71,4 +83,5 @@ class ContextBuilder:
             recent_messages=tuple(message for turn in turns[first:] for message in turn),
             current_query=current_query,
             estimated_recent_tokens=estimated_tokens,
+            long_term_memories=tuple(long_term_memories[: self._max_long_term_memories]),
         )

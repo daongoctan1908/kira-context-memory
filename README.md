@@ -11,7 +11,8 @@ Batch A-D của Tuần 2 tích hợp short-term context qua PostgreSQL và vLLM.
 Batch A1 bổ sung identity/user scope và nền tảng Mem0/pgvector; Batch B1-B2 thêm taxonomy policy
 versioned theo native Mem0 V3 dual-source cùng synthetic acceptance gate cho memory extraction.
 Batch B3 bổ sung direct completed-turn formation use case; Batch B4 nghiệm thu formation trên
-PostgreSQL/pgvector thật với provider doubles deterministic. LTM vẫn chưa wire vào `/chat`:
+PostgreSQL/pgvector thật với provider doubles deterministic. Batch C1 mở rộng context và rewrite
+prompt v2 để nhận ranked LTM an toàn; Mem0 search vẫn chưa wire vào `/chat`:
 
 - cấu trúc presentation, application, domain, infrastructure, config và worker;
 - dependency/tooling bằng Python 3.11, `uv`, Ruff và pytest;
@@ -41,6 +42,10 @@ PostgreSQL/pgvector thật với provider doubles deterministic. LTM vẫn chưa
   Gateway/worker runtime cấu hình `auto_create=false` và không chạy DDL.
 - B4 kiểm tra sáu taxonomy positive, sáu negative case, formula exact, duplicate boundary và
   cross-user isolation bằng conversation store + Mem0 adapter + pgvector thật.
+- `ConversationContext` nhận tối đa 10 LTM theo đúng ranking từ retrieval; LTM không dùng chung
+  recent token budget và current query vẫn luôn được truyền riêng, không trim.
+- rewrite prompt v2 chỉ gửi text của LTM trong JSON untrusted data, không gửi memory ID, score hay
+  metadata; precedence là current explicit > recent > LTM và memory không phải nguồn authorization.
 
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem
@@ -107,16 +112,20 @@ tạm thời chỉ đặt PostgreSQL ở degraded state và `/ready` vẫn trả
 PostgreSQL là conversation store duy nhất. Recent window không xóa full history và không có
 inactivity TTL; `MAX_RECENT_MESSAGES` và token budget chỉ giới hạn context gửi tới rewriter.
 
-## Context Builder và Query Rewriter (Week 2 Batch C)
+## Context Builder và Query Rewriter (Week 3 Batch C1)
 
 - `ContextBuilder` nhận history đã được store sắp xếp cũ → mới, không sort lại timestamp.
 - Giữ tối đa `MAX_RECENT_MESSAGES` (mặc định 10) và `RECENT_CONTEXT_TOKEN_BUDGET` (3.000).
   Bỏ orphan assistant ở đầu window và loại turn cũ nhất theo nguyên nhóm; không truncate text.
 - Estimator là `ceil(UTF-8 bytes / 4) + 8/message`, không phải số token Qwen chính xác.
   Current query và system prompt không tính vào recent budget; current query không bị sửa/trim.
-- Prompt v1 tách system instructions khỏi JSON recent/current untrusted data. Chỉ rewrite;
-  explicit current query thắng context, không invent KPI/date/location/service, giữ nguyên query
-  standalone/topic switch và phần reference chưa resolve được.
+- Ranked LTM giữ nguyên thứ tự từ provider, bị cap bởi `MEMORY_SEARCH_TOP_K` trong khoảng 1–10,
+  không sort/dedup lại và chưa có token budget riêng trong baseline Week 3.
+- Prompt v2 tách system instructions khỏi JSON LTM/recent/current untrusted data. Chỉ gửi nội dung
+  memory, không gửi ID/score/metadata. Explicit current query thắng recent và LTM; recent thắng LTM
+  khi xung đột; LTM chỉ được dùng khi liên quan và không phải instruction/authorization source.
+  Rewriter vẫn không invent KPI/date/location/service, giữ nguyên query standalone/topic switch
+  và phần reference chưa resolve được.
 - `VllmQueryRewriterAdapter` dùng HTTPX client do caller quản lý và không tự retry.
   Contract là [vLLM Chat Completions](https://docs.vllm.ai/en/latest/serving/online_serving/openai_compatible_server/):
   `POST /v1/chat/completions`, `temperature=0`, `stream=false`, `max_tokens=256`.
@@ -127,8 +136,9 @@ inactivity TTL; `MAX_RECENT_MESSAGES` và token budget chỉ giới hạn contex
   truncated (`finish_reason=length`) hoặc tool-call response bị từ chối. Adapter không log dữ liệu.
 
 Gateway khởi tạo adapter vLLM ở startup; bắt buộc cấu hình base URL và model nhưng không gọi
-model để probe. Empty/fully-trimmed recent bỏ qua rewriter. PostgreSQL recent-read hoặc rewriter
-lỗi sẽ fallback current query nguyên bản. KiRa vẫn là dependency bắt buộc.
+model để probe. Ở checkpoint C1, flow online vẫn là Week 2: empty/fully-trimmed recent bỏ qua
+rewriter và chưa thực hiện Mem0 search. PostgreSQL recent-read hoặc rewriter lỗi sẽ fallback
+current query nguyên bản. KiRa vẫn là dependency bắt buộc.
 
 Test prompt bao phủ location/time/metric/reference/comparison, standalone, topic switch và
 injection trong recent data. Đây là unit/HTTP contract tests với mock, **không chứng minh chất lượng

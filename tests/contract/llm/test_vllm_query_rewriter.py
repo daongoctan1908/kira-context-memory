@@ -14,6 +14,7 @@ from app.domain.errors.query_rewriter import (
     QueryRewriterProtocolError,
     QueryRewriterTimeoutError,
 )
+from app.domain.models.memory import LongTermMemory
 from app.infrastructure.llm.vllm_query_rewriter import VllmQueryRewriterAdapter
 
 
@@ -92,6 +93,33 @@ async def test_custom_timeouts_output_limit_and_model_are_honored() -> None:
             ),
         )
         assert await adapter.rewrite(ContextBuilder().build([], "q")) == "abcd"
+
+
+async def test_request_contains_ranked_ltm_content_without_provider_metadata() -> None:
+    requests: list[httpx.Request] = []
+    memories = (
+        LongTermMemory("private-id-1", "fact ranked first", 0.9, {"private": "one"}),
+        LongTermMemory("private-id-2", "fact ranked second", 0.8, {"private": "two"}),
+    )
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json=completion("standalone query"))
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        adapter = VllmQueryRewriterAdapter(client, make_settings())
+        result = await adapter.rewrite(ContextBuilder().build([], "follow-up", memories))
+
+    assert result == "standalone query"
+    prompt_envelope = json.loads(json.loads(requests[0].content)["messages"][1]["content"])
+    assert prompt_envelope["long_term_memories"] == [
+        "fact ranked first",
+        "fact ranked second",
+    ]
+    serialized_request = requests[0].content.decode()
+    assert "private-id" not in serialized_request
+    assert '"score"' not in serialized_request
+    assert '"metadata"' not in serialized_request
 
 
 @pytest.mark.parametrize("status", [301, 400, 401, 403, 429, 500, 503])

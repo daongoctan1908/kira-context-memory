@@ -6,6 +6,7 @@ import pytest
 from app.application.services.context_builder import ContextBuilder, estimate_recent_tokens
 from app.domain.models.context import ConversationContext
 from app.domain.models.conversation import ConversationMessage, ConversationRole
+from app.domain.models.memory import LongTermMemory
 
 
 def pair(turn: int, content: str = "text") -> tuple[ConversationMessage, ConversationMessage]:
@@ -18,6 +19,15 @@ def pair(turn: int, content: str = "text") -> tuple[ConversationMessage, Convers
             timestamp=datetime(2026, 9, 4, tzinfo=UTC) + timedelta(seconds=turn * 2 + index),
         )
         for index, role in enumerate((ConversationRole.USER, ConversationRole.ASSISTANT))
+    )
+
+
+def memory(index: int, content: str | None = None) -> LongTermMemory:
+    return LongTermMemory(
+        memory_id=f"memory-{index}",
+        content=content or f"ranked fact {index}",
+        score=1 - index / 100,
+        metadata={"private": f"metadata-{index}"},
     )
 
 
@@ -34,6 +44,39 @@ def test_empty_history_keeps_current_query_untouched() -> None:
     assert context.recent_messages == ()
     assert context.current_query == query
     assert context.estimated_recent_tokens == 0
+    assert context.long_term_memories == ()
+
+
+def test_ltm_ranking_is_preserved_and_bounded_independently_from_recent() -> None:
+    ranked = tuple(memory(index) for index in range(12))
+    recent = pair(1, "x" * 100)
+
+    context = ContextBuilder(recent_token_budget=10).build(recent, "current", ranked)
+
+    assert context.long_term_memories == ranked[:10]
+    assert context.recent_messages == ()
+    assert context.estimated_recent_tokens == 0
+
+
+def test_configured_ltm_cap_keeps_provider_order_without_sorting_or_deduplication() -> None:
+    first = memory(1)
+    second = memory(2)
+    ranked = (second, first, second)
+
+    context = ContextBuilder(max_long_term_memories=2).build([], "q", ranked)
+
+    assert context.long_term_memories == (second, first)
+
+
+def test_ltm_has_no_token_budget_and_never_changes_current_query() -> None:
+    current_query = "  explicit current query  "
+    large_memories = tuple(memory(index, "nội dung " * 4000) for index in range(10))
+
+    context = ContextBuilder(recent_token_budget=1).build([], current_query, large_memories)
+
+    assert context.long_term_memories == large_memories
+    assert context.estimated_recent_tokens == 0
+    assert context.current_query == current_query
 
 
 def test_message_cap_keeps_newest_messages_without_mutating_input() -> None:
@@ -141,8 +184,18 @@ def test_builder_rejects_invalid_budget(budget: int) -> None:
         ContextBuilder(recent_token_budget=budget)
 
 
+@pytest.mark.parametrize("limit", [0, 11, -1, True, 1.5])
+def test_builder_rejects_invalid_ltm_cap(limit: int) -> None:
+    with pytest.raises(ValueError, match="max_long_term_memories"):
+        ContextBuilder(max_long_term_memories=limit)
+
+
 def test_context_is_immutable_and_repr_does_not_contain_conversation_text() -> None:
-    context = ContextBuilder().build(pair(1, "private-history"), "private-current")
+    context = ContextBuilder().build(
+        pair(1, "private-history"),
+        "private-current",
+        (memory(1, "private-memory"),),
+    )
     assert "private" not in repr(context)
     with pytest.raises(FrozenInstanceError):
         context.current_query = "changed"  # type: ignore[misc]
@@ -164,3 +217,14 @@ def test_context_rejects_invalid_estimated_count(tokens: int) -> None:
 def test_context_requires_immutable_typed_messages(messages) -> None:
     with pytest.raises(ValueError):
         ConversationContext(messages, "query", 0)
+
+
+@pytest.mark.parametrize("memories", [[], ("not-a-memory",)])
+def test_context_requires_immutable_typed_ltm(memories) -> None:
+    with pytest.raises(ValueError, match="long_term_memories"):
+        ConversationContext((), "query", 0, memories)
+
+
+def test_context_rejects_more_than_ten_ltm_items() -> None:
+    with pytest.raises(ValueError, match="at most 10"):
+        ConversationContext((), "query", 0, tuple(memory(index) for index in range(11)))

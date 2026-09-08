@@ -64,6 +64,7 @@ def test_settings_have_safe_baseline_defaults(monkeypatch) -> None:
     assert settings.memory_schema == "memory"
     assert settings.memory_collection_name == "memories"
     assert settings.memory_formation_message_limit == 10
+    assert settings.memory_search_top_k == 10
 
 
 def test_settings_hide_postgres_credentials_from_repr(monkeypatch) -> None:
@@ -157,6 +158,18 @@ def test_memory_formation_limit_must_preserve_turn_pairs(limit: int) -> None:
             kira_username="service-account",
             kira_basic_auth="secret",
             memory_formation_message_limit=limit,
+        )
+
+
+@pytest.mark.parametrize("limit", [0, 11])
+def test_memory_search_top_k_is_bounded_to_c1_context_limit(limit: int) -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            _env_file=None,
+            kira_base_url="http://kira.test",
+            kira_username="service-account",
+            kira_basic_auth="secret",
+            memory_search_top_k=limit,
         )
 
 
