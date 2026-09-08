@@ -69,6 +69,11 @@ Phạm vi implementation local của Tuần 3 cho T3.1–T3.17 đã hoàn tất.
 bộ vẫn là release gate bên ngoài vì workspace hiện không có `.env` endpoint/credential. Xem bảng
 đối chiếu và lệnh nghiệm thu tại [Week 3 acceptance](docs/week3-acceptance.md).
 
+Tuần 4 bắt đầu bằng ADR T4.1: PostgreSQL `memory_jobs` sẽ là async memory queue duy nhất. Gateway
+sau này ghi completed turn và job atomically; Worker claim trực tiếp bằng
+`FOR UPDATE SKIP LOCKED`. Redis/Redis Stream không được đưa trở lại baseline. Xem
+[Week 4 PostgreSQL memory job queue ADR](docs/week4-t4.1-postgresql-memory-job-queue.md).
+
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem
 [Week 2 runbook và evidence](docs/week2-acceptance.md).
@@ -300,5 +305,6 @@ implement các port của domain. Domain/application không import framework ho�
 
 - `main` luôn là baseline đã qua kiểm tra.
 - Mỗi feature dùng branch ngắn hạn `feat/<feature>`; Week 2 dùng
-  `feat/short-term-context` trên baseline Week 1.
+  `feat/short-term-context`, Week 3 dùng `feat/long-term-memory` và Week 4 dùng
+  `feat/async-memory-worker` trên checkpoint Week 3.
 - Commit theo checkpoint có thể review; merge về `main` sau khi lint và test pass.
