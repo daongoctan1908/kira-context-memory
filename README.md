@@ -14,6 +14,8 @@ Batch B3 bổ sung direct completed-turn formation use case; Batch B4 nghiệm t
 PostgreSQL/pgvector thật với provider doubles deterministic. Batch C1 mở rộng context và rewrite
 prompt v2 để nhận ranked LTM an toàn; Batch C2 bổ sung orchestration search song song vào use case.
 Batch C3 wire Mem0 retrieval có feature flag vào FastAPI lifecycle và observability:
+Batch C4 thêm cross-session acceptance gate trên PostgreSQL/pgvector thật, gồm formation trực tiếp
+ở Session A, recall ở Session B, user isolation và precedence Current > Recent > LTM:
 
 - cấu trúc presentation, application, domain, infrastructure, config và worker;
 - dependency/tooling bằng Python 3.11, `uv`, Ruff và pytest;
@@ -56,6 +58,12 @@ Batch C3 wire Mem0 retrieval có feature flag vào FastAPI lifecycle và observa
   fail hoặc thay KiRa response bằng synthetic answer.
 - `/metrics` có LTM search outcome/latency/result count và degraded counter `mem0/memory_search`;
   không dùng user/session/memory ID, query, prompt hay error message làm label.
+- C4 chạy native Mem0 V3 và pgvector thật với provider doubles deterministic, đi xuyên qua
+  `ContextBuilder`, HTTP contract của vLLM adapter, Gateway SSE và KiRa double; cùng một
+  `session_id` ở user khác không đọc được recent hoặc LTM của owner.
+- C4 có thêm semantic gate opt-in dùng embedding, memory LLM và query-rewrite endpoint thật.
+  Gate này không tự chạy trong CI/local mặc định và không được báo pass khi chưa có endpoint
+  nội bộ được phê duyệt.
 
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem
@@ -173,6 +181,26 @@ uv run pytest tests/integration/postgres/test_memory_formation.py --no-cov
 Gate này dùng deterministic in-process doubles cho embedding và memory LLM để kiểm tra pipeline,
 DB persistence, metadata, dedup và isolation ổn định. Nó không thay thế semantic gate B2 trên model
 nội bộ thật; policy quality vẫn là `NOT_RUN` nếu chưa cấu hình endpoint được phê duyệt.
+
+Chạy Week 3 C4 cross-session gate deterministic:
+
+```powershell
+$env:POSTGRES_TEST_URL="postgresql+asyncpg://kira:replace_me@127.0.0.1:5432/kira_context"
+uv run pytest tests/integration/postgres/test_cross_session_recall.py --no-cov
+```
+
+Test đầu dùng PostgreSQL/pgvector và native Mem0 V3 thật, nhưng provider embedding/memory LLM
+deterministic và vLLM HTTP mock để kết quả ổn định. Test semantic thứ hai mặc định skip. Chỉ chạy
+với disposable database và các endpoint model nội bộ đã được phê duyệt:
+
+```powershell
+$env:RUN_CROSS_SESSION_EVAL="1"
+uv run pytest tests/integration/postgres/test_cross_session_recall.py `
+  -m "postgres_integration and memory_llm_integration" --no-cov
+```
+
+Xem contract, ma trận nghiệm thu và giới hạn evidence tại
+[Week 3 C4 cross-session acceptance](docs/week3-c4-cross-session-acceptance.md).
 
 ### Chạy Gateway
 
