@@ -65,6 +65,10 @@ Batch C4 thêm cross-session acceptance gate trên PostgreSQL/pgvector thật, g
   Gate này không tự chạy trong CI/local mặc định và không được báo pass khi chưa có endpoint
   nội bộ được phê duyệt.
 
+Phạm vi implementation local của Tuần 3 cho T3.1–T3.17 đã hoàn tất. Evidence dùng model/KiRa nội
+bộ vẫn là release gate bên ngoài vì workspace hiện không có `.env` endpoint/credential. Xem bảng
+đối chiếu và lệnh nghiệm thu tại [Week 3 acceptance](docs/week3-acceptance.md).
+
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem
 [Week 2 runbook và evidence](docs/week2-acceptance.md).
@@ -261,7 +265,8 @@ Không ghi partial turn khi lỗi hoặc disconnect được phát hiện. Write
 chỉ chứa nguyên pair user/assistant và current completed turn luôn ở cuối. Harness gửi cả user lẫn
 assistant message cho native Mem0 V3 để giữ đúng ngữ cảnh xác nhận/reference; không gọi
 `update()`/`delete()` có chủ đích và không ép action provider thành ADD. Gateway chưa tự gọi
-formation; online lifecycle wiring và durable delivery đều nằm ngoài Batch B.
+formation; retrieval runtime đã được wire ở C3, còn online formation/durable delivery nằm ngoài
+scope Tuần 3.
 
 `CONVERSATION_OPERATION_TIMEOUT_SECONDS=5` giới hạn tổng thời gian mỗi read/write (kể cả chờ pool).
 Để chạy ngay stack cô lập với mock KiRa/vLLM và DB thật:
