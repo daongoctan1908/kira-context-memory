@@ -1,4 +1,4 @@
-"""Short-term context orchestration; KiRa remains the only answer source."""
+"""Short/long-term context orchestration; KiRa remains the only answer source."""
 
 import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -9,7 +9,11 @@ from uuid import uuid4
 
 from app.application.services.context_builder import ContextBuilder
 from app.domain.errors.conversation import ConversationStoreError, ConversationStoreProtocolError
-from app.domain.errors.memory import LongTermMemoryError
+from app.domain.errors.memory import (
+    LongTermMemoryError,
+    LongTermMemoryProtocolError,
+    LongTermMemoryTimeoutError,
+)
 from app.domain.errors.query_rewriter import QueryRewriterError
 from app.domain.models.chat import ChatCommand
 from app.domain.models.context import MAX_LONG_TERM_MEMORIES
@@ -141,6 +145,7 @@ class HandleChatUseCase:
                 "current_query_only",
             )
             self._observer.context_observed(0, 0)
+            self._observer.memory_search_observed("bypass", None, None)
             self._observer.rewrite_observed("bypass", None)
             return ChatStreamSession(await self._kira_client.chat_stream(command.message))
 
@@ -192,6 +197,7 @@ class HandleChatUseCase:
             user_id,
             command.session_id,
             command.message,
+            correlation_id,
         )
 
         if isinstance(recent_result, (ConversationStoreError, TimeoutError)):
@@ -219,14 +225,7 @@ class HandleChatUseCase:
             self._observer.rewrite_observed("bypass", None)
             return command.message
 
-        memories = (
-            () if isinstance(memory_result, (LongTermMemoryError, TimeoutError)) else memory_result
-        )
-        if not isinstance(memories, tuple) or any(
-            not isinstance(memory, LongTermMemory) for memory in memories
-        ):
-            # Treat a provider contract violation as unavailable optional context.
-            memories = ()
+        memories = () if isinstance(memory_result, LongTermMemoryError) else memory_result
         try:
             context = self._builder.build(recent_result, command.message, memories)
         except ValueError as error:
@@ -268,13 +267,14 @@ class HandleChatUseCase:
         user_id: str,
         session_id: str,
         query: str,
+        correlation_id: str,
     ) -> tuple[
         tuple[ConversationMessage, ...] | ConversationStoreError | TimeoutError,
-        tuple[LongTermMemory, ...] | LongTermMemoryError | TimeoutError,
+        tuple[LongTermMemory, ...] | LongTermMemoryError,
     ]:
         tasks = (
             asyncio.create_task(self._read_recent(user_id, session_id)),
-            asyncio.create_task(self._search_memory(user_id, query)),
+            asyncio.create_task(self._search_memory(user_id, query, correlation_id)),
         )
         try:
             recent_result, memory_result = await asyncio.gather(*tasks)
@@ -304,16 +304,54 @@ class HandleChatUseCase:
         self,
         user_id: str,
         query: str,
-    ) -> tuple[LongTermMemory, ...] | LongTermMemoryError | TimeoutError:
+        correlation_id: str,
+    ) -> tuple[LongTermMemory, ...] | LongTermMemoryError:
         if self._memory is None:
+            self._observer.memory_search_observed("bypass", None, None)
             return ()
+        started = perf_counter()
         try:
             async with asyncio.timeout(self._memory_search_timeout):
-                return await self._memory.search(
+                memories = await self._memory.search(
                     user_id,
                     query,
                     top_k=self._memory_search_top_k,
                     threshold=self._memory_search_threshold,
                 )
-        except (LongTermMemoryError, TimeoutError) as error:
+        except TimeoutError:
+            error = LongTermMemoryTimeoutError()
+            self._observe_memory_failure(correlation_id, error, perf_counter() - started)
             return error
+        except LongTermMemoryError as error:
+            self._observe_memory_failure(correlation_id, error, perf_counter() - started)
+            return error
+        except Exception:
+            self._observer.memory_search_observed("error", None, perf_counter() - started)
+            raise
+
+        if not isinstance(memories, tuple) or any(
+            not isinstance(memory, LongTermMemory) for memory in memories
+        ):
+            error = LongTermMemoryProtocolError()
+            self._observe_memory_failure(correlation_id, error, perf_counter() - started)
+            return error
+        self._observer.memory_search_observed(
+            "success",
+            len(memories),
+            perf_counter() - started,
+        )
+        return memories
+
+    def _observe_memory_failure(
+        self,
+        correlation_id: str,
+        error: LongTermMemoryError,
+        seconds: float,
+    ) -> None:
+        self._observer.memory_search_observed("error", None, seconds)
+        self._observer.degraded(
+            correlation_id,
+            "memory_search",
+            type(error).__name__,
+            "recent_or_original_query",
+        )

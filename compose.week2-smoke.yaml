@@ -64,6 +64,7 @@ services:
       APP_ENVIRONMENT: test
       DEV_STATIC_IDENTITY_ENABLED: "true"
       DEV_STATIC_USER_ID: local-smoke-user
+      LTM_ENABLED: "false"
     ports:
       - "127.0.0.1:18000:8000"
     depends_on:

@@ -5,7 +5,12 @@ import logging
 
 from prometheus_client import CollectorRegistry, Counter, Histogram
 
-from app.domain.ports.context_observer import ContextOperation, RewriteOutcome, WriteOutcome
+from app.domain.ports.context_observer import (
+    ContextOperation,
+    MemorySearchOutcome,
+    RewriteOutcome,
+    WriteOutcome,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +60,25 @@ class ContextTelemetry:
             buckets=(0, 100, 500, 1000, 2000, 3000, 6000),
             registry=self.registry,
         )
+        self.memory_searches = Counter(
+            "kira_memory_search_total",
+            "Long-term-memory search outcomes",
+            ["outcome"],
+            registry=self.registry,
+        )
+        self.memory_search_latency = Histogram(
+            "kira_memory_search_duration_seconds",
+            "Attempted long-term-memory search latency",
+            ["outcome"],
+            buckets=(0.01, 0.05, 0.1, 0.5, 1, 2, 3, 5),
+            registry=self.registry,
+        )
+        self.memory_search_results = Histogram(
+            "kira_memory_search_results",
+            "Ranked memories returned by successful searches",
+            buckets=(0, 1, 2, 3, 5, 10),
+            registry=self.registry,
+        )
         self.rewrites = Counter(
             "kira_context_rewrite_total",
             "Rewrite outcomes",
@@ -85,6 +109,18 @@ class ContextTelemetry:
         self.recent_messages.observe(message_count)
         self.recent_tokens.observe(estimated_tokens)
 
+    def memory_search_observed(
+        self,
+        outcome: MemorySearchOutcome,
+        result_count: int | None,
+        seconds: float | None,
+    ) -> None:
+        self.memory_searches.labels(outcome).inc()
+        if seconds is not None:
+            self.memory_search_latency.labels(outcome).observe(seconds)
+        if result_count is not None:
+            self.memory_search_results.observe(result_count)
+
     def rewrite_observed(self, outcome: RewriteOutcome, seconds: float | None) -> None:
         self.rewrites.labels(outcome).inc()
         if seconds is not None:
@@ -99,6 +135,7 @@ class ContextTelemetry:
     ) -> None:
         dependency = {
             "identity": "identity",
+            "memory_search": "mem0",
             "rewriter": "vllm",
         }.get(operation, "postgresql")
         self.degradations.labels(dependency, operation).inc()

@@ -71,8 +71,10 @@ async def run(gateway_url: str, mock_kira_url: str, database_url: str) -> None:
                 print(f"PASS mock_e2e case={case.name} persisted_messages=4")
             metrics = (await client.get(gateway_url + "/metrics")).text
             assert 'kira_context_rewrite_total{outcome="success"}' in metrics
+            assert 'kira_memory_search_total{outcome="bypass"}' in metrics
+            assert 'kira_memory_search_total{outcome="error"}' not in metrics
             assert 'kira_conversation_write_total{outcome="inserted"}' in metrics
-            print("PASS health readiness metrics; real_model_gate=NOT_RUN")
+            print("PASS health readiness metrics ltm_disabled_bypass; real_model_gate=NOT_RUN")
     finally:
         try:
             if created_sessions:

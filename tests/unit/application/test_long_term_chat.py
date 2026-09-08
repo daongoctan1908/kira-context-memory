@@ -14,6 +14,7 @@ from app.domain.errors.query_rewriter import QueryRewriterTimeoutError
 from app.domain.models.chat import ChatCommand
 from app.domain.models.identity import AuthenticatedPrincipal
 from app.domain.models.memory import LongTermMemory
+from app.infrastructure.observability.context import ContextTelemetry
 from tests.integration.test_gateway_api import FakeKiraClient
 from tests.support.context_fakes import FakeRewriter, MemoryStore, make_use_case, pair
 
@@ -53,6 +54,7 @@ async def test_combines_ranked_ltm_with_recent_using_trusted_user_and_original_q
     rewriter = FakeRewriter("rewritten with memory")
     client = FakeKiraClient()
 
+    telemetry = ContextTelemetry()
     await make_use_case(
         client,
         conversation_store=MemoryStore(recent),
@@ -60,6 +62,7 @@ async def test_combines_ranked_ltm_with_recent_using_trusted_user_and_original_q
         long_term_memory=ltm,
         memory_search_top_k=7,
         memory_search_threshold=0.35,
+        observer=telemetry,
     ).execute(COMMAND, principal=PRINCIPAL)
 
     assert ltm.searches == [(PRINCIPAL.user_id, COMMAND.message, 7, 0.35)]
@@ -67,6 +70,14 @@ async def test_combines_ranked_ltm_with_recent_using_trusted_user_and_original_q
     assert rewriter.contexts[0].recent_messages == recent
     assert rewriter.contexts[0].long_term_memories == memories
     assert rewriter.contexts[0].current_query == COMMAND.message
+    assert (
+        telemetry.registry.get_sample_value(
+            "kira_memory_search_total",
+            {"outcome": "success"},
+        )
+        == 1
+    )
+    assert telemetry.registry.get_sample_value("kira_memory_search_results_sum") == 2
 
 
 async def test_ltm_only_context_still_invokes_rewriter_for_cross_session_recall():
@@ -117,17 +128,26 @@ async def test_memory_failure_degrades_to_recent_and_current(error):
     recent = pair()
     rewriter = FakeRewriter("rewritten from recent")
     client = FakeKiraClient()
+    telemetry = ContextTelemetry()
 
     await make_use_case(
         client,
         conversation_store=MemoryStore(recent),
         query_rewriter=rewriter,
         long_term_memory=FakeLongTermMemory(error=error),
+        observer=telemetry,
     ).execute(COMMAND, principal=PRINCIPAL)
 
     assert rewriter.contexts[0].recent_messages == recent
     assert rewriter.contexts[0].long_term_memories == ()
     assert client.messages == ["rewritten from recent"]
+    assert (
+        telemetry.registry.get_sample_value(
+            "kira_context_degraded_total",
+            {"dependency": "mem0", "operation": "memory_search"},
+        )
+        == 1
+    )
 
 
 async def test_use_case_enforces_memory_search_deadline_and_uses_recent():
@@ -325,11 +345,21 @@ async def test_cancellation_during_memory_search_propagates_before_kira():
 async def test_missing_identity_never_searches_ltm():
     ltm = FakeLongTermMemory((memory(1),))
     client = FakeKiraClient()
+    telemetry = ContextTelemetry()
 
-    await make_use_case(client, long_term_memory=ltm).execute(COMMAND, principal=None)
+    await make_use_case(client, long_term_memory=ltm, observer=telemetry).execute(
+        COMMAND, principal=None
+    )
 
     assert ltm.searches == []
     assert client.messages == [COMMAND.message]
+    assert (
+        telemetry.registry.get_sample_value(
+            "kira_memory_search_total",
+            {"outcome": "bypass"},
+        )
+        == 1
+    )
 
 
 async def test_provider_contract_violation_discards_ltm_without_losing_recent():
