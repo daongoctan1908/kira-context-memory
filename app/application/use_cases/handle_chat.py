@@ -9,14 +9,18 @@ from uuid import uuid4
 
 from app.application.services.context_builder import ContextBuilder
 from app.domain.errors.conversation import ConversationStoreError, ConversationStoreProtocolError
+from app.domain.errors.memory import LongTermMemoryError
 from app.domain.errors.query_rewriter import QueryRewriterError
 from app.domain.models.chat import ChatCommand
+from app.domain.models.context import MAX_LONG_TERM_MEMORIES
 from app.domain.models.conversation import ConversationMessage, ConversationRole
 from app.domain.models.identity import AuthenticatedPrincipal
 from app.domain.models.kira import KiraStreamEvent
+from app.domain.models.memory import LongTermMemory
 from app.domain.ports.context_observer import ContextObserverPort
 from app.domain.ports.conversation_store import ConversationStorePort
 from app.domain.ports.kira_client import KiraClientPort
+from app.domain.ports.long_term_memory import LongTermMemoryPort
 from app.domain.ports.query_rewriter import QueryRewriterPort
 
 
@@ -83,7 +87,29 @@ class HandleChatUseCase:
         observer: ContextObserverPort,
         max_recent_messages: int = 10,
         store_timeout_seconds: float = 5.0,
+        long_term_memory: LongTermMemoryPort | None = None,
+        memory_search_top_k: int = 10,
+        memory_search_threshold: float = 0.1,
+        memory_search_timeout_seconds: float = 3.0,
     ) -> None:
+        if (
+            isinstance(memory_search_top_k, bool)
+            or not isinstance(memory_search_top_k, int)
+            or not 1 <= memory_search_top_k <= MAX_LONG_TERM_MEMORIES
+        ):
+            raise ValueError(f"memory_search_top_k must be between 1 and {MAX_LONG_TERM_MEMORIES}")
+        if (
+            isinstance(memory_search_threshold, bool)
+            or not isinstance(memory_search_threshold, (int, float))
+            or not 0 <= memory_search_threshold <= 1
+        ):
+            raise ValueError("memory_search_threshold must be between zero and one")
+        if (
+            isinstance(memory_search_timeout_seconds, bool)
+            or not isinstance(memory_search_timeout_seconds, (int, float))
+            or memory_search_timeout_seconds <= 0
+        ):
+            raise ValueError("memory_search_timeout_seconds must be positive")
         self._kira_client = kira_client
         self._store = conversation_store
         self._rewriter = query_rewriter
@@ -91,6 +117,10 @@ class HandleChatUseCase:
         self._observer = observer
         self._recent_limit = max_recent_messages
         self._store_timeout = store_timeout_seconds
+        self._memory = long_term_memory
+        self._memory_search_top_k = memory_search_top_k
+        self._memory_search_threshold = float(memory_search_threshold)
+        self._memory_search_timeout = float(memory_search_timeout_seconds)
 
     async def execute(
         self,
@@ -158,17 +188,50 @@ class HandleChatUseCase:
         user_id: str,
         correlation_id: str,
     ) -> str:
+        recent_result, memory_result = await self._load_context_inputs(
+            user_id,
+            command.session_id,
+            command.message,
+        )
+
+        if isinstance(recent_result, (ConversationStoreError, TimeoutError)):
+            self._observer.degraded(
+                correlation_id,
+                "postgres_read",
+                type(recent_result).__name__,
+                "original_query",
+            )
+            self._observer.context_observed(0, 0)
+            self._observer.rewrite_observed("bypass", None)
+            return command.message
+
         try:
-            async with asyncio.timeout(self._store_timeout):
-                recent = await self._store.read_recent(
-                    user_id,
-                    command.session_id,
-                    self._recent_limit,
-                )
-            if any(message.session_id != command.session_id for message in recent):
+            if any(message.session_id != command.session_id for message in recent_result):
                 raise ConversationStoreProtocolError()
-            context = self._builder.build(recent, command.message)
-        except (ConversationStoreError, TimeoutError, ValueError) as error:
+        except (AttributeError, TypeError, ConversationStoreProtocolError) as error:
+            self._observer.degraded(
+                correlation_id,
+                "postgres_read",
+                type(error).__name__,
+                "original_query",
+            )
+            self._observer.context_observed(0, 0)
+            self._observer.rewrite_observed("bypass", None)
+            return command.message
+
+        memories = (
+            () if isinstance(memory_result, (LongTermMemoryError, TimeoutError)) else memory_result
+        )
+        if not isinstance(memories, tuple) or any(
+            not isinstance(memory, LongTermMemory) for memory in memories
+        ):
+            # Treat a provider contract violation as unavailable optional context.
+            memories = ()
+        try:
+            context = self._builder.build(recent_result, command.message, memories)
+        except ValueError as error:
+            # Store data already passed its session boundary. A remaining model invariant
+            # failure can only make contextual rewrite unsafe, so fail closed to current-only.
             self._observer.degraded(
                 correlation_id,
                 "postgres_read",
@@ -182,7 +245,7 @@ class HandleChatUseCase:
         self._observer.context_observed(
             len(context.recent_messages), context.estimated_recent_tokens
         )
-        if not context.recent_messages:
+        if not context.recent_messages and not context.long_term_memories:
             self._observer.rewrite_observed("bypass", None)
             return command.message
         started = perf_counter()
@@ -199,3 +262,58 @@ class HandleChatUseCase:
             return command.message
         self._observer.rewrite_observed("success", perf_counter() - started)
         return query
+
+    async def _load_context_inputs(
+        self,
+        user_id: str,
+        session_id: str,
+        query: str,
+    ) -> tuple[
+        tuple[ConversationMessage, ...] | ConversationStoreError | TimeoutError,
+        tuple[LongTermMemory, ...] | LongTermMemoryError | TimeoutError,
+    ]:
+        tasks = (
+            asyncio.create_task(self._read_recent(user_id, session_id)),
+            asyncio.create_task(self._search_memory(user_id, query)),
+        )
+        try:
+            recent_result, memory_result = await asyncio.gather(*tasks)
+        except BaseException:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            raise
+        return recent_result, memory_result
+
+    async def _read_recent(
+        self,
+        user_id: str,
+        session_id: str,
+    ) -> tuple[ConversationMessage, ...] | ConversationStoreError | TimeoutError:
+        try:
+            async with asyncio.timeout(self._store_timeout):
+                return await self._store.read_recent(
+                    user_id,
+                    session_id,
+                    self._recent_limit,
+                )
+        except (ConversationStoreError, TimeoutError) as error:
+            return error
+
+    async def _search_memory(
+        self,
+        user_id: str,
+        query: str,
+    ) -> tuple[LongTermMemory, ...] | LongTermMemoryError | TimeoutError:
+        if self._memory is None:
+            return ()
+        try:
+            async with asyncio.timeout(self._memory_search_timeout):
+                return await self._memory.search(
+                    user_id,
+                    query,
+                    top_k=self._memory_search_top_k,
+                    threshold=self._memory_search_threshold,
+                )
+        except (LongTermMemoryError, TimeoutError) as error:
+            return error

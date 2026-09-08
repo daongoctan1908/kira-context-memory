@@ -12,7 +12,8 @@ Batch A1 bổ sung identity/user scope và nền tảng Mem0/pgvector; Batch B1-
 versioned theo native Mem0 V3 dual-source cùng synthetic acceptance gate cho memory extraction.
 Batch B3 bổ sung direct completed-turn formation use case; Batch B4 nghiệm thu formation trên
 PostgreSQL/pgvector thật với provider doubles deterministic. Batch C1 mở rộng context và rewrite
-prompt v2 để nhận ranked LTM an toàn; Mem0 search vẫn chưa wire vào `/chat`:
+prompt v2 để nhận ranked LTM an toàn; Batch C2 bổ sung orchestration search song song vào use case.
+Mem0 runtime vẫn chưa được khởi tạo/wire trong FastAPI lifecycle:
 
 - cấu trúc presentation, application, domain, infrastructure, config và worker;
 - dependency/tooling bằng Python 3.11, `uv`, Ruff và pytest;
@@ -46,6 +47,10 @@ prompt v2 để nhận ranked LTM an toàn; Mem0 search vẫn chưa wire vào `/
   recent token budget và current query vẫn luôn được truyền riêng, không trim.
 - rewrite prompt v2 chỉ gửi text của LTM trong JSON untrusted data, không gửi memory ID, score hay
   metadata; precedence là current explicit > recent > LTM và memory không phải nguồn authorization.
+- `HandleChatUseCase` có thể search LTM theo trusted `user_id` và original current query song song
+  với PostgreSQL recent-read; LTM-only context cũng được rewrite để hỗ trợ cross-session recall.
+- LTM timeout/lỗi typed fallback về Recent + Current. PostgreSQL recent-read lỗi luôn current-only
+  và bỏ kết quả LTM; cancellation/lỗi lập trình không bị nuốt hoặc để task dependency chạy rơi nền.
 
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem
@@ -136,9 +141,10 @@ inactivity TTL; `MAX_RECENT_MESSAGES` và token budget chỉ giới hạn contex
   truncated (`finish_reason=length`) hoặc tool-call response bị từ chối. Adapter không log dữ liệu.
 
 Gateway khởi tạo adapter vLLM ở startup; bắt buộc cấu hình base URL và model nhưng không gọi
-model để probe. Ở checkpoint C1, flow online vẫn là Week 2: empty/fully-trimmed recent bỏ qua
-rewriter và chưa thực hiện Mem0 search. PostgreSQL recent-read hoặc rewriter lỗi sẽ fallback
-current query nguyên bản. KiRa vẫn là dependency bắt buộc.
+model để probe. C2 mới hoàn thiện application orchestration; FastAPI chưa inject Mem0 adapter nên
+container online vẫn chạy flow Week 2 cho đến C3. Khi được inject, rewriter chỉ bypass nếu cả recent
+và LTM đều rỗng. PostgreSQL recent-read hoặc rewriter lỗi fallback current query nguyên bản; lỗi
+riêng LTM vẫn cho phép Recent + Current tiếp tục. KiRa vẫn là dependency bắt buộc.
 
 Test prompt bao phủ location/time/metric/reference/comparison, standalone, topic switch và
 injection trong recent data. Đây là unit/HTTP contract tests với mock, **không chứng minh chất lượng
