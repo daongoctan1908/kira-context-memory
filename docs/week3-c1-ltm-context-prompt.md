@@ -85,7 +85,11 @@ The full repository test and formatting gates remain mandatory before commit.
 - Ruff lint and format check: passed.
 - Existing B1/B2 policy, adapter, and pristine contract gate: 53 passed.
 - Customized Mem0 pgvector provider gate: 91 passed.
-- PostgreSQL/pgvector integration, Docker image build, and socket smoke: **NOT RUN** in this
-  checkpoint because the local Docker Linux engine was unavailable after startup attempts.
+- Full PostgreSQL/pgvector integration marker: 17 passed, including conversation store, exact
+  completed-turn formation, and memory schema checks.
+- Docker image `kira-context:0.3.0` rebuilt successfully and runs as user `kira`; the running
+  Gateway reports prompt version 2 and healthy `/health`/`/ready` endpoints.
+- Synthetic socket E2E: all 8 location/time/metric/reference/comparison/standalone/topic-switch/
+  injection cases passed, including exact completed-turn persistence and metrics checks.
 - Approved real vLLM/Mem0 semantic endpoints: **NOT RUN**; C1 validates prompt/HTTP contracts, not
   live-model rewrite quality.
