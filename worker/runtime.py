@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from app.domain.errors.memory_job import MemoryJobQueueProtocolError
 from app.domain.models.memory_job import MemoryJobStats
 from app.domain.ports.memory_job_queue import MemoryJobQueuePort
+from worker.cleanup import MemoryJobCleanupRunner
 from worker.runner import MemoryJobRunner
 from worker.telemetry import MemoryJobTelemetry
 
@@ -26,6 +27,7 @@ class MemoryWorkerRuntime:
         *,
         metrics_refresh_seconds: float,
         database_timeout_seconds: float,
+        cleanup_runner: MemoryJobCleanupRunner | None = None,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
         _require_positive_finite(metrics_refresh_seconds, "metrics_refresh_seconds")
@@ -35,11 +37,13 @@ class MemoryWorkerRuntime:
         self._telemetry = telemetry
         self._metrics_refresh = float(metrics_refresh_seconds)
         self._database_timeout = float(database_timeout_seconds)
+        self._cleanup_runner = cleanup_runner
         self._freshness_window = (2 * self._metrics_refresh) + self._database_timeout
         self._clock = clock or _utc_now
         self._stop_requested = asyncio.Event()
         self._runner_task: asyncio.Task[None] | None = None
         self._metrics_task: asyncio.Task[None] | None = None
+        self._cleanup_task: asyncio.Task[None] | None = None
         self._last_queue_refresh_at: datetime | None = None
         self._queue_snapshot_available = False
         self._started = False
@@ -70,6 +74,11 @@ class MemoryWorkerRuntime:
             self._sample_queue_loop(),
             name="memory-job-metrics",
         )
+        if self._cleanup_runner is not None:
+            self._cleanup_task = asyncio.create_task(
+                self._run_cleanup(),
+                name="memory-job-cleanup",
+            )
         await asyncio.sleep(0)
 
     async def stop(self) -> None:
@@ -77,7 +86,13 @@ class MemoryWorkerRuntime:
             return
         self._stop_requested.set()
         self._runner.request_stop()
-        tasks = tuple(task for task in (self._metrics_task, self._runner_task) if task is not None)
+        if self._cleanup_runner is not None:
+            self._cleanup_runner.request_stop()
+        tasks = tuple(
+            task
+            for task in (self._metrics_task, self._cleanup_task, self._runner_task)
+            if task is not None
+        )
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         self._stopped = True
@@ -110,6 +125,24 @@ class MemoryWorkerRuntime:
         while not self._stop_requested.is_set():
             await self._sample_queue_once()
             await self._pause(self._metrics_refresh)
+
+    async def _run_cleanup(self) -> None:
+        if self._cleanup_runner is None:
+            return
+        try:
+            await self._cleanup_runner.run()
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            logger.error(
+                "Memory job cleanup runner stopped unexpectedly",
+                extra={
+                    "dependency": "memory_job_runtime",
+                    "operation": "cleanup_memory_jobs",
+                    "error_class": type(error).__name__,
+                    "fallback_mode": "processing_continues",
+                },
+            )
 
     async def _sample_queue_once(self) -> None:
         try:

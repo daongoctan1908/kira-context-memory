@@ -115,6 +115,11 @@ endpoint read-only `/health`, `/ready`, `/metrics`. Readiness yêu cầu runner 
 khả dụng và queue-stats snapshot còn fresh; metrics HTTP chỉ đọc cache, không query PostgreSQL.
 Prometheus labels chỉ dùng status/outcome bounded, không chứa identity, event hay error class. Xem
 [Week 4 T4.14 Worker FastAPI app](docs/week4-t4.14-worker-fastapi-app.md).
+T4.15 thêm retention runner trong cùng Worker lifecycle: chạy ngay một bounded cleanup batch rồi
+lặp theo interval, giữ completed mặc định 7 ngày và dead 30 ngày; pending/processing không bao giờ
+bị purge. Cleanup timeout/lỗi DB chỉ retry ở chu kỳ kế tiếp và không dừng processing runner.
+PostgreSQL acceptance cũng khóa đủ 5 provider attempts cùng retry schedule `1/5/30/120`. Xem
+[Week 4 T4.15 retry and retention](docs/week4-t4.15-retry-cleanup-retention.md).
 
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem

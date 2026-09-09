@@ -160,7 +160,7 @@ class MemoryJobTelemetry:
         self.database_backoff.set(snapshot.database_backoff_seconds)
 
     def cleanup_observed(self, result: MemoryJobPurgeResult) -> None:
-        """Reserved for the T4.15 cleanup loop without changing metric contracts."""
+        """Observe rows removed by one successful bounded retention operation."""
         if result.completed:
             self.cleanup.labels("completed").inc(result.completed)
         if result.dead:

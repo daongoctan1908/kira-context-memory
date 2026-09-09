@@ -84,6 +84,19 @@ class FakeStatsQueue:
         return response  # type: ignore[return-value]
 
 
+class FakeCleanupRunner:
+    def __init__(self) -> None:
+        self.started = asyncio.Event()
+        self.stop_requested = asyncio.Event()
+
+    async def run(self) -> None:
+        self.started.set()
+        await self.stop_requested.wait()
+
+    def request_stop(self) -> None:
+        self.stop_requested.set()
+
+
 def make_runtime(
     runner: FakeRunner,
     queue: FakeStatsQueue,
@@ -221,3 +234,16 @@ async def test_stopped_runner_makes_runtime_not_ready_and_logs_safely(monkeypatc
 def test_runtime_rejects_invalid_time_bounds(field: str, value: object) -> None:
     with pytest.raises(ValueError):
         make_runtime(FakeRunner(), FakeStatsQueue(), **{field: value})
+
+
+async def test_runtime_starts_and_stops_cleanup_with_other_background_tasks() -> None:
+    runner = FakeRunner()
+    queue = FakeStatsQueue()
+    cleanup = FakeCleanupRunner()
+    runtime = make_runtime(runner, queue, cleanup_runner=cleanup)
+
+    await runtime.start()
+    await asyncio.wait_for(cleanup.started.wait(), timeout=1)
+    await runtime.stop()
+
+    assert cleanup.stop_requested.is_set()

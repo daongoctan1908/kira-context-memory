@@ -10,6 +10,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.domain.ports.long_term_memory import LongTermMemoryPort
+from worker.cleanup import MemoryJobCleanupRunner
 from worker.dependencies import WorkerDependencies, worker_dependency_lifespan
 from worker.runtime import MemoryWorkerRuntime
 from worker.settings import WorkerSettings, get_worker_settings
@@ -38,12 +39,24 @@ def create_app(
             long_term_memory=long_term_memory,
             job_observer=telemetry,
         ) as dependencies:
+            cleanup_runner = MemoryJobCleanupRunner(
+                dependencies.memory_job_queue,
+                interval_seconds=resolved_settings.memory_job_cleanup_interval_seconds,
+                completed_retention_seconds=(
+                    resolved_settings.memory_job_completed_retention_seconds
+                ),
+                dead_retention_seconds=resolved_settings.memory_job_dead_retention_seconds,
+                batch_size=resolved_settings.memory_job_cleanup_batch_size,
+                database_timeout_seconds=resolved_settings.memory_job_db_timeout_seconds,
+                observer=telemetry,
+            )
             runtime = MemoryWorkerRuntime(
                 dependencies.runner,
                 dependencies.memory_job_queue,
                 telemetry,
                 metrics_refresh_seconds=resolved_settings.memory_job_metrics_refresh_seconds,
                 database_timeout_seconds=resolved_settings.memory_job_db_timeout_seconds,
+                cleanup_runner=cleanup_runner,
             )
             application.state.runtime = runtime
             await runtime.start()

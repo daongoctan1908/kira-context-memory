@@ -10,7 +10,7 @@ import pytest
 
 import worker.main as worker_main
 from app.domain.errors.memory_job import MemoryJobQueueConfigurationError
-from app.domain.models.memory_job import MemoryJobStats
+from app.domain.models.memory_job import MemoryJobPurgeResult, MemoryJobStats
 from worker.main import create_app
 from worker.runner import MemoryJobRunnerSnapshot
 from worker.settings import WorkerSettings
@@ -66,6 +66,8 @@ class FakeQueue:
         self.error = error
         self.stats_calls = 0
         self.sampled = asyncio.Event()
+        self.purge_calls: list[dict[str, object]] = []
+        self.purged = asyncio.Event()
 
     async def stats(self) -> MemoryJobStats:
         self.stats_calls += 1
@@ -74,6 +76,11 @@ class FakeQueue:
             raise self.error
         self.sampled.set()
         return MemoryJobStats(2, 1, 4, 3, 7.5)
+
+    async def purge_terminal(self, **kwargs) -> MemoryJobPurgeResult:
+        self.purge_calls.append(kwargs)
+        self.purged.set()
+        return MemoryJobPurgeResult()
 
 
 def dependency_factory(runner: FakeRunner, queue: FakeQueue, captured: dict[str, object]):
@@ -100,6 +107,7 @@ async def test_worker_app_exposes_only_internal_read_endpoints_and_cached_metric
         transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
         async with httpx.AsyncClient(transport=transport, base_url="http://worker.test") as client:
             await asyncio.wait_for(queue.sampled.wait(), timeout=1)
+            await asyncio.wait_for(queue.purged.wait(), timeout=1)
             await asyncio.sleep(0)
             ready = await client.get("/ready")
             calls_before_probes = queue.stats_calls
@@ -116,6 +124,7 @@ async def test_worker_app_exposes_only_internal_read_endpoints_and_cached_metric
         assert "kira_memory_worker_runner_active 1.0" in metrics.text
         assert "kira_memory_job_queue_database_available 1.0" in metrics.text
         assert queue.stats_calls == calls_before_probes
+        assert queue.purge_calls[0]["limit"] == 1000
 
     assert runner.stop_requested.is_set()
     assert captured["settings"] is settings
