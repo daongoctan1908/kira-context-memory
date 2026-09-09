@@ -14,6 +14,7 @@ from app.domain.errors.conversation import (
     ConversationStoreOperationError,
     ConversationStoreProtocolError,
 )
+from app.domain.errors.kira import KiraTimeoutError
 from app.domain.models.conversation import ConversationMessage, ConversationRole
 from app.infrastructure.postgres import conversation_store as conversation_store_module
 from app.infrastructure.postgres.conversation_store import PostgresConversationStoreAdapter
@@ -24,7 +25,8 @@ from app.infrastructure.postgres.schema import (
     memory_jobs,
 )
 from app.presentation.api.main import create_app
-from tests.integration.test_gateway_api import make_settings
+from tests.integration.test_gateway_api import FakeKiraClient, kira_event, make_settings
+from tests.support.context_fakes import FakeRewriter
 from tests.support.mock_kira_server import app as mock_kira_app
 from tests.support.mock_kira_server import query_hashes
 from tests.support.mock_vllm_server import app as mock_vllm_app
@@ -121,6 +123,40 @@ async def _append(
         ),
     )
     return result.inserted
+
+
+async def _session_persistence_counts(
+    engine: AsyncEngine,
+    session_id: str,
+) -> tuple[int, int, int]:
+    filters = (
+        conversations.c.user_id == USER_ID,
+        conversations.c.session_id == session_id,
+    )
+    async with engine.connect() as connection:
+        conversation_count = await connection.scalar(
+            select(func.count()).select_from(conversations).where(*filters)
+        )
+        message_count = await connection.scalar(
+            select(func.count())
+            .select_from(conversation_messages.join(conversations))
+            .where(*filters)
+        )
+        job_count = await connection.scalar(
+            select(func.count())
+            .select_from(
+                memory_jobs.join(
+                    conversation_messages,
+                    memory_jobs.c.boundary_message_id == conversation_messages.c.message_id,
+                ).join(conversations)
+            )
+            .where(*filters)
+        )
+    return (
+        int(conversation_count or 0),
+        int(message_count or 0),
+        int(job_count or 0),
+    )
 
 
 async def test_migration_revision_and_recent_index_exist(engine: AsyncEngine) -> None:
@@ -413,6 +449,163 @@ async def test_gateway_completed_stream_persists_and_schedules_atomically(
     assert "gateway_error" not in response.text
     assert scheduled.status == "pending"
     assert scheduled.message_index == 1
+
+
+async def test_gateway_formation_disabled_persists_turn_without_job(
+    engine: AsyncEngine,
+    session_id: str,
+) -> None:
+    settings = make_settings().model_copy(
+        update={
+            "kira_username": "local-smoke",
+            "memory_formation_enabled": False,
+        }
+    )
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=mock_kira_app)) as kira_http:
+        app = create_app(
+            settings=settings,
+            http_client=kira_http,
+            postgres_engine=engine,
+        )
+        async with (
+            app.router.lifespan_context(app),
+            httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=app),
+                base_url="http://gateway.test",
+            ) as client,
+        ):
+            response = await client.post(
+                "/chat",
+                json={"session_id": session_id, "message": "completed without formation"},
+            )
+            metrics = await client.get("/metrics")
+
+    assert response.status_code == 200
+    assert "gateway_error" not in response.text
+    assert await _session_persistence_counts(engine, session_id) == (1, 2, 0)
+    assert 'kira_memory_job_schedule_total{outcome="disabled"} 1.0' in metrics.text
+
+
+async def test_gateway_midstream_failure_persists_neither_turn_nor_job(
+    engine: AsyncEngine,
+    session_id: str,
+) -> None:
+    kira_client = FakeKiraClient(
+        events=[kira_event('{"text":"partial"}', "partial")],
+        stream_error=KiraTimeoutError(stage="chat stream"),
+    )
+    app = create_app(
+        settings=make_settings().model_copy(update={"memory_formation_enabled": True}),
+        kira_client=kira_client,
+        postgres_engine=engine,
+    )
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://gateway.test",
+        ) as client,
+    ):
+        response = await client.post(
+            "/chat",
+            json={"session_id": session_id, "message": "failing stream"},
+        )
+        metrics = await client.get("/metrics")
+
+    assert response.status_code == 200
+    assert "gateway_error" in response.text
+    assert await _session_persistence_counts(engine, session_id) == (0, 0, 0)
+    assert "kira_memory_job_schedule_total{" not in metrics.text
+
+
+async def test_gateway_missing_identity_persists_neither_turn_nor_job(
+    engine: AsyncEngine,
+    session_id: str,
+) -> None:
+    settings = make_settings().model_copy(
+        update={
+            "kira_username": "local-smoke",
+            "dev_static_identity_enabled": False,
+            "dev_static_user_id": None,
+            "memory_formation_enabled": True,
+        }
+    )
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=mock_kira_app)) as kira_http:
+        app = create_app(
+            settings=settings,
+            http_client=kira_http,
+            postgres_engine=engine,
+        )
+        async with (
+            app.router.lifespan_context(app),
+            httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=app),
+                base_url="http://gateway.test",
+            ) as client,
+        ):
+            response = await client.post(
+                "/chat",
+                json={"session_id": session_id, "message": "anonymous completion"},
+            )
+            metrics = await client.get("/metrics")
+
+    assert response.status_code == 200
+    assert "gateway_error" not in response.text
+    assert await _session_persistence_counts(engine, session_id) == (0, 0, 0)
+    assert "kira_memory_job_schedule_total{" not in metrics.text
+
+
+async def test_gateway_job_insert_failure_rolls_back_without_mutating_sse(
+    engine: AsyncEngine,
+    session_id: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seed_session = f"{session_id}-seed"
+    seed_turn_id = f"seed-{uuid4()}"
+    seed = await PostgresConversationStoreAdapter(engine).append_turn(
+        USER_ID,
+        _message(seed_session, seed_turn_id, ConversationRole.USER, "seed", 1),
+        _message(seed_session, seed_turn_id, ConversationRole.ASSISTANT, "seed", 2),
+        schedule_memory=True,
+    )
+    assert seed.memory_job_event_id is not None
+    monkeypatch.setattr(
+        conversation_store_module,
+        "uuid4",
+        lambda: seed.memory_job_event_id,
+    )
+    app = create_app(
+        settings=make_settings().model_copy(update={"memory_formation_enabled": True}),
+        kira_client=FakeKiraClient(events=[kira_event('{"text":"answer"}', "answer")]),
+        postgres_engine=engine,
+        query_rewriter=FakeRewriter(),
+    )
+    try:
+        async with (
+            app.router.lifespan_context(app),
+            httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=app),
+                base_url="http://gateway.test",
+            ) as client,
+        ):
+            response = await client.post(
+                "/chat",
+                json={"session_id": session_id, "message": "must roll back"},
+            )
+            metrics = await client.get("/metrics")
+
+        assert response.content == b'data: {"text":"answer"}\n\n'
+        assert await _session_persistence_counts(engine, session_id) == (0, 0, 0)
+        assert 'kira_conversation_write_total{outcome="error"} 1.0' in metrics.text
+        assert 'kira_memory_job_schedule_total{outcome="error"} 1.0' in metrics.text
+    finally:
+        async with engine.begin() as connection:
+            await connection.execute(
+                delete(conversations).where(
+                    conversations.c.user_id == USER_ID,
+                    conversations.c.session_id == seed_session,
+                )
+            )
 
 
 async def test_concurrent_append_preserves_pair_order_and_session_isolation(

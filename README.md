@@ -85,12 +85,15 @@ T4.8 nối flag vào completion callback đúng một lần: chỉ clean KiRa EO
 mới persist turn kèm yêu cầu tạo reference-only job; Gateway không gọi Mem0 formation. Worker loop
 T4.9 thêm counter scheduling low-cardinality với bốn outcome `scheduled`, `disabled`, `duplicate`,
 `error`; không dùng identity hay conversation/job reference làm label. Worker loop và Mem0
-processing vẫn được giữ cho các task kế tiếp. Xem
+processing vẫn được giữ cho các task kế tiếp. T4.10 khóa regression matrix trên PostgreSQL thật và
+hoàn tất Batch B: enabled/disabled, stream failure, missing identity và atomic rollback đều giữ
+nguyên SSE contract. Xem
 [Week 4 T4.5 queue adapter](docs/week4-t4.5-postgresql-memory-job-queue-adapter.md),
 [Week 4 Batch A acceptance](docs/week4-batch-a-acceptance.md) và
 [Week 4 T4.7 formation flag](docs/week4-t4.7-memory-formation-feature-flag.md),
 [Week 4 T4.8 completion scheduling](docs/week4-t4.8-gateway-completion-scheduling.md) và
-[Week 4 T4.9 scheduling observability](docs/week4-t4.9-gateway-scheduling-observability.md).
+[Week 4 T4.9 scheduling observability](docs/week4-t4.9-gateway-scheduling-observability.md),
+[Week 4 Batch B acceptance](docs/week4-batch-b-gateway-scheduling-acceptance.md).
 
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem

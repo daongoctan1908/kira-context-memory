@@ -2,7 +2,7 @@
 name: kira-context-week2
 
 x-runtime: &runtime
-  image: kira-context:0.3.0
+  image: kira-context:0.4.0-batch-b
 
 services:
   postgres:
@@ -53,7 +53,7 @@ services:
     build:
       context: .
       args:
-        APP_VERSION: 0.3.0
+        APP_VERSION: 0.4.0-batch-b
     environment:
       KIRA_BASE_URL: http://mock-kira:8000
       KIRA_USERNAME: local-smoke
