@@ -330,7 +330,6 @@ async def test_duplicate_scheduling_returns_existing_memory_event() -> None:
             FakeResult(),
             FakeResult(one=SimpleNamespace(conversation_id=conversation_id, next_turn_sequence=2)),
             FakeResult(rows=existing),
-            FakeResult(one=None),
             FakeResult(one=SimpleNamespace(event_id=event_id)),
         ]
     )
@@ -345,6 +344,48 @@ async def test_duplicate_scheduling_returns_existing_memory_event() -> None:
     assert result.inserted is False
     assert result.memory_job_event_id == event_id
     assert "SELECT memory_jobs.event_id" in str(connection.calls[-1][0])
+
+
+async def test_duplicate_turn_is_not_backfilled_when_scheduling_was_previously_disabled() -> None:
+    conversation_id = uuid4()
+    existing = [
+        {
+            "conversation_id": conversation_id,
+            "message_id": 10,
+            "message_index": 0,
+            "role": "user",
+            "content": "Câu hỏi",
+            "schema_version": 1,
+        },
+        {
+            "conversation_id": conversation_id,
+            "message_id": 11,
+            "message_index": 1,
+            "role": "assistant",
+            "content": "Trả lời",
+            "schema_version": 1,
+        },
+    ]
+    connection = FakeConnection(
+        [
+            FakeResult(),
+            FakeResult(one=SimpleNamespace(conversation_id=conversation_id, next_turn_sequence=2)),
+            FakeResult(rows=existing),
+            FakeResult(one=None),
+        ]
+    )
+
+    result = await adapter(connection).append_turn(
+        USER_ID,
+        message(ConversationRole.USER, content="Câu hỏi"),
+        message(ConversationRole.ASSISTANT, content="Trả lời"),
+        schedule_memory=True,
+    )
+
+    assert result.inserted is False
+    assert result.memory_job_event_id is None
+    assert "SELECT memory_jobs.event_id" in str(connection.calls[-1][0])
+    assert all("INSERT INTO memory_jobs" not in str(call[0]) for call in connection.calls)
 
 
 async def test_append_turn_returns_false_for_matching_duplicate() -> None:

@@ -45,6 +45,7 @@ _CONFIGURATION_SQLSTATES = {
 }
 _ERROR_CLASS_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
 _MAX_SMALLINT = 32_767
+_ATTEMPTS_EXHAUSTED_ERROR_CLASS = "MemoryJobAttemptsExhaustedError"
 
 
 class PostgresMemoryJobQueueAdapter:
@@ -338,6 +339,40 @@ class PostgresMemoryJobQueueAdapter:
 
     @staticmethod
     def _claim_candidates(limit: int, max_attempts: int):
+        exhausted_ids = (
+            select(memory_jobs.c.event_id)
+            .where(
+                memory_jobs.c.status == MemoryJobStatus.PROCESSING.value,
+                memory_jobs.c.lease_expires_at <= func.now(),
+                memory_jobs.c.attempt_count >= max_attempts,
+            )
+            .order_by(memory_jobs.c.lease_expires_at.asc(), memory_jobs.c.event_id.asc())
+            .limit(limit)
+            .with_for_update(skip_locked=True, of=memory_jobs)
+            .cte("exhausted_memory_job_ids")
+        )
+        dead_exhausted = (
+            update(memory_jobs)
+            .where(
+                memory_jobs.c.event_id.in_(select(exhausted_ids.c.event_id)),
+                memory_jobs.c.status == MemoryJobStatus.PROCESSING.value,
+                memory_jobs.c.lease_expires_at <= func.now(),
+                memory_jobs.c.attempt_count >= max_attempts,
+            )
+            .values(
+                status=MemoryJobStatus.DEAD.value,
+                lease_owner=None,
+                lease_token=None,
+                lease_expires_at=None,
+                last_error_class=_ATTEMPTS_EXHAUSTED_ERROR_CLASS,
+                lifecycle_event_count=None,
+                completed_at=None,
+                dead_at=func.now(),
+                updated_at=func.now(),
+            )
+            .returning(memory_jobs.c.event_id)
+            .cte("dead_exhausted_memory_jobs")
+        )
         due_at = case(
             (
                 memory_jobs.c.status == MemoryJobStatus.PENDING.value,
@@ -382,6 +417,7 @@ class PostgresMemoryJobQueueAdapter:
             .order_by(due_at.asc(), memory_jobs.c.created_at.asc(), memory_jobs.c.event_id.asc())
             .limit(limit)
             .with_for_update(skip_locked=True, of=memory_jobs)
+            .add_cte(dead_exhausted)
         )
 
     @staticmethod

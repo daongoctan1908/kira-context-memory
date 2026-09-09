@@ -225,7 +225,7 @@ class PostgresConversationStoreAdapter:
                     )
                     memory_job_event_id = None
                     if schedule_memory:
-                        memory_job_event_id = await self._schedule_memory_job(
+                        memory_job_event_id = await self._read_memory_job_event_id(
                             connection,
                             duplicate.reference.boundary_message_id,
                         )
@@ -297,6 +297,26 @@ class PostgresConversationStoreAdapter:
             ),
             memory_job_event_id=memory_job_event_id,
         )
+
+    @staticmethod
+    async def _read_memory_job_event_id(
+        connection: AsyncConnection,
+        boundary_message_id: int,
+    ) -> UUID | None:
+        """Return an existing job for a duplicate turn without backfilling old work."""
+        existing = (
+            await connection.execute(
+                select(memory_jobs.c.event_id).where(
+                    memory_jobs.c.boundary_message_id == boundary_message_id
+                )
+            )
+        ).one_or_none()
+        if existing is None:
+            return None
+        event_id = existing.event_id
+        if not isinstance(event_id, UUID):
+            raise ConversationStoreProtocolError
+        return event_id
 
     @staticmethod
     async def _schedule_memory_job(

@@ -78,8 +78,10 @@ biết SQLAlchemy/PostgreSQL. T4.3 thêm migration/schema reference-only với l
 partial operational indexes. T4.4 thêm feature flag độc lập và transaction ghi completed turn +
 optional memory job atomically. T4.5 hiện thực queue adapter PostgreSQL với claim/reclaim
 `FOR UPDATE SKIP LOCKED`, lease-token guarded transitions và các thao tác stats/dead/requeue/purge;
-Worker loop và Mem0 processing vẫn được giữ cho các task kế tiếp. Xem
-[Week 4 T4.5 queue adapter](docs/week4-t4.5-postgresql-memory-job-queue-adapter.md).
+T4.6 khóa concurrency, deterministic ordering, final-attempt expiry và user/session boundary
+isolation bằng PostgreSQL thật. Batch A đã hoàn tất; Worker loop và Mem0 processing vẫn được giữ
+cho các task kế tiếp. Xem [Week 4 T4.5 queue adapter](docs/week4-t4.5-postgresql-memory-job-queue-adapter.md)
+và [Week 4 Batch A acceptance](docs/week4-batch-a-acceptance.md).
 
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem

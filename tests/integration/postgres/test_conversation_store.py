@@ -282,6 +282,37 @@ async def test_completed_turn_does_not_schedule_when_formation_is_disabled(
     assert event_id is None
 
 
+async def test_duplicate_old_turn_is_not_backfilled_after_formation_is_enabled(
+    engine: AsyncEngine,
+    session_id: str,
+) -> None:
+    adapter = PostgresConversationStoreAdapter(engine)
+    turn_id = f"not-backfilled-{uuid4()}"
+    user = _message(session_id, turn_id, ConversationRole.USER, "question", 1)
+    assistant = _message(session_id, turn_id, ConversationRole.ASSISTANT, "answer", 2)
+    original = await adapter.append_turn(USER_ID, user, assistant)
+
+    duplicate = await adapter.append_turn(
+        USER_ID,
+        user,
+        assistant,
+        schedule_memory=True,
+    )
+
+    async with engine.connect() as connection:
+        event_id = await connection.scalar(
+            select(memory_jobs.c.event_id).where(
+                memory_jobs.c.boundary_message_id == original.reference.boundary_message_id
+            )
+        )
+    assert original.inserted is True
+    assert original.memory_job_event_id is None
+    assert duplicate.inserted is False
+    assert duplicate.reference == original.reference
+    assert duplicate.memory_job_event_id is None
+    assert event_id is None
+
+
 async def test_memory_job_insert_failure_rolls_back_new_conversation_turn(
     engine: AsyncEngine,
     session_id: str,

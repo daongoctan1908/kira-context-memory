@@ -198,10 +198,13 @@ async def test_claim_due_returns_typed_pending_and_reclaimed_jobs() -> None:
     assert jobs[1].reference.user_id == "user-1"
     assert jobs[1].reference.boundary_message_id == 42
     assert len({job.lease_token for job in jobs}) == 2
-    claim_sql = str(connection.calls[0].compile(dialect=postgresql.dialect()))
+    compiled_claim = connection.calls[0].compile(dialect=postgresql.dialect())
+    claim_sql = str(compiled_claim)
     assert "FOR UPDATE" in claim_sql
     assert "SKIP LOCKED" in claim_sql
     assert "memory_jobs.attempt_count <" in claim_sql
+    assert "dead_exhausted_memory_jobs" in claim_sql
+    assert "MemoryJobAttemptsExhaustedError" in compiled_claim.params.values()
     assert all("UPDATE memory_jobs" in str(call) for call in connection.calls[1:])
 
 

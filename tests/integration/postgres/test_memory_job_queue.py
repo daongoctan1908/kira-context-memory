@@ -74,11 +74,13 @@ async def _schedule(
     engine: AsyncEngine,
     session_id: str,
     number: int,
+    *,
+    user_id: str = USER_ID,
 ) -> UUID:
     timestamp = datetime.now(UTC)
     turn_id = f"{session_id}-turn-{number}-{uuid4()}"
     result = await PostgresConversationStoreAdapter(engine).append_turn(
-        USER_ID,
+        user_id,
         ConversationMessage(
             session_id,
             turn_id,
@@ -97,6 +99,37 @@ async def _schedule(
     )
     assert result.memory_job_event_id is not None
     return result.memory_job_event_id
+
+
+async def test_claim_order_is_deterministic_by_due_creation_and_event_id(
+    engine: AsyncEngine,
+    session_id: str,
+) -> None:
+    event_ids = [await _schedule(engine, session_id, number) for number in range(4)]
+    anchor = datetime.now(UTC) - timedelta(minutes=10)
+    queue_order = [event_ids[2], event_ids[1], event_ids[3], event_ids[0]]
+    values = {
+        event_ids[0]: (anchor + timedelta(seconds=3), anchor),
+        event_ids[1]: (anchor + timedelta(seconds=1), anchor + timedelta(seconds=2)),
+        event_ids[2]: (anchor + timedelta(seconds=1), anchor + timedelta(seconds=1)),
+        event_ids[3]: (anchor + timedelta(seconds=2), anchor),
+    }
+    async with engine.begin() as connection:
+        for event_id, (next_attempt_at, created_at) in values.items():
+            await connection.execute(
+                update(memory_jobs)
+                .where(memory_jobs.c.event_id == event_id)
+                .values(next_attempt_at=next_attempt_at, created_at=created_at)
+            )
+
+    claimed = await PostgresMemoryJobQueueAdapter(engine).claim_due(
+        lease_owner=uuid4(),
+        limit=4,
+        lease_seconds=120,
+        max_attempts=5,
+    )
+
+    assert [job.event_id for job in claimed] == queue_order
 
 
 async def test_claim_filters_future_and_exhausted_jobs(
@@ -179,6 +212,52 @@ async def test_skip_locked_prevents_duplicate_claims_between_workers(
     )
     assert [job.event_id for job in remaining] == [locked_id]
     assert {job.event_id for job in claimed}.isdisjoint(job.event_id for job in remaining)
+
+
+async def test_two_workers_claim_all_due_jobs_without_overlap(
+    engine: AsyncEngine,
+    session_id: str,
+) -> None:
+    event_ids = {await _schedule(engine, session_id, number) for number in range(12)}
+    first_owner = uuid4()
+    second_owner = uuid4()
+    first_queue = PostgresMemoryJobQueueAdapter(engine)
+    second_queue = PostgresMemoryJobQueueAdapter(engine)
+
+    first, second = await asyncio.gather(
+        first_queue.claim_due(
+            lease_owner=first_owner,
+            limit=6,
+            lease_seconds=120,
+            max_attempts=5,
+        ),
+        second_queue.claim_due(
+            lease_owner=second_owner,
+            limit=6,
+            lease_seconds=120,
+            max_attempts=5,
+        ),
+    )
+
+    first_ids = {job.event_id for job in first}
+    second_ids = {job.event_id for job in second}
+    assert len(first) == len(second) == 6
+    assert first_ids.isdisjoint(second_ids)
+    assert first_ids | second_ids == event_ids
+    async with engine.connect() as connection:
+        leased = dict(
+            (
+                await connection.execute(
+                    select(memory_jobs.c.event_id, memory_jobs.c.lease_owner).where(
+                        memory_jobs.c.event_id.in_(event_ids)
+                    )
+                )
+            )
+            .tuples()
+            .all()
+        )
+    assert {leased[event_id] for event_id in first_ids} == {first_owner}
+    assert {leased[event_id] for event_id in second_ids} == {second_owner}
 
 
 async def test_retry_expiry_reclaim_and_complete_are_lease_guarded(
@@ -274,6 +353,90 @@ async def test_retry_expiry_reclaim_and_complete_are_lease_guarded(
     assert completed["completed_at"] is not None
     assert completed["lease_token"] is None
     assert completed["last_error_class"] is None
+
+
+async def test_expired_final_attempt_is_dead_without_sixth_delivery(
+    engine: AsyncEngine,
+    session_id: str,
+) -> None:
+    event_id = await _schedule(engine, session_id, 1)
+    queue = PostgresMemoryJobQueueAdapter(engine)
+    claimed = (
+        await queue.claim_due(
+            lease_owner=uuid4(),
+            limit=1,
+            lease_seconds=120,
+            max_attempts=1,
+        )
+    )[0]
+    async with engine.begin() as connection:
+        await connection.execute(
+            update(memory_jobs)
+            .where(memory_jobs.c.event_id == event_id)
+            .values(lease_expires_at=func.now() - timedelta(seconds=1))
+        )
+
+    assert (
+        await queue.claim_due(
+            lease_owner=uuid4(),
+            limit=1,
+            lease_seconds=120,
+            max_attempts=1,
+        )
+        == ()
+    )
+    async with engine.connect() as connection:
+        dead = (
+            (
+                await connection.execute(
+                    select(memory_jobs).where(memory_jobs.c.event_id == event_id)
+                )
+            )
+            .mappings()
+            .one()
+        )
+    assert dead["status"] == MemoryJobStatus.DEAD.value
+    assert dead["attempt_count"] == claimed.attempt_count == 1
+    assert dead["last_error_class"] == "MemoryJobAttemptsExhaustedError"
+    assert dead["dead_at"] is not None
+    assert dead["lease_owner"] is None
+    assert dead["lease_token"] is None
+    assert dead["lease_expires_at"] is None
+
+
+async def test_claimed_references_remain_isolated_for_same_session_across_users(
+    engine: AsyncEngine,
+) -> None:
+    session_id = f"shared-memory-job-session-{uuid4()}"
+    first_user = f"memory-job-user-a-{uuid4()}"
+    second_user = f"memory-job-user-b-{uuid4()}"
+    try:
+        first_id = await _schedule(engine, session_id, 1, user_id=first_user)
+        second_id = await _schedule(engine, session_id, 2, user_id=second_user)
+
+        claimed = await PostgresMemoryJobQueueAdapter(engine).claim_due(
+            lease_owner=uuid4(),
+            limit=2,
+            lease_seconds=120,
+            max_attempts=5,
+        )
+
+        references = {job.event_id: job.reference for job in claimed}
+        assert set(references) == {first_id, second_id}
+        assert references[first_id].user_id == first_user
+        assert references[second_id].user_id == second_user
+        assert references[first_id].session_id == references[second_id].session_id == session_id
+        assert references[first_id].conversation_id != references[second_id].conversation_id
+        assert references[first_id].turn_id != references[second_id].turn_id
+        assert references[first_id].boundary_message_id != references[second_id].boundary_message_id
+    finally:
+        async with engine.begin() as connection:
+            await connection.execute(
+                delete(conversations).where(
+                    conversations.c.user_id.in_((first_user, second_user)),
+                    conversations.c.session_id == session_id,
+                )
+            )
 
 
 async def test_dead_list_stats_and_explicit_requeue(

@@ -17,7 +17,9 @@ SQLAlchemy, asyncpg, and PostgreSQL types.
 - pending jobs whose `next_attempt_at` is due; or
 - processing jobs whose lease has expired.
 
-Rows at the configured maximum attempt count are not claimed. Candidates are ordered by their due
+Pending rows at the configured maximum attempt count are not claimed. An expired processing lease
+already at the maximum is moved directly to `dead` in a bounded data-modifying CTE, so it cannot
+remain stuck or cause a sixth provider delivery. Other candidates are ordered by their due
 timestamp, creation timestamp, and event ID, then locked with `FOR UPDATE SKIP LOCKED`. This lets
 multiple Worker replicas make progress without claiming the same row or waiting for a peer's row
 lock.
