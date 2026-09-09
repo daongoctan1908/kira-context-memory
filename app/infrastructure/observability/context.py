@@ -7,6 +7,7 @@ from prometheus_client import CollectorRegistry, Counter, Histogram
 
 from app.domain.ports.context_observer import (
     ContextOperation,
+    MemoryJobScheduleOutcome,
     MemorySearchOutcome,
     RewriteOutcome,
     WriteOutcome,
@@ -79,6 +80,12 @@ class ContextTelemetry:
             buckets=(0, 1, 2, 3, 5, 10),
             registry=self.registry,
         )
+        self.memory_job_schedules = Counter(
+            "kira_memory_job_schedule_total",
+            "Gateway memory-job scheduling outcomes for eligible completed turns",
+            ["outcome"],
+            registry=self.registry,
+        )
         self.rewrites = Counter(
             "kira_context_rewrite_total",
             "Rewrite outcomes",
@@ -125,6 +132,9 @@ class ContextTelemetry:
         self.rewrites.labels(outcome).inc()
         if seconds is not None:
             self.rewrite_latency.labels(outcome).observe(seconds)
+
+    def memory_job_schedule_observed(self, outcome: MemoryJobScheduleOutcome) -> None:
+        self.memory_job_schedules.labels(outcome).inc()
 
     def degraded(
         self,

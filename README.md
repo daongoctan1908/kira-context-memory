@@ -83,11 +83,14 @@ isolation bằng PostgreSQL thật. Batch A đã hoàn tất. T4.7 khóa feature
 độc lập với online retrieval `LTM_ENABLED`; formation-only mode không khởi tạo Mem0 trong Gateway.
 T4.8 nối flag vào completion callback đúng một lần: chỉ clean KiRa EOF có trusted identity và text
 mới persist turn kèm yêu cầu tạo reference-only job; Gateway không gọi Mem0 formation. Worker loop
-và Mem0 processing vẫn được giữ cho các task kế tiếp. Xem
+T4.9 thêm counter scheduling low-cardinality với bốn outcome `scheduled`, `disabled`, `duplicate`,
+`error`; không dùng identity hay conversation/job reference làm label. Worker loop và Mem0
+processing vẫn được giữ cho các task kế tiếp. Xem
 [Week 4 T4.5 queue adapter](docs/week4-t4.5-postgresql-memory-job-queue-adapter.md),
 [Week 4 Batch A acceptance](docs/week4-batch-a-acceptance.md) và
 [Week 4 T4.7 formation flag](docs/week4-t4.7-memory-formation-feature-flag.md),
-[Week 4 T4.8 completion scheduling](docs/week4-t4.8-gateway-completion-scheduling.md).
+[Week 4 T4.8 completion scheduling](docs/week4-t4.8-gateway-completion-scheduling.md) và
+[Week 4 T4.9 scheduling observability](docs/week4-t4.9-gateway-scheduling-observability.md).
 
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem

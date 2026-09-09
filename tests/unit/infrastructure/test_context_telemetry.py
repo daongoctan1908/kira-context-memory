@@ -31,6 +31,7 @@ def test_metrics_have_bounded_labels_and_per_application_registry():
     telemetry = ContextTelemetry()
     telemetry.context_observed(2, 45)
     telemetry.memory_search_observed("success", 2, 0.03)
+    telemetry.memory_job_schedule_observed("scheduled")
     telemetry.rewrite_observed("success", 0.12)
     telemetry.degraded("private-correlation", "rewriter", "PrivateError", "original_query")
     telemetry.conversation_write_observed("inserted")
@@ -42,7 +43,21 @@ def test_metrics_have_bounded_labels_and_per_application_registry():
     assert 'kira_memory_search_total{outcome="success"} 1.0' in payload
     assert "kira_memory_search_results_sum 2.0" in payload
     assert 'kira_memory_search_duration_seconds_count{outcome="success"} 1.0' in payload
+    assert 'kira_memory_job_schedule_total{outcome="scheduled"} 1.0' in payload
     assert ContextTelemetry().registry is not telemetry.registry
+
+
+def test_memory_job_schedule_metric_has_only_bounded_outcome_label():
+    telemetry = ContextTelemetry()
+    for outcome in ("scheduled", "disabled", "duplicate", "error"):
+        telemetry.memory_job_schedule_observed(outcome)
+
+    payload = generate_latest(telemetry.registry).decode()
+
+    for outcome in ("scheduled", "disabled", "duplicate", "error"):
+        assert f'kira_memory_job_schedule_total{{outcome="{outcome}"}} 1.0' in payload
+    for forbidden in ("user_id", "session_id", "turn_id", "event_id", "boundary_message_id"):
+        assert forbidden not in payload
 
 
 def test_memory_degradation_uses_mem0_dependency_without_sensitive_labels():

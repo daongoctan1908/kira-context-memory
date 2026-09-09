@@ -17,7 +17,7 @@ from app.domain.errors.memory import (
 from app.domain.errors.query_rewriter import QueryRewriterError
 from app.domain.models.chat import ChatCommand
 from app.domain.models.context import MAX_LONG_TERM_MEMORIES
-from app.domain.models.conversation import ConversationMessage, ConversationRole
+from app.domain.models.conversation import AppendTurnResult, ConversationMessage, ConversationRole
 from app.domain.models.identity import AuthenticatedPrincipal
 from app.domain.models.kira import KiraStreamEvent
 from app.domain.models.memory import LongTermMemory
@@ -165,6 +165,8 @@ class HandleChatUseCase:
         source = await self._kira_client.chat_stream(query)
 
         async def persist(final_text: str) -> None:
+            if not self._memory_formation_enabled:
+                self._observer.memory_job_schedule_observed("disabled")
             try:
                 user = ConversationMessage(
                     command.session_id,
@@ -197,12 +199,37 @@ class HandleChatUseCase:
                     "answer_without_history",
                 )
                 self._observer.conversation_write_observed("error")
+                if self._memory_formation_enabled:
+                    self._observer.memory_job_schedule_observed("error")
             else:
                 self._observer.conversation_write_observed(
                     "inserted" if result.inserted else "duplicate"
                 )
+                if self._memory_formation_enabled:
+                    self._observe_memory_job_schedule(correlation_id, result)
 
         return ChatStreamSession(source, on_complete=persist)
+
+    def _observe_memory_job_schedule(
+        self,
+        correlation_id: str,
+        result: AppendTurnResult,
+    ) -> None:
+        if not result.inserted:
+            self._observer.memory_job_schedule_observed("duplicate")
+            return
+        if result.memory_job_event_id is not None:
+            self._observer.memory_job_schedule_observed("scheduled")
+            return
+        # A newly inserted turn requested atomic scheduling, so a missing event ID
+        # means the store broke its completion contract even if the answer was saved.
+        self._observer.memory_job_schedule_observed("error")
+        self._observer.degraded(
+            correlation_id,
+            "postgres_write",
+            "ConversationStoreProtocolError",
+            "answer_without_memory_job",
+        )
 
     async def _resolve_query(
         self,

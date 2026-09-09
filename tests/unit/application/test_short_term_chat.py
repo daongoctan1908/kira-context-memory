@@ -69,13 +69,22 @@ async def test_rewrite_and_persist_original_with_exact_assistant_once():
         )
         == 1
     )
+    assert (
+        telemetry.registry.get_sample_value(
+            "kira_memory_job_schedule_total",
+            {"outcome": "disabled"},
+        )
+        == 1
+    )
 
 
 async def test_completed_turn_requests_memory_job_when_formation_is_enabled():
     store = MemoryStore()
+    telemetry = ContextTelemetry()
     session = await make_use_case(
         FakeKiraClient(events=[answer()]),
         conversation_store=store,
+        observer=telemetry,
         memory_formation_enabled=True,
     ).execute(COMMAND, principal=PRINCIPAL)
 
@@ -83,6 +92,13 @@ async def test_completed_turn_requests_memory_job_when_formation_is_enabled():
 
     assert len(store.writes) == 1
     assert store.schedule_requests == [True]
+    assert (
+        telemetry.registry.get_sample_value(
+            "kira_memory_job_schedule_total",
+            {"outcome": "scheduled"},
+        )
+        == 1
+    )
 
 
 @pytest.mark.parametrize("budget,history", [(3000, ()), (1, pair())])
@@ -182,9 +198,11 @@ async def test_unsuccessful_or_textless_stream_does_not_persist(failure):
         open_error=error if failure == "before" else None,
         stream_error=error if failure == "midstream" else None,
     )
+    telemetry = ContextTelemetry()
     use_case = make_use_case(
         client,
         conversation_store=store,
+        observer=telemetry,
         memory_formation_enabled=True,
     )
     if failure == "before":
@@ -204,6 +222,14 @@ async def test_unsuccessful_or_textless_stream_does_not_persist(failure):
         assert client.last_stream.closed
     assert store.writes == []
     assert store.schedule_requests == []
+    assert all(
+        telemetry.registry.get_sample_value(
+            "kira_memory_job_schedule_total",
+            {"outcome": outcome},
+        )
+        is None
+        for outcome in ("scheduled", "disabled", "duplicate", "error")
+    )
 
 
 @pytest.mark.parametrize(
@@ -225,6 +251,13 @@ async def test_write_failure_is_only_observed_never_raised(write_error):
         )
         == 1
     )
+    assert (
+        telemetry.registry.get_sample_value(
+            "kira_memory_job_schedule_total",
+            {"outcome": "error"},
+        )
+        == 1
+    )
 
 
 async def test_duplicate_write_outcome():
@@ -233,12 +266,49 @@ async def test_duplicate_write_outcome():
         FakeKiraClient(events=[answer()]),
         conversation_store=MemoryStore(inserted=False),
         observer=telemetry,
+        memory_formation_enabled=True,
     ).execute(COMMAND, principal=PRINCIPAL)
     await drain(session)
     assert (
         telemetry.registry.get_sample_value(
             "kira_conversation_write_total",
             {"outcome": "duplicate"},
+        )
+        == 1
+    )
+    assert (
+        telemetry.registry.get_sample_value(
+            "kira_memory_job_schedule_total",
+            {"outcome": "duplicate"},
+        )
+        == 1
+    )
+
+
+async def test_missing_job_reference_is_observed_as_schedule_protocol_error():
+    store = MemoryStore()
+    store.memory_job_event_id = None
+    telemetry = ContextTelemetry()
+    session = await make_use_case(
+        FakeKiraClient(events=[answer()]),
+        conversation_store=store,
+        observer=telemetry,
+        memory_formation_enabled=True,
+    ).execute(COMMAND, principal=PRINCIPAL, correlation_id="missing-job-reference")
+
+    await drain(session)
+
+    assert (
+        telemetry.registry.get_sample_value(
+            "kira_memory_job_schedule_total",
+            {"outcome": "error"},
+        )
+        == 1
+    )
+    assert (
+        telemetry.registry.get_sample_value(
+            "kira_context_degraded_total",
+            {"dependency": "postgresql", "operation": "postgres_write"},
         )
         == 1
     )

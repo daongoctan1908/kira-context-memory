@@ -13,7 +13,7 @@ from tests.support.context_fakes import FakeRewriter, MemoryStore, pair
 
 async def test_gateway_preserves_sse_on_write_failure_and_exposes_safe_metrics():
     app = create_app(
-        settings=make_settings(),
+        settings=make_settings().model_copy(update={"memory_formation_enabled": True}),
         kira_client=FakeKiraClient(events=[kira_event('{"text":"answer"}', "answer")]),
         conversation_store=MemoryStore(pair(), write_error=RuntimeError("private payload")),
         query_rewriter=FakeRewriter(),
@@ -44,6 +44,7 @@ async def test_gateway_preserves_sse_on_write_failure_and_exposes_safe_metrics()
     assert metrics.status_code == 200
     assert metrics.headers["content-type"].startswith("text/plain")
     assert 'kira_conversation_write_total{outcome="error"} 1.0' in metrics.text
+    assert 'kira_memory_job_schedule_total{outcome="error"} 1.0' in metrics.text
     assert 'kira_context_rewrite_total{outcome="success"} 1.0' in metrics.text
     assert "session-1" not in metrics.text
     assert "private" not in metrics.text

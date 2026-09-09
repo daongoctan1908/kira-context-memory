@@ -10,6 +10,7 @@ ContextOperation = Literal[
     "rewriter",
 ]
 MemorySearchOutcome = Literal["success", "error", "bypass"]
+MemoryJobScheduleOutcome = Literal["scheduled", "disabled", "duplicate", "error"]
 RewriteOutcome = Literal["success", "error", "bypass"]
 WriteOutcome = Literal["inserted", "duplicate", "error"]
 
@@ -23,6 +24,8 @@ class ContextObserverPort(Protocol):
         result_count: int | None,
         seconds: float | None,
     ) -> None: ...
+
+    def memory_job_schedule_observed(self, outcome: MemoryJobScheduleOutcome) -> None: ...
 
     def rewrite_observed(self, outcome: RewriteOutcome, seconds: float | None) -> None: ...
 

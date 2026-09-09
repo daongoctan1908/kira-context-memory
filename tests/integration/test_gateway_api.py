@@ -379,11 +379,15 @@ async def test_gateway_schedules_reference_only_and_never_executes_memory_format
                 "/chat",
                 json={"session_id": "session-1", "message": "question"},
             )
+            metrics = await client.get("/metrics")
 
     assert response.status_code == 200
     assert store.schedule_requests == [True]
     assert memory.searches == [("test-user", "question", 10, 0.1)]
     assert memory.process_calls == 0
+    assert 'kira_memory_job_schedule_total{outcome="scheduled"} 1.0' in metrics.text
+    for forbidden in ("test-user", "session-1", "question"):
+        assert forbidden not in metrics.text
 
 
 async def test_chat_rejects_client_supplied_user_id() -> None:
