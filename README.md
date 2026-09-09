@@ -99,6 +99,11 @@ Worker chỉ nhận PostgreSQL, Mem0 và queue runtime settings, validate cả a
 pgvector memory schema trước khi sẵn sàng, rồi đóng đúng các resource do Worker sở hữu. Poller,
 job execution và HTTP runtime vẫn thuộc T4.12-T4.14. Xem
 [Week 4 T4.11 Worker settings and lifecycle](docs/week4-t4.11-worker-settings-lifecycle.md).
+T4.12 thêm `ProcessMemoryJobUseCase`: mỗi leased job đọc exact PostgreSQL boundary qua
+`ProcessMemoryUseCase`, giữ nguyên native Mem0 lifecycle, rồi thực hiện đúng một transition
+complete/retry/dead. Retryable dependency errors dùng backoff theo attempt; lỗi boundary,
+configuration/schema và protocol đi thẳng dead; cancellation không bị chuyển thành failure. Xem
+[Week 4 T4.12 memory job processing](docs/week4-t4.12-memory-job-processing.md).
 
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem

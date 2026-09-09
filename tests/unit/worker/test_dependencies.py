@@ -3,6 +3,7 @@ from unittest.mock import Mock
 import pytest
 
 from app.application.use_cases.process_memory import ProcessMemoryUseCase
+from app.application.use_cases.process_memory_job import ProcessMemoryJobUseCase
 from app.domain.errors.conversation import ConversationStoreConfigurationError
 from app.domain.errors.memory import LongTermMemoryConfigurationError
 from app.domain.errors.memory_job import MemoryJobQueueConfigurationError
@@ -96,6 +97,7 @@ async def test_lifespan_constructs_validated_worker_dependencies_and_closes_owne
         assert isinstance(dependencies.memory_job_queue, PostgresMemoryJobQueueAdapter)
         assert dependencies.long_term_memory is memory
         assert isinstance(dependencies.process_memory, ProcessMemoryUseCase)
+        assert isinstance(dependencies.process_memory_job, ProcessMemoryJobUseCase)
         assert dependencies.process_memory._message_limit == 8
         assert memory.closed is False
         assert engine.disposed is False

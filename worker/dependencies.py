@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.application.use_cases.process_memory import ProcessMemoryUseCase
+from app.application.use_cases.process_memory_job import ProcessMemoryJobUseCase
 from app.domain.errors.memory import LongTermMemoryTimeoutError
 from app.domain.errors.memory_job import MemoryJobQueueConnectionError
 from app.domain.ports.conversation_store import ConversationStorePort
@@ -31,6 +32,7 @@ class WorkerDependencies:
     memory_job_queue: MemoryJobQueuePort
     long_term_memory: LongTermMemoryPort
     process_memory: ProcessMemoryUseCase
+    process_memory_job: ProcessMemoryJobUseCase
 
 
 @asynccontextmanager
@@ -80,12 +82,19 @@ async def worker_dependency_lifespan(
             resolved_memory,
             message_limit=resolved_settings.memory_formation_message_limit,
         )
+        process_memory_job = ProcessMemoryJobUseCase(
+            process_memory,
+            memory_job_queue,
+            max_attempts=resolved_settings.memory_job_max_attempts,
+            retry_delays_seconds=resolved_settings.memory_job_retry_delays_seconds,
+        )
         yield WorkerDependencies(
             settings=resolved_settings,
             conversation_store=conversation_store,
             memory_job_queue=memory_job_queue,
             long_term_memory=resolved_memory,
             process_memory=process_memory,
+            process_memory_job=process_memory_job,
         )
     finally:
         try:
