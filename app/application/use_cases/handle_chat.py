@@ -41,6 +41,7 @@ class ChatStreamSession(AsyncIterator[KiraStreamEvent]):
         self._closed = False
         self._source_closed = False
         self._on_complete = on_complete
+        self._completion_started = False
 
     @property
     def final_text(self) -> str:
@@ -57,8 +58,7 @@ class ChatStreamSession(AsyncIterator[KiraStreamEvent]):
             event = await anext(self._source)
         except StopAsyncIteration:
             await self.aclose()
-            if self._on_complete is not None and self.final_text.strip():
-                await self._on_complete(self.final_text)
+            await self._complete_once()
             raise
         except BaseException:
             await self.aclose()
@@ -76,6 +76,14 @@ class ChatStreamSession(AsyncIterator[KiraStreamEvent]):
         if close is not None:
             await close()
         self._source_closed = True
+
+    async def _complete_once(self) -> None:
+        """Invoke completion at most once, and only after clean source exhaustion."""
+        if self._completion_started or self._on_complete is None or not self.final_text.strip():
+            return
+        # Set before awaiting so concurrent end-of-stream observation cannot schedule twice.
+        self._completion_started = True
+        await self._on_complete(self.final_text)
 
 
 class HandleChatUseCase:

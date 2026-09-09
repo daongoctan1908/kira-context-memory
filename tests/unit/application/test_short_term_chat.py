@@ -253,12 +253,14 @@ async def test_missing_identity_uses_current_query_without_history_or_persistenc
         client,
         conversation_store=store,
         observer=telemetry,
+        memory_formation_enabled=True,
     ).execute(COMMAND, principal=None, correlation_id="anonymous-request")
     await drain(session)
 
     assert client.messages == [COMMAND.message]
     assert store.reads == []
     assert store.writes == []
+    assert store.schedule_requests == []
     assert (
         telemetry.registry.get_sample_value(
             "kira_context_degraded_total",
@@ -357,3 +359,36 @@ async def test_cleanup_cancel_can_be_retried_without_completion():
     await session.aclose()
     assert source.aclose.await_count == 2
     callback.assert_not_awaited()
+
+
+async def test_concurrent_clean_exhaustion_invokes_completion_once():
+    class ConcurrentEndStream:
+        def __init__(self):
+            self.calls = 0
+            self.both_waiting = asyncio.Event()
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            self.calls += 1
+            if self.calls == 1:
+                return answer("complete answer")
+            if self.calls == 3:
+                self.both_waiting.set()
+            await self.both_waiting.wait()
+            raise StopAsyncIteration
+
+    source = ConcurrentEndStream()
+    callback = AsyncMock()
+    session = ChatStreamSession(source, callback)
+
+    assert (await anext(session)).text_fragment == "complete answer"
+    results = await asyncio.gather(
+        anext(session),
+        anext(session),
+        return_exceptions=True,
+    )
+
+    assert all(isinstance(result, StopAsyncIteration) for result in results)
+    callback.assert_awaited_once_with("complete answer")

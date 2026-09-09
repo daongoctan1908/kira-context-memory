@@ -16,6 +16,7 @@ from app.domain.models.conversation import (
     ConversationMessage,
 )
 from app.domain.models.kira import KiraAuthResult, KiraEventKind, KiraStreamEvent
+from app.domain.models.memory import LongTermMemory, MemoryProcessResult, MemorySource
 from app.infrastructure.memory.mem0_adapter import Mem0Adapter
 from app.infrastructure.postgres.managed_store import ManagedPostgresConversationStore
 from app.infrastructure.postgres.schema import EXPECTED_SCHEMA_REVISION
@@ -125,6 +126,28 @@ class FakeConversationStore:
         limit: int,
     ) -> tuple[ConversationMessage, ...]:
         return ()
+
+
+class FormationTrapLongTermMemory:
+    def __init__(self) -> None:
+        self.searches: list[tuple[str, str, int, float]] = []
+        self.process_calls = 0
+
+    async def search(
+        self,
+        user_id: str,
+        query: str,
+        *,
+        top_k: int,
+        threshold: float,
+    ) -> tuple[LongTermMemory, ...]:
+        self.searches.append((user_id, query, top_k, threshold))
+        return ()
+
+    async def process_memory(self, source: MemorySource) -> MemoryProcessResult:
+        del source
+        self.process_calls += 1
+        raise AssertionError("Gateway must not execute memory formation")
 
 
 class UnavailableConnectionContext:
@@ -335,6 +358,32 @@ async def test_gateway_wires_memory_formation_independently_from_ltm(monkeypatch
 
     assert store.schedule_requests == [True]
     assert mem0_construction_attempts == []
+
+
+async def test_gateway_schedules_reference_only_and_never_executes_memory_formation() -> None:
+    store = FakeConversationStore()
+    memory = FormationTrapLongTermMemory()
+    settings = make_settings().model_copy(update={"memory_formation_enabled": True})
+    kira_client = FakeKiraClient(events=[kira_event('{"text":"test"}', "answer")])
+    app = create_app(
+        settings=settings,
+        kira_client=kira_client,
+        conversation_store=store,
+        long_term_memory=memory,
+    )
+
+    async with app.router.lifespan_context(app):
+        transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+        async with httpx.AsyncClient(transport=transport, base_url="http://gateway.test") as client:
+            response = await client.post(
+                "/chat",
+                json={"session_id": "session-1", "message": "question"},
+            )
+
+    assert response.status_code == 200
+    assert store.schedule_requests == [True]
+    assert memory.searches == [("test-user", "question", 10, 0.1)]
+    assert memory.process_calls == 0
 
 
 async def test_chat_rejects_client_supplied_user_id() -> None:
