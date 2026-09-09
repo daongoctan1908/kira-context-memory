@@ -110,6 +110,11 @@ và ngừng claim ngay khi shutdown. In-flight job được drain trong grace pe
 mà không tạo transition giả để replica khác reclaim. Runner snapshot chỉ giữ trạng thái
 low-cardinality phục vụ readiness/metrics ở T4.14. Xem
 [Week 4 T4.13 concurrent runner](docs/week4-t4.13-concurrent-runner.md).
+T4.14 đưa runner vào một FastAPI process nội bộ riêng: `python -m worker.main` phục vụ đúng ba
+endpoint read-only `/health`, `/ready`, `/metrics`. Readiness yêu cầu runner active, queue claim DB
+khả dụng và queue-stats snapshot còn fresh; metrics HTTP chỉ đọc cache, không query PostgreSQL.
+Prometheus labels chỉ dùng status/outcome bounded, không chứa identity, event hay error class. Xem
+[Week 4 T4.14 Worker FastAPI app](docs/week4-t4.14-worker-fastapi-app.md).
 
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem

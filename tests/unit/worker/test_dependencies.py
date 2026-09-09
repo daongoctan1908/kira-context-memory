@@ -87,12 +87,13 @@ async def test_lifespan_constructs_validated_worker_dependencies_and_closes_owne
     engine_factory = Mock(return_value=engine)
     memory_factory = Mock(return_value=memory)
     memory_schema_validator = Mock(side_effect=valid_memory_schema)
+    observer = Mock()
     monkeypatch.setattr("worker.dependencies.create_postgres_engine", engine_factory)
     monkeypatch.setattr("worker.dependencies.Mem0Adapter.from_settings", memory_factory)
     monkeypatch.setattr("worker.dependencies.validate_memory_schema", memory_schema_validator)
     settings = make_settings(memory_formation_message_limit=8)
 
-    async with worker_dependency_lifespan(settings) as dependencies:
+    async with worker_dependency_lifespan(settings, job_observer=observer) as dependencies:
         assert dependencies.settings is settings
         assert isinstance(dependencies.conversation_store, ManagedPostgresConversationStore)
         assert isinstance(dependencies.memory_job_queue, PostgresMemoryJobQueueAdapter)
@@ -100,6 +101,7 @@ async def test_lifespan_constructs_validated_worker_dependencies_and_closes_owne
         assert isinstance(dependencies.process_memory, ProcessMemoryUseCase)
         assert isinstance(dependencies.process_memory_job, ProcessMemoryJobUseCase)
         assert isinstance(dependencies.runner, MemoryJobRunner)
+        assert dependencies.runner._observer is observer
         assert dependencies.process_memory._message_limit == 8
         assert memory.closed is False
         assert engine.disposed is False

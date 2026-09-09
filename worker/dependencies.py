@@ -20,7 +20,7 @@ from app.infrastructure.postgres.client import create_postgres_engine
 from app.infrastructure.postgres.conversation_store import PostgresConversationStoreAdapter
 from app.infrastructure.postgres.managed_store import ManagedPostgresConversationStore
 from app.infrastructure.postgres.memory_job_queue import PostgresMemoryJobQueueAdapter
-from worker.runner import MemoryJobRunner
+from worker.runner import MemoryJobObserver, MemoryJobRunner
 from worker.settings import WorkerSettings, get_worker_settings
 
 
@@ -43,6 +43,7 @@ async def worker_dependency_lifespan(
     *,
     postgres_engine: AsyncEngine | None = None,
     long_term_memory: LongTermMemoryPort | None = None,
+    job_observer: MemoryJobObserver | None = None,
 ) -> AsyncIterator[WorkerDependencies]:
     """Validate, construct, and close dependencies owned by one Worker process."""
     resolved_settings = settings or get_worker_settings()
@@ -100,6 +101,7 @@ async def worker_dependency_lifespan(
             max_attempts=resolved_settings.memory_job_max_attempts,
             database_timeout_seconds=resolved_settings.memory_job_db_timeout_seconds,
             shutdown_grace_seconds=resolved_settings.memory_job_shutdown_grace_seconds,
+            observer=job_observer,
         )
         yield WorkerDependencies(
             settings=resolved_settings,

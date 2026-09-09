@@ -29,6 +29,7 @@ LABEL org.opencontainers.image.title="kira-context-memory" \
       org.opencontainers.image.version="${APP_VERSION}"
 
 ENV APP_VERSION=${APP_VERSION} \
+    HEALTH_PORT=8000 \
     MEM0_DIR=/tmp/kira-mem0 \
     MEM0_TELEMETRY=False \
     PATH="/app/.venv/bin:${PATH}" \
@@ -48,9 +49,9 @@ COPY --chown=kira:kira worker ./worker
 
 USER kira
 
-EXPOSE 8000
+EXPOSE 8000 8001
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()"]
+    CMD ["python", "-c", "import os, urllib.request; urllib.request.urlopen(f\"http://127.0.0.1:{os.environ.get('HEALTH_PORT', '8000')}/health\", timeout=2).read()"]
 
 CMD ["uvicorn", "app.presentation.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

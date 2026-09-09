@@ -95,9 +95,11 @@ class BlockingProcessor:
         target_started: int = 1,
         release_immediately: bool = False,
         error: Exception | None = None,
+        result: ProcessMemoryJobResult | None = None,
     ) -> None:
         self.target_started = target_started
         self.error = error
+        self.result = result or ProcessMemoryJobResult(MemoryJobProcessOutcome.COMPLETED)
         self.release = asyncio.Event()
         if release_immediately:
             self.release.set()
@@ -118,13 +120,35 @@ class BlockingProcessor:
             if self.error is not None:
                 raise self.error
             await self.release.wait()
-            return ProcessMemoryJobResult(MemoryJobProcessOutcome.COMPLETED)
+            return self.result
         except asyncio.CancelledError:
             self.cancelled += 1
             raise
         finally:
             self.current -= 1
             self.finished.set()
+
+
+class RecordingObserver:
+    def __init__(self, *, error: Exception | None = None) -> None:
+        self.error = error
+        self.claimed: list[tuple[MemoryJob, ...]] = []
+        self.processed: list[tuple[MemoryJob, ProcessMemoryJobResult, float]] = []
+
+    def jobs_claimed(self, jobs: tuple[MemoryJob, ...]) -> None:
+        self.claimed.append(jobs)
+        if self.error is not None:
+            raise self.error
+
+    def job_processed(
+        self,
+        job: MemoryJob,
+        result: ProcessMemoryJobResult,
+        seconds: float,
+    ) -> None:
+        self.processed.append((job, result, seconds))
+        if self.error is not None:
+            raise self.error
 
 
 def make_runner(
@@ -217,6 +241,83 @@ async def test_runner_passes_lease_contract_and_processes_reclaimed_job() -> Non
         "lease_seconds": 77.0,
         "max_attempts": 5,
     }
+
+
+async def test_runner_observes_claim_and_persisted_processing_result() -> None:
+    job = make_job(reclaimed=True, attempt_count=2)
+    result = ProcessMemoryJobResult(MemoryJobProcessOutcome.RETRY, error_class="PrivateError")
+    queue = FakeClaimQueue((job,))
+    processor = BlockingProcessor(release_immediately=True, result=result)
+    observer = RecordingObserver()
+    timer_values = iter((10.0, 10.25))
+    runner = make_runner(
+        queue,
+        processor,
+        observer=observer,
+        timer=lambda: next(timer_values),
+    )
+
+    run_task = asyncio.create_task(runner.run())
+    await asyncio.wait_for(processor.finished.wait(), timeout=1)
+    runner.request_stop()
+    await asyncio.wait_for(run_task, timeout=1)
+
+    assert observer.claimed == [(job,)]
+    assert observer.processed == [(job, result, 0.25)]
+
+
+async def test_observer_failure_never_changes_job_processing(monkeypatch) -> None:
+    job = make_job()
+    queue = FakeClaimQueue((job,))
+    processor = BlockingProcessor(release_immediately=True)
+    observer = RecordingObserver(error=RuntimeError("private metrics detail"))
+    log_extras: list[dict[str, object]] = []
+
+    def capture_warning(message: str, *, extra: dict[str, object]) -> None:
+        log_extras.append(extra)
+
+    monkeypatch.setattr("worker.runner.logger.warning", capture_warning)
+    runner = make_runner(queue, processor, observer=observer)
+
+    run_task = asyncio.create_task(runner.run())
+    await asyncio.wait_for(processor.finished.wait(), timeout=1)
+    runner.request_stop()
+    await asyncio.wait_for(run_task, timeout=1)
+
+    assert processor.jobs == [job]
+    assert len(log_extras) == 2
+    assert all(extra["error_class"] == "RuntimeError" for extra in log_extras)
+    assert "private metrics detail" not in repr(log_extras)
+    assert str(job.event_id) not in repr(log_extras)
+
+
+async def test_observation_timer_failure_never_prevents_job_processing(monkeypatch) -> None:
+    job = make_job()
+    queue = FakeClaimQueue((job,))
+    processor = BlockingProcessor(release_immediately=True)
+    observer = RecordingObserver()
+    log_extras: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        "worker.runner.logger.warning",
+        lambda message, *, extra: log_extras.append(extra),
+    )
+    runner = make_runner(
+        queue,
+        processor,
+        observer=observer,
+        timer=lambda: (_ for _ in ()).throw(RuntimeError("private timer detail")),
+    )
+
+    run_task = asyncio.create_task(runner.run())
+    await asyncio.wait_for(processor.finished.wait(), timeout=1)
+    runner.request_stop()
+    await asyncio.wait_for(run_task, timeout=1)
+
+    assert processor.jobs == [job]
+    assert observer.processed == []
+    assert log_extras[0]["operation"] == "start_processing_timer"
+    assert "private timer detail" not in repr(log_extras)
 
 
 async def test_database_errors_back_off_then_success_resets_readiness_state() -> None:

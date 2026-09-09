@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import math
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -25,6 +26,23 @@ _MAX_DATABASE_BACKOFF_SECONDS = 30.0
 class ClaimedMemoryJobProcessor(Protocol):
     async def execute(self, job: MemoryJob) -> ProcessMemoryJobResult:
         """Process and transition one currently leased memory job."""
+        ...
+
+
+class MemoryJobObserver(Protocol):
+    """Synchronous, content-free observations emitted by the Worker runtime."""
+
+    def jobs_claimed(self, jobs: tuple[MemoryJob, ...]) -> None:
+        """Observe a successfully leased batch."""
+        ...
+
+    def job_processed(
+        self,
+        job: MemoryJob,
+        result: ProcessMemoryJobResult,
+        seconds: float,
+    ) -> None:
+        """Observe one successfully persisted job transition."""
         ...
 
 
@@ -58,6 +76,8 @@ class MemoryJobRunner:
         shutdown_grace_seconds: float,
         lease_owner: UUID | None = None,
         clock: Callable[[], datetime] | None = None,
+        observer: MemoryJobObserver | None = None,
+        timer: Callable[[], float] | None = None,
     ) -> None:
         _require_positive_finite(poll_interval_seconds, "poll_interval_seconds")
         _require_positive_integer(batch_size, "batch_size")
@@ -80,6 +100,8 @@ class MemoryJobRunner:
         self._shutdown_grace = float(shutdown_grace_seconds)
         self._lease_owner = lease_owner or uuid4()
         self._clock = clock or _utc_now
+        self._observer = observer
+        self._timer = timer or time.perf_counter
 
         self._stop_requested = asyncio.Event()
         self._in_flight: set[asyncio.Task[None]] = set()
@@ -139,6 +161,7 @@ class MemoryJobRunner:
                     continue
 
                 self._record_database_success()
+                self._observe_claimed(jobs)
                 for job in jobs:
                     task = asyncio.create_task(
                         self._process_job_safely(job),
@@ -182,7 +205,12 @@ class MemoryJobRunner:
 
     async def _process_job_safely(self, job: MemoryJob) -> None:
         try:
-            await self._processor.execute(job)
+            started_at = self._timer()
+        except Exception as error:
+            _log_observer_failure(error, "start_processing_timer")
+            started_at = None
+        try:
+            result = await self._processor.execute(job)
         except asyncio.CancelledError:
             raise
         except Exception as error:
@@ -195,6 +223,31 @@ class MemoryJobRunner:
                     "fallback_mode": "lease_reclaim",
                 },
             )
+        else:
+            if started_at is not None:
+                self._observe_processed(job, result, started_at)
+
+    def _observe_claimed(self, jobs: tuple[MemoryJob, ...]) -> None:
+        if self._observer is None or not jobs:
+            return
+        try:
+            self._observer.jobs_claimed(jobs)
+        except Exception as error:
+            _log_observer_failure(error, "observe_claimed_jobs")
+
+    def _observe_processed(
+        self,
+        job: MemoryJob,
+        result: ProcessMemoryJobResult,
+        started_at: float,
+    ) -> None:
+        if self._observer is None:
+            return
+        try:
+            seconds = max(float(self._timer()) - started_at, 0.0)
+            self._observer.job_processed(job, result, seconds)
+        except Exception as error:
+            _log_observer_failure(error, "observe_processed_job")
 
     async def _pause(self, delay_seconds: float) -> None:
         try:
@@ -269,3 +322,15 @@ def _require_positive_finite(value: object, field_name: str) -> None:
 
 def _utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+def _log_observer_failure(error: Exception, operation: str) -> None:
+    logger.warning(
+        "Memory job observation failed",
+        extra={
+            "dependency": "prometheus",
+            "operation": operation,
+            "error_class": type(error).__name__,
+            "fallback_mode": "continue_processing",
+        },
+    )
