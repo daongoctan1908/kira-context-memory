@@ -16,6 +16,7 @@ from app.domain.models.conversation import (
     ConversationMessage,
 )
 from app.domain.models.kira import KiraAuthResult, KiraEventKind, KiraStreamEvent
+from app.infrastructure.memory.mem0_adapter import Mem0Adapter
 from app.infrastructure.postgres.managed_store import ManagedPostgresConversationStore
 from app.infrastructure.postgres.schema import EXPECTED_SCHEMA_REVISION
 from app.presentation.api.main import create_app
@@ -296,7 +297,19 @@ async def test_chat_proxies_raw_kira_frames_and_sets_stream_headers() -> None:
     assert kira_client.last_stream is not None and kira_client.last_stream.closed
 
 
-async def test_gateway_wires_memory_formation_independently_from_ltm() -> None:
+async def test_gateway_wires_memory_formation_independently_from_ltm(monkeypatch) -> None:
+    mem0_construction_attempts: list[Settings] = []
+
+    def fail_if_mem0_is_constructed(cls, settings: Settings):
+        del cls
+        mem0_construction_attempts.append(settings)
+        raise AssertionError("formation-only mode must not construct Mem0")
+
+    monkeypatch.setattr(
+        Mem0Adapter,
+        "from_settings",
+        classmethod(fail_if_mem0_is_constructed),
+    )
     store = FakeConversationStore()
     settings = make_settings().model_copy(
         update={"memory_formation_enabled": True, "ltm_enabled": False}
@@ -321,6 +334,7 @@ async def test_gateway_wires_memory_formation_independently_from_ltm() -> None:
         assert app.state.memory_formation_enabled is True
 
     assert store.schedule_requests == [True]
+    assert mem0_construction_attempts == []
 
 
 async def test_chat_rejects_client_supplied_user_id() -> None:

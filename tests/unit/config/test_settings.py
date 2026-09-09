@@ -152,19 +152,56 @@ def test_enabled_ltm_requires_all_runtime_dependencies() -> None:
         )
 
 
-def test_memory_formation_scheduling_is_independent_from_ltm_configuration() -> None:
+@pytest.mark.parametrize(
+    ("ltm_enabled", "memory_formation_enabled"),
+    [
+        (False, False),
+        (False, True),
+        (True, False),
+        (True, True),
+    ],
+)
+def test_memory_retrieval_and_formation_flags_are_independent(
+    ltm_enabled: bool,
+    memory_formation_enabled: bool,
+) -> None:
+    memory_runtime = (
+        {
+            "memory_database_url": "postgresql://user:password@db/memory",
+            "memory_embedding_base_url": "http://embedding.test",
+            "memory_embedding_model": "embedding-model",
+            "memory_embedding_dims": 1024,
+            "memory_llm_base_url": "http://memory-llm.test",
+            "memory_llm_model": "memory-model",
+        }
+        if ltm_enabled
+        else {}
+    )
+
     settings = Settings(
         _env_file=None,
         kira_base_url="http://kira.test",
         kira_username="service-account",
         kira_basic_auth="secret",
-        memory_formation_enabled=True,
-        ltm_enabled=False,
+        ltm_enabled=ltm_enabled,
+        memory_formation_enabled=memory_formation_enabled,
+        **memory_runtime,
     )
 
-    assert settings.memory_formation_enabled is True
-    assert settings.ltm_enabled is False
-    assert settings.memory_database_url is None
+    assert settings.ltm_enabled is ltm_enabled
+    assert settings.memory_formation_enabled is memory_formation_enabled
+    if not ltm_enabled:
+        assert settings.memory_database_url is None
+
+
+def test_memory_formation_flag_rejects_ambiguous_environment_value(monkeypatch) -> None:
+    monkeypatch.setenv("KIRA_BASE_URL", "http://kira.test")
+    monkeypatch.setenv("KIRA_USERNAME", "service-account")
+    monkeypatch.setenv("KIRA_BASIC_AUTH", "secret")
+    monkeypatch.setenv("MEMORY_FORMATION_ENABLED", "sometimes")
+
+    with pytest.raises(ValidationError, match="memory_formation_enabled"):
+        Settings(_env_file=None)
 
 
 @pytest.mark.parametrize("limit", [0, 1, 3])
