@@ -11,6 +11,7 @@ from app.infrastructure.postgres.managed_store import ManagedPostgresConversatio
 from app.infrastructure.postgres.memory_job_queue import PostgresMemoryJobQueueAdapter
 from app.infrastructure.postgres.schema import EXPECTED_SCHEMA_REVISION
 from worker.dependencies import worker_dependency_lifespan
+from worker.runner import MemoryJobRunner
 from worker.settings import WorkerSettings
 
 
@@ -98,6 +99,7 @@ async def test_lifespan_constructs_validated_worker_dependencies_and_closes_owne
         assert dependencies.long_term_memory is memory
         assert isinstance(dependencies.process_memory, ProcessMemoryUseCase)
         assert isinstance(dependencies.process_memory_job, ProcessMemoryJobUseCase)
+        assert isinstance(dependencies.runner, MemoryJobRunner)
         assert dependencies.process_memory._message_limit == 8
         assert memory.closed is False
         assert engine.disposed is False

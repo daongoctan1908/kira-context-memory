@@ -320,18 +320,36 @@ async def test_permanent_boundary_configuration_and_protocol_errors_go_directly_
     assert queue.retried == []
 
 
-async def test_unexpected_programming_error_propagates_and_leaves_lease_untouched() -> None:
+async def test_unexpected_runtime_error_is_retried_with_only_its_class_name() -> None:
+    job = make_job()
     queue = FakeQueue()
 
-    with pytest.raises(RuntimeError, match="private provider detail"):
-        await make_use_case(
-            FakeMemoryProcessor(error=RuntimeError("private provider detail")),
-            queue,
-        ).execute(make_job())
+    result = await make_use_case(
+        FakeMemoryProcessor(error=RuntimeError("private provider detail")),
+        queue,
+    ).execute(job)
 
     assert queue.completed == []
-    assert queue.retried == []
+    assert queue.retried == [
+        (job.event_id, job.lease_token, NOW + timedelta(seconds=1), "RuntimeError")
+    ]
     assert queue.dead == []
+    assert result.outcome is MemoryJobProcessOutcome.RETRY
+    assert result.error_class == "RuntimeError"
+    assert "private provider detail" not in repr(result)
+
+
+async def test_unexpected_runtime_error_is_dead_on_final_attempt() -> None:
+    job = make_job(attempt_count=5)
+    queue = FakeQueue()
+
+    result = await make_use_case(
+        FakeMemoryProcessor(error=RuntimeError("private provider detail")),
+        queue,
+    ).execute(job)
+
+    assert result.outcome is MemoryJobProcessOutcome.DEAD
+    assert queue.dead == [(job.event_id, job.lease_token, "RuntimeError")]
 
 
 async def test_cancellation_propagates_and_leaves_job_under_its_lease() -> None:

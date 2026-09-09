@@ -27,7 +27,7 @@ reinterpret Mem0's decision.
 | Permanent | invalid boundary or conversation protocol; configuration/schema; memory protocol | dead immediately |
 | Final attempt | any retryable failure on attempt 5 | dead, never schedule attempt 6 |
 | Cancellation | task/process cancellation | no transition; keep lease for expiry/reclaim |
-| Programming error | unexpected untyped exception | propagate; keep lease for expiry/reclaim |
+| Unexpected runtime error | unexpected `Exception` | bounded retry, then dead on final attempt |
 | Queue/lease failure | complete/retry/dead transition fails or lease is stale | propagate; never attempt a second transition |
 
 The default attempt-to-delay mapping is deterministic:
@@ -58,7 +58,7 @@ capable datetimes. The database remains authoritative for whether the current le
 
 Focused tests cover the exact-boundary chain through the real `ProcessMemoryUseCase`, mixed native
 lifecycle results, zero/positive event completion, every typed retryable and permanent error,
-attempt-indexed delays, final-attempt dead-lettering, cancellation, unexpected exceptions, stale
+attempt-indexed delays, bounded unexpected exceptions, cancellation, stale
 lease/queue transition failures, and constructor/job invariants. Full repository, PostgreSQL, Ruff,
 and Docker gates remain required before the task commit is accepted.
 

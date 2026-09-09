@@ -104,6 +104,12 @@ T4.12 thêm `ProcessMemoryJobUseCase`: mỗi leased job đọc exact PostgreSQL 
 complete/retry/dead. Retryable dependency errors dùng backoff theo attempt; lỗi boundary,
 configuration/schema và protocol đi thẳng dead; cancellation không bị chuyển thành failure. Xem
 [Week 4 T4.12 memory job processing](docs/week4-t4.12-memory-job-processing.md).
+T4.13 bổ sung `MemoryJobRunner` one-shot: claim không vượt số slot trống hoặc batch cap, hỗ trợ
+nhiều replica qua lease/reclaim của PostgreSQL, backoff exponential tối đa 30 giây khi poll DB lỗi
+và ngừng claim ngay khi shutdown. In-flight job được drain trong grace period; job quá hạn bị cancel
+mà không tạo transition giả để replica khác reclaim. Runner snapshot chỉ giữ trạng thái
+low-cardinality phục vụ readiness/metrics ở T4.14. Xem
+[Week 4 T4.13 concurrent runner](docs/week4-t4.13-concurrent-runner.md).
 
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem

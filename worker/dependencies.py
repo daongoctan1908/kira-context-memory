@@ -20,6 +20,7 @@ from app.infrastructure.postgres.client import create_postgres_engine
 from app.infrastructure.postgres.conversation_store import PostgresConversationStoreAdapter
 from app.infrastructure.postgres.managed_store import ManagedPostgresConversationStore
 from app.infrastructure.postgres.memory_job_queue import PostgresMemoryJobQueueAdapter
+from worker.runner import MemoryJobRunner
 from worker.settings import WorkerSettings, get_worker_settings
 
 
@@ -33,6 +34,7 @@ class WorkerDependencies:
     long_term_memory: LongTermMemoryPort
     process_memory: ProcessMemoryUseCase
     process_memory_job: ProcessMemoryJobUseCase
+    runner: MemoryJobRunner
 
 
 @asynccontextmanager
@@ -88,6 +90,17 @@ async def worker_dependency_lifespan(
             max_attempts=resolved_settings.memory_job_max_attempts,
             retry_delays_seconds=resolved_settings.memory_job_retry_delays_seconds,
         )
+        runner = MemoryJobRunner(
+            memory_job_queue,
+            process_memory_job,
+            poll_interval_seconds=resolved_settings.memory_job_poll_interval_seconds,
+            batch_size=resolved_settings.memory_job_batch_size,
+            concurrency=resolved_settings.memory_job_concurrency,
+            lease_seconds=resolved_settings.memory_job_lease_seconds,
+            max_attempts=resolved_settings.memory_job_max_attempts,
+            database_timeout_seconds=resolved_settings.memory_job_db_timeout_seconds,
+            shutdown_grace_seconds=resolved_settings.memory_job_shutdown_grace_seconds,
+        )
         yield WorkerDependencies(
             settings=resolved_settings,
             conversation_store=conversation_store,
@@ -95,6 +108,7 @@ async def worker_dependency_lifespan(
             long_term_memory=resolved_memory,
             process_memory=process_memory,
             process_memory_job=process_memory_job,
+            runner=runner,
         )
     finally:
         try:

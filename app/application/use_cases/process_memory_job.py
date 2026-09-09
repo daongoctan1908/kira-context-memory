@@ -107,6 +107,10 @@ class ProcessMemoryJobUseCase:
             if job.attempt_count >= self._max_attempts:
                 return await self._dead_letter(job, error)
             return await self._retry(job, error)
+        except Exception as error:
+            if job.attempt_count >= self._max_attempts:
+                return await self._dead_letter(job, error)
+            return await self._retry(job, error)
 
         lifecycle_event_count = len(result.events)
         await self._queue.complete(
