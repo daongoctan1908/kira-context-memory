@@ -10,6 +10,7 @@ from app.domain.errors.memory import LongTermMemoryConfigurationError
 from app.infrastructure.memory.postgres_admin import (
     MEMORY_SCHEMA_VERSION,
     _initialize_memory_schema_sync,
+    _validate_memory_schema_sync,
     normalize_psycopg_dsn,
 )
 
@@ -46,6 +47,15 @@ async def test_memory_schema_init_is_idempotent_and_validates_dimension() -> Non
         )
 
         assert state == repeated
+        validated = await asyncio.to_thread(
+            _validate_memory_schema_sync,
+            dsn,
+            schema_name,
+            collection_name,
+            "test-embedding-model",
+            3,
+        )
+        assert validated == state
         assert state.schema_version == MEMORY_SCHEMA_VERSION
         assert state.embedding_dims == 3
         with psycopg.connect(dsn) as connection, connection.cursor() as cursor:
@@ -70,6 +80,15 @@ async def test_memory_schema_init_is_idempotent_and_validates_dimension() -> Non
         with pytest.raises(LongTermMemoryConfigurationError):
             await asyncio.to_thread(
                 _initialize_memory_schema_sync,
+                dsn,
+                schema_name,
+                collection_name,
+                "different-model",
+                3,
+            )
+        with pytest.raises(LongTermMemoryConfigurationError):
+            await asyncio.to_thread(
+                _validate_memory_schema_sync,
                 dsn,
                 schema_name,
                 collection_name,

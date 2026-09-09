@@ -3,11 +3,11 @@
 from sqlalchemy.exc import ArgumentError
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
-from app.config.settings import Settings
+from app.config.runtime_contracts import PostgresRuntimeSettings
 from app.domain.errors.conversation import ConversationStoreConfigurationError
 
 
-def create_postgres_engine(settings: Settings) -> AsyncEngine:
+def create_postgres_engine(settings: PostgresRuntimeSettings) -> AsyncEngine:
     """Create a pooled SQLAlchemy async engine without opening a connection."""
     if settings.database_url is None:
         raise ConversationStoreConfigurationError

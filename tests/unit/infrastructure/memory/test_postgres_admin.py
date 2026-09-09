@@ -11,6 +11,7 @@ from app.infrastructure.memory.postgres_admin import (
     initialize_memory_schema,
     normalize_psycopg_dsn,
     probe_embedding_dimension,
+    validate_memory_schema,
 )
 
 
@@ -98,3 +99,30 @@ async def test_initializer_uses_admin_dsn_after_successful_probe(monkeypatch):
         "embed-model",
         3,
     )
+
+
+async def test_validator_uses_runtime_dsn_without_embedding_probe(monkeypatch):
+    captured = {}
+
+    def validate_sync(*args):
+        captured["args"] = args
+        return "valid"
+
+    monkeypatch.setattr(
+        "app.infrastructure.memory.postgres_admin._validate_memory_schema_sync",
+        validate_sync,
+    )
+
+    assert await validate_memory_schema(settings()) == "valid"
+    assert captured["args"] == (
+        "postgresql://user:secret@db/memory",
+        "memory",
+        "memories",
+        "embed-model",
+        3,
+    )
+
+
+async def test_validator_rejects_incomplete_runtime_configuration() -> None:
+    with pytest.raises(LongTermMemoryConfigurationError):
+        await validate_memory_schema(settings(memory_database_url=None))

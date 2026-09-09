@@ -8,7 +8,7 @@ import httpx
 import psycopg
 from psycopg import sql
 
-from app.config.settings import Settings
+from app.config.runtime_contracts import MemoryAdminRuntimeSettings
 from app.domain.errors.memory import (
     LongTermMemoryConfigurationError,
     LongTermMemoryConnectionError,
@@ -49,7 +49,7 @@ def embeddings_url(base_url: str) -> str:
 
 
 async def probe_embedding_dimension(
-    settings: Settings,
+    settings: MemoryAdminRuntimeSettings,
     client: httpx.AsyncClient,
 ) -> int:
     """Verify that the configured OpenAI-compatible embedder returns the pinned dimension."""
@@ -107,7 +107,7 @@ async def probe_embedding_dimension(
 
 
 async def initialize_memory_schema(
-    settings: Settings,
+    settings: MemoryAdminRuntimeSettings,
     client: httpx.AsyncClient | None = None,
 ) -> MemorySchemaState:
     """Probe embeddings, then create or validate the versioned memory schema."""
@@ -143,6 +143,91 @@ async def initialize_memory_schema(
         raise LongTermMemoryConnectionError from error
     except psycopg.Error as error:
         raise LongTermMemoryOperationError from error
+
+
+async def validate_memory_schema(
+    settings: MemoryAdminRuntimeSettings,
+) -> MemorySchemaState:
+    """Read and validate the existing memory schema without issuing DDL."""
+    if (
+        settings.memory_database_url is None
+        or settings.memory_embedding_model is None
+        or settings.memory_embedding_dims is None
+    ):
+        raise LongTermMemoryConfigurationError
+
+    dsn = normalize_psycopg_dsn(str(settings.memory_database_url.get_secret_value()))
+    try:
+        return await asyncio.to_thread(
+            _validate_memory_schema_sync,
+            dsn,
+            settings.memory_schema,
+            settings.memory_collection_name,
+            settings.memory_embedding_model,
+            settings.memory_embedding_dims,
+        )
+    except LongTermMemoryConfigurationError:
+        raise
+    except (psycopg.OperationalError, TimeoutError, OSError) as error:
+        raise LongTermMemoryConnectionError from error
+    except psycopg.Error as error:
+        raise LongTermMemoryOperationError from error
+
+
+def _validate_memory_schema_sync(
+    dsn: str,
+    schema_name: str,
+    collection_name: str,
+    embedding_model: str,
+    embedding_dims: int,
+) -> MemorySchemaState:
+    """Validate version metadata and vector dimensions using read-only statements."""
+    try:
+        mem0_version = version(MEM0_DISTRIBUTION)
+    except PackageNotFoundError as error:
+        raise LongTermMemoryConfigurationError from error
+
+    metadata_table_name = f"{schema_name}.kira_memory_schema"
+    metadata_table = sql.Identifier(schema_name, "kira_memory_schema")
+    with psycopg.connect(dsn) as connection, connection.cursor() as cursor:
+        cursor.execute("SELECT extversion FROM pg_extension WHERE extname = 'vector'")
+        extension_row = cursor.fetchone()
+        if not extension_row or not isinstance(extension_row[0], str):
+            raise LongTermMemoryConfigurationError
+        pgvector_version = extension_row[0]
+
+        cursor.execute("SELECT to_regclass(%s)", (metadata_table_name,))
+        metadata_registration = cursor.fetchone()
+        if not metadata_registration or metadata_registration[0] is None:
+            raise LongTermMemoryConfigurationError
+        cursor.execute(
+            sql.SQL(
+                "SELECT schema_version, embedding_model, embedding_dims, "
+                "mem0_version, pgvector_version FROM {} WHERE singleton"
+            ).format(metadata_table)
+        )
+        row = cursor.fetchone()
+        expected = (
+            MEMORY_SCHEMA_VERSION,
+            embedding_model,
+            embedding_dims,
+            mem0_version,
+            pgvector_version,
+        )
+        if row is None or tuple(row) != expected:
+            raise LongTermMemoryConfigurationError
+
+        for table_name in (collection_name, f"{collection_name}_entities"):
+            cursor.execute(
+                "SELECT format_type(a.atttypid, a.atttypmod) "
+                "FROM pg_attribute AS a "
+                "WHERE a.attrelid = to_regclass(%s) AND a.attname = 'vector'",
+                (f"{schema_name}.{table_name}",),
+            )
+            if cursor.fetchone() != (f"vector({embedding_dims})",):
+                raise LongTermMemoryConfigurationError
+
+    return MemorySchemaState(*expected)
 
 
 def _initialize_memory_schema_sync(

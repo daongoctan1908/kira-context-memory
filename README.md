@@ -94,6 +94,11 @@ nguyên SSE contract. Xem
 [Week 4 T4.8 completion scheduling](docs/week4-t4.8-gateway-completion-scheduling.md) và
 [Week 4 T4.9 scheduling observability](docs/week4-t4.9-gateway-scheduling-observability.md),
 [Week 4 Batch B acceptance](docs/week4-batch-b-gateway-scheduling-acceptance.md).
+T4.11 mở Batch C bằng `WorkerSettings` độc lập Gateway và một dependency lifespan fail-fast:
+Worker chỉ nhận PostgreSQL, Mem0 và queue runtime settings, validate cả application migration lẫn
+pgvector memory schema trước khi sẵn sàng, rồi đóng đúng các resource do Worker sở hữu. Poller,
+job execution và HTTP runtime vẫn thuộc T4.12-T4.14. Xem
+[Week 4 T4.11 Worker settings and lifecycle](docs/week4-t4.11-worker-settings-lifecycle.md).
 
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem

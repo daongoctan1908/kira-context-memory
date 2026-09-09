@@ -9,7 +9,7 @@ from typing import Any, Protocol
 import httpx
 
 from app.application.services.memory_policy import MEMORY_EXTRACTION_INSTRUCTIONS
-from app.config.settings import Settings
+from app.config.runtime_contracts import MemoryRuntimeSettings
 from app.domain.errors.memory import (
     LongTermMemoryConfigurationError,
     LongTermMemoryConnectionError,
@@ -39,7 +39,7 @@ def _openai_base_url(value: object) -> str:
     return normalized if normalized.endswith("/v1") else f"{normalized}/v1"
 
 
-def build_mem0_config(settings: Settings) -> dict[str, object]:
+def build_mem0_config(settings: MemoryRuntimeSettings) -> dict[str, object]:
     """Build the internal-package config without leaking credentials to core or logs."""
     if (
         settings.memory_database_url is None
@@ -102,7 +102,7 @@ def build_mem0_config(settings: Settings) -> dict[str, object]:
     }
 
 
-def create_mem0_client(settings: Settings) -> AsyncMem0Client:
+def create_mem0_client(settings: MemoryRuntimeSettings) -> AsyncMem0Client:
     """Construct the vendored client with telemetry disabled and runtime DDL forbidden."""
     os.environ["MEM0_TELEMETRY"] = "False"
     mem0_logger = logging.getLogger("mem0")
@@ -135,7 +135,7 @@ class Mem0Adapter:
         self._operation_timeout = operation_timeout_seconds
 
     @classmethod
-    def from_settings(cls, settings: Settings) -> "Mem0Adapter":
+    def from_settings(cls, settings: MemoryRuntimeSettings) -> "Mem0Adapter":
         return cls(
             create_mem0_client(settings),
             search_timeout_seconds=settings.memory_search_timeout_seconds,

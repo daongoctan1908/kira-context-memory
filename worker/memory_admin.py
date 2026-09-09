@@ -3,8 +3,8 @@
 import argparse
 import asyncio
 
-from app.config.settings import get_settings
 from app.infrastructure.memory.postgres_admin import initialize_memory_schema
+from worker.settings import get_worker_settings
 
 
 def parse_args() -> argparse.Namespace:
@@ -16,7 +16,7 @@ def parse_args() -> argparse.Namespace:
 async def run() -> None:
     args = parse_args()
     if args.command == "init":
-        state = await initialize_memory_schema(get_settings())
+        state = await initialize_memory_schema(get_worker_settings())
         print(f"memory schema ready: version={state.schema_version} dims={state.embedding_dims}")
 
 
