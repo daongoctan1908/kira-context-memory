@@ -147,6 +147,11 @@ transition, Worker bị `SIGKILL`, replica mới reclaim lease hết hạn ở a
 dedup giữ một memory và zero-event retry vẫn complete. Override lease chỉ dùng cho synthetic gate và
 base Worker luôn được khôi phục. Xem
 [Week 4 T4.21 crash/lease recovery](docs/week4-t4.21-crash-lease-recovery.md).
+T4.22 fault PostgreSQL ở cấp container: Worker giữ `/health=200` nhưng chuyển `/ready=503`, còn
+Gateway giữ readiness và trả KiRa SSE bằng current query. Metrics/log ghi rõ degraded read, write,
+memory search và queue availability mà không lộ dữ liệu synthetic; PostgreSQL cùng runtime tự hồi
+phục khi test kết thúc. Xem
+[Week 4 T4.22 observability/readiness](docs/week4-t4.22-observability-readiness-acceptance.md).
 
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem
@@ -240,6 +245,7 @@ docker compose -f compose.week4.yaml ps -a
 uv run python -m scripts.smoke_week4_async
 uv run python -m scripts.smoke_week4_retry
 uv run python -m scripts.smoke_week4_crash
+uv run python -m scripts.smoke_week4_observability
 ```
 
 Gateway ở `http://127.0.0.1:18000`, Worker ở `http://127.0.0.1:18001`; PostgreSQL và bốn mock

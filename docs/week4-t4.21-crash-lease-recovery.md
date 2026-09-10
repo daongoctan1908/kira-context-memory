@@ -75,5 +75,5 @@ Validated locally on 2026-09-10:
 
 This is evidence for at-least-once lease recovery of an identical deterministic fact. It is not a
 general exactly-once guarantee and does not add application-level deduplication beyond native Mem0
-V3 exact-hash behavior. PostgreSQL outage/readiness belongs to T4.22; final release evidence belongs
-to T4.23.
+V3 exact-hash behavior. PostgreSQL outage/readiness is covered separately by T4.22; final release
+evidence belongs to T4.23.
