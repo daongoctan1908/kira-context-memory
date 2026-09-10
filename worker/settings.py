@@ -86,7 +86,33 @@ class WorkerSettings(BaseSettings):
         return self
 
 
+class MemoryJobAdminSettings(BaseSettings):
+    """Minimal PostgreSQL-only settings for the memory-job operator CLI."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+        frozen=True,
+    )
+
+    database_url: Secret[PostgresDsn]
+    postgres_pool_size: int = Field(default=2, ge=1)
+    postgres_max_overflow: int = Field(default=0, ge=0)
+    postgres_pool_timeout_seconds: float = Field(default=2.0, gt=0)
+    postgres_connect_timeout_seconds: float = Field(default=2.0, gt=0)
+    postgres_command_timeout_seconds: float = Field(default=5.0, gt=0)
+    memory_job_db_timeout_seconds: float = Field(default=5.0, gt=0)
+
+
 @lru_cache
 def get_worker_settings() -> WorkerSettings:
     """Return the process-wide immutable Worker settings instance."""
     return WorkerSettings()  # type: ignore[call-arg]
+
+
+@lru_cache
+def get_memory_job_admin_settings() -> MemoryJobAdminSettings:
+    """Return PostgreSQL-only settings for one operator CLI process."""
+    return MemoryJobAdminSettings()  # type: ignore[call-arg]

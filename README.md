@@ -120,6 +120,10 @@ lặp theo interval, giữ completed mặc định 7 ngày và dead 30 ngày; pe
 bị purge. Cleanup timeout/lỗi DB chỉ retry ở chu kỳ kế tiếp và không dừng processing runner.
 PostgreSQL acceptance cũng khóa đủ 5 provider attempts cùng retry schedule `1/5/30/120`. Xem
 [Week 4 T4.15 retry and retention](docs/week4-t4.15-retry-cleanup-retention.md).
+T4.16 thêm operator CLI machine-readable cho queue stats, bounded dead listing và explicit
+single-event requeue. CLI dùng dependency lifecycle PostgreSQL riêng, không tải Mem0/provider và
+không mở HTTP mutation endpoint. Xem
+[Week 4 T4.16 operator CLI](docs/week4-t4.16-memory-job-operator-cli.md).
 
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem
@@ -178,6 +182,19 @@ Lệnh này cần `MEMORY_ADMIN_DATABASE_URL` (hoặc fallback `MEMORY_DATABASE_
 hai collection `memory.memories` và `memory.memories_entities` cùng metadata/index. Chạy lại
 idempotent; model, dimension, Mem0 version hoặc pgvector version lệch metadata sẽ fail closed.
 Runtime service account chỉ cần DML và không được cấp quyền DDL.
+
+Kiểm tra queue và requeue có chủ đích một dead job bằng operator CLI PostgreSQL-only:
+
+```powershell
+uv run kira-memory-jobs stats
+uv run kira-memory-jobs list-dead --limit 50
+uv run kira-memory-jobs requeue --event-id 00000000-0000-0000-0000-000000000000
+```
+
+CLI chỉ cần `DATABASE_URL` cùng cấu hình pool/timeout PostgreSQL; nó không khởi tạo Mem0 và không
+cần KiRa, embedding hay memory-LLM. `list-dead` chỉ trả projection vận hành đã sanitize và bị giới
+hạn tối đa 1.000 row. `requeue` chỉ tác động đúng một UUID đang ở trạng thái `dead`; event không tồn
+tại hoặc không còn dead trả exit code 4 và không thay đổi dữ liệu.
 
 `DATABASE_URL` phải khớp `POSTGRES_DB`, `POSTGRES_USER` và `POSTGRES_PASSWORD` trong `.env`.
 Gateway không tự chạy migration. Cấu hình hoặc schema sai làm startup fail; connection timeout

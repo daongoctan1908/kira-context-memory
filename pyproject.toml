@@ -22,6 +22,9 @@ dependencies = [
     "viettel-mem0[postgres]==2.0.20+viettel.2",
 ]
 
+[project.scripts]
+kira-memory-jobs = "worker.job_admin:main"
+
 [tool.uv.sources]
 viettel-mem0 = { path = "packages/viettel-mem0" }
 
