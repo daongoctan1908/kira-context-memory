@@ -93,6 +93,6 @@ Validated locally on 2026-09-10:
 
 ## Scope boundary
 
-T4.20 proves bounded Worker retry, dead-letter, and explicit requeue behavior. It does not prove
-crash-after-provider-call lease recovery, queue-database outage readiness, production provider
-semantics, or exactly-once formation. Those remain T4.21–T4.23.
+T4.20 proves bounded Worker retry, dead-letter, and explicit requeue behavior. Crash-after-write
+lease recovery is covered separately by T4.21. Queue-database outage readiness, production provider
+semantics, and final release evidence remain T4.22–T4.23; exactly-once formation is out of scope.

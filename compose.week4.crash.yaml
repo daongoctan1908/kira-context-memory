@@ -1,0 +1,9 @@
+# Synthetic T4.21 lease timings. Use only together with compose.week4.yaml.
+services:
+  worker:
+    environment:
+      CONVERSATION_OPERATION_TIMEOUT_SECONDS: "1"
+      MEMORY_OPERATION_TIMEOUT_SECONDS: "2"
+      MEMORY_JOB_LEASE_SECONDS: "5"
+      POSTGRES_COMMAND_TIMEOUT_SECONDS: "10"
+      MEMORY_JOB_METRICS_REFRESH_SECONDS: "0.25"

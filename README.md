@@ -142,6 +142,11 @@ retry horizon vào `dead` đúng attempt 5; packaged operator CLI list projectio
 requeue chính xác event để Worker xử lý thành công. Compose chỉ tăng tốc retry cho synthetic gate,
 không đổi default production. Xem
 [Week 4 T4.20 retry/dead/requeue E2E](docs/week4-t4.20-retry-dead-requeue-e2e.md).
+T4.21 khóa crash boundary sau durable Mem0 write nhưng trước queue complete: PostgreSQL row lock giữ
+transition, Worker bị `SIGKILL`, replica mới reclaim lease hết hạn ở attempt 2; native exact-hash
+dedup giữ một memory và zero-event retry vẫn complete. Override lease chỉ dùng cho synthetic gate và
+base Worker luôn được khôi phục. Xem
+[Week 4 T4.21 crash/lease recovery](docs/week4-t4.21-crash-lease-recovery.md).
 
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem
@@ -234,6 +239,7 @@ docker compose -f compose.week4.yaml up -d --no-build --wait
 docker compose -f compose.week4.yaml ps -a
 uv run python -m scripts.smoke_week4_async
 uv run python -m scripts.smoke_week4_retry
+uv run python -m scripts.smoke_week4_crash
 ```
 
 Gateway ở `http://127.0.0.1:18000`, Worker ở `http://127.0.0.1:18001`; PostgreSQL và bốn mock
