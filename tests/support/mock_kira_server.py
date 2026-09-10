@@ -25,6 +25,13 @@ async def observed_requests() -> dict[str, object]:
     return {"stub": "kira-week2-local-only", "query_hashes": list(query_hashes)}
 
 
+@app.post("/_test/reset")
+async def reset_requests() -> dict[str, str]:
+    """Reset synthetic hash evidence without exposing request content."""
+    query_hashes.clear()
+    return {"status": "reset"}
+
+
 @app.post("/authenticate")
 async def authenticate(request: Request) -> JSONResponse:
     payload = await request.json()

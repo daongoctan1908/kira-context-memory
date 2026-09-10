@@ -133,6 +133,10 @@ T4.18 mở Batch D bằng stack `compose.week4.yaml` độc lập và không Red
 migration, memory init, Gateway, Worker cùng bốn deterministic provider mocks chạy thành các
 service riêng. Gateway/Worker dùng readiness healthcheck; hai DDL job phải exit 0 trước khi runtime
 khởi động. Xem [Week 4 T4.18 Compose stack](docs/week4-t4.18-compose-stack.md).
+T4.19 khóa happy path bất đồng bộ trên chính stack này: memory-LLM bị chặn trong lúc Session A đã
+nhận xong SSE, Worker sau đó complete durable job, và Session B ở session mới recall LTM qua
+Rewriter trước khi query đã rewrite tới KiRa. Evidence chỉ dùng hash/count và dữ liệu synthetic.
+Xem [Week 4 T4.19 async happy-path E2E](docs/week4-t4.19-async-happy-path-e2e.md).
 
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem
@@ -223,6 +227,7 @@ Khởi động stack synthetic Week 4 đầy đủ để chạy các gate Batch 
 docker compose -f compose.week4.yaml build gateway
 docker compose -f compose.week4.yaml up -d --no-build --wait
 docker compose -f compose.week4.yaml ps -a
+uv run python -m scripts.smoke_week4_async
 ```
 
 Gateway ở `http://127.0.0.1:18000`, Worker ở `http://127.0.0.1:18001`; PostgreSQL và bốn mock
