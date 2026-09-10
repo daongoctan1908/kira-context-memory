@@ -36,6 +36,124 @@ class TestPGVector(unittest.TestCase):
         self.test_payloads = [{"key": "value1"}, {"key": "value2"}]
         self.test_ids = [str(uuid.uuid4()), str(uuid.uuid4())]
 
+    def _runtime_pgvector(self):
+        return PGVector(
+            dbname="unused",
+            collection_name="memories",
+            embedding_model_dims=3,
+            user=None,
+            password=None,
+            host=None,
+            port=None,
+            diskann=False,
+            hnsw=True,
+            connection_pool=self.mock_pool_psycopg,
+            schema_name="memory",
+            auto_create=False,
+        )
+
+    def test_exact_formation_receipt_lookup_does_not_use_semantic_search(self):
+        pgvector = self._runtime_pgvector()
+        event_id = str(uuid.uuid4())
+        committed = [{"id": str(uuid.uuid4()), "memory": "first wording", "event": "ADD"}]
+        self.mock_cursor.fetchone.return_value = ("user-1", committed)
+
+        with (
+            patch.object(pgvector, "_get_cursor") as get_cursor,
+            patch.object(pgvector, "search") as semantic_search,
+        ):
+            get_cursor.return_value.__enter__.return_value = self.mock_cursor
+            result = pgvector.get_formation_result(event_id, "user-1")
+
+        self.assertEqual(result, committed)
+        semantic_search.assert_not_called()
+
+    def test_formation_insert_writes_receipt_and_all_vectors_in_one_transaction(self):
+        pgvector = self._runtime_pgvector()
+        event_id = str(uuid.uuid4())
+        memory_id = str(uuid.uuid4())
+        result = [{"id": memory_id, "memory": "durable fact", "event": "ADD"}]
+        payload = {
+            "user_id": "user-1",
+            "formation_event_id": event_id,
+            "data": "durable fact",
+        }
+        self.mock_cursor.fetchone.return_value = (event_id,)
+
+        with patch.object(pgvector, "_get_cursor") as get_cursor:
+            get_cursor.return_value.__enter__.return_value = self.mock_cursor
+            created, committed = pgvector.insert_with_formation_receipt(
+                [[1.0, 0.0, 0.0]],
+                [payload],
+                [memory_id],
+                event_id=event_id,
+                user_id="user-1",
+                result=result,
+            )
+
+        self.assertTrue(created)
+        self.assertEqual(committed, result)
+        get_cursor.assert_called_once_with(commit=True)
+        self.mock_cursor.executemany.assert_called_once()
+
+    def test_formation_conflict_returns_first_receipt_without_inserting_paraphrase(self):
+        pgvector = self._runtime_pgvector()
+        event_id = str(uuid.uuid4())
+        first_id = str(uuid.uuid4())
+        second_id = str(uuid.uuid4())
+        first = [{"id": first_id, "memory": "threshold 10%", "event": "ADD"}]
+        paraphrase = [
+            {"id": second_id, "memory": "preferred threshold is ten percent", "event": "ADD"}
+        ]
+        self.mock_cursor.fetchone.side_effect = [None, ("user-1", first)]
+
+        with patch.object(pgvector, "_get_cursor") as get_cursor:
+            get_cursor.return_value.__enter__.return_value = self.mock_cursor
+            created, committed = pgvector.insert_with_formation_receipt(
+                [[0.0, 1.0, 0.0]],
+                [
+                    {
+                        "user_id": "user-1",
+                        "formation_event_id": event_id,
+                        "data": "preferred threshold is ten percent",
+                    }
+                ],
+                [second_id],
+                event_id=event_id,
+                user_id="user-1",
+                result=paraphrase,
+            )
+
+        self.assertFalse(created)
+        self.assertEqual(committed, first)
+        self.mock_cursor.executemany.assert_not_called()
+
+    def test_formation_insert_rejects_misaligned_or_cross_user_provenance(self):
+        pgvector = self._runtime_pgvector()
+        event_id = str(uuid.uuid4())
+        memory_id = str(uuid.uuid4())
+
+        with self.assertRaisesRegex(ValueError, "align"):
+            pgvector.insert_with_formation_receipt(
+                [],
+                [],
+                [memory_id],
+                event_id=event_id,
+                user_id="user-1",
+                result=[],
+            )
+        with self.assertRaisesRegex(ValueError, "provenance"):
+            pgvector.insert_with_formation_receipt(
+                [[1.0, 0.0, 0.0]],
+                [{"user_id": "other-user", "formation_event_id": event_id}],
+                [memory_id],
+                event_id=event_id,
+                user_id="user-1",
+                result=[{"id": memory_id, "memory": "fact", "event": "ADD"}],
+            )
+
+        self.mock_pool_psycopg.connection.assert_not_called()
+
     def test_runtime_mode_rejects_missing_collection_without_ddl(self):
         pgvector = PGVector(
             dbname="unused",

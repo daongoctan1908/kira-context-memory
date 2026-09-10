@@ -142,9 +142,10 @@ retry horizon vào `dead` đúng attempt 5; packaged operator CLI list projectio
 requeue chính xác event để Worker xử lý thành công. Compose chỉ tăng tốc retry cho synthetic gate,
 không đổi default production. Xem
 [Week 4 T4.20 retry/dead/requeue E2E](docs/week4-t4.20-retry-dead-requeue-e2e.md).
-T4.21 khóa crash boundary sau durable Mem0 write nhưng trước queue complete: PostgreSQL row lock giữ
-transition, Worker bị `SIGKILL`, replica mới reclaim lease hết hạn ở attempt 2; native exact-hash
-dedup giữ một memory và zero-event retry vẫn complete. Override lease chỉ dùng cho synthetic gate và
+T4.21 khóa cả hai crash boundary trước và sau formation commit. Mỗi `memory_jobs.event_id` được
+truyền xuyên suốt xuống memory layer; pgvector commit atomically toàn bộ memory cùng một durable
+receipt có primary key `event_id`. Retry sau commit đọc receipt trực tiếp rồi complete queue, không
+gọi semantic top-k, exact-text hash hay LLM lần hai. Override lease chỉ dùng cho synthetic gate và
 base Worker luôn được khôi phục. Xem
 [Week 4 T4.21 crash/lease recovery](docs/week4-t4.21-crash-lease-recovery.md).
 T4.22 fault PostgreSQL ở cấp container: Worker giữ `/health=200` nhưng chuyển `/ready=503`, còn
@@ -152,7 +153,8 @@ Gateway giữ readiness và trả KiRa SSE bằng current query. Metrics/log ghi
 memory search và queue availability mà không lộ dữ liệu synthetic; PostgreSQL cùng runtime tự hồi
 phục khi test kết thúc. Xem
 [Week 4 T4.22 observability/readiness](docs/week4-t4.22-observability-readiness-acceptance.md).
-T4.23 đồng bộ package, Gateway, Worker, OCI label và Compose image về `0.4.0`; dựng lại volume
+T4.23 đồng bộ package, Gateway, Worker, OCI label và Compose image; bản vá formation idempotency
+dùng `0.4.1` với custom Mem0 `2.0.20+viettel.3` và memory schema version 2. Stack được dựng lại từ
 synthetic từ đầu, chạy migration up/down/up và replay toàn bộ T4.19–T4.22. Release gate cũng khóa
 raw asyncpg `57P03` để Worker backoff rồi tự hồi phục thay vì dừng runner. Xem
 [Week 4 T4.23 release evidence](docs/week4-t4.23-release-evidence.md).
@@ -211,7 +213,9 @@ uv run python -m worker.memory_admin init
 
 Lệnh này cần `MEMORY_ADMIN_DATABASE_URL` (hoặc fallback `MEMORY_DATABASE_URL`) có quyền
 `CREATE EXTENSION`/schema. Nó probe `/v1/embeddings`, kiểm tra dimension thật rồi tạo/validate
-hai collection `memory.memories` và `memory.memories_entities` cùng metadata/index. Chạy lại
+hai collection `memory.memories`, `memory.memories_entities`, receipt table
+`memory.memories_formation_receipts` cùng metadata/index. Memory schema version 2 hỗ trợ controlled
+upgrade từ baseline version 1 / `viettel.2`; cấu hình hoặc version lạ vẫn fail closed. Chạy lại
 idempotent; model, dimension, Mem0 version hoặc pgvector version lệch metadata sẽ fail closed.
 Runtime service account chỉ cần DML và không được cấp quyền DDL.
 
@@ -355,8 +359,8 @@ uv run python scripts/smoke_gateway.py `
 Build và chạy Docker image versioned:
 
 ```powershell
-docker build --build-arg APP_VERSION=0.4.0 -t kira-context:0.4.0 .
-docker run -d --name kira-context-v4 --env-file .env -p 8000:8000 kira-context:0.4.0
+docker build --build-arg APP_VERSION=0.4.1 -t kira-context:0.4.1 .
+docker run -d --name kira-context-v4 --env-file .env -p 8000:8000 kira-context:0.4.1
 docker ps --filter "name=kira-context"
 ```
 

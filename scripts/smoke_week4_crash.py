@@ -56,11 +56,14 @@ class CrashJobEvidence:
 
 async def run(options: CrashSmokeOptions) -> None:
     run_id = uuid4().hex[:12]
-    session_id = f"w4-crash-{run_id}"
-    fact = memory_fact(f"{run_id}-crash")
-    message = session_a_message(f"{run_id}-crash")
+    pre_session_id = f"w4-crash-pre-{run_id}"
+    pre_fact = memory_fact(f"{run_id}-pre")
+    pre_message = session_a_message(f"{run_id}-pre")
+    post_session_id = f"w4-crash-post-{run_id}"
+    post_fact = memory_fact(f"{run_id}-post")
+    post_message = session_a_message(f"{run_id}-post")
     engine = create_async_engine(options.database_url, pool_pre_ping=True)
-    completed = False
+    post_completed = False
     crash_worker_started = False
 
     timeout = httpx.Timeout(options.timeout_seconds)
@@ -69,35 +72,112 @@ async def run(options: CrashSmokeOptions) -> None:
             await _start_crash_worker(options, force_recreate=True)
             crash_worker_started = True
             await _wait_for_url(client, options.worker_url + "/ready", 200, options)
-            await _reset_blocked_provider(client, options)
 
-            if await _chat(client, options.gateway_url, session_id, message) != EXPECTED_KIRA_TEXT:
+            # Phase 1: a crash before the memory transaction commits must leave no receipt or
+            # partial vector; the reclaimed attempt performs formation once and commits it.
+            await _reset_blocked_provider(client, options)
+            if (
+                await _chat(client, options.gateway_url, pre_session_id, pre_message)
+                != EXPECTED_KIRA_TEXT
+            ):
                 raise Week4SmokeError
             await _wait_for_blocked_provider(client, options, request_count=1)
-            claimed = await _wait_for_job(
+            pre_claimed = await _wait_for_job(
                 engine,
-                session_id,
+                pre_session_id,
                 options,
                 status=MemoryJobStatus.PROCESSING.value,
                 attempt_count=1,
             )
-            if claimed.lease_expires_at is None:
+            if pre_claimed.lease_expires_at is None:
+                raise Week4SmokeError
+            await _compose(options, True, "kill", "-s", "SIGKILL", "worker")
+            if (
+                await _memory_count(engine, pre_fact) != 0
+                or await _receipt_count(engine, pre_claimed.event_id) != 0
+            ):
+                raise Week4SmokeError
+            pre_stranded = await _job_evidence(engine, pre_session_id)
+            if (
+                pre_stranded is None
+                or pre_stranded.status != MemoryJobStatus.PROCESSING.value
+                or pre_stranded.attempt_count != 1
+                or pre_stranded.lifecycle_event_count is not None
+            ):
+                raise Week4SmokeError
+            print("PASS worker_crashed_before_formation_commit memory_count=0 receipt_count=0")
+
+            await _release_provider(client, options)
+            await _start_crash_worker(options, force_recreate=False)
+            await _wait_for_url(client, options.worker_url + "/ready", 200, options)
+            pre_recovered = await _wait_for_job(
+                engine,
+                pre_session_id,
+                options,
+                status=MemoryJobStatus.COMPLETED.value,
+                attempt_count=2,
+            )
+            if (
+                pre_recovered.lease_expires_at is not None
+                or pre_recovered.lifecycle_event_count != 1
+            ):
+                raise Week4SmokeError
+            await _wait_for_formation(
+                engine,
+                pre_fact,
+                pre_claimed.event_id,
+                expected=1,
+                options=options,
+            )
+            await _require_provider_calls(client, options, expected=2)
+            await _wait_for_reclaim_metrics(client, options)
+            print(
+                "PASS pre_commit_lease_reclaimed attempts=2 provider_calls=2 "
+                "durable_memory_count=1 receipt_count=1"
+            )
+            await _cleanup(engine, pre_session_id, pre_fact, pre_claimed.event_id)
+
+            # Phase 2: a crash after memory+receipt commit but before queue completion must
+            # reclaim the lease and complete from the exact receipt without search or LLM.
+            await _reset_blocked_provider(client, options)
+            if (
+                await _chat(client, options.gateway_url, post_session_id, post_message)
+                != EXPECTED_KIRA_TEXT
+            ):
+                raise Week4SmokeError
+            await _wait_for_blocked_provider(client, options, request_count=1)
+            post_claimed = await _wait_for_job(
+                engine,
+                post_session_id,
+                options,
+                status=MemoryJobStatus.PROCESSING.value,
+                attempt_count=1,
+            )
+            if post_claimed.lease_expires_at is None:
                 raise Week4SmokeError
 
             lock_connection = await engine.connect()
             transaction = await lock_connection.begin()
             try:
-                await _lock_job(lock_connection, claimed.event_id)
+                await _lock_job(lock_connection, post_claimed.event_id)
                 await _release_provider(client, options)
-                await _wait_for_memory_count(engine, fact, expected=1, options=options)
+                await _wait_for_formation(
+                    engine,
+                    post_fact,
+                    post_claimed.event_id,
+                    expected=1,
+                    options=options,
+                )
                 await _wait_for_blocked_completion(engine, options)
                 await _compose(options, True, "kill", "-s", "SIGKILL", "worker")
-                print("PASS worker_crashed_after_memory_write blocked_complete=1")
+                print(
+                    "PASS worker_crashed_after_formation_commit blocked_complete=1 receipt_count=1"
+                )
             finally:
                 await transaction.rollback()
                 await lock_connection.close()
 
-            stranded = await _job_evidence(engine, session_id)
+            stranded = await _job_evidence(engine, post_session_id)
             if (
                 stranded is None
                 or stranded.status != MemoryJobStatus.PROCESSING.value
@@ -110,29 +190,42 @@ async def run(options: CrashSmokeOptions) -> None:
             await _wait_for_url(client, options.worker_url + "/ready", 200, options)
             recovered = await _wait_for_job(
                 engine,
-                session_id,
+                post_session_id,
                 options,
                 status=MemoryJobStatus.COMPLETED.value,
                 attempt_count=2,
             )
             if recovered.lease_expires_at is not None:
                 raise Week4SmokeError
-            await _wait_for_memory_count(engine, fact, expected=1, options=options)
-            await _require_provider_calls(client, options, expected=2)
+            if recovered.lifecycle_event_count != 1:
+                raise Week4SmokeError
+            await _wait_for_formation(
+                engine,
+                post_fact,
+                post_claimed.event_id,
+                expected=1,
+                options=options,
+            )
+            await _require_provider_calls(client, options, expected=1)
             await _wait_for_reclaim_metrics(client, options)
             print(
-                "PASS expired_lease_reclaimed attempts=2 durable_memory_count=1 "
-                f"lifecycle_events={recovered.lifecycle_event_count}"
+                "PASS post_commit_receipt_replayed attempts=2 provider_calls=1 "
+                "durable_memory_count=1 receipt_count=1 lifecycle_events=1"
             )
-            completed = True
+            post_completed = True
         finally:
             try:
                 try:
                     await _release_provider(client, options)
                 except httpx.HTTPError:
                     pass
-                if completed:
-                    await _cleanup(engine, session_id, fact)
+                if post_completed:
+                    await _cleanup(
+                        engine,
+                        post_session_id,
+                        post_fact,
+                        post_claimed.event_id,
+                    )
             finally:
                 await engine.dispose()
                 if crash_worker_started:
@@ -386,16 +479,28 @@ async def _memory_count(engine: AsyncEngine, fact: str) -> int:
         )
 
 
-async def _wait_for_memory_count(
+async def _receipt_count(engine: AsyncEngine, event_id: UUID) -> int:
+    statement = text(
+        "SELECT count(*) FROM memory.memories_formation_receipts WHERE event_id = :event_id"
+    )
+    async with engine.connect() as connection:
+        return int((await connection.execute(statement, {"event_id": event_id})).scalar_one())
+
+
+async def _wait_for_formation(
     engine: AsyncEngine,
     fact: str,
+    event_id: UUID,
     *,
     expected: int,
     options: CrashSmokeOptions,
 ) -> None:
     deadline = time.monotonic() + options.timeout_seconds
     while time.monotonic() < deadline:
-        if await _memory_count(engine, fact) == expected:
+        if (
+            await _memory_count(engine, fact) == expected
+            and await _receipt_count(engine, event_id) == expected
+        ):
             return
         await asyncio.sleep(0.05)
     raise Week4SmokeError
@@ -423,13 +528,22 @@ async def _wait_for_reclaim_metrics(
     raise Week4SmokeError
 
 
-async def _cleanup(engine: AsyncEngine, session_id: str, fact: str) -> None:
+async def _cleanup(
+    engine: AsyncEngine,
+    session_id: str,
+    fact: str,
+    event_id: UUID,
+) -> None:
     async with engine.begin() as connection:
         await connection.execute(
             delete(conversations).where(
                 conversations.c.user_id == SMOKE_USER_ID,
                 conversations.c.session_id == session_id,
             )
+        )
+        await connection.execute(
+            text("DELETE FROM memory.memories_formation_receipts WHERE event_id = :event_id"),
+            {"event_id": event_id},
         )
         for table_name in ("memories", "memories_entities"):
             await connection.execute(

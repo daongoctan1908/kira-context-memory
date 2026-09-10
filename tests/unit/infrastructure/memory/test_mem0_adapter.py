@@ -80,6 +80,7 @@ def source() -> MemorySource:
                 "session-1", "turn-1", ConversationRole.ASSISTANT, "Đã rõ", timestamp
             ),
         ),
+        uuid4(),
     )
 
 
@@ -183,6 +184,7 @@ async def test_process_memory_calls_only_add_with_exact_boundary_metadata():
         {"role": "assistant", "content": "Đã rõ"},
     ]
     assert kwargs["user_id"] == "user-1"
+    assert kwargs["metadata"]["formation_event_id"] == str(memory_source.formation_event_id)
     assert kwargs["metadata"]["boundary_message_id"] == 42
     assert kwargs["infer"] is True
     assert not hasattr(client, "update")

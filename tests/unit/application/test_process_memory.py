@@ -68,6 +68,7 @@ class FakeMemory:
 
 async def test_reads_exact_boundary_and_preserves_provider_lifecycle_result():
     ref = reference()
+    formation_event_id = uuid4()
     store = FakeStore(messages())
     expected = MemoryProcessResult(
         (
@@ -79,12 +80,16 @@ async def test_reads_exact_boundary_and_preserves_provider_lifecycle_result():
     )
     memory = FakeMemory(expected)
 
-    result = await ProcessMemoryUseCase(store, memory, message_limit=4).execute(ref)
+    result = await ProcessMemoryUseCase(store, memory, message_limit=4).execute(
+        ref,
+        formation_event_id,
+    )
 
     assert result is expected
     assert store.calls == [(ref.user_id, ref.conversation_id, ref.boundary_message_id, 4)]
     assert memory.sources[0].reference is ref
     assert memory.sources[0].messages == messages()
+    assert memory.sources[0].formation_event_id == formation_event_id
 
 
 @pytest.mark.parametrize(
@@ -102,7 +107,7 @@ async def test_rejects_empty_cross_session_or_non_boundary_snapshot(snapshot):
     memory = FakeMemory()
 
     with pytest.raises(ConversationStoreProtocolError):
-        await ProcessMemoryUseCase(FakeStore(snapshot), memory).execute(reference())
+        await ProcessMemoryUseCase(FakeStore(snapshot), memory).execute(reference(), uuid4())
 
     assert memory.sources == []
 
@@ -110,13 +115,29 @@ async def test_rejects_empty_cross_session_or_non_boundary_snapshot(snapshot):
 async def test_store_and_memory_typed_failures_propagate_to_runtime_boundary():
     store_error = ConversationStoreConnectionError()
     with pytest.raises(ConversationStoreConnectionError):
-        await ProcessMemoryUseCase(FakeStore(error=store_error), FakeMemory()).execute(reference())
+        await ProcessMemoryUseCase(FakeStore(error=store_error), FakeMemory()).execute(
+            reference(),
+            uuid4(),
+        )
 
     memory_error = LongTermMemoryTimeoutError()
     with pytest.raises(LongTermMemoryTimeoutError):
         await ProcessMemoryUseCase(FakeStore(messages()), FakeMemory(error=memory_error)).execute(
-            reference()
+            reference(),
+            uuid4(),
         )
+
+
+async def test_rejects_non_uuid_formation_event_before_reading_store():
+    store = FakeStore(messages())
+
+    with pytest.raises(TypeError, match="formation_event_id"):
+        await ProcessMemoryUseCase(store, FakeMemory()).execute(
+            reference(),
+            "not-a-uuid",  # type: ignore[arg-type]
+        )
+
+    assert store.calls == []
 
 
 @pytest.mark.parametrize("limit", [0, 1, 3])

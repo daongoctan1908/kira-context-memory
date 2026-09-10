@@ -3,6 +3,7 @@
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
+from uuid import UUID
 
 from app.domain.models.conversation import (
     CompletedTurnReference,
@@ -41,6 +42,7 @@ class MemorySource:
 
     reference: CompletedTurnReference
     messages: tuple[ConversationMessage, ...]
+    formation_event_id: UUID
 
     def __post_init__(self) -> None:
         if (
@@ -49,6 +51,8 @@ class MemorySource:
             or any(not isinstance(message, ConversationMessage) for message in self.messages)
         ):
             raise ValueError("memory source messages must not be empty")
+        if not isinstance(self.formation_event_id, UUID):
+            raise ValueError("formation_event_id must be a UUID")
         if len(self.messages) % 2:
             raise ValueError("memory source must contain complete turns")
         if any(message.session_id != self.reference.session_id for message in self.messages):

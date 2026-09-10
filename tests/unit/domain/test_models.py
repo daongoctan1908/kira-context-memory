@@ -119,7 +119,7 @@ def test_identity_turn_reference_and_memory_lifecycle_models() -> None:
     append_result = AppendTurnResult(True, reference, event_id)
     assert append_result.reference == reference
     assert append_result.memory_job_event_id == event_id
-    assert MemorySource(reference, (user, assistant)).messages == (user, assistant)
+    assert MemorySource(reference, (user, assistant), event_id).messages == (user, assistant)
     assert LongTermMemory("memory-1", "Thích biểu đồ", 0.9).score == 0.9
     result = MemoryProcessResult(
         (
@@ -154,6 +154,7 @@ def test_identity_turn_reference_and_memory_lifecycle_models() -> None:
                     "other", "turn", ConversationRole.USER, "content", datetime.now(UTC)
                 ),
             ),
+            uuid4(),
         ),
     ],
 )

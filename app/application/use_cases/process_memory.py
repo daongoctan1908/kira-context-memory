@@ -1,5 +1,7 @@
 """Form long-term memory from an exact, persisted conversation boundary."""
 
+from uuid import UUID
+
 from app.domain.errors.conversation import ConversationStoreProtocolError
 from app.domain.models.conversation import CompletedTurnReference
 from app.domain.models.memory import MemoryProcessResult, MemorySource
@@ -23,8 +25,14 @@ class ProcessMemoryUseCase:
         self._memory = long_term_memory
         self._message_limit = message_limit
 
-    async def execute(self, reference: CompletedTurnReference) -> MemoryProcessResult:
+    async def execute(
+        self,
+        reference: CompletedTurnReference,
+        formation_event_id: UUID,
+    ) -> MemoryProcessResult:
         """Process only messages owned by the user and ending at the referenced turn."""
+        if not isinstance(formation_event_id, UUID):
+            raise TypeError("formation_event_id must be a UUID")
         messages = await self._store.read_through_boundary(
             reference.user_id,
             reference.conversation_id,
@@ -32,7 +40,7 @@ class ProcessMemoryUseCase:
             self._message_limit,
         )
         try:
-            source = MemorySource(reference, messages)
+            source = MemorySource(reference, messages, formation_event_id)
         except ValueError as error:
             # A missing, cross-session, or non-boundary snapshot violates the store contract.
             raise ConversationStoreProtocolError from error

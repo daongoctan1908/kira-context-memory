@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import Protocol
+from uuid import UUID
 
 from app.domain.errors.conversation import (
     ConversationStoreConfigurationError,
@@ -41,7 +42,11 @@ _PERMANENT_ERRORS = (
 
 
 class MemoryProcessor(Protocol):
-    async def execute(self, reference: CompletedTurnReference) -> MemoryProcessResult:
+    async def execute(
+        self,
+        reference: CompletedTurnReference,
+        formation_event_id: UUID,
+    ) -> MemoryProcessResult:
         """Form memory from the exact persisted boundary."""
         ...
 
@@ -100,7 +105,7 @@ class ProcessMemoryJobUseCase:
             raise ValueError("job attempt exceeds the configured maximum")
 
         try:
-            result = await self._process_memory.execute(job.reference)
+            result = await self._process_memory.execute(job.reference, job.event_id)
         except _PERMANENT_ERRORS as error:
             return await self._dead_letter(job, error)
         except _RETRYABLE_ERRORS as error:

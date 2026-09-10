@@ -21,6 +21,7 @@ from app.domain.models.conversation import ConversationMessage, ConversationRole
 from app.infrastructure.memory.mem0_adapter import Mem0Adapter, create_mem0_client
 from app.infrastructure.memory.postgres_admin import (
     _initialize_memory_schema_sync,
+    formation_receipt_table_name,
     normalize_psycopg_dsn,
 )
 from app.infrastructure.postgres.conversation_store import PostgresConversationStoreAdapter
@@ -195,6 +196,7 @@ async def test_exact_boundary_formation_policy_cases_dedup_and_user_isolation() 
     adapter: Mem0Adapter | None = None
     created_users: list[str] = []
     references = {}
+    formation_event_ids = {}
 
     try:
         await asyncio.to_thread(
@@ -235,8 +237,10 @@ async def test_exact_boundary_formation_policy_cases_dedup_and_user_isolation() 
                 created_users.append(user_id)
                 reference = await _persist_case(store, case, user_id, session_id)
                 references[case.name] = reference
+                formation_event_id = uuid4()
+                formation_event_ids[case.name] = formation_event_id
 
-                result = await process_memory.execute(reference)
+                result = await process_memory.execute(reference, formation_event_id)
                 found = await adapter.search(
                     user_id,
                     "durable profile preference and convention",
@@ -258,6 +262,7 @@ async def test_exact_boundary_formation_policy_cases_dedup_and_user_isolation() 
                 if case.expectation.should_extract:
                     assert result.events
                     assert len(found) == 1
+                    assert found[0].metadata["formation_event_id"] == str(formation_event_id)
                     assert found[0].metadata["conversation_id"] == str(reference.conversation_id)
                     assert found[0].metadata["turn_id"] == reference.turn_id
                     assert found[0].metadata["boundary_message_id"] == reference.boundary_message_id
@@ -266,14 +271,25 @@ async def test_exact_boundary_formation_policy_cases_dedup_and_user_isolation() 
                     assert found == ()
 
             formula_reference = references["user_defined_metric_formula_exact"]
-            duplicate = await process_memory.execute(formula_reference)
+            llm_calls_before_retry = len(llm.case_names)
+            with patch.object(
+                adapter._client.vector_store,  # type: ignore[attr-defined]
+                "search",
+                side_effect=AssertionError("receipt retry must bypass semantic top_k retrieval"),
+            ):
+                duplicate = await process_memory.execute(
+                    formula_reference,
+                    formation_event_ids["user_defined_metric_formula_exact"],
+                )
             formula_memories = await adapter.search(
                 formula_reference.user_id,
                 "Tỷ lệ giữ chân",
                 top_k=10,
                 threshold=0,
             )
-            assert duplicate.events == ()
+            assert len(duplicate.events) == 1
+            assert duplicate.events[0].action == "ADD"
+            assert len(llm.case_names) == llm_calls_before_retry
             assert len(formula_memories) == 1
             assert (
                 "Tỷ lệ giữ chân = (thuê bao cuối kỳ - thuê bao mới) / "
@@ -289,6 +305,13 @@ async def test_exact_boundary_formation_policy_cases_dedup_and_user_isolation() 
                 )
             )
             assert cursor.fetchone() == (len(POSITIVE_CASES),)
+            cursor.execute(
+                sql.SQL("SELECT count(*) FROM {}.{}").format(
+                    sql.Identifier(schema_name),
+                    sql.Identifier(formation_receipt_table_name(settings.memory_collection_name)),
+                )
+            )
+            assert cursor.fetchone() == (len(SELECTED_CASES),)
         assert set(POSITIVE_CASES).issubset(llm.case_names)
         assert set(NEGATIVE_CASES).issubset(llm.case_names)
     finally:

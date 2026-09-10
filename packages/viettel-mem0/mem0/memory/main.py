@@ -419,6 +419,28 @@ def _build_session_scope(filters):
     return "&".join(parts)
 
 
+def _formation_identity(metadata, filters):
+    event_id = metadata.get("formation_event_id")
+    if event_id is None:
+        return None
+    user_id = filters.get("user_id")
+    if not isinstance(event_id, str) or not isinstance(user_id, str) or not user_id.strip():
+        raise ValueError("formation_event_id requires a user-scoped memory operation")
+    try:
+        normalized_event_id = str(uuid.UUID(event_id))
+    except (ValueError, AttributeError, TypeError) as exc:
+        raise ValueError("formation_event_id must be a UUID") from exc
+    metadata["formation_event_id"] = normalized_event_id
+    return normalized_event_id, user_id
+
+
+def _formation_method(vector_store, name):
+    method = getattr(vector_store, name, None)
+    if not callable(method):
+        raise RuntimeError("configured vector store does not support atomic formation receipts")
+    return method
+
+
 def _entity_collection_name(provider: str, collection_name: str) -> str:
     separator = "-" if provider == "s3_vectors" else "_"
     return f"{collection_name}{separator}entities"
@@ -917,11 +939,19 @@ class Memory(MemoryBase):
 
         # Phase 0: Context gathering
         session_scope = _build_session_scope(filters)
+        search_filters = {k: v for k, v in filters.items() if k in ("user_id", "agent_id", "run_id") and v}
+        formation_identity = _formation_identity(metadata, search_filters)
+        if formation_identity is not None:
+            committed = _formation_method(
+                self.vector_store,
+                "get_formation_result",
+            )(*formation_identity)
+            if committed is not None:
+                return committed
         last_messages = self.db.get_last_messages(session_scope, limit=10)
         parsed_messages = parse_messages(messages)
 
         # Phase 1: Existing memory retrieval
-        search_filters = {k: v for k, v in filters.items() if k in ("user_id", "agent_id", "run_id") and v}
         query_embedding = self.embedding_model.embed(parsed_messages, "search")
         existing_results = self.vector_store.search(
             query=parsed_messages,
@@ -985,6 +1015,20 @@ class Memory(MemoryBase):
 
         if not extracted_memories:
             # Save messages even if nothing extracted
+            if formation_identity is not None:
+                _, committed = _formation_method(
+                    self.vector_store,
+                    "insert_with_formation_receipt",
+                )(
+                    [],
+                    [],
+                    [],
+                    event_id=formation_identity[0],
+                    user_id=formation_identity[1],
+                    result=[],
+                )
+                self.db.save_messages(messages, session_scope)
+                return committed
             self.db.save_messages(messages, session_scope)
             return []
 
@@ -1001,6 +1045,8 @@ class Memory(MemoryBase):
                     embed_map[text] = self.embedding_model.embed(text, "add")
                 except Exception as e:
                     logger.warning(f"Failed to embed memory text: {e}")
+        if formation_identity is not None and any(text not in embed_map for text in mem_texts):
+            raise RuntimeError("atomic formation requires embeddings for every extracted memory")
 
         # Phase 4: Per-memory CPU processing + Phase 5: Hash dedup
         # Build set of existing hashes for dedup
@@ -1038,6 +1084,20 @@ class Memory(MemoryBase):
 
             records.append((memory_id, text, embed_map[text], mem_metadata))
 
+        if not records and formation_identity is not None:
+            _, committed = _formation_method(
+                self.vector_store,
+                "insert_with_formation_receipt",
+            )(
+                [],
+                [],
+                [],
+                event_id=formation_identity[0],
+                user_id=formation_identity[1],
+                result=[],
+            )
+            self.db.save_messages(messages, session_scope)
+            return committed
         if not records:
             self.db.save_messages(messages, session_scope)
             return []
@@ -1046,20 +1106,40 @@ class Memory(MemoryBase):
         all_vectors = [r[2] for r in records]
         all_ids = [r[0] for r in records]
         all_payloads = [r[3] for r in records]
+        returned_memories = [
+            {"id": r[0], "memory": r[1], "event": "ADD"}
+            for r in records
+        ]
 
-        try:
-            self.vector_store.insert(
+        if formation_identity is not None:
+            created, committed = _formation_method(
+                self.vector_store,
+                "insert_with_formation_receipt",
+            )(
                 vectors=all_vectors,
                 ids=all_ids,
                 payloads=all_payloads,
+                event_id=formation_identity[0],
+                user_id=formation_identity[1],
+                result=returned_memories,
             )
-        except Exception:
-            # Fallback: insert one by one
-            for mid, vec, pay in zip(all_ids, all_vectors, all_payloads):
-                try:
-                    self.vector_store.insert(vectors=[vec], ids=[mid], payloads=[pay])
-                except Exception as e:
-                    logger.error(f"Failed to insert memory {mid}: {e}")
+            if not created:
+                return committed
+            returned_memories = committed
+        else:
+            try:
+                self.vector_store.insert(
+                    vectors=all_vectors,
+                    ids=all_ids,
+                    payloads=all_payloads,
+                )
+            except Exception:
+                # Fallback: insert one by one
+                for mid, vec, pay in zip(all_ids, all_vectors, all_payloads):
+                    try:
+                        self.vector_store.insert(vectors=[vec], ids=[mid], payloads=[pay])
+                    except Exception as e:
+                        logger.error(f"Failed to insert memory {mid}: {e}")
 
         # Batch history
         history_records = [
@@ -1191,11 +1271,6 @@ class Memory(MemoryBase):
 
         # Phase 8: Save messages + return
         self.db.save_messages(messages, session_scope)
-
-        returned_memories = [
-            {"id": r[0], "memory": r[1], "event": "ADD"}
-            for r in records
-        ]
 
         keys, encoded_ids = process_telemetry_filters(filters)
         capture_event(
@@ -2578,11 +2653,19 @@ class AsyncMemory(MemoryBase):
 
         # Phase 0: Context gathering
         session_scope = _build_session_scope(effective_filters)
+        search_filters = {k: v for k, v in effective_filters.items() if k in ("user_id", "agent_id", "run_id") and v}
+        formation_identity = _formation_identity(metadata, search_filters)
+        if formation_identity is not None:
+            committed = await asyncio.to_thread(
+                _formation_method(self.vector_store, "get_formation_result"),
+                *formation_identity,
+            )
+            if committed is not None:
+                return committed
         last_messages = await asyncio.to_thread(self.db.get_last_messages, session_scope, 10)
         parsed_messages = parse_messages(messages)
 
         # Phase 1: Existing memory retrieval
-        search_filters = {k: v for k, v in effective_filters.items() if k in ("user_id", "agent_id", "run_id") and v}
         query_embedding = await asyncio.to_thread(self.embedding_model.embed, parsed_messages, "search")
         existing_results = await asyncio.to_thread(
             self.vector_store.search,
@@ -2645,6 +2728,18 @@ class AsyncMemory(MemoryBase):
             extracted_memories = []
 
         if not extracted_memories:
+            if formation_identity is not None:
+                _, committed = await asyncio.to_thread(
+                    _formation_method(self.vector_store, "insert_with_formation_receipt"),
+                    [],
+                    [],
+                    [],
+                    event_id=formation_identity[0],
+                    user_id=formation_identity[1],
+                    result=[],
+                )
+                await asyncio.to_thread(self.db.save_messages, messages, session_scope)
+                return committed
             await asyncio.to_thread(self.db.save_messages, messages, session_scope)
             return []
 
@@ -2660,6 +2755,8 @@ class AsyncMemory(MemoryBase):
                     embed_map[text] = await asyncio.to_thread(self.embedding_model.embed, text, "add")
                 except Exception as e:
                     logger.warning(f"Failed to embed memory text (async): {e}")
+        if formation_identity is not None and any(text not in embed_map for text in mem_texts):
+            raise RuntimeError("atomic formation requires embeddings for every extracted memory")
 
         # Phase 4: Per-memory CPU processing + Phase 5: Hash dedup
         existing_hashes = set()
@@ -2696,6 +2793,18 @@ class AsyncMemory(MemoryBase):
 
             records.append((memory_id, text, embed_map[text], mem_metadata))
 
+        if not records and formation_identity is not None:
+            _, committed = await asyncio.to_thread(
+                _formation_method(self.vector_store, "insert_with_formation_receipt"),
+                [],
+                [],
+                [],
+                event_id=formation_identity[0],
+                user_id=formation_identity[1],
+                result=[],
+            )
+            await asyncio.to_thread(self.db.save_messages, messages, session_scope)
+            return committed
         if not records:
             await asyncio.to_thread(self.db.save_messages, messages, session_scope)
             return []
@@ -2704,20 +2813,38 @@ class AsyncMemory(MemoryBase):
         all_vectors = [r[2] for r in records]
         all_ids = [r[0] for r in records]
         all_payloads = [r[3] for r in records]
+        returned_memories = [
+            {"id": r[0], "memory": r[1], "event": "ADD"}
+            for r in records
+        ]
 
-        try:
-            await asyncio.to_thread(
-                self.vector_store.insert,
+        if formation_identity is not None:
+            created, committed = await asyncio.to_thread(
+                _formation_method(self.vector_store, "insert_with_formation_receipt"),
                 vectors=all_vectors,
                 ids=all_ids,
                 payloads=all_payloads,
+                event_id=formation_identity[0],
+                user_id=formation_identity[1],
+                result=returned_memories,
             )
-        except Exception:
-            for mid, vec, pay in zip(all_ids, all_vectors, all_payloads):
-                try:
-                    await asyncio.to_thread(self.vector_store.insert, vectors=[vec], ids=[mid], payloads=[pay])
-                except Exception as e:
-                    logger.error(f"Failed to insert memory {mid} (async): {e}")
+            if not created:
+                return committed
+            returned_memories = committed
+        else:
+            try:
+                await asyncio.to_thread(
+                    self.vector_store.insert,
+                    vectors=all_vectors,
+                    ids=all_ids,
+                    payloads=all_payloads,
+                )
+            except Exception:
+                for mid, vec, pay in zip(all_ids, all_vectors, all_payloads):
+                    try:
+                        await asyncio.to_thread(self.vector_store.insert, vectors=[vec], ids=[mid], payloads=[pay])
+                    except Exception as e:
+                        logger.error(f"Failed to insert memory {mid} (async): {e}")
 
         # Batch history
         history_records = [
@@ -2849,11 +2976,6 @@ class AsyncMemory(MemoryBase):
 
         # Phase 8: Save messages + return
         await asyncio.to_thread(self.db.save_messages, messages, session_scope)
-
-        returned_memories = [
-            {"id": r[0], "memory": r[1], "event": "ADD"}
-            for r in records
-        ]
 
         keys, encoded_ids = process_telemetry_filters(effective_filters)
         capture_event(

@@ -249,7 +249,10 @@ async def test_session_a_formation_is_recalled_in_session_b_without_cross_user_l
                     datetime(2026, 9, 8, 0, 0, 1, tzinfo=UTC),
                 ),
             )
-            formation = await ProcessMemoryUseCase(store, adapter).execute(formed_turn.reference)
+            formation = await ProcessMemoryUseCase(store, adapter).execute(
+                formed_turn.reference,
+                uuid4(),
+            )
             assert formation.events
 
             recalled = await adapter.search(user_a, FOLLOW_UP, top_k=10, threshold=0)
@@ -445,7 +448,10 @@ async def test_live_cross_session_memory_and_rewrite_gate() -> None:
                 datetime(2026, 9, 8, 0, 0, 1, tzinfo=UTC),
             ),
         )
-        formation = await ProcessMemoryUseCase(store, memory).execute(completed.reference)
+        formation = await ProcessMemoryUseCase(store, memory).execute(
+            completed.reference,
+            uuid4(),
+        )
         assert formation.events
 
         recalled = await memory.search(

@@ -332,6 +332,10 @@ async def _cleanup(
 ) -> None:
     async with engine.begin() as connection:
         await connection.execute(
+            text("DELETE FROM memory.memories_formation_receipts WHERE user_id = :user_id"),
+            {"user_id": SMOKE_USER_ID},
+        )
+        await connection.execute(
             delete(conversations).where(
                 conversations.c.user_id == SMOKE_USER_ID,
                 conversations.c.session_id.in_(session_ids),

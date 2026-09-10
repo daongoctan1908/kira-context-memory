@@ -60,10 +60,14 @@ class FakeMemoryProcessor:
     ) -> None:
         self.result = result or MemoryProcessResult()
         self.error = error
-        self.references: list[CompletedTurnReference] = []
+        self.calls: list[tuple[CompletedTurnReference, object]] = []
 
-    async def execute(self, reference: CompletedTurnReference) -> MemoryProcessResult:
-        self.references.append(reference)
+    async def execute(
+        self,
+        reference: CompletedTurnReference,
+        formation_event_id: object,
+    ) -> MemoryProcessResult:
+        self.calls.append((reference, formation_event_id))
         if self.error is not None:
             raise self.error
         return self.result
@@ -171,7 +175,7 @@ async def test_success_completes_exact_job_with_native_lifecycle_event_count() -
     assert result.lifecycle_event_count == 4
     assert result.error_class is None
     assert result.next_attempt_at is None
-    assert processor.references == [job.reference]
+    assert processor.calls == [(job.reference, job.event_id)]
     assert queue.completed == [(job.event_id, job.lease_token, 4)]
     assert queue.retried == []
     assert queue.dead == []
@@ -225,6 +229,7 @@ async def test_job_runs_through_exact_boundary_process_memory_use_case() -> None
     ]
     assert memory.sources[0].reference is job.reference
     assert memory.sources[0].messages == messages
+    assert memory.sources[0].formation_event_id == job.event_id
     assert queue.completed == [(job.event_id, job.lease_token, 1)]
 
 
@@ -417,7 +422,7 @@ async def test_execute_rejects_invalid_job_or_attempt_without_touching_dependenc
     with pytest.raises(ValueError, match="attempt exceeds"):
         await use_case.execute(make_job(attempt_count=6))
 
-    assert processor.references == []
+    assert processor.calls == []
 
 
 async def test_retry_requires_timezone_aware_clock() -> None:

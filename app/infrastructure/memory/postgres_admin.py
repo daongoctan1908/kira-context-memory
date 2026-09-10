@@ -17,8 +17,11 @@ from app.domain.errors.memory import (
     LongTermMemoryTimeoutError,
 )
 
-MEMORY_SCHEMA_VERSION = 1
+MEMORY_SCHEMA_VERSION = 2
 MEM0_DISTRIBUTION = "viettel-mem0"
+LEGACY_MEMORY_SCHEMA_VERSION = 1
+LEGACY_MEM0_VERSION = "2.0.20+viettel.2"
+FORMATION_RECEIPT_SUFFIX = "_formation_receipts"
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +49,11 @@ def embeddings_url(base_url: str) -> str:
     if normalized.endswith("/v1"):
         return f"{normalized}/embeddings"
     return f"{normalized}/v1/embeddings"
+
+
+def formation_receipt_table_name(collection_name: str) -> str:
+    """Return the collection-scoped durable formation receipt table name."""
+    return f"{collection_name}{FORMATION_RECEIPT_SUFFIX}"
 
 
 async def probe_embedding_dimension(
@@ -227,6 +235,8 @@ def _validate_memory_schema_sync(
             if cursor.fetchone() != (f"vector({embedding_dims})",):
                 raise LongTermMemoryConfigurationError
 
+        _validate_formation_schema(cursor, schema_name, collection_name)
+
     return MemorySchemaState(*expected)
 
 
@@ -302,7 +312,14 @@ def _initialize_memory_schema_sync(
             mem0_version,
             pgvector_version,
         )
-        if row is None or tuple(row) != expected:
+        legacy = (
+            LEGACY_MEMORY_SCHEMA_VERSION,
+            embedding_model,
+            embedding_dims,
+            LEGACY_MEM0_VERSION,
+            pgvector_version,
+        )
+        if row is None or tuple(row) not in (expected, legacy):
             raise LongTermMemoryConfigurationError
 
         for table_name in (collection_name, f"{collection_name}_entities"):
@@ -336,6 +353,17 @@ def _initialize_memory_schema_sync(
                     collection_table,
                 )
             )
+            if table_name == collection_name:
+                cursor.execute(
+                    sql.SQL(
+                        "CREATE INDEX IF NOT EXISTS {} ON {} "
+                        "((payload->>'formation_event_id')) "
+                        "WHERE payload ? 'formation_event_id'"
+                    ).format(
+                        sql.Identifier(f"{collection_name}_formation_event_id_idx"),
+                        collection_table,
+                    )
+                )
             cursor.execute(
                 sql.SQL(
                     "CREATE INDEX IF NOT EXISTS {} ON {} "
@@ -346,4 +374,78 @@ def _initialize_memory_schema_sync(
                 )
             )
 
+        receipt_table = sql.Identifier(
+            schema_name,
+            formation_receipt_table_name(collection_name),
+        )
+        cursor.execute(
+            sql.SQL(
+                """
+                CREATE TABLE IF NOT EXISTS {} (
+                    event_id UUID PRIMARY KEY,
+                    user_id TEXT NOT NULL CHECK (btrim(user_id) <> ''),
+                    result JSONB NOT NULL CHECK (jsonb_typeof(result) = 'array'),
+                    memory_count INTEGER NOT NULL CHECK (
+                        memory_count >= 0 AND memory_count = jsonb_array_length(result)
+                    ),
+                    committed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+                """
+            ).format(receipt_table)
+        )
+
+        if tuple(row) == legacy:
+            cursor.execute(
+                sql.SQL(
+                    "UPDATE {} SET schema_version = %s, mem0_version = %s "
+                    "WHERE singleton AND schema_version = %s AND mem0_version = %s"
+                ).format(metadata_table),
+                (
+                    MEMORY_SCHEMA_VERSION,
+                    mem0_version,
+                    LEGACY_MEMORY_SCHEMA_VERSION,
+                    LEGACY_MEM0_VERSION,
+                ),
+            )
+            if cursor.rowcount != 1:
+                raise LongTermMemoryConfigurationError
+
+        _validate_formation_schema(cursor, schema_name, collection_name)
+
     return MemorySchemaState(*expected)
+
+
+def _validate_formation_schema(cursor, schema_name: str, collection_name: str) -> None:
+    receipt_table_name = formation_receipt_table_name(collection_name)
+    cursor.execute(
+        "SELECT column_name, data_type, is_nullable "
+        "FROM information_schema.columns "
+        "WHERE table_schema = %s AND table_name = %s",
+        (schema_name, receipt_table_name),
+    )
+    receipt_columns = {name: (data_type, nullable) for name, data_type, nullable in cursor}
+    required_columns = {
+        "event_id": ("uuid", "NO"),
+        "user_id": ("text", "NO"),
+        "result": ("jsonb", "NO"),
+        "memory_count": ("integer", "NO"),
+        "committed_at": ("timestamp with time zone", "NO"),
+    }
+    if any(receipt_columns.get(name) != contract for name, contract in required_columns.items()):
+        raise LongTermMemoryConfigurationError
+
+    cursor.execute(
+        "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+        "WHERE conrelid = to_regclass(%s) AND contype = 'p'",
+        (f"{schema_name}.{receipt_table_name}",),
+    )
+    if cursor.fetchone() != ("PRIMARY KEY (event_id)",):
+        raise LongTermMemoryConfigurationError
+
+    cursor.execute(
+        "SELECT to_regclass(%s)",
+        (f"{schema_name}.{collection_name}_formation_event_id_idx",),
+    )
+    index_registration = cursor.fetchone()
+    if not index_registration or index_registration[0] is None:
+        raise LongTermMemoryConfigurationError

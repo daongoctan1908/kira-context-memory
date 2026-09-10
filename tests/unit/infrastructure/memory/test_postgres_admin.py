@@ -8,6 +8,7 @@ from app.domain.errors.memory import (
 )
 from app.infrastructure.memory.postgres_admin import (
     embeddings_url,
+    formation_receipt_table_name,
     initialize_memory_schema,
     normalize_psycopg_dsn,
     probe_embedding_dimension,
@@ -37,6 +38,10 @@ def test_url_and_dsn_normalization():
     assert normalize_psycopg_dsn("postgresql+asyncpg://user@db/name") == "postgresql://user@db/name"
     with pytest.raises(LongTermMemoryConfigurationError):
         normalize_psycopg_dsn("sqlite:///memory.db")
+
+
+def test_formation_receipt_table_is_collection_scoped():
+    assert formation_receipt_table_name("memories") == "memories_formation_receipts"
 
 
 async def test_embedding_probe_validates_auth_contract_and_dimension():

@@ -1,5 +1,6 @@
 import logging
 import time
+import uuid
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock
@@ -28,6 +29,114 @@ def _setup_mocks(mocker):
     mocker.patch("mem0.memory.storage.SQLiteManager", mocker.MagicMock())
 
     return mock_llm, mock_vector_store
+
+
+class TestAsyncFormationIdempotency:
+    @pytest.fixture
+    def memory(self, mocker):
+        _setup_mocks(mocker)
+        memory = AsyncMemory()
+        memory.db.get_last_messages = MagicMock(return_value=[])
+        memory.db.save_messages = MagicMock()
+        memory.db.batch_add_history = MagicMock()
+        return memory
+
+    @pytest.mark.asyncio
+    async def test_committed_event_bypasses_top_k_embedding_and_llm(self, memory):
+        event_id = str(uuid.uuid4())
+        committed = [
+            {
+                "id": str(uuid.uuid4()),
+                "memory": "User prefers threshold 10%",
+                "event": "ADD",
+            }
+        ]
+        memory.vector_store.get_formation_result.return_value = committed
+        memory.vector_store.search.side_effect = AssertionError("top_k lookup must be bypassed")
+        memory.embedding_model.embed.side_effect = AssertionError("embedding must be bypassed")
+        memory.llm.generate_response.side_effect = AssertionError("LLM must be bypassed")
+
+        result = await memory._add_to_vector_store(
+            messages=[{"role": "user", "content": "threshold should be ten percent"}],
+            metadata={"formation_event_id": event_id},
+            effective_filters={"user_id": "user-1"},
+            infer=True,
+        )
+
+        assert result == committed
+        memory.vector_store.get_formation_result.assert_called_once_with(event_id, "user-1")
+        memory.vector_store.search.assert_not_called()
+        memory.llm.generate_response.assert_not_called()
+        memory.db.get_last_messages.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_concurrent_paraphrase_loser_returns_first_committed_formation(
+        self,
+        memory,
+        mocker,
+    ):
+        event_id = str(uuid.uuid4())
+        first_id = str(uuid.uuid4())
+        second_id = str(uuid.uuid4())
+        committed = [
+            {"id": first_id, "memory": "User prefers threshold 10%", "event": "ADD"}
+        ]
+        memory.vector_store.get_formation_result.return_value = None
+        memory.vector_store.search.return_value = []
+        memory.vector_store.insert_with_formation_receipt.return_value = (False, committed)
+        memory.embedding_model.embed.return_value = [1.0, 0.0, 0.0]
+        memory.embedding_model.embed_batch.return_value = [[0.0, 1.0, 0.0]]
+        memory.llm.generate_response.return_value = (
+            '{"memory": [{"text": "User prefers a threshold of 10%"}]}'
+        )
+        mocker.patch("mem0.memory.main.uuid.uuid4", return_value=uuid.UUID(second_id))
+        mocker.patch("mem0.memory.main.extract_entities_batch", return_value=[[]])
+
+        result = await memory._add_to_vector_store(
+            messages=[{"role": "user", "content": "use threshold 10%"}],
+            metadata={"formation_event_id": event_id},
+            effective_filters={"user_id": "user-1"},
+            infer=True,
+        )
+
+        assert result == committed
+        call = memory.vector_store.insert_with_formation_receipt.call_args
+        assert call.kwargs["event_id"] == event_id
+        assert call.kwargs["user_id"] == "user-1"
+        assert call.kwargs["result"] == [
+            {
+                "id": second_id,
+                "memory": "User prefers a threshold of 10%",
+                "event": "ADD",
+            }
+        ]
+        memory.vector_store.insert.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_no_extracted_fact_still_commits_empty_receipt(self, memory):
+        event_id = str(uuid.uuid4())
+        memory.vector_store.get_formation_result.return_value = None
+        memory.vector_store.search.return_value = []
+        memory.vector_store.insert_with_formation_receipt.return_value = (True, [])
+        memory.embedding_model.embed.return_value = [1.0, 0.0, 0.0]
+        memory.llm.generate_response.return_value = '{"memory": []}'
+
+        result = await memory._add_to_vector_store(
+            messages=[{"role": "user", "content": "hello"}],
+            metadata={"formation_event_id": event_id},
+            effective_filters={"user_id": "user-1"},
+            infer=True,
+        )
+
+        assert result == []
+        memory.vector_store.insert_with_formation_receipt.assert_called_once_with(
+            [],
+            [],
+            [],
+            event_id=event_id,
+            user_id="user-1",
+            result=[],
+        )
 
 
 class TestAddToVectorStoreErrors:

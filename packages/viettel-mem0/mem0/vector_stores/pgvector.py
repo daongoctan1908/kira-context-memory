@@ -3,6 +3,7 @@ import logging
 import re
 from contextlib import contextmanager
 from typing import Any, List, Optional
+from uuid import UUID
 from urllib.parse import parse_qsl, urlencode, urlsplit
 
 from pydantic import BaseModel
@@ -135,6 +136,16 @@ def _with_sslmode(connection_string: str, sslmode: str) -> str:
         return re.sub(r"(^|\s)sslmode=\S+", lambda match: f"{match.group(1)}sslmode={sslmode}", connection_string)
 
     return f"{connection_string} sslmode={sslmode}"
+
+
+def _validate_formation_identity(event_id: str, user_id: str):
+    if not isinstance(event_id, str) or not isinstance(user_id, str) or not user_id.strip():
+        raise ValueError("formation event_id and user_id must be non-empty strings")
+    try:
+        normalized_event_id = str(UUID(event_id))
+    except (ValueError, AttributeError, TypeError) as exc:
+        raise ValueError("formation event_id must be a UUID") from exc
+    return normalized_event_id, user_id
 
 
 class OutputData(BaseModel):
@@ -271,6 +282,13 @@ class PGVector(VectorStoreBase):
         """Return a safely-quoted SQL identifier for the collection table."""
         return sql.Identifier(self.schema_name, self.collection_name)
 
+    def _formation_receipts(self) -> "sql.Identifier":
+        """Return the collection-scoped formation receipt table identifier."""
+        return sql.Identifier(
+            self.schema_name,
+            f"{self.collection_name}_formation_receipts",
+        )
+
     def create_col(self) -> None:
         """
         Create a new collection (table in PostgreSQL).
@@ -325,6 +343,29 @@ class PGVector(VectorStoreBase):
                     self._col(),
                 )
             )
+            cur.execute(
+                sql.SQL("""
+                CREATE INDEX IF NOT EXISTS {} ON {}
+                ((payload->>'formation_event_id'))
+                WHERE payload ? 'formation_event_id';
+                """).format(
+                    sql.Identifier(f"{self.collection_name}_formation_event_id_idx"),
+                    self._col(),
+                )
+            )
+            cur.execute(
+                sql.SQL("""
+                CREATE TABLE IF NOT EXISTS {} (
+                    event_id UUID PRIMARY KEY,
+                    user_id TEXT NOT NULL CHECK (btrim(user_id) <> ''),
+                    result JSONB NOT NULL CHECK (jsonb_typeof(result) = 'array'),
+                    memory_count INTEGER NOT NULL CHECK (
+                        memory_count >= 0 AND memory_count = jsonb_array_length(result)
+                    ),
+                    committed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                );
+                """).format(self._formation_receipts())
+            )
 
     def insert(self, vectors: list[list[float]], payloads=None, ids=None) -> None:
         self._ensure_collection()
@@ -345,6 +386,91 @@ class PGVector(VectorStoreBase):
                     sql.SQL("INSERT INTO {} (id, vector, payload) VALUES %s").format(self._col()),
                     data,
                 )
+
+    def get_formation_result(self, event_id: str, user_id: str):
+        """Return an exact committed formation receipt without semantic retrieval."""
+        event_id, user_id = _validate_formation_identity(event_id, user_id)
+        with self._get_cursor() as cur:
+            cur.execute(
+                sql.SQL("SELECT user_id, result FROM {} WHERE event_id = %s").format(
+                    self._formation_receipts()
+                ),
+                (event_id,),
+            )
+            row = cur.fetchone()
+        if row is None:
+            return None
+        if row[0] != user_id or not isinstance(row[1], list):
+            raise ValueError("formation receipt violates its identity contract")
+        return row[1]
+
+    def insert_with_formation_receipt(
+        self,
+        vectors: list[list[float]],
+        payloads: list[dict],
+        ids: list[str],
+        *,
+        event_id: str,
+        user_id: str,
+        result: list[dict],
+    ):
+        """Atomically insert every memory and its event-scoped formation receipt."""
+        event_id, user_id = _validate_formation_identity(event_id, user_id)
+        if not (len(vectors) == len(payloads) == len(ids) == len(result)):
+            raise ValueError("formation vectors, payloads, ids, and result must align")
+        for memory_id, payload, item in zip(ids, payloads, result):
+            if (
+                not isinstance(payload, dict)
+                or payload.get("formation_event_id") != event_id
+                or payload.get("user_id") != user_id
+                or not isinstance(item, dict)
+                or item.get("id") != memory_id
+            ):
+                raise ValueError("formation payload provenance does not match its receipt")
+
+        json_payloads = [json.dumps(payload) for payload in payloads]
+        data = [
+            (memory_id, vector, payload)
+            for memory_id, vector, payload in zip(ids, vectors, json_payloads)
+        ]
+        with self._get_cursor(commit=True) as cur:
+            cur.execute(
+                sql.SQL(
+                    "INSERT INTO {} (event_id, user_id, result, memory_count) "
+                    "VALUES (%s, %s, %s, %s) "
+                    "ON CONFLICT (event_id) DO NOTHING RETURNING event_id"
+                ).format(self._formation_receipts()),
+                (event_id, user_id, Json(result), len(result)),
+            )
+            if cur.fetchone() is None:
+                cur.execute(
+                    sql.SQL("SELECT user_id, result FROM {} WHERE event_id = %s").format(
+                        self._formation_receipts()
+                    ),
+                    (event_id,),
+                )
+                existing = cur.fetchone()
+                if existing is None or existing[0] != user_id or not isinstance(existing[1], list):
+                    raise ValueError("formation receipt violates its identity contract")
+                return False, existing[1]
+
+            if data:
+                if PSYCOPG_VERSION == 3:
+                    cur.executemany(
+                        sql.SQL("INSERT INTO {} (id, vector, payload) VALUES (%s, %s, %s)").format(
+                            self._col()
+                        ),
+                        data,
+                    )
+                else:
+                    execute_values(
+                        cur,
+                        sql.SQL("INSERT INTO {} (id, vector, payload) VALUES %s").format(
+                            self._col()
+                        ),
+                        data,
+                    )
+        return True, result
 
     def search(
         self,

@@ -1,48 +1,72 @@
-# Week 4 T4.21 — Crash and lease recovery
+# Week 4 T4.21 — Event-idempotent crash and lease recovery
 
 ## Outcome
 
-T4.21 proves the strongest deployed at-least-once failure boundary in the Week 4 baseline:
+T4.21 now verifies memory formation idempotency by `memory_jobs.event_id`, rather than treating
+Mem0 V3 exact-text hash dedup over semantic `top_k=10` as a correctness boundary.
 
-`Mem0 durable write → queue completion blocked → Worker SIGKILL → lease expiry → new Worker reclaim`
+The deployed flow is:
 
-The test does not merely kill a Worker before it performs useful work. It first observes the
-synthetic memory in pgvector, then confirms the original Worker is waiting on the PostgreSQL
-`memory_jobs` completion update, and only then terminates the process with `SIGKILL`.
+`claim event_id → exact receipt lookup → V3 formation → atomic memories + receipt commit → queue complete`
 
-## Synthetic lease override
+If a reclaimed job already has a committed receipt, formation returns that receipt before message
+history, embedding, semantic search, or LLM extraction. The Worker then performs only the separate,
+idempotent queue-completion transition.
 
-`compose.week4.crash.yaml` is a test-only override used together with the base stack. It reduces the
-Worker conversation timeout to 1 second, memory operation timeout to 2 seconds, and lease to 5
-seconds. The lease remains greater than the combined operation deadlines, so the same
-`WorkerSettings` validation applies.
+## Transaction review
 
-The base Compose stack and production defaults remain unchanged at a 120-second lease and a
-30-second memory-operation timeout. The crash runner always recreates the base Worker in `finally`,
-even when an assertion fails.
+The queue uses SQLAlchemy/asyncpg while custom Mem0 owns a separate synchronous psycopg pool. They
+cannot safely share one local PostgreSQL transaction. They also do not need to: at-least-once queue
+delivery intentionally commits after the durable memory boundary.
 
-## Deterministic sequence
+The atomic boundary is therefore inside the memory database:
 
-1. Recreate only the Worker with the crash override and require `/ready` to return 200.
-2. Reset the synthetic memory-LLM in blocked mode and complete one Gateway chat turn.
-3. Require one provider request blocked and the corresponding job `processing` at attempt 1.
-4. Start a separate PostgreSQL transaction and take a row lock on that exact `event_id`.
-5. Release memory-LLM and require exactly one matching pgvector memory.
-6. Query `pg_stat_activity` for one lock-waiting `UPDATE memory_jobs`; no query text is printed.
-7. Send `SIGKILL` to the Worker while its completion transition is blocked.
-8. Roll back the test lock and require the durable job to remain `processing` at attempt 1.
-9. Start a new Worker with the same crash override and wait for the five-second lease to expire.
-10. Require a reclaimed claim, attempt 2 completion, exactly two provider calls, and still exactly
-    one durable memory.
-11. Delete the synthetic conversation/job and memory, then recreate the base Worker.
+- `memory.memories_formation_receipts.event_id` is the primary key;
+- each memory payload persists the same `formation_event_id` provenance;
+- one psycopg transaction inserts the receipt and every vector memory;
+- any vector failure rolls back both receipt and all rows;
+- an `ON CONFLICT (event_id)` loser reads and returns the first committed result without inserting;
+- an empty V3 extraction still commits an empty receipt, so it is not re-extracted on retry.
 
-On attempt 2, native Mem0 V3 finds the identical user-scoped hash and emits zero new lifecycle
-events. Zero events is a successful processing result, so the Worker completes the job with
-`lifecycle_event_count=0`.
+SQLite Mem0 history and entity linking remain derived, best-effort operations after this commit.
+They are deliberately outside the correctness boundary; long-term facts and their receipt are the
+authoritative formation output.
+
+## Schema contract
+
+Memory schema version 2 adds:
+
+```sql
+CREATE TABLE memory.memories_formation_receipts (
+    event_id UUID PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    result JSONB NOT NULL,
+    memory_count INTEGER NOT NULL,
+    committed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+The actual DDL also checks non-blank users, JSON-array results, and `memory_count` consistency. A
+partial expression index on `memories.payload->>'formation_event_id'` supports provenance audits.
+The admin initializer performs a controlled upgrade only from schema version 1 paired with
+`viettel-mem0==2.0.20+viettel.2`; unknown version tuples fail closed.
+
+## Crash acceptance phases
+
+`scripts.smoke_week4_crash` executes the phases sequentially with a five-second synthetic lease:
+
+1. **Crash before formation commit:** block the memory LLM, observe attempt 1 in `processing`, kill
+   the Worker, and require zero memories plus zero receipts. After lease reclaim, attempt 2 calls
+   the provider and commits exactly one memory/receipt. Total provider calls: two.
+2. **Crash after formation commit:** block queue completion with a row lock, release the LLM, wait
+   for exactly one memory and receipt, then kill the Worker. Attempt 2 reclaims the job, reads the
+   receipt, and completes without a second provider call. Total provider calls: one.
+
+The second phase is independent of output wording and top-k membership: no second extraction or
+semantic retrieval occurs. Focused tests additionally force semantic search to fail on replay and
+offer a paraphrased second formation result; the committed receipt still wins.
 
 ## Runbook
-
-Start the base stack first, then run the self-contained crash acceptance:
 
 ```powershell
 docker compose -f compose.week4.yaml up -d --no-build --wait
@@ -50,30 +74,22 @@ uv run python -m scripts.smoke_week4_crash
 docker compose -f compose.week4.yaml exec -T worker kira-memory-jobs stats
 ```
 
-The runner accepts explicit base/override Compose paths, service URLs, database URL, and bounded
-timeout. Docker Compose is invoked directly without an intermediate shell. Provider output,
-database URLs, message content, and subprocess stderr are never printed on failure.
+The runner restores the base Worker in `finally`. Provider payloads, database URLs, credentials,
+and conversation content are not printed.
 
 ## Acceptance evidence
 
-Validated locally on 2026-09-10:
+Validated locally on 2026-09-11 with image `kira-context:0.4.1`:
 
-- the first Worker was lock-blocked after one durable memory write and before queue completion;
-- `SIGKILL` left the job `processing` at attempt 1 with no terminal fields;
-- a new Worker reclaimed the expired lease and completed the job at attempt 2;
-- the second native Mem0 call emitted zero lifecycle events and exact-hash dedup kept one memory;
-- restarted-Worker metrics reported at least one reclaimed claim and one success;
-- provider evidence reported exactly two calls and no injected provider failure;
-- post-success cleanup left every queue status at zero;
-- base Worker was restored with lease 120 seconds and memory operation timeout 30 seconds;
-- Week 4 smoke/provider focused tests: 32 passed;
-- full default suite: 620 passed, 65 skipped, with 93.12% coverage;
-- Ruff lint/format and merged Compose configuration checks passed;
-- T4.19 and T4.20 deployed E2E gates passed again after base Worker restoration.
+- crash before commit: zero memory and zero receipt at `SIGKILL`; reclaimed attempt 2 completed
+  with one memory/receipt and two total provider calls;
+- crash after commit: one memory/receipt existed before `SIGKILL`; reclaimed attempt 2 completed
+  with the original lifecycle result and one total provider call;
+- both recovered jobs completed at attempt 2 and the base 120-second Worker was restored;
+- post-smoke synthetic queue, memory, and receipt counts returned to zero.
 
 ## Scope boundary
 
-This is evidence for at-least-once lease recovery of an identical deterministic fact. It is not a
-general exactly-once guarantee and does not add application-level deduplication beyond native Mem0
-V3 exact-hash behavior. PostgreSQL outage/readiness is covered separately by T4.22; final release
-evidence belongs to T4.23.
+This guarantees idempotent memory formation per `event_id` while queue delivery remains
+at-least-once. It is not a distributed transaction between queue and memory databases, does not
+deduplicate different event IDs, and does not make derived SQLite history/entity links atomic.

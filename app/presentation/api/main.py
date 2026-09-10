@@ -177,7 +177,7 @@ def create_app(
 
     application = FastAPI(
         title="KiRa Context Gateway",
-        version="0.4.0",
+        version="0.4.1",
         lifespan=lifespan,
     )
     application.state.ready = False

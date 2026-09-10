@@ -187,6 +187,7 @@ class Mem0Adapter:
                     messages,
                     user_id=reference.user_id,
                     metadata={
+                        "formation_event_id": str(source.formation_event_id),
                         "conversation_id": str(reference.conversation_id),
                         "turn_id": reference.turn_id,
                         "boundary_message_id": reference.boundary_message_id,

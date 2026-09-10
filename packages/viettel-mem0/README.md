@@ -62,6 +62,20 @@ All benchmarks run on the same production-representative model stack. Single-pas
 
 See the [migration guide](https://docs.mem0.ai/migration/oss-v2-to-v3) for upgrade instructions. The [evaluation framework](https://github.com/mem0ai/memory-benchmarks) is open-sourced so anyone can reproduce the numbers.
 
+### Viettel event-scoped formation extension
+
+The internal `2.0.20+viettel.3` distribution keeps the native V3 extraction policy and adds an
+optional PostgreSQL/pgvector idempotency contract. When `metadata.formation_event_id` is a UUID on a
+user-scoped `add(..., infer=True)` call, the pgvector adapter writes every generated memory and a
+collection-scoped receipt in one database transaction. A later call with the same event ID returns
+the committed receipt before embedding, semantic retrieval, or LLM extraction. The event ID is
+persisted in each memory payload as provenance.
+
+This extension requires the custom pgvector adapter and a pre-initialized
+`<collection>_formation_receipts` table. Other vector stores fail closed when an event-scoped
+formation is requested. SQLite history and entity links are derived, best-effort side effects after
+the atomic memory/receipt commit; they are not part of that transaction.
+
 ## Research Highlights
 - **92.5 on LoCoMo** -- +21 points over the previous algorithm
 - **94.4 on LongMemEval** -- +27 points, with 98.2 on assistant memory recall

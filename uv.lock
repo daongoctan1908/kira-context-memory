@@ -372,7 +372,7 @@ wheels = [
 
 [[package]]
 name = "kira-context-memory"
-version = "0.4.0"
+version = "0.4.1"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
@@ -992,7 +992,7 @@ wheels = [
 
 [[package]]
 name = "viettel-mem0"
-version = "2.0.20+viettel.2"
+version = "2.0.20+viettel.3"
 source = { directory = "packages/viettel-mem0" }
 dependencies = [
     { name = "httpx" },

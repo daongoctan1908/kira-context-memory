@@ -23,7 +23,7 @@ RUN uv sync --frozen --no-dev --no-editable
 
 FROM python:3.11-slim-bookworm AS runtime
 
-ARG APP_VERSION=0.4.0
+ARG APP_VERSION=0.4.1
 
 LABEL org.opencontainers.image.title="kira-context-memory" \
       org.opencontainers.image.version="${APP_VERSION}"
