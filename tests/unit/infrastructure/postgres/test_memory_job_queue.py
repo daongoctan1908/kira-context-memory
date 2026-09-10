@@ -5,6 +5,7 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
+from asyncpg.exceptions import CannotConnectNowError
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
@@ -206,6 +207,19 @@ async def test_claim_due_returns_typed_pending_and_reclaimed_jobs() -> None:
     assert "dead_exhausted_memory_jobs" in claim_sql
     assert "MemoryJobAttemptsExhaustedError" in compiled_claim.params.values()
     assert all("UPDATE memory_jobs" in str(call) for call in connection.calls[1:])
+
+
+async def test_claim_due_maps_raw_asyncpg_startup_outage_to_connection_error() -> None:
+    with pytest.raises(MemoryJobQueueConnectionError):
+        await adapter(
+            FakeConnection(),
+            enter_error=CannotConnectNowError("database system is starting up"),
+        ).claim_due(
+            lease_owner=uuid4(),
+            limit=1,
+            lease_seconds=120,
+            max_attempts=5,
+        )
 
 
 async def test_claim_due_returns_empty_tuple_without_updates() -> None:

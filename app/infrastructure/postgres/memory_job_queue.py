@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import Any, NoReturn
 from uuid import UUID, uuid4
 
+from asyncpg.exceptions import PostgresError
 from sqlalchemy import case, delete, func, or_, select, text, update
 from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
@@ -59,7 +60,7 @@ class PostgresMemoryJobQueueAdapter:
         try:
             async with self._engine.connect() as connection:
                 revision = await connection.scalar(text("SELECT version_num FROM alembic_version"))
-        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+        except (BuiltinTimeoutError, OSError, PostgresError, SQLAlchemyError) as error:
             self._raise_mapped(error)
         if revision != EXPECTED_SCHEMA_REVISION:
             raise MemoryJobQueueConfigurationError
@@ -96,7 +97,7 @@ class PostgresMemoryJobQueueAdapter:
                 ]
         except MemoryJobQueueProtocolError:
             raise
-        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+        except (BuiltinTimeoutError, OSError, PostgresError, SQLAlchemyError) as error:
             self._raise_mapped(error)
         return tuple(claimed)
 
@@ -218,7 +219,7 @@ class PostgresMemoryJobQueueAdapter:
             )
         except (KeyError, TypeError, ValueError) as error:
             raise MemoryJobQueueProtocolError from error
-        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+        except (BuiltinTimeoutError, OSError, PostgresError, SQLAlchemyError) as error:
             self._raise_mapped(error)
 
     async def list_dead(self, *, limit: int) -> tuple[DeadMemoryJob, ...]:
@@ -243,7 +244,7 @@ class PostgresMemoryJobQueueAdapter:
             return tuple(self._to_dead_job(row) for row in rows)
         except (KeyError, TypeError, ValueError) as error:
             raise MemoryJobQueueProtocolError from error
-        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+        except (BuiltinTimeoutError, OSError, PostgresError, SQLAlchemyError) as error:
             self._raise_mapped(error)
 
     async def requeue_dead(self, event_id: UUID) -> bool:
@@ -274,7 +275,7 @@ class PostgresMemoryJobQueueAdapter:
             async with self._engine.begin() as connection:
                 result = await connection.execute(statement)
                 return result.rowcount == 1
-        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+        except (BuiltinTimeoutError, OSError, PostgresError, SQLAlchemyError) as error:
             self._raise_mapped(error)
 
     async def purge_terminal(
@@ -334,7 +335,7 @@ class PostgresMemoryJobQueueAdapter:
             )
         except MemoryJobQueueProtocolError:
             raise
-        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+        except (BuiltinTimeoutError, OSError, PostgresError, SQLAlchemyError) as error:
             self._raise_mapped(error)
 
     @staticmethod
@@ -499,7 +500,7 @@ class PostgresMemoryJobQueueAdapter:
                     raise MemoryJobLeaseLostError
         except MemoryJobLeaseLostError:
             raise
-        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+        except (BuiltinTimeoutError, OSError, PostgresError, SQLAlchemyError) as error:
             self._raise_mapped(error)
 
     @staticmethod
@@ -518,11 +519,9 @@ class PostgresMemoryJobQueueAdapter:
         sqlstate = _find_sqlstate(error)
         if sqlstate in _CONFIGURATION_SQLSTATES:
             raise MemoryJobQueueConfigurationError from error
-        if _has_connection_failure(error):
+        if _has_connection_failure(error) or _is_connection(sqlstate):
             raise MemoryJobQueueConnectionError from error
-        if isinstance(error, DBAPIError) and (
-            error.connection_invalidated or _is_connection(sqlstate)
-        ):
+        if isinstance(error, DBAPIError) and error.connection_invalidated:
             raise MemoryJobQueueConnectionError from error
         raise MemoryJobQueueOperationError from error
 

@@ -152,6 +152,10 @@ Gateway giữ readiness và trả KiRa SSE bằng current query. Metrics/log ghi
 memory search và queue availability mà không lộ dữ liệu synthetic; PostgreSQL cùng runtime tự hồi
 phục khi test kết thúc. Xem
 [Week 4 T4.22 observability/readiness](docs/week4-t4.22-observability-readiness-acceptance.md).
+T4.23 đồng bộ package, Gateway, Worker, OCI label và Compose image về `0.4.0`; dựng lại volume
+synthetic từ đầu, chạy migration up/down/up và replay toàn bộ T4.19–T4.22. Release gate cũng khóa
+raw asyncpg `57P03` để Worker backoff rồi tự hồi phục thay vì dừng runner. Xem
+[Week 4 T4.23 release evidence](docs/week4-t4.23-release-evidence.md).
 
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem
@@ -351,8 +355,8 @@ uv run python scripts/smoke_gateway.py `
 Build và chạy Docker image versioned:
 
 ```powershell
-docker build --build-arg APP_VERSION=0.3.0 -t kira-context:0.3.0 .
-docker run -d --name kira-context-v3 --env-file .env -p 8000:8000 kira-context:0.3.0
+docker build --build-arg APP_VERSION=0.4.0 -t kira-context:0.4.0 .
+docker run -d --name kira-context-v4 --env-file .env -p 8000:8000 kira-context:0.4.0
 docker ps --filter "name=kira-context"
 ```
 
