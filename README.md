@@ -124,6 +124,11 @@ T4.16 thêm operator CLI machine-readable cho queue stats, bounded dead listing 
 single-event requeue. CLI dùng dependency lifecycle PostgreSQL riêng, không tải Mem0/provider và
 không mở HTTP mutation endpoint. Xem
 [Week 4 T4.16 operator CLI](docs/week4-t4.16-memory-job-operator-cli.md).
+T4.17 hoàn tất Batch C bằng acceptance matrix cho retry, dead, lost lease, cancellation, cleanup,
+readiness và CLI. Cross-component test mới chạy Worker FastAPI runtime cùng queue/conversation
+adapter PostgreSQL thật: retryable timeout được retry rồi complete, còn job bị cancel sau shutdown
+grace vẫn giữ lease để replica khác reclaim; stale lease token bị từ chối. Xem
+[Week 4 T4.17 Worker test acceptance](docs/week4-t4.17-worker-test-acceptance.md).
 
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem
@@ -195,6 +200,18 @@ CLI chỉ cần `DATABASE_URL` cùng cấu hình pool/timeout PostgreSQL; nó kh
 cần KiRa, embedding hay memory-LLM. `list-dead` chỉ trả projection vận hành đã sanitize và bị giới
 hạn tối đa 1.000 row. `requeue` chỉ tác động đúng một UUID đang ở trạng thái `dead`; event không tồn
 tại hoặc không còn dead trả exit code 4 và không thay đổi dữ liệu.
+
+Chạy riêng gate hoàn tất Worker Batch C trên PostgreSQL disposable:
+
+```powershell
+$env:POSTGRES_TEST_URL="postgresql+asyncpg://kira:replace_me@127.0.0.1:5432/kira_context"
+uv run pytest tests/integration/postgres/test_memory_job_processing.py `
+  tests/integration/postgres/test_memory_job_runner.py `
+  tests/integration/postgres/test_memory_job_retention.py `
+  tests/integration/postgres/test_memory_job_admin.py `
+  tests/integration/postgres/test_memory_worker_acceptance.py --no-cov
+Remove-Item Env:POSTGRES_TEST_URL
+```
 
 `DATABASE_URL` phải khớp `POSTGRES_DB`, `POSTGRES_USER` và `POSTGRES_PASSWORD` trong `.env`.
 Gateway không tự chạy migration. Cấu hình hoặc schema sai làm startup fail; connection timeout
