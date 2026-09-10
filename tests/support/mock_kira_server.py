@@ -13,6 +13,12 @@ app = FastAPI(title="Local KiRa Contract Stub")
 query_hashes: deque[str] = deque(maxlen=100)
 
 
+@app.get("/health")
+async def health() -> dict[str, str]:
+    """Expose process liveness for the isolated Compose acceptance stack."""
+    return {"status": "ok"}
+
+
 @app.get("/_test/requests")
 async def observed_requests() -> dict[str, object]:
     """Test-only evidence, hashes of synthetic input instead of raw conversation text."""

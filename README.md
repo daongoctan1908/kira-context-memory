@@ -129,6 +129,10 @@ readiness và CLI. Cross-component test mới chạy Worker FastAPI runtime cùn
 adapter PostgreSQL thật: retryable timeout được retry rồi complete, còn job bị cancel sau shutdown
 grace vẫn giữ lease để replica khác reclaim; stale lease token bị từ chối. Xem
 [Week 4 T4.17 Worker test acceptance](docs/week4-t4.17-worker-test-acceptance.md).
+T4.18 mở Batch D bằng stack `compose.week4.yaml` độc lập và không Redis: PostgreSQL/pgvector,
+migration, memory init, Gateway, Worker cùng bốn deterministic provider mocks chạy thành các
+service riêng. Gateway/Worker dùng readiness healthcheck; hai DDL job phải exit 0 trước khi runtime
+khởi động. Xem [Week 4 T4.18 Compose stack](docs/week4-t4.18-compose-stack.md).
 
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem
@@ -212,6 +216,19 @@ uv run pytest tests/integration/postgres/test_memory_job_processing.py `
   tests/integration/postgres/test_memory_worker_acceptance.py --no-cov
 Remove-Item Env:POSTGRES_TEST_URL
 ```
+
+Khởi động stack synthetic Week 4 đầy đủ để chạy các gate Batch D:
+
+```powershell
+docker compose -f compose.week4.yaml build gateway
+docker compose -f compose.week4.yaml up -d --no-build --wait
+docker compose -f compose.week4.yaml ps -a
+```
+
+Gateway ở `http://127.0.0.1:18000`, Worker ở `http://127.0.0.1:18001`; PostgreSQL và bốn mock
+provider chỉ publish trên loopback. Stack dùng project `kira-context-week4`, credential synthetic
+cố định và volume riêng; không phụ thuộc giá trị `.env`, không gọi endpoint thật và không chứa
+Redis.
 
 `DATABASE_URL` phải khớp `POSTGRES_DB`, `POSTGRES_USER` và `POSTGRES_PASSWORD` trong `.env`.
 Gateway không tự chạy migration. Cấu hình hoặc schema sai làm startup fail; connection timeout

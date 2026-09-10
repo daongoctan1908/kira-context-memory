@@ -10,6 +10,12 @@ from tests.support.week2_cases import CASES
 app = FastAPI(title="Local vLLM Contract Stub")
 
 
+@app.get("/health")
+async def health() -> dict[str, str]:
+    """Expose process liveness for the isolated Compose acceptance stack."""
+    return {"status": "ok"}
+
+
 @app.post("/v1/embeddings")
 async def embed(request: Request) -> JSONResponse:
     """Synthetic OpenAI-compatible embedding contract for local admin-init smoke."""
