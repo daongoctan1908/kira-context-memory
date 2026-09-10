@@ -141,6 +141,8 @@ async def test_memory_llm_mock_accepts_native_mem0_message_format_and_block_cont
             "stub": "memory-llm-local-only",
             "request_count": 1,
             "blocked_request_count": 1,
+            "failure_count": 0,
+            "remaining_failures": 0,
             "released": False,
         }
 
@@ -149,6 +151,61 @@ async def test_memory_llm_mock_accepts_native_mem0_message_format_and_block_cont
 
     extracted = json.loads(response.json()["choices"][0]["message"]["content"])
     assert extracted == {"memory": [{"text": fact, "attributed_to": "user"}]}
+
+
+async def test_memory_llm_mock_applies_bounded_failure_budget_then_recovers() -> None:
+    prompt = (
+        "## New Messages\n"
+        "user: T4_E2E_MEMORY: Synthetic recovery fact.\n\n"
+        "## Observation Date\n2026-09-10"
+    )
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=mock_memory_llm_server.app),
+        base_url="http://memory-llm.test",
+    ) as client:
+        reset = await client.post(
+            "/_test/reset",
+            json={"block": False, "failures": 2},
+        )
+        failed_one = await client.post("/v1/chat/completions", json=memory_request(prompt))
+        failed_two = await client.post("/v1/chat/completions", json=memory_request(prompt))
+        recovered = await client.post("/v1/chat/completions", json=memory_request(prompt))
+        state = (await client.get("/_test/state")).json()
+
+    assert reset.json()["remaining_failures"] == 2
+    assert failed_one.status_code == failed_two.status_code == 400
+    assert failed_one.json()["error"]["code"] == "synthetic_fault"
+    assert recovered.status_code == 200
+    assert state == {
+        "stub": "memory-llm-local-only",
+        "request_count": 3,
+        "blocked_request_count": 0,
+        "failure_count": 2,
+        "remaining_failures": 0,
+        "released": True,
+    }
+
+
+@pytest.mark.parametrize(
+    "control",
+    [
+        {},
+        {"block": "false"},
+        {"block": False, "failures": True},
+        {"block": False, "failures": -1},
+        {"block": False, "failures": 101},
+    ],
+)
+async def test_memory_llm_mock_rejects_invalid_fault_control(
+    control: dict[str, object],
+) -> None:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=mock_memory_llm_server.app),
+        base_url="http://memory-llm.test",
+    ) as client:
+        response = await client.post("/_test/reset", json=control)
+
+    assert response.status_code == 400
 
 
 async def test_rewriter_mock_uses_matching_long_term_memory_and_records_only_hashes() -> None:

@@ -14,6 +14,8 @@ _NEXT_HEADING = "\n\n## Observation Date"
 
 _request_count = 0
 _blocked_request_count = 0
+_failure_count = 0
+_remaining_failures = 0
 _block_enabled = False
 _release = asyncio.Event()
 _release.set()
@@ -33,24 +35,41 @@ async def state() -> dict[str, object]:
         "stub": "memory-llm-local-only",
         "request_count": _request_count,
         "blocked_request_count": _blocked_request_count,
+        "failure_count": _failure_count,
+        "remaining_failures": _remaining_failures,
         "released": _release.is_set(),
     }
 
 
 @app.post("/_test/reset")
 async def reset(request: Request) -> JSONResponse:
-    global _block_enabled, _blocked_request_count, _release, _request_count
+    global _block_enabled, _blocked_request_count, _failure_count
+    global _release, _remaining_failures, _request_count
     body = await request.json()
     block = body.get("block")
-    if not isinstance(block, bool):
+    failures = body.get("failures", 0)
+    if (
+        not isinstance(block, bool)
+        or isinstance(failures, bool)
+        or not isinstance(failures, int)
+        or not 0 <= failures <= 100
+    ):
         return JSONResponse(status_code=400, content={"error": "invalid control"})
     _request_count = 0
     _blocked_request_count = 0
+    _failure_count = 0
+    _remaining_failures = failures
     _block_enabled = block
     _release = asyncio.Event()
     if not block:
         _release.set()
-    return JSONResponse({"status": "reset", "blocking": block})
+    return JSONResponse(
+        {
+            "status": "reset",
+            "blocking": block,
+            "remaining_failures": failures,
+        }
+    )
 
 
 @app.post("/_test/release")
@@ -76,11 +95,24 @@ async def chat_completions(request: Request) -> JSONResponse:
     ):
         return JSONResponse(status_code=400, content={"error": "invalid contract"})
 
-    global _blocked_request_count, _request_count
+    global _blocked_request_count, _failure_count, _remaining_failures, _request_count
     _request_count += 1
     if _block_enabled and not _release.is_set():
         _blocked_request_count += 1
         await _release.wait()
+    if _remaining_failures:
+        _remaining_failures -= 1
+        _failure_count += 1
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": {
+                    "code": "synthetic_fault",
+                    "message": "synthetic provider failure",
+                    "type": "synthetic_fault",
+                }
+            },
+        )
 
     facts = _extract_marked_facts(messages[1]["content"])
     content = json.dumps(

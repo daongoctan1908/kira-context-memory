@@ -137,6 +137,11 @@ T4.19 khóa happy path bất đồng bộ trên chính stack này: memory-LLM b�
 nhận xong SSE, Worker sau đó complete durable job, và Session B ở session mới recall LTM qua
 Rewriter trước khi query đã rewrite tới KiRa. Evidence chỉ dùng hash/count và dữ liệu synthetic.
 Xem [Week 4 T4.19 async happy-path E2E](docs/week4-t4.19-async-happy-path-e2e.md).
+T4.20 khóa recovery path trên stack thật: lỗi transient complete ở attempt 2; lỗi còn tồn tại quá
+retry horizon vào `dead` đúng attempt 5; packaged operator CLI list projection đã sanitize rồi
+requeue chính xác event để Worker xử lý thành công. Compose chỉ tăng tốc retry cho synthetic gate,
+không đổi default production. Xem
+[Week 4 T4.20 retry/dead/requeue E2E](docs/week4-t4.20-retry-dead-requeue-e2e.md).
 
 PostgreSQL integration tests và Docker E2E chạy được local; KiRa/Qwen dùng mock.
 Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem
@@ -228,6 +233,7 @@ docker compose -f compose.week4.yaml build gateway
 docker compose -f compose.week4.yaml up -d --no-build --wait
 docker compose -f compose.week4.yaml ps -a
 uv run python -m scripts.smoke_week4_async
+uv run python -m scripts.smoke_week4_retry
 ```
 
 Gateway ở `http://127.0.0.1:18000`, Worker ở `http://127.0.0.1:18001`; PostgreSQL và bốn mock

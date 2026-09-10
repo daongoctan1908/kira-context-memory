@@ -75,6 +75,6 @@ Validated locally on 2026-09-10:
 
 ## Scope boundary
 
-T4.19 validates only the deployed happy path and its asynchronous boundary. It does not exercise
-retry/dead/requeue behavior, process-crash recovery, dependency-outage dashboards, real KiRa/Qwen
-or memory providers, or production performance. Those remain T4.20–T4.23.
+T4.19 validates only the deployed happy path and its asynchronous boundary. Retry/dead/requeue is
+covered separately by T4.20. Process-crash recovery, dependency-outage dashboards, real KiRa/Qwen
+or memory providers, production performance, and release evidence remain T4.21–T4.23.

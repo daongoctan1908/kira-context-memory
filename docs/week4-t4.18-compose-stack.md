@@ -98,6 +98,10 @@ tasks can exercise the complete topology. This does not move formation into the 
 completed Gateway turn only schedules a PostgreSQL job, and the Worker remains the sole Mem0
 formation caller.
 
+Starting with T4.20, this synthetic stack accelerates the four retry delays to 0.25 seconds each so
+the five-attempt dead-letter gate remains fast. Worker production defaults stay 1/5/30/120 seconds;
+the Compose override is an acceptance setting, not a runtime-policy change.
+
 ## Acceptance evidence
 
 Validated locally on 2026-09-10:
