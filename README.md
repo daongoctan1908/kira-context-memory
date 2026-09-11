@@ -6,6 +6,11 @@ thuộc trực tiếp vào FastAPI, HTTPX, PostgreSQL SDK hoặc vLLM.
 
 ## Trạng thái
 
+**Week 5:** T5.1 đã lưu [plan và backlog](docs/week5-plan.md),
+[benchmark contract v1](docs/week5-benchmark-contract.md) và
+[control manifest](docs/week5-baseline.json) tại baseline `75deb1d`.
+T5.2–T5.20 chưa triển khai; chưa có kết quả benchmark Week 5. Runtime Week 4 giữ nguyên.
+
 Batch A-D của Tuần 1 cung cấp Gateway baseline hoàn chỉnh để live smoke với KiRa Test.
 Batch A-D của Tuần 2 tích hợp short-term context qua PostgreSQL và vLLM. Tuần 3
 Batch A1 bổ sung identity/user scope và nền tảng Mem0/pgvector; Batch B1-B2 thêm taxonomy policy

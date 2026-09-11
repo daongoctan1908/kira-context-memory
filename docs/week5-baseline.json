@@ -1,0 +1,129 @@
+{
+  "manifest_schema_version": 1,
+  "contract_id": "kira-week5-benchmark-v1",
+  "frozen_on": "2026-09-11",
+  "kind": "source_control_baseline_not_a_benchmark_result",
+  "source": {
+    "commit": "75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00",
+    "tree": "20fb6f6f35f78d6de6eb55c83e388917cb338597",
+    "git_object_format": "sha1",
+    "blobs": {
+      "Dockerfile": "d9a683bfbf624cca1f4645157e62bf8db941830a",
+      "app/application/services/context_builder.py": "bbb691eea6841bba517af515f4a760588261e948",
+      "app/application/services/memory_policy.py": "424c5f14909da039287d9d927b7215841dc63af4",
+      "app/application/services/rewrite_prompt.py": "f5ed9ac9740887fcca8c9988ec4b6fb147ed3495",
+      "app/config/settings.py": "7a2f2a9d75c8a49da82294a10ebeccd4ae339aa8",
+      "app/infrastructure/llm/vllm_query_rewriter.py": "2c8d2f67c4ec61a3128b1bc10fb9ea858c2d2ad9",
+      "app/infrastructure/memory/mem0_adapter.py": "985ae5dc8d40c0c8bff0f436d28cc2ba5a8a8402",
+      "app/infrastructure/memory/postgres_admin.py": "d34c1979d73db6a23145850ac24e9c8a46d0434c",
+      "compose.week4.yaml": "6de4ce18d3a00f37a5d08896e41b66c074c303f7",
+      "packages/viettel-mem0/mem0/configs/prompts.py": "bdcb6af3f14aff66bf4d43d0d80e7a48a69eaa0f",
+      "packages/viettel-mem0/mem0/memory/main.py": "ab4cbef89ba53df1bc8d2b730e817cd941eb7c57",
+      "packages/viettel-mem0/mem0/vector_stores/pgvector.py": "5bd5fa0014d73ecb6927d154750c98dad014d6df",
+      "packages/viettel-mem0/pyproject.toml": "e7b98776a988e1ee5e45e5b1bdfcce4b2fe8f9d6",
+      "pyproject.toml": "ad82ee31d10f426e603d7cc47ddcd48603840022",
+      "uv.lock": "c57d4f3912a40b65edd6741aae4ed46111751a65",
+      "worker/settings.py": "9d635445a014c66e5bb226dcf4a5ef4cf9a7bef5"
+    }
+  },
+  "versions": {
+    "application": "0.4.1",
+    "viettel_mem0": "2.0.20+viettel.3",
+    "mem0_upstream_tag": "v2.0.20",
+    "mem0_upstream_commit": "9a7924befd7026e41e445ba809370009e5e985a6",
+    "mem0_upstream_tree": "71d41407cefaae26d8cdeb2f180f24bc4b0e90a7",
+    "formation_engine": "native_mem0_v3",
+    "memory_schema": 2,
+    "application_migration_head": "20260908_0003",
+    "memory_policy": "kira-memory-policy-v2",
+    "rewrite_prompt": "2"
+  },
+  "source_image_references": {
+    "application_tag": "kira-context:0.4.1",
+    "postgres_tag": "pgvector/pgvector:0.8.6-pg16-bookworm",
+    "immutable_image_ids": null,
+    "note": "Source tags only. Record actual image digests or image IDs in each future run."
+  },
+  "source_defaults": {
+    "gateway": {
+      "ltm_enabled": false,
+      "memory_formation_enabled": false,
+      "max_recent_messages": 10,
+      "recent_context_token_budget": 3000,
+      "vllm_connect_timeout_seconds": 2.0,
+      "vllm_read_timeout_seconds": 8.0,
+      "vllm_max_output_chars": 2048,
+      "memory_search_top_k": 10,
+      "memory_search_threshold": 0.1,
+      "memory_search_timeout_seconds": 3.0
+    },
+    "context": {
+      "max_long_term_memories": 10,
+      "recent_token_estimator": "sum(ceil(utf8_byte_length(message.content) / 4) + 8)",
+      "recent_budget_excludes": ["system_prompt", "current_query", "long_term_memories"]
+    },
+    "rewrite_request": {
+      "temperature": 0,
+      "stream": false,
+      "max_tokens": 256
+    },
+    "memory": {
+      "memory_llm_temperature": 0.0,
+      "memory_llm_max_tokens": 1000,
+      "memory_operation_timeout_seconds": 30.0,
+      "memory_formation_message_limit": 10,
+      "memory_postgres_min_connections": 1,
+      "memory_postgres_max_connections": 5,
+      "adapter_search_rerank": false,
+      "automatic_lifecycle_override": false,
+      "formation_idempotency_key": "memory_jobs.event_id",
+      "atomic_boundary": ["vector_memories", "formation_receipt"],
+      "queue_completion_in_same_transaction": false
+    },
+    "embedding_preflight_settings": {
+      "memory_embedding_connect_timeout_seconds": 2.0,
+      "memory_embedding_read_timeout_seconds": 8.0,
+      "note": "Probe settings, not a claim about effective native Mem0 provider SDK timeouts/retries."
+    },
+    "worker": {
+      "memory_job_poll_interval_seconds": 1.0,
+      "memory_job_batch_size": 10,
+      "memory_job_concurrency": 4,
+      "memory_job_lease_seconds": 120.0,
+      "memory_job_max_attempts": 5,
+      "memory_job_retry_delays_seconds": [1.0, 5.0, 30.0, 120.0],
+      "memory_job_db_timeout_seconds": 5.0,
+      "memory_job_shutdown_grace_seconds": 30.0,
+      "memory_job_metrics_refresh_seconds": 15.0,
+      "memory_job_cleanup_interval_seconds": 3600.0,
+      "memory_job_completed_retention_seconds": 604800.0,
+      "memory_job_dead_retention_seconds": 2592000.0,
+      "memory_job_cleanup_batch_size": 1000
+    }
+  },
+  "evaluation_activation": {
+    "explicit_capabilities_by_suite": true,
+    "same_resolved_config_for_paired_runs_except_declared_candidate_changes": true,
+    "quality_trials_use_fresh_state_and_event": true,
+    "same_event_replay_is_a_separate_correctness_suite": true,
+    "dedicated_disposable_database_required_for_write_suites": true
+  },
+  "profiles": ["mock", "external_synthetic", "internal_test"],
+  "unresolved_run_inputs": [
+    "exact_provider_and_model_deployment_for_extraction",
+    "exact_provider_and_model_deployment_for_rewrite",
+    "embedding_provider_model_and_verified_dimension",
+    "effective_provider_sdk_timeouts_and_retries",
+    "approved_corpus_split_and_review_hashes",
+    "resolved_non_secret_config_and_rendered_prompt_hashes",
+    "isolated_database_and_resource_ownership",
+    "workload_seed_concurrency_warmup_and_sample_counts",
+    "real_kira_availability_for_business_task_success"
+  ],
+  "week5_execution": {
+    "mock": "NOT_RUN",
+    "external_synthetic": "NOT_RUN",
+    "internal_test": "NOT_RUN",
+    "note": "T5.1 freezes documentation only; inherited Week 4 test evidence is not a Week 5 benchmark run."
+  }
+}
