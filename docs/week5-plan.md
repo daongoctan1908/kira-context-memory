@@ -2,9 +2,9 @@
 
 ## Trạng thái và baseline
 
-T5.1 hoàn tất: plan, control manifest và benchmark contract đã được đưa vào repository.
-T5.2–T5.20 chưa triển khai. Tài liệu này mô tả công việc tiếp theo, không phải evidence rằng
-harness, dataset hoặc benchmark đã chạy.
+T5.1–T5.2 hoàn tất về implementation: plan/control contract, eval types và provider preflight.
+[T5.2 evidence](week5-t5.2-preflight.md): ba OpenAI probes pass; PostgreSQL live còn `NOT_RUN`.
+T5.3–T5.20 chưa triển khai; dataset và semantic benchmark chưa chạy.
 
 - Control: `75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00`, kết thúc Week 4.
 - Application `0.4.1`; `viettel-mem0==2.0.20+viettel.3`; memory schema version `2`.
@@ -53,7 +53,7 @@ schema lưu memory. User/mentor review gold labels trước khi chấm semantic 
 | Task | Nội dung / Definition of Done | Phụ thuộc | Trạng thái |
 | --- | --- | --- | --- |
 | T5.1 | Lưu plan; khóa control manifest; chốt scope tuning, profiles, metrics, candidate selection và safety gates | Week 4 | DONE |
-| T5.2 | Eval types + provider preflight: typed case/config/result; probe chat/JSON extraction, embedding batch/dimension và DB theo dependency từng suite; lỗi typed, output không lộ secret | T5.1 | NOT_STARTED |
+| T5.2 | Eval types + provider preflight: typed case/config/result; probe chat/JSON extraction, embedding batch/dimension và DB theo dependency từng suite; lỗi typed, output không lộ secret | T5.1 | DONE; PostgreSQL live NOT_RUN |
 | T5.3 | Synthetic dataset v1: đủ bốn suite, positive/negative và domain slices; gold IDs, evidence, constraints và allowed attribution; trạng thái draft/reviewed rõ | T5.2 | NOT_STARTED |
 | T5.4 | Validator + split: validate schema, unique IDs, gold references, normalized exact duplicates, family isolation, seed reproducibility và checksums; semantic near-duplicate do reviewer kiểm tra | T5.3 | NOT_STARTED |
 | T5.5 | Scorer/human review/report: deterministic checks + review semantic thủ công; CLI dự kiến `validate`, `preflight`, `run`, `review`, `compare`; kết quả có denominator, coverage và error breakdown | T5.4 | NOT_STARTED |
@@ -112,8 +112,8 @@ không dùng việc có dependency graph để trộn thay đổi của các tas
 
 - T5.1 chỉ thêm tài liệu/manifest và README links; giữ nguyên `app/`, `worker/`, migrations,
   custom Mem0, Docker/Compose, dependency versions và lock.
-- Các task sau dự kiến thêm `evaluation/`, `scripts/run_week5_benchmark.py`, tests riêng và
-  eval-image definition. Đây là tên dự kiến, **chưa phải file/CLI đang chạy được**.
+- T5.2 đã thêm `evaluation/`, `scripts/run_week5_benchmark.py preflight` và tests riêng.
+  Các lệnh validator/scorer cùng eval-image definition sẽ có ở task sau; chưa chạy benchmark.
 - Prompt/config runtime chỉ được thay có chủ đích tại T5.18 sau evidence. Candidate experiments
   nằm trong evaluation trước đó; algorithm/lifecycle/schema change cần kế hoạch review riêng.
 - Mỗi write suite dùng disposable DB tách khỏi DB có live Worker, schema/collection/user theo run;

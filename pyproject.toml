@@ -25,6 +25,9 @@ dependencies = [
 [project.scripts]
 kira-memory-jobs = "worker.job_admin:main"
 
+[project.optional-dependencies]
+evaluation = ["python-dotenv>=1.0,<2.0"]
+
 [tool.uv.sources]
 viettel-mem0 = { path = "packages/viettel-mem0" }
 
@@ -41,7 +44,7 @@ dev = [
 packages = ["app", "worker"]
 
 [tool.pytest.ini_options]
-addopts = "--strict-markers --strict-config --cov=app --cov=worker --cov-report=term-missing --cov-fail-under=90"
+addopts = "--strict-markers --strict-config --cov=app --cov=worker --cov=evaluation --cov-report=term-missing --cov-fail-under=90"
 asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
