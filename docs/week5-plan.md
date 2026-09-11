@@ -3,7 +3,7 @@
 ## Trạng thái và baseline
 
 T5.1–T5.2 hoàn tất về implementation: plan/control contract, eval types và provider preflight.
-[T5.2 evidence](week5-t5.2-preflight.md): ba OpenAI probes pass; PostgreSQL live còn `NOT_RUN`.
+[T5.2 evidence](week5-t5.2-preflight.md): ba OpenAI probes và PostgreSQL/pgvector live pass.
 T5.3–T5.20 chưa triển khai; dataset và semantic benchmark chưa chạy.
 
 - Control: `75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00`, kết thúc Week 4.
@@ -53,7 +53,7 @@ schema lưu memory. User/mentor review gold labels trước khi chấm semantic 
 | Task | Nội dung / Definition of Done | Phụ thuộc | Trạng thái |
 | --- | --- | --- | --- |
 | T5.1 | Lưu plan; khóa control manifest; chốt scope tuning, profiles, metrics, candidate selection và safety gates | Week 4 | DONE |
-| T5.2 | Eval types + provider preflight: typed case/config/result; probe chat/JSON extraction, embedding batch/dimension và DB theo dependency từng suite; lỗi typed, output không lộ secret | T5.1 | DONE; PostgreSQL live NOT_RUN |
+| T5.2 | Eval types + provider preflight: typed case/config/result; probe chat/JSON extraction, embedding batch/dimension và DB theo dependency từng suite; lỗi typed, output không lộ secret | T5.1 | DONE |
 | T5.3 | Synthetic dataset v1: đủ bốn suite, positive/negative và domain slices; gold IDs, evidence, constraints và allowed attribution; trạng thái draft/reviewed rõ | T5.2 | NOT_STARTED |
 | T5.4 | Validator + split: validate schema, unique IDs, gold references, normalized exact duplicates, family isolation, seed reproducibility và checksums; semantic near-duplicate do reviewer kiểm tra | T5.3 | NOT_STARTED |
 | T5.5 | Scorer/human review/report: deterministic checks + review semantic thủ công; CLI dự kiến `validate`, `preflight`, `run`, `review`, `compare`; kết quả có denominator, coverage và error breakdown | T5.4 | NOT_STARTED |

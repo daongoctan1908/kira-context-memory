@@ -2,8 +2,8 @@
 
 T5.2 đã triển khai typed case/config/result và preflight theo suite. Ba probe OpenAI thật đã
 pass với key trong `.env.week5.local`: extraction JSON, rewrite chat và embedding batch.
-PostgreSQL live chưa chạy được; Docker Linux engine unavailable tại thời điểm kiểm tra và
-file cấu hình Week 5 chưa có database URI. Những dependency này vẫn là `NOT_RUN`.
+Sau khi Docker Linux engine hoạt động ngày 2026-09-12, PostgreSQL/pgvector, application migration
+và memory schema version 2 cũng đã được kiểm tra trên stack synthetic local và pass.
 
 Preflight chỉ chứng minh protocol và dependency được cấu hình đúng. Chất lượng native extraction,
 retrieval, rewrite và cross-session sẽ được chấm bằng corpus/review trong các task tiếp theo.
@@ -122,7 +122,7 @@ HTTP contracts đã đối chiếu [Chat Completions](https://developers.openai.
 và [Embeddings](https://developers.openai.com/api/reference/python/resources/embeddings/methods/create)
 trong OpenAI Docs. Giữ JSON-mode contract đang test; chưa migrate Mem0 sang một response schema khác.
 
-## Evidence ngày 2026-09-11
+## Evidence OpenAI ngày 2026-09-11 và Docker ngày 2026-09-12
 
 Live run `4b100329-0293-4a60-a28b-f32cad29d6ae`, bắt đầu `2026-09-11T16:44:55.631385Z`:
 
@@ -131,7 +131,7 @@ Live run `4b100329-0293-4a60-a28b-f32cad29d6ae`, bắt đầu `2026-09-11T16:44:
 | Extraction JSON | PASS | `gpt-4o-mini` → `gpt-4o-mini-2024-07-18`; 1 fact; 125 total tokens |
 | Rewrite chat | PASS | `gpt-4o-mini` → `gpt-4o-mini-2024-07-18`; 68 total tokens |
 | Embedding batch | PASS | `text-embedding-3-small`; 2 vectors × 1536 dimensions; 12 total tokens |
-| pgvector / memory schema | NOT_RUN | Chưa có Week 5 database URI; Docker Linux engine chưa khả dụng |
+| pgvector / memory schema | PASS ngày 2026-09-12 | Local embedding stub: 2 vectors × 3 dimensions; pgvector và memory schema version 2 pass |
 
 Ba request thành công báo tổng 205 tokens; không suy ra chi phí khi provider không trả cost.
 Lượt thử trước đó dùng inherited key khác trả 401; không dùng lượt đó làm evidence chất lượng.
@@ -154,8 +154,16 @@ Validation cuối:
   hàng loạt baseline files chỉ để đổi newline.
 - `uv lock --check`, wheel build và `git diff --check` pass. Dependency versions runtime không đổi;
   lock chỉ thêm metadata optional extra cho dependency `python-dotenv` đã được resolve.
-- PostgreSQL opt-in test và các live integration gates chưa cấu hình được skip rõ. Không có
-  claim PostgreSQL live hoặc Docker build mới đã pass ở T5.2.
+- Docker retry ngày 2026-09-12: PostgreSQL `pgvector/pgvector:0.8.6-pg16-bookworm` healthy;
+  application migration `20260908_0003` và memory init `version=2`, `dims=3` pass. Retrieval
+  preflight run `92f41926-5b6c-40b6-b782-704f28467e3f` pass `embedding_batch`, `pgvector` và
+  `memory_schema`; artifact local tại
+  `artifacts/week5/t5.2-postgres-preflight-20260912.json`.
+- Full PostgreSQL integration rerun bằng đúng async SQLAlchemy URI: **68 passed, 1 skipped**.
+  Lần đầu truyền `postgresql://` làm hai test SQLAlchemy tìm driver `psycopg2`; chạy lại bằng
+  `postgresql+asyncpg://` pass hoàn toàn. Đây là lỗi invocation, không phải lỗi database/runtime.
+- Docker image không được rebuild trong lượt retry; stack dùng image `kira-context:0.4.1` và
+  PostgreSQL image đã khóa trong Compose.
 - Real key không xuất hiện trong các file thay đổi; `.env.week5.local` và `artifacts/` tiếp tục
   được Git ignore. Evidence local: `artifacts/week5/t5.2-final-tests.xml` và
   `artifacts/week5/t5.2-final-coverage.json`.
@@ -164,4 +172,4 @@ Validation cuối:
 
 T5.3 tạo corpus synthetic có gold draft, T5.4 xử lý validator/split và T5.5 bổ sung scoring/review.
 T5.2 không tạo corpus hoặc semantic score. PostgreSQL live test có opt-in bằng `POSTGRES_TEST_URL`
-trỏ DB disposable khi hạ tầng khả dụng; test mặc định skip rõ nếu chưa cấu hình.
+trỏ DB disposable; test mặc định skip rõ nếu chưa cấu hình.

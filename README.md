@@ -9,8 +9,8 @@ thuộc trực tiếp vào FastAPI, HTTPX, PostgreSQL SDK hoặc vLLM.
 **Week 5:** T5.1 đã lưu [plan và backlog](docs/week5-plan.md),
 [benchmark contract v1](docs/week5-benchmark-contract.md) và
 [control manifest](docs/week5-baseline.json) tại baseline `75deb1d`.
-[T5.2](docs/week5-t5.2-preflight.md) đã có eval types và CLI preflight; ba OpenAI probes pass,
-PostgreSQL live còn `NOT_RUN`. T5.3–T5.20 chưa triển khai; chưa có semantic benchmark Week 5.
+[T5.2](docs/week5-t5.2-preflight.md) đã có eval types và CLI preflight; ba OpenAI probes cùng
+PostgreSQL/pgvector live pass. T5.3–T5.20 chưa triển khai; chưa có semantic benchmark Week 5.
 
 Batch A-D của Tuần 1 cung cấp Gateway baseline hoàn chỉnh để live smoke với KiRa Test.
 Batch A-D của Tuần 2 tích hợp short-term context qua PostgreSQL và vLLM. Tuần 3
