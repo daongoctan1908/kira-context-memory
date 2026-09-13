@@ -4,8 +4,17 @@ import math
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import AnyHttpUrl, Field, PostgresDsn, Secret, SecretStr, model_validator
+from pydantic import (
+    AnyHttpUrl,
+    Field,
+    PostgresDsn,
+    Secret,
+    SecretStr,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.application.services.memory_temporal import DEFAULT_SOURCE_TIMEZONE
 
 
 class WorkerSettings(BaseSettings):
@@ -47,6 +56,7 @@ class WorkerSettings(BaseSettings):
     memory_search_timeout_seconds: float = Field(default=3.0, gt=0)
     memory_operation_timeout_seconds: float = Field(default=30.0, gt=0)
     memory_formation_message_limit: int = Field(default=10, ge=2, multiple_of=2)
+    memory_source_timezone: str = DEFAULT_SOURCE_TIMEZONE
 
     memory_job_poll_interval_seconds: float = Field(default=1.0, gt=0)
     memory_job_batch_size: int = Field(default=10, ge=1)

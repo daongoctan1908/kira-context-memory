@@ -1,0 +1,59 @@
+# Week 5 runtime smoke: real OpenAI providers with synthetic KiRa input/output.
+# Usage: uv run --frozen python scripts/week5_openai_stack.py up
+name: kira-context-week5-openai
+
+x-openai-memory-runtime: &openai-memory-runtime
+  MEMORY_EMBEDDING_BASE_URL: ${WEEK5_OPENAI_BASE_URL:-https://api.openai.com/v1}
+  MEMORY_EMBEDDING_MODEL: ${WEEK5_OPENAI_EMBEDDING_MODEL:?set WEEK5_OPENAI_EMBEDDING_MODEL}
+  MEMORY_EMBEDDING_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY}
+  # 1536 matches text-embedding-3-small. Override this when using another shape.
+  MEMORY_EMBEDDING_DIMS: ${WEEK5_EMBEDDING_DIMENSIONS:-1536}
+  MEMORY_EMBEDDING_CONNECT_TIMEOUT_SECONDS: "5"
+  MEMORY_EMBEDDING_READ_TIMEOUT_SECONDS: "30"
+  MEMORY_LLM_BASE_URL: ${WEEK5_OPENAI_BASE_URL:-https://api.openai.com/v1}
+  MEMORY_LLM_MODEL: ${WEEK5_OPENAI_CHAT_MODEL:?set WEEK5_OPENAI_CHAT_MODEL}
+  MEMORY_LLM_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY}
+  MEMORY_LLM_TEMPERATURE: "0"
+  MEMORY_LLM_MAX_TOKENS: "1000"
+  MEMORY_SEARCH_TIMEOUT_SECONDS: "30"
+  MEMORY_OPERATION_TIMEOUT_SECONDS: "60"
+
+services:
+  # Keep the provider mocks defined in the base file for Week 4 regression only.
+  # They are not created by this stack unless the profile is explicitly enabled.
+  mock-rewriter:
+    profiles: [week4-provider-mocks]
+
+  mock-embedding:
+    profiles: [week4-provider-mocks]
+
+  mock-memory-llm:
+    profiles: [week4-provider-mocks]
+
+  memory-init:
+    environment:
+      <<: *openai-memory-runtime
+    depends_on: !override
+      migrate:
+        condition: service_completed_successfully
+
+  gateway:
+    environment:
+      <<: *openai-memory-runtime
+      VLLM_BASE_URL: ${WEEK5_OPENAI_BASE_URL:-https://api.openai.com/v1}
+      VLLM_MODEL: ${WEEK5_OPENAI_CHAT_MODEL:?set WEEK5_OPENAI_CHAT_MODEL}
+      VLLM_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY}
+      VLLM_CONNECT_TIMEOUT_SECONDS: "5"
+      VLLM_READ_TIMEOUT_SECONDS: "30"
+    depends_on: !override
+      memory-init:
+        condition: service_completed_successfully
+      mock-kira:
+        condition: service_healthy
+
+  worker:
+    environment:
+      <<: *openai-memory-runtime
+    depends_on: !override
+      memory-init:
+        condition: service_completed_successfully

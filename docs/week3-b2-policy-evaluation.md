@@ -1,5 +1,8 @@
 # Week 3 Batch B2 — memory-policy acceptance gate
 
+> Historical v2 checkpoint. The active policy is v5 and the unchanged corpus is v4; see
+> [source-time grounding](memory-temporal-grounding.md) for changes and current validation.
+
 ## Delivered boundary
 
 Batch B2 turns the B1 extraction rules into an executable, versioned acceptance gate. It does not

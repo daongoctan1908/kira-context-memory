@@ -11,6 +11,17 @@ thuộc trực tiếp vào FastAPI, HTTPX, PostgreSQL SDK hoặc vLLM.
 [control manifest](docs/week5-baseline.json) tại baseline `75deb1d`.
 [T5.2](docs/week5-t5.2-preflight.md) đã có eval types và CLI preflight; ba OpenAI probes cùng
 PostgreSQL/pgvector live pass. T5.3–T5.20 chưa triển khai; chưa có semantic benchmark Week 5.
+Để kiểm tra Gateway + Worker bằng OpenAI thật nhưng vẫn giữ dữ liệu/KiRa synthetic, dùng
+[Week 5 OpenAI runtime smoke](docs/week5-openai-runtime-smoke.md). Stack này thay ba provider mock
+bằng OpenAI và giữ database Week 5 tách biệt; kết quả smoke không được coi là benchmark chất lượng.
+
+Extraction policy hiện tại là [v5 với temporal grounding tối giản](docs/memory-temporal-grounding.md).
+Adapter giữ nguyên messages, chỉ truyền mảng `source_time` qua `add(prompt=...)` cùng một đoạn
+temporal instruction ngắn; không tính sẵn lịch và không có ví dụ nghiệp vụ trong custom policy.
+Memory formation ghi mốc vào fact khi cần; Rewriter/KiRa chịu trách nhiệm suy luận downstream.
+Corpus vẫn có 46 ca. Chưa chạy live gate cho v5; kết quả 13/15 trước đây thuộc v4, không áp dụng
+cho bản mới. [Kết quả v3](docs/memory-policy-v3-telecom.md) giữ làm evidence lịch sử.
+Control benchmark Week 5 vẫn khóa v2; các lượt thử này không thay thế benchmark.
 
 Batch A-D của Tuần 1 cung cấp Gateway baseline hoàn chỉnh để live smoke với KiRa Test.
 Batch A-D của Tuần 2 tích hợp short-term context qua PostgreSQL và vLLM. Tuần 3

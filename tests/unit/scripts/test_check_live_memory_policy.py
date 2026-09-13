@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 
 import httpx
 import pytest
@@ -7,6 +8,10 @@ from mem0.configs.prompts import ADDITIVE_EXTRACTION_PROMPT
 from app.application.services.memory_policy import (
     MEMORY_EXTRACTION_INSTRUCTIONS,
     MEMORY_POLICY_VERSION,
+)
+from app.application.services.memory_temporal import (
+    TEMPORAL_GUIDANCE,
+    build_memory_extraction_prompt,
 )
 from scripts.check_live_memory_policy import (
     MemoryPolicyEvalClient,
@@ -35,7 +40,7 @@ def case(name: str):
 def test_acceptance_matrix_covers_taxonomy_and_negative_rules() -> None:
     validate_case_matrix()
 
-    assert len(CASES) == 18
+    assert len(CASES) == 46
     negative_tags = {
         tag for item in CASES if not item.expectation.should_extract for tag in item.tags
     }
@@ -52,6 +57,105 @@ def test_build_messages_uses_exact_mem0_v3_prompt_and_policy_precedence() -> Non
     assert user_prompt.index("## New Messages") < user_prompt.index("## Custom Instructions")
     assert user_prompt.index("## Custom Instructions") < user_prompt.index("# Output:")
     assert "## Observation Date\n2026-09-07" in user_prompt
+
+
+def test_build_messages_passes_existing_memories_with_runtime_style_ids() -> None:
+    correction = case("telecom_threshold_correction_existing_memory")
+    prompt = build_extraction_messages(correction)[1]["content"]
+
+    existing_section = prompt.split("## Existing Memories\n", 1)[1].split("## New Messages", 1)[0]
+    assert json.loads(existing_section) == [{"id": "0", "text": correction.existing_memories[0]}]
+
+
+def test_source_date_is_not_replaced_by_the_worker_observation_date() -> None:
+    anchored = case("telecom_relative_focus_with_source_date")
+    prompt = build_extraction_messages(anchored)[1]["content"]
+
+    assert "13/09/2026" in prompt.split("## New Messages", 1)[1]
+    assert "## Observation Date\n2026-09-20" in prompt
+    assert score_case(anchored, ("Ưu tiên nghẽn 5G Hà Nội ngày 13/09/2026.",)).passed
+    wrong_date = score_case(anchored, ("Ưu tiên nghẽn 5G Hà Nội ngày 20/09/2026.",))
+    assert "missing_required_alternative" in wrong_date.reason_codes
+    assert "forbidden_term" in wrong_date.reason_codes
+
+
+def test_evaluator_and_runtime_use_the_same_temporal_builder():
+    item = case("temporal_midnight_confirmation")
+    messages = build_extraction_messages(item)
+    prompt = messages[1]["content"]
+    assert build_memory_extraction_prompt(item.messages) in prompt
+    raw_section = prompt.split("## New Messages\n", 1)[1].split("## Observation Date", 1)[0]
+    assert TEMPORAL_GUIDANCE not in raw_section
+    assert "source_time" not in raw_section
+    table = json.loads(prompt.split(TEMPORAL_GUIDANCE, 1)[1].split("\n\n# Output:", 1)[0])
+    assert table == {
+        "source_time": [
+            "2026-09-30T23:58:00+07:00",
+            "2026-09-30T23:59:00+07:00",
+            "2026-10-01T00:01:00+07:00",
+            "2026-10-01T00:01:08+07:00",
+        ]
+    }
+    assert "## Observation Date\n2026-10-04" in prompt
+
+
+def test_evaluator_never_fills_missing_source_times_from_observation_date():
+    prompt = build_extraction_messages(case("temporal_missing_source_no_guess"))[1]["content"]
+    table = json.loads(prompt.split(TEMPORAL_GUIDANCE, 1)[1].split("\n\n# Output:", 1)[0])
+    assert table == {"source_time": [None, None]}
+
+
+@pytest.mark.parametrize("value", ("2026-09-14T09:00:00", "2026-09-14"))
+def test_policy_fixtures_require_aware_source_times(value):
+    from tests.support.memory_policy_cases import user
+
+    with pytest.raises(ValueError, match="timezone-aware"):
+        user("test", timestamp=value)
+
+
+def test_scoring_keeps_scope_and_exclusions_in_the_same_fact() -> None:
+    scoped = case("telecom_separate_rules_keep_exclusions_attached")
+    correct = (
+        "Báo cáo ARPU cho trả trước không gồm M2M.",
+        "Báo cáo throughput 5G loại trừ cell đang bảo dưỡng.",
+    )
+    assert score_case(scoped, correct).passed
+
+    # All keywords are still present, but the exclusions now qualify the wrong rules.
+    swapped = (
+        "Báo cáo ARPU cho trả trước loại trừ cell đang bảo dưỡng.",
+        "Báo cáo throughput 5G không gồm M2M.",
+    )
+    assert score_case(scoped, swapped).reason_codes == ("missing_fact_context",)
+
+
+def test_scoring_rejects_changed_aggregation_operator_and_units() -> None:
+    ratio = case("telecom_ratio_aggregation_exact")
+    fact = (
+        "Báo cáo ngày: KPI_X = SUM(success) / SUM(attempt) * 100%, chỉ tính cell có attempt >= 100."
+    )
+    assert score_case(ratio, (fact,)).passed
+    assert not score_case(
+        ratio, (fact.replace("SUM(success) / SUM(attempt)", "AVG(success / attempt)"),)
+    ).passed
+    assert not score_case(ratio, (fact.replace(">= 100", "> 100"),)).passed
+
+    units = case("telecom_recurring_direction_units_timezone")
+    report_rule = "Báo cáo 5G theo cell tách UL/DL, Mbps, P95, 18:00-20:00 UTC+7."
+    assert score_case(units, (report_rule,)).passed
+    assert not score_case(units, (report_rule.replace("Mbps", "MB/s"),)).passed
+
+
+@pytest.mark.parametrize("existing", (("",), ["fact"], (None,)))
+def test_cases_reject_invalid_existing_memory_context(existing) -> None:
+    with pytest.raises(ValueError, match="existing memories"):
+        replace(case("greeting_only"), existing_memories=existing)
+
+
+@pytest.mark.parametrize("groups", (((),), (("",),)))
+def test_expectations_reject_empty_per_fact_requirements(groups) -> None:
+    with pytest.raises(ValueError, match="required fact groups"):
+        replace(case("telecom_alarm_scope_and_window").expectation, required_fact_terms=groups)
 
 
 def test_parse_memory_facts_matches_mem0_json_envelope() -> None:

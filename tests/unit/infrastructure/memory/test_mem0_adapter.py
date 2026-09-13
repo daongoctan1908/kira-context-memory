@@ -1,10 +1,16 @@
 import asyncio
+import json
+from dataclasses import replace
 from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
 
 from app.application.services.memory_policy import MEMORY_EXTRACTION_INSTRUCTIONS
+from app.application.services.memory_temporal import (
+    TEMPORAL_GUIDANCE,
+    build_memory_extraction_prompt,
+)
 from app.config.settings import Settings
 from app.domain.errors.memory import (
     LongTermMemoryConnectionError,
@@ -187,8 +193,76 @@ async def test_process_memory_calls_only_add_with_exact_boundary_metadata():
     assert kwargs["metadata"]["formation_event_id"] == str(memory_source.formation_event_id)
     assert kwargs["metadata"]["boundary_message_id"] == 42
     assert kwargs["infer"] is True
+    assert kwargs["prompt"] == build_memory_extraction_prompt(memory_source.messages)
+    assert "timestamp" not in kwargs
+    assert "expiration_date" not in kwargs
     assert not hasattr(client, "update")
     assert not hasattr(client, "delete")
+
+
+async def test_concurrent_formations_keep_request_local_timestamps_and_raw_content():
+    class ConcurrentMem0(FakeMem0):
+        custom_instructions = MEMORY_EXTRACTION_INSTRUCTIONS
+
+        def __init__(self):
+            super().__init__()
+            self.ready = asyncio.Event()
+
+        async def add(self, messages, **kwargs):
+            self.add_calls.append((messages, kwargs))
+            if len(self.add_calls) == 2:
+                self.ready.set()
+            await asyncio.wait_for(self.ready.wait(), timeout=1)
+            return {"results": []}
+
+    client = ConcurrentMem0()
+    memory_adapter = adapter(client)
+    first = source()
+    second = replace(
+        first,
+        formation_event_id=uuid4(),
+        messages=tuple(
+            replace(message, timestamp=datetime(2026, 10, 1, tzinfo=UTC))
+            for message in first.messages
+        ),
+    )
+    await asyncio.gather(
+        memory_adapter.process_memory(first), memory_adapter.process_memory(second)
+    )
+    calls = {
+        kwargs["metadata"]["formation_event_id"]: (messages, kwargs)
+        for messages, kwargs in client.add_calls
+    }
+    for item in (first, second):
+        messages, kwargs = calls[str(item.formation_event_id)]
+        assert messages == [
+            {"role": message.role.value, "content": message.content} for message in item.messages
+        ]
+        assert kwargs["prompt"] == build_memory_extraction_prompt(item.messages)
+    assert client.custom_instructions == MEMORY_EXTRACTION_INSTRUCTIONS
+
+
+async def test_replayed_source_produces_identical_prompt_and_preserves_event_identity():
+    client = FakeMem0()
+    memory_adapter = adapter(client)
+    item = source()
+    await memory_adapter.process_memory(item)
+    await memory_adapter.process_memory(item)
+    assert client.add_calls[0] == client.add_calls[1]
+
+
+async def test_from_settings_applies_source_timezone(monkeypatch):
+    client = FakeMem0()
+    monkeypatch.setattr(
+        "app.infrastructure.memory.mem0_adapter.create_mem0_client", lambda _: client
+    )
+    configured = settings().model_copy(update={"memory_source_timezone": "UTC"})
+    memory_adapter = Mem0Adapter.from_settings(configured)
+    await memory_adapter.process_memory(source())
+    prompt = client.add_calls[0][1]["prompt"]
+    table = json.loads(prompt.split(TEMPORAL_GUIDANCE, 1)[1].strip())
+    assert set(table) == {"source_time"}
+    assert table["source_time"][0].endswith("+00:00")
 
 
 async def test_process_memory_preserves_ordered_lifecycle_actions():

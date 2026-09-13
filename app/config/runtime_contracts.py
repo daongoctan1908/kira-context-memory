@@ -35,6 +35,7 @@ class MemoryRuntimeSettings(Protocol):
     memory_llm_max_tokens: int
     memory_search_timeout_seconds: float
     memory_operation_timeout_seconds: float
+    memory_source_timezone: str
 
 
 class MemoryAdminRuntimeSettings(Protocol):

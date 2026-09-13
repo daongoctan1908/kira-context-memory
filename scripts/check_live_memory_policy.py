@@ -23,6 +23,10 @@ from app.application.services.memory_policy import (
     MEMORY_POLICY_VERSION,
     MEMORY_TAXONOMY,
 )
+from app.application.services.memory_temporal import (
+    DEFAULT_SOURCE_TIMEZONE,
+    build_memory_extraction_prompt,
+)
 from tests.support.memory_policy_cases import (
     CASES,
     MEMORY_POLICY_EVAL_VERSION,
@@ -41,6 +45,7 @@ class PolicyEvalOptions:
     timeout_seconds: float = 30.0
     max_tokens: int = 1000
     api_key: str | None = field(default=None, repr=False)
+    source_timezone: str = DEFAULT_SOURCE_TIMEZONE
 
     def __post_init__(self) -> None:
         try:
@@ -75,18 +80,28 @@ class PolicyEvalResult:
         return self.outcome == "pass"
 
 
-def build_extraction_messages(case: MemoryPolicyCase) -> list[dict[str, str]]:
+def build_extraction_messages(
+    case: MemoryPolicyCase,
+    *,
+    source_timezone: str = DEFAULT_SOURCE_TIMEZONE,
+) -> list[dict[str, str]]:
     """Build the exact V3 extraction prompt shape without writing a memory."""
     parsed_messages = parse_messages(
         [{"role": message.role, "content": message.content} for message in case.messages]
     )
     user_prompt = generate_additive_extraction_prompt(
-        existing_memories=[],
+        existing_memories=[
+            {"id": str(index), "text": text} for index, text in enumerate(case.existing_memories)
+        ],
         new_messages=parsed_messages,
         last_k_messages=[],
         current_date=case.observation_date,
         timestamp=case.observation_date,
-        custom_instructions=MEMORY_EXTRACTION_INSTRUCTIONS,
+        custom_instructions=build_memory_extraction_prompt(
+            case.messages,
+            source_timezone=source_timezone,
+            instructions=MEMORY_EXTRACTION_INSTRUCTIONS,
+        ),
     )
     return [
         {"role": "system", "content": ADDITIVE_EXTRACTION_PROMPT},
@@ -145,6 +160,9 @@ def score_case(
     for alternatives in expectation.required_any_terms:
         if not any(_normalize(term) in normalized for term in alternatives):
             reasons.append("missing_required_alternative")
+    for group in expectation.required_fact_terms:
+        if not any(all(_normalize(term) in _normalize(fact) for term in group) for fact in facts):
+            reasons.append("missing_fact_context")
     for term in expectation.forbidden_terms:
         if _normalize(term) in normalized:
             reasons.append("forbidden_term")
@@ -174,7 +192,10 @@ class MemoryPolicyEvalClient:
                 headers=_authorization_header(self._options.api_key),
                 json={
                     "model": self._options.model,
-                    "messages": build_extraction_messages(case),
+                    "messages": build_extraction_messages(
+                        case,
+                        source_timezone=self._options.source_timezone,
+                    ),
                     "temperature": 0,
                     "max_tokens": self._options.max_tokens,
                     "stream": False,
@@ -238,6 +259,7 @@ def options_from_environment(environ: Mapping[str, str] | None = None) -> Policy
         timeout_seconds=timeout,
         max_tokens=max_tokens,
         api_key=source.get("MEMORY_LLM_API_KEY"),
+        source_timezone=source.get("MEMORY_SOURCE_TIMEZONE", DEFAULT_SOURCE_TIMEZONE),
     )
 
 

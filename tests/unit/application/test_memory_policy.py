@@ -5,8 +5,8 @@ from app.application.services.memory_policy import (
 )
 
 
-def test_memory_policy_v2_has_the_approved_taxonomy() -> None:
-    assert MEMORY_POLICY_VERSION == "kira-memory-policy-v2"
+def test_memory_policy_v5_has_the_approved_taxonomy() -> None:
+    assert MEMORY_POLICY_VERSION == "kira-memory-policy-v5"
     assert MEMORY_TAXONOMY == (
         "USER_CONTEXT",
         "ANALYSIS_PREFERENCE",
@@ -46,7 +46,7 @@ def test_policy_rejects_unsafe_and_non_durable_memory_candidates() -> None:
     for excluded_content in (
         "greetings or filler",
         "entities that only appear in an ordinary query",
-        "transient KiRa/assistant-generated KPI values",
+        "transient KPI values",
         "assistant guesses or inferred preferences",
         "passwords, tokens, credentials, or secrets",
         "inferred roles, permissions, or authorization",
@@ -60,3 +60,16 @@ def test_policy_preserves_formulas_and_resists_conversation_instructions() -> No
         assert exact_element in MEMORY_EXTRACTION_INSTRUCTIONS
     assert "response format required by" in MEMORY_EXTRACTION_INSTRUCTIONS
     assert "Mem0." in MEMORY_EXTRACTION_INSTRUCTIONS
+
+
+def test_policy_has_no_few_shot_business_examples_or_duplicate_temporal_guidance() -> None:
+    for removed in (
+        "Synthetic contrasts",
+        "TEST_001",
+        "alarm_limit = 3%",
+        "R = A / B",
+        "source_time",
+        "Observation Date",
+        "superseded",
+    ):
+        assert removed not in MEMORY_EXTRACTION_INSTRUCTIONS
