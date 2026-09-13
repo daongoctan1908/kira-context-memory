@@ -23,10 +23,7 @@ from app.application.services.memory_policy import (
     MEMORY_POLICY_VERSION,
     MEMORY_TAXONOMY,
 )
-from app.application.services.memory_temporal import (
-    DEFAULT_SOURCE_TIMEZONE,
-    build_memory_extraction_prompt,
-)
+from app.application.services.memory_temporal import build_memory_extraction_prompt
 from tests.support.memory_policy_cases import (
     CASES,
     MEMORY_POLICY_EVAL_VERSION,
@@ -45,7 +42,6 @@ class PolicyEvalOptions:
     timeout_seconds: float = 30.0
     max_tokens: int = 1000
     api_key: str | None = field(default=None, repr=False)
-    source_timezone: str = DEFAULT_SOURCE_TIMEZONE
 
     def __post_init__(self) -> None:
         try:
@@ -80,11 +76,7 @@ class PolicyEvalResult:
         return self.outcome == "pass"
 
 
-def build_extraction_messages(
-    case: MemoryPolicyCase,
-    *,
-    source_timezone: str = DEFAULT_SOURCE_TIMEZONE,
-) -> list[dict[str, str]]:
+def build_extraction_messages(case: MemoryPolicyCase) -> list[dict[str, str]]:
     """Build the exact V3 extraction prompt shape without writing a memory."""
     parsed_messages = parse_messages(
         [{"role": message.role, "content": message.content} for message in case.messages]
@@ -99,7 +91,6 @@ def build_extraction_messages(
         timestamp=case.observation_date,
         custom_instructions=build_memory_extraction_prompt(
             case.messages,
-            source_timezone=source_timezone,
             instructions=MEMORY_EXTRACTION_INSTRUCTIONS,
         ),
     )
@@ -192,10 +183,7 @@ class MemoryPolicyEvalClient:
                 headers=_authorization_header(self._options.api_key),
                 json={
                     "model": self._options.model,
-                    "messages": build_extraction_messages(
-                        case,
-                        source_timezone=self._options.source_timezone,
-                    ),
+                    "messages": build_extraction_messages(case),
                     "temperature": 0,
                     "max_tokens": self._options.max_tokens,
                     "stream": False,
@@ -259,7 +247,6 @@ def options_from_environment(environ: Mapping[str, str] | None = None) -> Policy
         timeout_seconds=timeout,
         max_tokens=max_tokens,
         api_key=source.get("MEMORY_LLM_API_KEY"),
-        source_timezone=source.get("MEMORY_SOURCE_TIMEZONE", DEFAULT_SOURCE_TIMEZONE),
     )
 
 

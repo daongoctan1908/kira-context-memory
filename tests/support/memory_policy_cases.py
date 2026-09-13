@@ -6,7 +6,7 @@ from typing import Literal
 
 from app.application.services.memory_policy import MEMORY_TAXONOMY
 
-MEMORY_POLICY_EVAL_VERSION = "kira-memory-policy-eval-v4"
+MEMORY_POLICY_EVAL_VERSION = "kira-memory-policy-eval-v5"
 
 
 @dataclass(frozen=True, slots=True)
@@ -717,7 +717,7 @@ TEMPORAL_CASES: tuple[MemoryPolicyCase, ...] = (
         ),
     ),
     MemoryPolicyCase(
-        name="temporal_utc_to_vietnam_day",
+        name="temporal_utc_keeps_utc_day",
         taxonomy="TEMPORARY_FOCUS",
         tags=("positive", "temporal_sidecar", "timezone_boundary"),
         observation_date="2026-09-25",
@@ -731,8 +731,8 @@ TEMPORAL_CASES: tuple[MemoryPolicyCase, ...] = (
         expectation=PolicyExpectation(
             True,
             required_terms=("VoLTE", "Đà Nẵng"),
-            required_any_terms=(("15/09/2026", "2026-09-15"),),
-            forbidden_terms=("14/09/2026", "2026-09-14", "25/09/2026", "2026-09-25"),
+            required_any_terms=(("14/09/2026", "2026-09-14"),),
+            forbidden_terms=("15/09/2026", "2026-09-15", "25/09/2026", "2026-09-25"),
             min_facts=1,
             max_facts=1,
         ),

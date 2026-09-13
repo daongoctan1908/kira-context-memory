@@ -90,10 +90,10 @@ def test_evaluator_and_runtime_use_the_same_temporal_builder():
     table = json.loads(prompt.split(TEMPORAL_GUIDANCE, 1)[1].split("\n\n# Output:", 1)[0])
     assert table == {
         "source_time": [
-            "2026-09-30T23:58:00+07:00",
-            "2026-09-30T23:59:00+07:00",
-            "2026-10-01T00:01:00+07:00",
-            "2026-10-01T00:01:08+07:00",
+            "2026-09-30T16:58:00+00:00",
+            "2026-09-30T16:59:00+00:00",
+            "2026-09-30T17:01:00+00:00",
+            "2026-09-30T17:01:08+00:00",
         ]
     }
     assert "## Observation Date\n2026-10-04" in prompt

@@ -1,6 +1,6 @@
 # Temporal grounding tối giản theo từng lần add
 
-Policy: `kira-memory-policy-v5`. Corpus giữ nguyên `kira-memory-policy-eval-v4` (46 ca).
+Policy: `kira-memory-policy-v5`. Corpus: `kira-memory-policy-eval-v5` (46 ca).
 Mục tiêu là cung cấp thời gian nguồn cho memory formation và ghi mốc vào fact khi cần,
 không xây temporal reasoning engine. Rewriter và KiRa chịu trách nhiệm suy luận downstream.
 Không sửa package Mem0/schema DB, không thêm expiration, validity fields hay supersession.
@@ -24,13 +24,13 @@ gồm cả user và assistant. Vị trí mảng là cách ghép với message; k
 ```json
 {
   "source_time": [
-    "2026-09-14T09:00:00+07:00",
-    "2026-09-14T09:01:00+07:00"
+    "2026-09-14T02:00:00+00:00",
+    "2026-09-14T02:01:00+00:00"
   ]
 }
 ```
 
-Helper chỉ kiểm tra timestamp, quy đổi timezone và serialize. Không đọc/parse content, không tính
+Helper chỉ kiểm tra timestamp, chuẩn hóa về UTC và serialize. Không đọc/parse content, không tính
 today/yesterday/week/month, không có `calendar_dates`, không có temporal examples hay business-specific
 examples trong custom instruction của ứng dụng. Policy vẫn giữ taxonomy, attribution, bảo toàn
 công thức/phạm vi và quy tắc không lưu secret hoặc dữ liệu không đủ điều kiện. Prompt gốc của
@@ -51,21 +51,15 @@ vào embedding dùng để tìm memory cũ và không đi vào history messages 
 nhắc lại quy tắc source time. Việc có mốc trong text không bảo đảm model luôn chọn đúng mốc, cũng
 không tự ẩn fact cũ khi retrieval. Không thay đổi Rewriter/KiRa trong lần refactor này.
 
-## Cấu hình
+## Quy ước UTC
 
-Gateway và Worker đọc cùng một biến, đã được nối vào base Compose mà Week 5 kế thừa:
+Gateway, Worker và evaluator không còn cấu hình timezone riêng cho memory formation. Mọi timestamp
+nguồn có timezone đều được chuẩn hóa về UTC trước khi đưa vào `source_time`; không còn biến
+`MEMORY_SOURCE_TIMEZONE` hay dependency `tzdata` trực tiếp. Cách này giữ một biểu diễn duy nhất giữa
+application và ngày mặc định UTC của Mem0. Không còn cấu hình week start; model tự hiểu biểu thức
+tuần từ timestamp và ngữ cảnh.
 
-```dotenv
-MEMORY_SOURCE_TIMEZONE=Asia/Ho_Chi_Minh
-```
-
-Timezone phải là IANA zone hợp lệ; cấu hình sai làm bước tạo extraction prompt thất bại. Đây là
-cấu hình mặc định của deployment, chưa phải timezone riêng cho từng user. `tzdata` là dependency
-trực tiếp để việc quy đổi IANA/DST hoạt động cả trên Windows và image tối giản. Không còn cấu hình
-week start; model tự hiểu biểu thức tuần từ timestamp và ngữ cảnh.
-
-Nếu muốn đổi timezone trong stack Week 5, thêm biến trên vào `.env.week5.local`. Source mới được
-áp dụng sau khi rebuild/restart; lệnh local:
+Thay đổi được áp dụng sau khi rebuild/restart stack Week 5:
 
 ```powershell
 uv run --frozen python scripts/week5_openai_stack.py up
@@ -76,16 +70,17 @@ trả kết quả cũ khi retry; không tự re-extract các job đã hoàn thà
 
 ## Kiểm chứng và giới hạn
 
-- Test tập trung vào đúng thứ tự/mốc nguồn, timezone/DST, null, marker giả, prompt ngắn không có
-  trường lịch, cùng event retry, hai lần formation chạy đồng thời và cấu hình. Test tính sẵn lịch
+- Test tập trung vào đúng thứ tự/mốc nguồn UTC, null, marker giả, prompt ngắn không có trường lịch,
+  cùng event retry và hai lần formation chạy đồng thời. Test timezone cấu hình và tính sẵn lịch
   của v4 đã bỏ; corpus semantic không bị sửa để phù hợp với implementation mới.
 - Contract test chạy qua **AsyncMemory thật**, thay provider/storage bằng doubles: xác nhận
   `prompt=` tới LLM, embedding và saved messages giữ nguyên text, policy dùng chung không đổi,
   replay receipt bỏ qua provider. Test này không đánh giá khả năng hiểu ngày của model.
 - Corpus có 12 ca temporal và 34 ca trước đó. Evaluator và adapter dùng cùng helper, có thể đặt ngày
   Observation Date muộn hơn ngày nguồn để phát hiện model dùng nhầm đồng hồ worker.
-- Chưa chạy live semantic gate cho đúng policy v5 này. Unit/contract test không phải bằng chứng
-  độ chính xác temporal của model. Không rebuild Docker hoặc ghi DB khi refactor.
+- Live semantic gate UTC của v5 với `gpt-4o-mini` đạt 7/15: cả ba ca đối chứng đạt nhưng bảy ca
+  cần suy luận trực tiếp từ source timestamp đều trượt. Report local, git-ignore:
+  `artifacts/temporal-grounding/v5-utc-live.json`. Không rebuild Docker hoặc ghi DB khi refactor.
 
 ### Kết quả lịch sử, không phải điểm của v5
 
@@ -103,8 +98,8 @@ trả kết quả cũ khi retry; không tự re-extract các job đã hoàn thà
 Đây là lựa chọn đơn giản hóa implementation, không phải tuyên bố cải thiện benchmark. Model vẫn
 có thể bỏ qua nguồn hoặc ghép sai ngày; chưa có kiểm chứng held-out/production cho v5.
 
-Chạy gate bằng `MEMORY_LLM_BASE_URL`, `MEMORY_LLM_MODEL`, `MEMORY_LLM_API_KEY` và timezone cấu hình
-ở trên. Ca kiểm thử `tuần này` hiện vẫn kỳ vọng tuần lịch thứ Hai đến Chủ nhật; implementation
+Chạy gate bằng `MEMORY_LLM_BASE_URL`, `MEMORY_LLM_MODEL` và `MEMORY_LLM_API_KEY`.
+Ca kiểm thử `tuần này` hiện vẫn kỳ vọng tuần lịch thứ Hai đến Chủ nhật; implementation
 không tính hoặc truyền trước khoảng này:
 
 ```powershell

@@ -251,13 +251,12 @@ async def test_replayed_source_produces_identical_prompt_and_preserves_event_ide
     assert client.add_calls[0] == client.add_calls[1]
 
 
-async def test_from_settings_applies_source_timezone(monkeypatch):
+async def test_from_settings_uses_utc_source_timestamps(monkeypatch):
     client = FakeMem0()
     monkeypatch.setattr(
         "app.infrastructure.memory.mem0_adapter.create_mem0_client", lambda _: client
     )
-    configured = settings().model_copy(update={"memory_source_timezone": "UTC"})
-    memory_adapter = Mem0Adapter.from_settings(configured)
+    memory_adapter = Mem0Adapter.from_settings(settings())
     await memory_adapter.process_memory(source())
     prompt = client.add_calls[0][1]["prompt"]
     table = json.loads(prompt.split(TEMPORAL_GUIDANCE, 1)[1].strip())

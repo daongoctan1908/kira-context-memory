@@ -73,7 +73,7 @@ async def test_per_call_prompt_reaches_native_extraction_but_not_embedding_or_sa
         assert MEMORY_EXTRACTION_INSTRUCTIONS in prompt
         section = prompt.split(TEMPORAL_GUIDANCE, 1)[1].split("\n\n# Output:", 1)[0]
         table = json.loads(section)
-        assert table == {"source_time": ["2026-09-14T09:00:00+07:00", "2026-09-14T09:01:00+07:00"]}
+        assert table == {"source_time": ["2026-09-14T02:00:00+00:00", "2026-09-14T02:01:00+00:00"]}
         assert "## Last k Messages\nuser: old history" in prompt
         assert store.insert_with_formation_receipt.call_args.kwargs["event_id"] == str(
             item.formation_event_id

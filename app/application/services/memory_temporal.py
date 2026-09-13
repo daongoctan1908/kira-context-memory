@@ -2,13 +2,10 @@
 
 import json
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Protocol
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.application.services.memory_policy import MEMORY_EXTRACTION_INSTRUCTIONS
-
-DEFAULT_SOURCE_TIMEZONE = "Asia/Ho_Chi_Minh"
 
 TEMPORAL_GUIDANCE = """Temporal grounding:
 
@@ -27,14 +24,8 @@ class TimedMessage(Protocol):
 def build_memory_extraction_prompt(
     messages: Sequence[TimedMessage],
     *,
-    source_timezone: str = DEFAULT_SOURCE_TIMEZONE,
     instructions: str = MEMORY_EXTRACTION_INSTRUCTIONS,
 ) -> str:
-    try:
-        zone = ZoneInfo(source_timezone)
-    except (ValueError, ZoneInfoNotFoundError) as error:
-        raise ValueError("memory source timezone must be a valid IANA timezone") from error
-
     source_times: list[str | None] = []
 
     for message in messages:
@@ -44,7 +35,7 @@ def build_memory_extraction_prompt(
             raise ValueError("source timestamps must be timezone-aware")
 
         source_times.append(
-            timestamp.astimezone(zone).isoformat() if timestamp is not None else None
+            timestamp.astimezone(UTC).isoformat() if timestamp is not None else None
         )
 
     temporal_context = json.dumps(

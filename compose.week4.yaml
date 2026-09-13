@@ -23,7 +23,6 @@ x-memory-runtime: &memory-runtime
   MEMORY_LLM_MAX_TOKENS: "1000"
   MEMORY_SEARCH_TIMEOUT_SECONDS: "3"
   MEMORY_OPERATION_TIMEOUT_SECONDS: "30"
-  MEMORY_SOURCE_TIMEZONE: ${MEMORY_SOURCE_TIMEZONE:-Asia/Ho_Chi_Minh}
 
 x-mock-health: &mock-health
   interval: 2s

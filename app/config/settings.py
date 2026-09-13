@@ -13,8 +13,6 @@ from pydantic import (
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from app.application.services.memory_temporal import DEFAULT_SOURCE_TIMEZONE
-
 
 class Settings(BaseSettings):
     """Runtime configuration loaded from environment variables or a local ``.env``."""
@@ -80,7 +78,6 @@ class Settings(BaseSettings):
     memory_llm_max_tokens: int = Field(default=1000, ge=1)
     memory_operation_timeout_seconds: float = Field(default=30.0, gt=0)
     memory_formation_message_limit: int = Field(default=10, ge=2, multiple_of=2)
-    memory_source_timezone: str = DEFAULT_SOURCE_TIMEZONE
     memory_search_top_k: int = Field(default=10, ge=1, le=10)
     memory_search_threshold: float = Field(default=0.1, ge=0, le=1)
     memory_search_timeout_seconds: float = Field(default=3.0, gt=0)

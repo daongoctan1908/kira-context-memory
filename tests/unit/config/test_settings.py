@@ -4,19 +4,6 @@ from pydantic import SecretStr, ValidationError
 from app.config.settings import Settings
 
 
-def test_settings_read_memory_source_timezone_from_environment(monkeypatch) -> None:
-    monkeypatch.setenv("MEMORY_SOURCE_TIMEZONE", "Europe/Berlin")
-
-    settings = Settings(
-        _env_file=None,
-        kira_base_url="http://kira.test",
-        kira_username="service-account",
-        kira_basic_auth="secret",
-    )
-
-    assert settings.memory_source_timezone == "Europe/Berlin"
-
-
 def test_settings_read_kira_values_from_environment(monkeypatch) -> None:
     monkeypatch.setenv("KIRA_BASE_URL", "http://kira.test.internal:8122")
     monkeypatch.setenv("KIRA_USERNAME", "service-account")

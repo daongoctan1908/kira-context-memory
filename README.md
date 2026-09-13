@@ -19,8 +19,9 @@ Extraction policy hiện tại là [v5 với temporal grounding tối giản](do
 Adapter giữ nguyên messages, chỉ truyền mảng `source_time` qua `add(prompt=...)` cùng một đoạn
 temporal instruction ngắn; không tính sẵn lịch và không có ví dụ nghiệp vụ trong custom policy.
 Memory formation ghi mốc vào fact khi cần; Rewriter/KiRa chịu trách nhiệm suy luận downstream.
-Corpus vẫn có 46 ca. Chưa chạy live gate cho v5; kết quả 13/15 trước đây thuộc v4, không áp dụng
-cho bản mới. [Kết quả v3](docs/memory-policy-v3-telecom.md) giữ làm evidence lịch sử.
+Corpus vẫn có 46 ca. Live gate UTC của v5 đạt 7/15; kết quả 13/15 trước đây thuộc v4 có
+precompute/examples nên không áp dụng cho bản mới. [Kết quả v3](docs/memory-policy-v3-telecom.md)
+giữ làm evidence lịch sử.
 Control benchmark Week 5 vẫn khóa v2; các lượt thử này không thay thế benchmark.
 
 Batch A-D của Tuần 1 cung cấp Gateway baseline hoàn chỉnh để live smoke với KiRa Test.

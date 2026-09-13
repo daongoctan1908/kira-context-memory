@@ -9,10 +9,7 @@ from typing import Any, Protocol
 import httpx
 
 from app.application.services.memory_policy import MEMORY_EXTRACTION_INSTRUCTIONS
-from app.application.services.memory_temporal import (
-    DEFAULT_SOURCE_TIMEZONE,
-    build_memory_extraction_prompt,
-)
+from app.application.services.memory_temporal import build_memory_extraction_prompt
 from app.config.runtime_contracts import MemoryRuntimeSettings
 from app.domain.errors.memory import (
     LongTermMemoryConfigurationError,
@@ -133,12 +130,10 @@ class Mem0Adapter:
         *,
         search_timeout_seconds: float,
         operation_timeout_seconds: float,
-        source_timezone: str = DEFAULT_SOURCE_TIMEZONE,
     ) -> None:
         self._client = client
         self._search_timeout = search_timeout_seconds
         self._operation_timeout = operation_timeout_seconds
-        self._source_timezone = source_timezone
 
     @classmethod
     def from_settings(cls, settings: MemoryRuntimeSettings) -> "Mem0Adapter":
@@ -146,7 +141,6 @@ class Mem0Adapter:
             create_mem0_client(settings),
             search_timeout_seconds=settings.memory_search_timeout_seconds,
             operation_timeout_seconds=settings.memory_operation_timeout_seconds,
-            source_timezone=settings.memory_source_timezone,
         )
 
     async def search(
@@ -200,10 +194,7 @@ class Mem0Adapter:
                         "boundary_message_id": reference.boundary_message_id,
                     },
                     infer=True,
-                    prompt=build_memory_extraction_prompt(
-                        source.messages,
-                        source_timezone=self._source_timezone,
-                    ),
+                    prompt=build_memory_extraction_prompt(source.messages),
                 )
         except TimeoutError as error:
             raise LongTermMemoryTimeoutError from error

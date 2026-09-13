@@ -19,14 +19,6 @@ def make_settings(**overrides: object) -> WorkerSettings:
     return WorkerSettings(**values)  # type: ignore[arg-type]
 
 
-def test_worker_settings_read_memory_source_timezone_from_environment(monkeypatch) -> None:
-    monkeypatch.setenv("MEMORY_SOURCE_TIMEZONE", "Europe/Berlin")
-
-    settings = make_settings()
-
-    assert settings.memory_source_timezone == "Europe/Berlin"
-
-
 def test_worker_settings_have_pinned_runtime_defaults_without_gateway_dependencies() -> None:
     settings = make_settings()
 
