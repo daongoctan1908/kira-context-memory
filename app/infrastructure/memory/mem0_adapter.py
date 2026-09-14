@@ -9,7 +9,6 @@ from typing import Any, Protocol
 import httpx
 
 from app.application.services.memory_policy import MEMORY_EXTRACTION_INSTRUCTIONS
-from app.application.services.memory_temporal import build_memory_extraction_prompt
 from app.config.runtime_contracts import MemoryRuntimeSettings
 from app.domain.errors.memory import (
     LongTermMemoryConfigurationError,
@@ -194,7 +193,6 @@ class Mem0Adapter:
                         "boundary_message_id": reference.boundary_message_id,
                     },
                     infer=True,
-                    prompt=build_memory_extraction_prompt(source.messages),
                 )
         except TimeoutError as error:
             raise LongTermMemoryTimeoutError from error

@@ -23,7 +23,6 @@ from app.application.services.memory_policy import (
     MEMORY_POLICY_VERSION,
     MEMORY_TAXONOMY,
 )
-from app.application.services.memory_temporal import build_memory_extraction_prompt
 from tests.support.memory_policy_cases import (
     CASES,
     MEMORY_POLICY_EVAL_VERSION,
@@ -89,10 +88,7 @@ def build_extraction_messages(case: MemoryPolicyCase) -> list[dict[str, str]]:
         last_k_messages=[],
         current_date=case.observation_date,
         timestamp=case.observation_date,
-        custom_instructions=build_memory_extraction_prompt(
-            case.messages,
-            instructions=MEMORY_EXTRACTION_INSTRUCTIONS,
-        ),
+        custom_instructions=MEMORY_EXTRACTION_INSTRUCTIONS,
     )
     return [
         {"role": "system", "content": ADDITIVE_EXTRACTION_PROMPT},

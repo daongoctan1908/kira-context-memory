@@ -1,5 +1,4 @@
 import asyncio
-import json
 from dataclasses import replace
 from datetime import UTC, datetime
 from uuid import uuid4
@@ -7,10 +6,6 @@ from uuid import uuid4
 import pytest
 
 from app.application.services.memory_policy import MEMORY_EXTRACTION_INSTRUCTIONS
-from app.application.services.memory_temporal import (
-    TEMPORAL_GUIDANCE,
-    build_memory_extraction_prompt,
-)
 from app.config.settings import Settings
 from app.domain.errors.memory import (
     LongTermMemoryConnectionError,
@@ -193,14 +188,14 @@ async def test_process_memory_calls_only_add_with_exact_boundary_metadata():
     assert kwargs["metadata"]["formation_event_id"] == str(memory_source.formation_event_id)
     assert kwargs["metadata"]["boundary_message_id"] == 42
     assert kwargs["infer"] is True
-    assert kwargs["prompt"] == build_memory_extraction_prompt(memory_source.messages)
+    assert "prompt" not in kwargs
     assert "timestamp" not in kwargs
     assert "expiration_date" not in kwargs
     assert not hasattr(client, "update")
     assert not hasattr(client, "delete")
 
 
-async def test_concurrent_formations_keep_request_local_timestamps_and_raw_content():
+async def test_concurrent_formations_keep_raw_content_and_event_identity():
     class ConcurrentMem0(FakeMem0):
         custom_instructions = MEMORY_EXTRACTION_INSTRUCTIONS
 
@@ -238,11 +233,11 @@ async def test_concurrent_formations_keep_request_local_timestamps_and_raw_conte
         assert messages == [
             {"role": message.role.value, "content": message.content} for message in item.messages
         ]
-        assert kwargs["prompt"] == build_memory_extraction_prompt(item.messages)
+        assert "prompt" not in kwargs
     assert client.custom_instructions == MEMORY_EXTRACTION_INSTRUCTIONS
 
 
-async def test_replayed_source_produces_identical_prompt_and_preserves_event_identity():
+async def test_replayed_source_produces_identical_add_call_and_preserves_event_identity():
     client = FakeMem0()
     memory_adapter = adapter(client)
     item = source()
@@ -251,17 +246,14 @@ async def test_replayed_source_produces_identical_prompt_and_preserves_event_ide
     assert client.add_calls[0] == client.add_calls[1]
 
 
-async def test_from_settings_uses_utc_source_timestamps(monkeypatch):
+async def test_from_settings_uses_configured_mem0_policy_without_request_override(monkeypatch):
     client = FakeMem0()
     monkeypatch.setattr(
         "app.infrastructure.memory.mem0_adapter.create_mem0_client", lambda _: client
     )
     memory_adapter = Mem0Adapter.from_settings(settings())
     await memory_adapter.process_memory(source())
-    prompt = client.add_calls[0][1]["prompt"]
-    table = json.loads(prompt.split(TEMPORAL_GUIDANCE, 1)[1].strip())
-    assert set(table) == {"source_time"}
-    assert table["source_time"][0].endswith("+00:00")
+    assert "prompt" not in client.add_calls[0][1]
 
 
 async def test_process_memory_preserves_ordered_lifecycle_actions():

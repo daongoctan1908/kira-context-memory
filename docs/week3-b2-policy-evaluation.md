@@ -1,7 +1,7 @@
 # Week 3 Batch B2 — memory-policy acceptance gate
 
-> Historical v2 checkpoint. The active policy is v5 and the unchanged corpus is v4; see
-> [source-time grounding](memory-temporal-grounding.md) for changes and current validation.
+> Historical v2 checkpoint. The active policy is v5. Runtime formation uses Mem0's configured
+> custom instructions without a request-local temporal sidecar.
 
 ## Delivered boundary
 

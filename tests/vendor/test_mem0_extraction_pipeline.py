@@ -1,6 +1,5 @@
-"""Exercise the installed AsyncMemory pipeline with provider/storage doubles."""
+"""Exercise the installed AsyncMemory extraction pipeline with provider/storage doubles."""
 
-import json
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
@@ -10,7 +9,6 @@ from mem0.configs.base import MemoryConfig
 from mem0.memory.utils import parse_messages
 
 from app.application.services.memory_policy import MEMORY_EXTRACTION_INSTRUCTIONS
-from app.application.services.memory_temporal import TEMPORAL_GUIDANCE
 from app.domain.models.conversation import (
     CompletedTurnReference,
     ConversationMessage,
@@ -20,7 +18,7 @@ from app.domain.models.memory import MemorySource
 from app.infrastructure.memory.mem0_adapter import Mem0Adapter
 
 
-async def test_per_call_prompt_reaches_native_extraction_but_not_embedding_or_saved_messages():
+async def test_configured_policy_reaches_extraction_without_changing_saved_messages():
     store = MagicMock()
     store.get_formation_result.return_value = None
     store.search.return_value = []
@@ -71,9 +69,7 @@ async def test_per_call_prompt_reaches_native_extraction_but_not_embedding_or_sa
         assert history.save_messages.call_args.args[0] == raw
         prompt = llm.generate_response.call_args.kwargs["messages"][1]["content"]
         assert MEMORY_EXTRACTION_INSTRUCTIONS in prompt
-        section = prompt.split(TEMPORAL_GUIDANCE, 1)[1].split("\n\n# Output:", 1)[0]
-        table = json.loads(section)
-        assert table == {"source_time": ["2026-09-14T02:00:00+00:00", "2026-09-14T02:01:00+00:00"]}
+        assert "source_time" not in prompt
         assert "## Last k Messages\nuser: old history" in prompt
         assert store.insert_with_formation_receipt.call_args.kwargs["event_id"] == str(
             item.formation_event_id

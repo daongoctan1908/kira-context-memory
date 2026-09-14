@@ -9,10 +9,6 @@ from app.application.services.memory_policy import (
     MEMORY_EXTRACTION_INSTRUCTIONS,
     MEMORY_POLICY_VERSION,
 )
-from app.application.services.memory_temporal import (
-    TEMPORAL_GUIDANCE,
-    build_memory_extraction_prompt,
-)
 from scripts.check_live_memory_policy import (
     MemoryPolicyEvalClient,
     PolicyEvalOptions,
@@ -40,7 +36,7 @@ def case(name: str):
 def test_acceptance_matrix_covers_taxonomy_and_negative_rules() -> None:
     validate_case_matrix()
 
-    assert len(CASES) == 46
+    assert len(CASES) == 34
     negative_tags = {
         tag for item in CASES if not item.expectation.should_extract for tag in item.tags
     }
@@ -77,40 +73,6 @@ def test_source_date_is_not_replaced_by_the_worker_observation_date() -> None:
     wrong_date = score_case(anchored, ("Ưu tiên nghẽn 5G Hà Nội ngày 20/09/2026.",))
     assert "missing_required_alternative" in wrong_date.reason_codes
     assert "forbidden_term" in wrong_date.reason_codes
-
-
-def test_evaluator_and_runtime_use_the_same_temporal_builder():
-    item = case("temporal_midnight_confirmation")
-    messages = build_extraction_messages(item)
-    prompt = messages[1]["content"]
-    assert build_memory_extraction_prompt(item.messages) in prompt
-    raw_section = prompt.split("## New Messages\n", 1)[1].split("## Observation Date", 1)[0]
-    assert TEMPORAL_GUIDANCE not in raw_section
-    assert "source_time" not in raw_section
-    table = json.loads(prompt.split(TEMPORAL_GUIDANCE, 1)[1].split("\n\n# Output:", 1)[0])
-    assert table == {
-        "source_time": [
-            "2026-09-30T16:58:00+00:00",
-            "2026-09-30T16:59:00+00:00",
-            "2026-09-30T17:01:00+00:00",
-            "2026-09-30T17:01:08+00:00",
-        ]
-    }
-    assert "## Observation Date\n2026-10-04" in prompt
-
-
-def test_evaluator_never_fills_missing_source_times_from_observation_date():
-    prompt = build_extraction_messages(case("temporal_missing_source_no_guess"))[1]["content"]
-    table = json.loads(prompt.split(TEMPORAL_GUIDANCE, 1)[1].split("\n\n# Output:", 1)[0])
-    assert table == {"source_time": [None, None]}
-
-
-@pytest.mark.parametrize("value", ("2026-09-14T09:00:00", "2026-09-14"))
-def test_policy_fixtures_require_aware_source_times(value):
-    from tests.support.memory_policy_cases import user
-
-    with pytest.raises(ValueError, match="timezone-aware"):
-        user("test", timestamp=value)
 
 
 def test_scoring_keeps_scope_and_exclusions_in_the_same_fact() -> None:

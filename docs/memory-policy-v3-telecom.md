@@ -3,8 +3,9 @@
 Checkpoint lịch sử: `kira-memory-policy-v3`. Corpus: `kira-memory-policy-eval-v3`.
 Ngày thay đổi: 2026-09-13. Sáu taxonomy và format JSON Mem0 giữ nguyên.
 
-Policy hiện hành là [v5 — source-time grounding tối giản](memory-temporal-grounding.md).
-Các kết quả và giới hạn bên dưới mô tả v3 tại thời điểm kiểm tra, không phải kết quả chạy lại v5.
+Policy hiện hành là v5 và dùng `custom_instructions` cấu hình sẵn của Mem0, không có temporal
+sidecar theo request. Các kết quả và giới hạn bên dưới mô tả v3 tại thời điểm kiểm tra, không phải
+kết quả chạy lại v5.
 
 **Trạng thái: bản cải tiến để thử nghiệm, chưa đạt toàn bộ live acceptance gate.**
 Không xem việc unit test qua là bằng chứng model luôn làm đúng policy.

@@ -15,13 +15,11 @@ PostgreSQL/pgvector live pass. T5.3–T5.20 chưa triển khai; chưa có semant
 [Week 5 OpenAI runtime smoke](docs/week5-openai-runtime-smoke.md). Stack này thay ba provider mock
 bằng OpenAI và giữ database Week 5 tách biệt; kết quả smoke không được coi là benchmark chất lượng.
 
-Extraction policy hiện tại là [v5 với temporal grounding tối giản](docs/memory-temporal-grounding.md).
-Adapter giữ nguyên messages, chỉ truyền mảng `source_time` qua `add(prompt=...)` cùng một đoạn
-temporal instruction ngắn; không tính sẵn lịch và không có ví dụ nghiệp vụ trong custom policy.
-Memory formation ghi mốc vào fact khi cần; Rewriter/KiRa chịu trách nhiệm suy luận downstream.
-Corpus vẫn có 46 ca. Live gate UTC của v5 đạt 7/15; kết quả 13/15 trước đây thuộc v4 có
-precompute/examples nên không áp dụng cho bản mới. [Kết quả v3](docs/memory-policy-v3-telecom.md)
-giữ làm evidence lịch sử.
+Extraction policy hiện tại là v5 và được cấu hình qua `custom_instructions` của Mem0. Adapter gửi
+nguyên văn messages vào luồng `add()` native, không bổ sung `source_time` hoặc temporal prompt theo
+từng request. Vì Mem0 OSS dùng ngày xử lý làm `Observation Date`, relative time của job xử lý muộn
+chưa có bảo đảm riêng; Rewriter/KiRa chịu trách nhiệm suy luận downstream. Corpus policy có 34 ca.
+[Kết quả v3](docs/memory-policy-v3-telecom.md) được giữ làm evidence lịch sử.
 Control benchmark Week 5 vẫn khóa v2; các lượt thử này không thay thế benchmark.
 
 Batch A-D của Tuần 1 cung cấp Gateway baseline hoàn chỉnh để live smoke với KiRa Test.
