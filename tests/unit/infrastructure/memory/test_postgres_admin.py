@@ -7,9 +7,12 @@ from app.domain.errors.memory import (
     LongTermMemoryProtocolError,
 )
 from app.infrastructure.memory.postgres_admin import (
+    CURRENT_MEM0_DISTRIBUTION_VERSION,
+    MEM0_SCHEMA_CONTRACT_VERSION,
     embeddings_url,
     formation_receipt_table_name,
     initialize_memory_schema,
+    memory_schema_contract_version,
     normalize_psycopg_dsn,
     probe_embedding_dimension,
     validate_memory_schema,
@@ -42,6 +45,22 @@ def test_url_and_dsn_normalization():
 
 def test_formation_receipt_table_is_collection_scoped():
     assert formation_receipt_table_name("memories") == "memories_formation_receipts"
+
+
+def test_observability_package_keeps_phase3_schema_contract(monkeypatch):
+    monkeypatch.setattr(
+        "app.infrastructure.memory.postgres_admin.version",
+        lambda distribution: CURRENT_MEM0_DISTRIBUTION_VERSION,
+    )
+
+    assert memory_schema_contract_version() == MEM0_SCHEMA_CONTRACT_VERSION
+
+    monkeypatch.setattr(
+        "app.infrastructure.memory.postgres_admin.version",
+        lambda distribution: "2.0.20+viettel.unknown",
+    )
+    with pytest.raises(LongTermMemoryConfigurationError):
+        memory_schema_contract_version()
 
 
 async def test_embedding_probe_validates_auth_contract_and_dimension():

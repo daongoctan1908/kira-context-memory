@@ -12,7 +12,11 @@ from app.application.use_cases.process_memory_job import (
     ProcessMemoryJobResult,
 )
 from app.domain.models.memory_job import MemoryJob, MemoryJobPurgeResult, MemoryJobStats
-from app.infrastructure.observability.langfuse_attributes import OBSERVATION_TYPE
+from app.infrastructure.observability.langfuse_attributes import (
+    OBSERVATION_TYPE,
+    masked_io_attributes,
+    usage_attributes,
+)
 from app.infrastructure.observability.logging import configure_structured_logging
 from app.infrastructure.observability.tracing import set_span_attribute, start_span
 from worker.runner import MemoryJobRunnerSnapshot
@@ -22,7 +26,11 @@ _CLAIM_KINDS = ("new", "reclaimed")
 _PROCESSING_OUTCOMES = ("success", "retry", "dead")
 _CLEANUP_STATUSES = ("completed", "dead")
 _STAGE_KINDS = {"internal": SpanKind.INTERNAL, "client": SpanKind.CLIENT}
-_STAGE_TYPES = {"memory_job.transition": "span"}
+_STAGE_TYPES = {
+    "conversation.read_boundary": "span",
+    "mem0.formation": "chain",
+    "memory_job.transition": "span",
+}
 
 
 class _StageObservation:
@@ -38,6 +46,19 @@ class _StageObservation:
             self._span.set_status(Status(StatusCode.ERROR if outcome == "error" else StatusCode.OK))
         except Exception:
             pass
+
+    def set_input(self, value: object) -> None:
+        self._set_attributes(masked_io_attributes(input_value=value))
+
+    def set_output(self, value: object) -> None:
+        self._set_attributes(masked_io_attributes(output_value=value))
+
+    def set_usage(self, usage: Mapping[str, object]) -> None:
+        self._set_attributes(usage_attributes(usage))
+
+    def _set_attributes(self, attributes: Mapping[str, object]) -> None:
+        for key, value in attributes.items():
+            self.set_attribute(key, value)
 
 
 def configure_worker_logging(level: str, *, deployment_environment: str = "development") -> None:

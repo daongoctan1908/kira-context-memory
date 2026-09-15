@@ -18,6 +18,7 @@ from app.domain.ports.memory_job_observer import MemoryJobProcessObserverPort
 from app.domain.ports.memory_job_queue import MemoryJobQueuePort
 from app.infrastructure.memory.mem0_adapter import Mem0Adapter
 from app.infrastructure.memory.postgres_admin import validate_memory_schema
+from app.infrastructure.observability.memory_observer import MemoryObserver
 from app.infrastructure.postgres.client import create_postgres_engine
 from app.infrastructure.postgres.conversation_store import PostgresConversationStoreAdapter
 from app.infrastructure.postgres.managed_store import ManagedPostgresConversationStore
@@ -81,13 +82,17 @@ async def worker_dependency_lifespan(
 
         resolved_memory = long_term_memory
         if resolved_memory is None:
-            owned_memory = Mem0Adapter.from_settings(resolved_settings)
+            owned_memory = Mem0Adapter.from_settings(
+                resolved_settings,
+                observer=MemoryObserver(tracer),
+            )
             resolved_memory = owned_memory
 
         process_memory = ProcessMemoryUseCase(
             conversation_store,
             resolved_memory,
             message_limit=resolved_settings.memory_formation_message_limit,
+            observer=process_observer,
         )
         process_memory_job = ProcessMemoryJobUseCase(
             process_memory,

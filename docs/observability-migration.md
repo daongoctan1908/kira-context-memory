@@ -1,6 +1,6 @@
 # Observability migration plan
 
-Status: Phases 0–3 complete. AI-stage observations begin in Phase 4. Every later
+Status: Phases 0–4 complete. OTel metric parity begins in Phase 5. Every later
 phase has an independent acceptance gate and may be rolled back without reverting business data.
 
 The architecture and identifier rules are normative in
@@ -254,15 +254,21 @@ Dependency: Phase 2.
 
 ## Phase 4 — AI-stage observations
 
+Status: **DONE**.
+
 Goal: identify whether observed bad output originated in retrieval, context construction, rewrite,
 KiRa, or a Mem0 formation substage.
 
 Modify:
 
 - `app/application/services/context_builder.py`;
+- `app/application/use_cases/handle_chat.py`;
 - `app/infrastructure/llm/vllm_query_rewriter.py`;
+- `app/infrastructure/kira/http_kira_client.py`;
 - `app/infrastructure/memory/mem0_adapter.py`;
 - `app/application/use_cases/process_memory.py`;
+- the framework-free context/worker observer ports and their OTel implementations;
+- `worker/dependencies.py` and `worker/telemetry.py`;
 - `packages/viettel-mem0/mem0/memory/main.py`;
 - `packages/viettel-mem0/mem0/llms/vllm.py`;
 - `packages/viettel-mem0/mem0/embeddings/openai.py`.
@@ -292,6 +298,17 @@ Acceptance:
 - each failure fixture points to one distinguishable stage/outcome;
 - observation changes do not alter prompts, calls, facts, lifecycle events, or receipts;
 - raw Mem0/HTTPX logging remains suppressed.
+
+Acceptance evidence:
+
+- the root suite passes with `824 passed`, `74 skipped`, and `92.32%` coverage;
+- the vendored Mem0 formation/provider/observer suites pass with `89 passed`;
+- PostgreSQL integration passes with `72 passed`, `1 skipped`; the `.4` telemetry-only package
+  deliberately retains the `.3` persisted schema-contract marker so Phase 3 rollback needs no
+  database mutation;
+- the rebuilt observability overlay completes the asynchronous `/chat` to memory to later-session
+  retrieval smoke with the Collector both available and stopped; Gateway and Worker remain ready
+  and return HTTP 200 while telemetry export is unavailable.
 
 Dependency: Phase 3.
 

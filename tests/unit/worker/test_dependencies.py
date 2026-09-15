@@ -7,6 +7,7 @@ from app.application.use_cases.process_memory_job import ProcessMemoryJobUseCase
 from app.domain.errors.conversation import ConversationStoreConfigurationError
 from app.domain.errors.memory import LongTermMemoryConfigurationError
 from app.domain.errors.memory_job import MemoryJobQueueConfigurationError
+from app.infrastructure.observability.memory_observer import MemoryObserver
 from app.infrastructure.postgres.managed_store import ManagedPostgresConversationStore
 from app.infrastructure.postgres.memory_job_queue import PostgresMemoryJobQueueAdapter
 from app.infrastructure.postgres.schema import EXPECTED_SCHEMA_REVISION
@@ -107,7 +108,9 @@ async def test_lifespan_constructs_validated_worker_dependencies_and_closes_owne
         assert engine.disposed is False
 
     engine_factory.assert_called_once_with(settings)
-    memory_factory.assert_called_once_with(settings)
+    memory_factory.assert_called_once()
+    assert memory_factory.call_args.args == (settings,)
+    assert isinstance(memory_factory.call_args.kwargs["observer"], MemoryObserver)
     memory_schema_validator.assert_called_once_with(settings)
     assert memory.closed is True
     assert engine.disposed is True

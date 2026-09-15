@@ -21,6 +21,8 @@ MEMORY_SCHEMA_VERSION = 2
 MEM0_DISTRIBUTION = "viettel-mem0"
 LEGACY_MEMORY_SCHEMA_VERSION = 1
 LEGACY_MEM0_VERSION = "2.0.20+viettel.2"
+MEM0_SCHEMA_CONTRACT_VERSION = "2.0.20+viettel.3"
+CURRENT_MEM0_DISTRIBUTION_VERSION = "2.0.20+viettel.4"
 FORMATION_RECEIPT_SUFFIX = "_formation_receipts"
 
 
@@ -31,6 +33,17 @@ class MemorySchemaState:
     embedding_dims: int
     mem0_version: str
     pgvector_version: str
+
+
+def memory_schema_contract_version() -> str:
+    """Return the persisted contract version for the installed compatible Mem0 build."""
+    try:
+        installed_version = version(MEM0_DISTRIBUTION)
+    except PackageNotFoundError as error:
+        raise LongTermMemoryConfigurationError from error
+    if installed_version != CURRENT_MEM0_DISTRIBUTION_VERSION:
+        raise LongTermMemoryConfigurationError
+    return MEM0_SCHEMA_CONTRACT_VERSION
 
 
 def normalize_psycopg_dsn(value: str) -> str:
@@ -190,10 +203,7 @@ def _validate_memory_schema_sync(
     embedding_dims: int,
 ) -> MemorySchemaState:
     """Validate version metadata and vector dimensions using read-only statements."""
-    try:
-        mem0_version = version(MEM0_DISTRIBUTION)
-    except PackageNotFoundError as error:
-        raise LongTermMemoryConfigurationError from error
+    mem0_version = memory_schema_contract_version()
 
     metadata_table_name = f"{schema_name}.kira_memory_schema"
     metadata_table = sql.Identifier(schema_name, "kira_memory_schema")
@@ -247,10 +257,7 @@ def _initialize_memory_schema_sync(
     embedding_model: str,
     embedding_dims: int,
 ) -> MemorySchemaState:
-    try:
-        mem0_version = version(MEM0_DISTRIBUTION)
-    except PackageNotFoundError as error:
-        raise LongTermMemoryConfigurationError from error
+    mem0_version = memory_schema_contract_version()
 
     metadata_table = sql.Identifier(schema_name, "kira_memory_schema")
     with psycopg.connect(dsn) as connection, connection.cursor() as cursor:
@@ -409,7 +416,6 @@ def _initialize_memory_schema_sync(
             )
             if cursor.rowcount != 1:
                 raise LongTermMemoryConfigurationError
-
         _validate_formation_schema(cursor, schema_name, collection_name)
 
     return MemorySchemaState(*expected)

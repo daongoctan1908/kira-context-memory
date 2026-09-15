@@ -67,9 +67,13 @@ class ContextBuilder:
         if len({message.session_id for message in recent_messages}) > 1:
             raise ValueError("recent messages must belong to one session")
 
+        trim_reason = "none"
         recent = tuple(recent_messages[-self._max_recent_messages :])
+        if len(recent) < len(recent_messages):
+            trim_reason = "message_limit"
         if recent and recent[0].role is ConversationRole.ASSISTANT:
             recent = recent[1:]
+            trim_reason = "orphan_assistant"
 
         turns = [tuple(group) for _, group in groupby(recent, key=lambda message: message.turn_id)]
         turn_tokens = [estimate_recent_tokens(turn) for turn in turns]
@@ -78,10 +82,12 @@ class ContextBuilder:
         while estimated_tokens > self._recent_token_budget:
             estimated_tokens -= turn_tokens[first]
             first += 1
+            trim_reason = "token_budget"
 
         return ConversationContext(
             recent_messages=tuple(message for turn in turns[first:] for message in turn),
             current_query=current_query,
             estimated_recent_tokens=estimated_tokens,
             long_term_memories=tuple(long_term_memories[: self._max_long_term_memories]),
+            trim_reason=trim_reason,
         )

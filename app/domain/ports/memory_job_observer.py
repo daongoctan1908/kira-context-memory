@@ -7,7 +7,11 @@ from typing import Literal, Protocol
 from app.domain.ports.context_observer import StageObservationPort
 
 MemoryJobStageKind = Literal["internal", "client"]
-MemoryJobStageName = Literal["memory_job.transition"]
+MemoryJobStageName = Literal[
+    "conversation.read_boundary",
+    "mem0.formation",
+    "memory_job.transition",
+]
 
 
 class MemoryJobProcessObserverPort(Protocol):

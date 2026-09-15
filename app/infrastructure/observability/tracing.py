@@ -40,6 +40,11 @@ _request_trace_state: ContextVar[RequestTraceState | None] = ContextVar(
     "request_trace_state",
     default=None,
 )
+_MASKED_OBSERVATION_STRINGS = {
+    "langfuse.observation.input",
+    "langfuse.observation.output",
+    "langfuse.observation.usage_details",
+}
 
 
 def current_trace_fields() -> dict[str, str]:
@@ -145,7 +150,15 @@ def start_span(
 def set_span_attribute(span: Span, key: str, value: object) -> None:
     """Attach one bounded scalar attribute and ignore observer failures."""
     safe_key = safe_log_value(key)
-    safe_value = safe_log_value(value)
+    if (
+        isinstance(safe_key, str)
+        and safe_key in _MASKED_OBSERVATION_STRINGS
+        and isinstance(value, str)
+        and len(value) <= 8192
+    ):
+        safe_value: object = value
+    else:
+        safe_value = safe_log_value(value)
     if not isinstance(safe_key, str) or safe_value is None:
         return
     try:

@@ -20,7 +20,7 @@ class StoredVector:
 
 
 def test_internal_distribution_preserves_upstream_namespace() -> None:
-    assert mem0.__version__ == "2.0.20+viettel.3"
+    assert mem0.__version__ == "2.0.20+viettel.4"
     assert Memory.__module__ == "mem0.memory.main"
 
 

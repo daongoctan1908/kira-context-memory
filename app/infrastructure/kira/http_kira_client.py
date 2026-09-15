@@ -22,7 +22,10 @@ from app.domain.errors.kira import (
 from app.domain.models.kira import KiraAuthResult, KiraStreamEvent
 from app.infrastructure.kira.sse_parser import parse_sse_line
 from app.infrastructure.kira.token_manager import Clock, KiraTokenManager
-from app.infrastructure.observability.langfuse_attributes import OBSERVATION_TYPE
+from app.infrastructure.observability.langfuse_attributes import (
+    OBSERVATION_TYPE,
+    masked_io_attributes,
+)
 from app.infrastructure.observability.tracing import (
     record_span_error,
     set_span_attribute,
@@ -43,9 +46,7 @@ class KiraHttpAdapter:
     ) -> None:
         self._http_client = http_client
         self._settings = settings
-        self._tracer = tracer or trace.NoOpTracerProvider().get_tracer(
-            "app.infrastructure.kira"
-        )
+        self._tracer = tracer or trace.NoOpTracerProvider().get_tracer("app.infrastructure.kira")
         self._timeout = httpx.Timeout(
             connect=settings.kira_connect_timeout_seconds,
             read=settings.kira_read_timeout_seconds,
@@ -105,7 +106,7 @@ class KiraHttpAdapter:
     async def chat_stream(self, message: str) -> AsyncIterator[KiraStreamEvent]:
         """Open a KiRa chat request and return an incremental event iterator."""
         token = await self._token_manager.get_token()
-        span = self._start_chat_span()
+        span = self._start_chat_span(message)
         started = perf_counter()
         try:
             stream_context, response = await self._open_chat_stream(message=message, token=token)
@@ -181,13 +182,14 @@ class KiraHttpAdapter:
             "Content-Type": "application/json",
         }
 
-    def _start_chat_span(self) -> Span:
+    def _start_chat_span(self, message: str) -> Span:
         try:
             span = self._tracer.start_span("kira.chat", kind=SpanKind.CLIENT)
         except Exception:
             return trace.INVALID_SPAN
         set_span_attribute(span, OBSERVATION_TYPE, "generation")
         set_span_attribute(span, "server.address", self._settings.kira_base_url.host or "kira")
+        _set_span_attributes(span, masked_io_attributes(input_value=message))
         return span
 
 
@@ -209,6 +211,8 @@ class _KiraResponseStream(AsyncIterator[KiraStreamEvent]):
         self._started = started
         self._first_event_observed = False
         self._first_content_observed = False
+        self._output_fragments: list[str] = []
+        self._output_bytes = 0
 
     def __aiter__(self) -> Self:
         return self
@@ -260,6 +264,21 @@ class _KiraResponseStream(AsyncIterator[KiraStreamEvent]):
             with anyio.CancelScope(shield=True):
                 await self._stream_context.__aexit__(None, None, None)
         finally:
+            if self._output_fragments:
+                _set_span_attributes(
+                    self._span,
+                    masked_io_attributes(output_value="".join(self._output_fragments)),
+                )
+                set_span_attribute(
+                    self._span,
+                    "kira.observation.output.original_bytes",
+                    self._output_bytes,
+                )
+                set_span_attribute(
+                    self._span,
+                    "kira.observation.output.truncated",
+                    self._output_bytes > 4096,
+                )
             _finish_span(self._span, outcome, error)
 
     def _observe_event(self, event: KiraStreamEvent) -> None:
@@ -270,6 +289,11 @@ class _KiraResponseStream(AsyncIterator[KiraStreamEvent]):
         if event.text_fragment and not self._first_content_observed:
             self._first_content_observed = True
             set_span_attribute(self._span, "kira.stream.first_content_seconds", elapsed)
+        if event.text_fragment:
+            self._output_bytes += len(event.text_fragment.encode("utf-8"))
+            captured = sum(len(fragment) for fragment in self._output_fragments)
+            if captured < 4096:
+                self._output_fragments.append(event.text_fragment[: 4096 - captured])
         if event.request_id is not None:
             set_span_attribute(self._span, "kira.request_id", event.request_id)
         if event.message_id is not None:
@@ -289,6 +313,11 @@ def _finish_span(span: Span, outcome: str, error: BaseException | None = None) -
         span.end()
     except Exception:
         pass
+
+
+def _set_span_attributes(span: Span, attributes: dict[str, object]) -> None:
+    for key, value in attributes.items():
+        set_span_attribute(span, key, value)
 
 
 def _optional_number(value: object) -> float | None:

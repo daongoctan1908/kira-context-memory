@@ -62,14 +62,18 @@ All benchmarks run on the same production-representative model stack. Single-pas
 
 See the [migration guide](https://docs.mem0.ai/migration/oss-v2-to-v3) for upgrade instructions. The [evaluation framework](https://github.com/mem0ai/memory-benchmarks) is open-sourced so anyone can reproduce the numbers.
 
-### Viettel event-scoped formation extension
+### Viettel extensions
 
-The internal `2.0.20+viettel.3` distribution keeps the native V3 extraction policy and adds an
-optional PostgreSQL/pgvector idempotency contract. When `metadata.formation_event_id` is a UUID on a
-user-scoped `add(..., infer=True)` call, the pgvector adapter writes every generated memory and a
-collection-scoped receipt in one database transaction. A later call with the same event ID returns
-the committed receipt before embedding, semantic retrieval, or LLM extraction. The event ID is
-persisted in each memory payload as provenance.
+The internal `2.0.20+viettel.4` distribution keeps the native V3 extraction policy. Its `.3`
+persisted contract adds optional PostgreSQL/pgvector idempotency: when
+`metadata.formation_event_id` is a UUID on a user-scoped `add(..., infer=True)` call, the pgvector
+adapter writes every generated memory and a collection-scoped receipt in one database transaction.
+A later call with the same event ID returns the committed receipt before embedding, semantic
+retrieval, or LLM extraction. The event ID is persisted in each memory payload as provenance.
+
+The `.4` package adds only a dependency-free, request-local observation hook. It does not change
+prompts, provider requests, extraction, vector data, receipts, or the persisted `.3` schema
+contract.
 
 This extension requires the custom pgvector adapter and a pre-initialized
 `<collection>_formation_receipts` table. Other vector stores fail closed when an event-scoped

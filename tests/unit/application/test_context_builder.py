@@ -45,6 +45,7 @@ def test_empty_history_keeps_current_query_untouched() -> None:
     assert context.current_query == query
     assert context.estimated_recent_tokens == 0
     assert context.long_term_memories == ()
+    assert context.trim_reason == "none"
 
 
 def test_ltm_ranking_is_preserved_and_bounded_independently_from_recent() -> None:
@@ -88,6 +89,7 @@ def test_message_cap_keeps_newest_messages_without_mutating_input() -> None:
     assert len(context.recent_messages) == 10
     assert context.recent_messages == tuple(history[-10:])
     assert context.estimated_recent_tokens == estimate_recent_tokens(history[-10:])
+    assert context.trim_reason == "message_limit"
     assert history == before
 
 
@@ -99,6 +101,7 @@ def test_budget_exact_boundary_includes_the_whole_pair() -> None:
     trimmed = ContextBuilder(recent_token_budget=budget - 1).build(history, "q")
     assert trimmed.recent_messages == pair(2)
     assert trimmed.estimated_recent_tokens == estimate_recent_tokens(pair(2))
+    assert trimmed.trim_reason == "token_budget"
 
 
 def test_budget_drops_oldest_turns_and_restores_store_order_not_timestamp_order() -> None:
@@ -129,6 +132,7 @@ def test_cap_cutting_a_turn_drops_the_oldest_orphan_assistant() -> None:
 
     assert context.recent_messages == history[2:]
     assert context.recent_messages[0].role is ConversationRole.USER
+    assert context.trim_reason == "orphan_assistant"
 
 
 def test_assistant_only_window_is_discarded() -> None:

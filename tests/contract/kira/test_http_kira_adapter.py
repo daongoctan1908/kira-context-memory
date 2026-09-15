@@ -153,12 +153,12 @@ async def test_chat_stream_sends_exact_payload_and_yields_frames_in_order() -> N
     }
 
 
-async def test_chat_trace_measures_stream_milestones_without_recording_content() -> None:
+async def test_chat_trace_measures_stream_milestones_with_masked_bounded_content() -> None:
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     tracer = provider.get_tracer("test.kira")
-    data = json.dumps(sse_payload("sensitive answer")).encode()
+    data = json.dumps(sse_payload("call +84 912 345 678")).encode()
 
     async def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/authenticate":
@@ -175,8 +175,8 @@ async def test_chat_trace_measures_stream_milestones_without_recording_content()
                 client,
                 make_settings(),
                 tracer=tracer,
-            ).chat_stream("sensitive question")
-            assert [event.text_fragment async for event in iterator] == ["sensitive answer"]
+            ).chat_stream("email user@example.com")
+            assert [event.text_fragment async for event in iterator] == ["call +84 912 345 678"]
 
     spans = exporter.get_finished_spans()
     auth_span = next(span for span in spans if span.name == "kira.authenticate")
@@ -192,8 +192,10 @@ async def test_chat_trace_measures_stream_milestones_without_recording_content()
     assert chat_span.attributes["kira.message_id"] == "message-1"
     assert chat_span.attributes["kira.stream.first_event_seconds"] >= 0
     assert chat_span.attributes["kira.stream.first_content_seconds"] >= 0
-    assert "sensitive question" not in str(chat_span.attributes)
-    assert "sensitive answer" not in str(chat_span.attributes)
+    assert "user@example.com" not in str(chat_span.attributes)
+    assert "+84 912 345 678" not in str(chat_span.attributes)
+    assert "[REDACTED_EMAIL]" in chat_span.attributes["langfuse.observation.input"]
+    assert "[REDACTED_PHONE]" in chat_span.attributes["langfuse.observation.output"]
     provider.shutdown()
 
 

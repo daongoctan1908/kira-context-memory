@@ -361,6 +361,16 @@ class HandleChatUseCase:
         try:
             with self._observer.stage("context.build") as build_observation:
                 try:
+                    build_observation.set_input(
+                        {
+                            "current_query": command.message,
+                            "recent_messages": [
+                                {"role": message.role.value, "content": message.content}
+                                for message in recent_result
+                            ],
+                            "long_term_memories": [memory.content for memory in memories],
+                        }
+                    )
                     context = self._builder.build(recent_result, command.message, memories)
                 except BaseException:
                     build_observation.set_outcome("error")
@@ -380,7 +390,7 @@ class HandleChatUseCase:
                 )
                 build_observation.set_attribute(
                     "kira.context.trim_reason",
-                    "none" if len(context.recent_messages) == len(recent_result) else "bounded",
+                    context.trim_reason,
                 )
         except ValueError as error:
             # Store data already passed its session boundary. A remaining model invariant
@@ -494,6 +504,7 @@ class HandleChatUseCase:
                 "kira.memory.threshold": self._memory_search_threshold,
             },
         ) as observation:
+            observation.set_input({"query": query})
             if self._memory is None:
                 self._observer.memory_search_observed("bypass", None, None)
                 observation.set_outcome("bypass")
@@ -531,6 +542,16 @@ class HandleChatUseCase:
             observation.set_outcome("success")
             observation.set_attribute("kira.memory.returned_count", len(memories))
             observation.set_attribute("kira.memory.selected_count", len(memories))
+            observation.set_output(
+                [
+                    {
+                        "id": memory.memory_id,
+                        "memory": memory.content,
+                        "score": memory.score,
+                    }
+                    for memory in memories
+                ]
+            )
             self._observer.memory_search_observed(
                 "success",
                 len(memories),

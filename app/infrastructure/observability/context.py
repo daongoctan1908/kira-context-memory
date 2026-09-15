@@ -19,7 +19,11 @@ from app.domain.ports.context_observer import (
     StageName,
     WriteOutcome,
 )
-from app.infrastructure.observability.langfuse_attributes import OBSERVATION_TYPE
+from app.infrastructure.observability.langfuse_attributes import (
+    OBSERVATION_TYPE,
+    masked_io_attributes,
+    usage_attributes,
+)
 from app.infrastructure.observability.tracing import (
     capture_telemetry_context,
     mark_request_outcome,
@@ -97,6 +101,19 @@ class _StageObservation:
             self._span.set_status(Status(StatusCode.ERROR if outcome == "error" else StatusCode.OK))
         except Exception:
             pass
+
+    def set_input(self, value: object) -> None:
+        self._set_attributes(masked_io_attributes(input_value=value))
+
+    def set_output(self, value: object) -> None:
+        self._set_attributes(masked_io_attributes(output_value=value))
+
+    def set_usage(self, usage: Mapping[str, object]) -> None:
+        self._set_attributes(usage_attributes(usage))
+
+    def _set_attributes(self, attributes: Mapping[str, object]) -> None:
+        for key, value in attributes.items():
+            self.set_attribute(key, value)
 
 
 class ContextTelemetry:

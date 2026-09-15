@@ -1098,7 +1098,7 @@ wheels = [
 
 [[package]]
 name = "viettel-mem0"
-version = "2.0.20+viettel.3"
+version = "2.0.20+viettel.4"
 source = { directory = "packages/viettel-mem0" }
 dependencies = [
     { name = "httpx" },

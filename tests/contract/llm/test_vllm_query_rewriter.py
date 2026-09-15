@@ -3,6 +3,9 @@ import json
 
 import httpx
 import pytest
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from app.application.services.context_builder import ContextBuilder
 from app.application.services.rewrite_prompt import build_rewrite_messages
@@ -93,6 +96,42 @@ async def test_custom_timeouts_output_limit_and_model_are_honored() -> None:
             ),
         )
         assert await adapter.rewrite(ContextBuilder().build([], "q")) == "abcd"
+
+
+async def test_trace_captures_masked_io_model_and_optional_provider_usage() -> None:
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = provider.get_tracer("test.rewriter")
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                **completion("call +84 912 345 678"),
+                "usage": {
+                    "prompt_tokens": 11,
+                    "completion_tokens": 4,
+                    "total_tokens": 15,
+                },
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with tracer.start_as_current_span("rewrite.generate"):
+            result = await VllmQueryRewriterAdapter(client, make_settings()).rewrite(
+                ContextBuilder().build([], "email user@example.com")
+            )
+
+    attributes = exporter.get_finished_spans()[0].attributes
+    assert result == "call +84 912 345 678"
+    assert attributes["langfuse.observation.model.name"] == "configured-test-model"
+    assert attributes["langfuse.observation.usage_details"] == (
+        '{"input":11,"output":4,"total":15}'
+    )
+    assert "user@example.com" not in attributes["langfuse.observation.input"]
+    assert "+84 912 345 678" not in attributes["langfuse.observation.output"]
+    provider.shutdown()
 
 
 async def test_request_contains_ranked_ltm_content_without_provider_metadata() -> None:
