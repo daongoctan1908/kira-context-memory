@@ -1,5 +1,10 @@
 """Process-local, low-cardinality Prometheus telemetry for the memory Worker."""
 
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
+
+from opentelemetry import trace
+from opentelemetry.trace import SpanKind, Status, StatusCode, Tracer
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
 
 from app.application.use_cases.process_memory_job import (
@@ -7,13 +12,32 @@ from app.application.use_cases.process_memory_job import (
     ProcessMemoryJobResult,
 )
 from app.domain.models.memory_job import MemoryJob, MemoryJobPurgeResult, MemoryJobStats
+from app.infrastructure.observability.langfuse_attributes import OBSERVATION_TYPE
 from app.infrastructure.observability.logging import configure_structured_logging
+from app.infrastructure.observability.tracing import set_span_attribute, start_span
 from worker.runner import MemoryJobRunnerSnapshot
 
 _QUEUE_STATUSES = ("pending", "processing", "completed", "dead")
 _CLAIM_KINDS = ("new", "reclaimed")
 _PROCESSING_OUTCOMES = ("success", "retry", "dead")
 _CLEANUP_STATUSES = ("completed", "dead")
+_STAGE_KINDS = {"internal": SpanKind.INTERNAL, "client": SpanKind.CLIENT}
+_STAGE_TYPES = {"memory_job.transition": "span"}
+
+
+class _StageObservation:
+    def __init__(self, span) -> None:
+        self._span = span
+
+    def set_attribute(self, key: str, value: object) -> None:
+        set_span_attribute(self._span, key, value)
+
+    def set_outcome(self, outcome: str) -> None:
+        self.set_attribute("kira.outcome", outcome)
+        try:
+            self._span.set_status(Status(StatusCode.ERROR if outcome == "error" else StatusCode.OK))
+        except Exception:
+            pass
 
 
 def configure_worker_logging(level: str, *, deployment_environment: str = "development") -> None:
@@ -29,7 +53,8 @@ def configure_worker_logging(level: str, *, deployment_environment: str = "devel
 class MemoryJobTelemetry:
     """Metrics registry shared only within one Worker process."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, tracer: Tracer | None = None) -> None:
+        self._tracer = tracer or trace.NoOpTracerProvider().get_tracer("worker.memory_jobs")
         self.registry = CollectorRegistry()
         self.queue_depth = Gauge(
             "kira_memory_job_queue_depth",
@@ -109,6 +134,28 @@ class MemoryJobTelemetry:
             self.processing_latency.labels(outcome)
         for status in _CLEANUP_STATUSES:
             self.cleanup.labels(status)
+
+    def configure_tracer(self, tracer: Tracer) -> None:
+        """Attach the process tracer after the fail-open runtime has initialized."""
+        self._tracer = tracer
+
+    @contextmanager
+    def stage(
+        self,
+        name: str,
+        *,
+        kind: str = "internal",
+        attributes: Mapping[str, object] | None = None,
+    ) -> Iterator[_StageObservation]:
+        span_attributes = dict(attributes or {})
+        span_attributes[OBSERVATION_TYPE] = _STAGE_TYPES.get(name, "span")
+        with start_span(
+            self._tracer,
+            name,
+            kind=_STAGE_KINDS.get(kind, SpanKind.INTERNAL),
+            attributes=span_attributes,
+        ) as span:
+            yield _StageObservation(span)
 
     def jobs_claimed(self, jobs: tuple[MemoryJob, ...]) -> None:
         new_count = sum(not job.reclaimed for job in jobs)

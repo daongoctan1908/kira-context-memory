@@ -4,6 +4,8 @@ from collections.abc import Mapping
 from contextlib import AbstractContextManager
 from typing import Literal, Protocol
 
+from app.domain.models.telemetry_context import TelemetryContext
+
 ContextOperation = Literal[
     "identity",
     "memory_search",
@@ -37,6 +39,8 @@ class StageObservationPort(Protocol):
 
 class ContextObserverPort(Protocol):
     def request_attribute(self, key: str, value: object) -> None: ...
+
+    def capture_telemetry_context(self, correlation_id: str) -> TelemetryContext | None: ...
 
     def stage(
         self,

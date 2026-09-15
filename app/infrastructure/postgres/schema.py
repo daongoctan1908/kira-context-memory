@@ -18,8 +18,11 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 
-EXPECTED_SCHEMA_REVISION = "20260908_0003"
+PREVIOUS_SCHEMA_REVISION = "20260908_0003"
+EXPECTED_SCHEMA_REVISION = "20260915_0004"
+SUPPORTED_SCHEMA_REVISIONS = frozenset({PREVIOUS_SCHEMA_REVISION, EXPECTED_SCHEMA_REVISION})
 
 metadata = MetaData()
 
@@ -105,6 +108,7 @@ memory_jobs = Table(
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column("completed_at", DateTime(timezone=True), nullable=True),
     Column("dead_at", DateTime(timezone=True), nullable=True),
+    Column("telemetry_context", JSONB, nullable=True),
     CheckConstraint("schema_version = 1", name="ck_memory_jobs_schema_version"),
     CheckConstraint(
         "attempt_count >= 0 AND requeue_count >= 0 "

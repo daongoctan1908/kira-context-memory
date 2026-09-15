@@ -10,6 +10,10 @@ from datetime import UTC, datetime
 from typing import Protocol
 from uuid import UUID, uuid4
 
+from opentelemetry import trace
+from opentelemetry.context import Context
+from opentelemetry.trace import SpanKind, Tracer
+
 from app.application.use_cases.process_memory_job import ProcessMemoryJobResult
 from app.domain.errors.memory_job import (
     MemoryJobQueueConnectionError,
@@ -18,6 +22,14 @@ from app.domain.errors.memory_job import (
 )
 from app.domain.models.memory_job import MemoryJob
 from app.domain.ports.memory_job_queue import MemoryJobQueuePort
+from app.infrastructure.observability.context import bind_observability_context
+from app.infrastructure.observability.langfuse_attributes import OBSERVATION_TYPE
+from app.infrastructure.observability.tracing import (
+    record_span_error,
+    set_span_attribute,
+    start_span,
+    telemetry_context_links,
+)
 
 logger = logging.getLogger(__name__)
 _MAX_DATABASE_BACKOFF_SECONDS = 30.0
@@ -78,6 +90,7 @@ class MemoryJobRunner:
         clock: Callable[[], datetime] | None = None,
         observer: MemoryJobObserver | None = None,
         timer: Callable[[], float] | None = None,
+        tracer: Tracer | None = None,
     ) -> None:
         _require_positive_finite(poll_interval_seconds, "poll_interval_seconds")
         _require_positive_integer(batch_size, "batch_size")
@@ -102,6 +115,7 @@ class MemoryJobRunner:
         self._clock = clock or _utc_now
         self._observer = observer
         self._timer = timer or time.perf_counter
+        self._tracer = tracer or trace.NoOpTracerProvider().get_tracer("worker.runner")
 
         self._stop_requested = asyncio.Event()
         self._in_flight: set[asyncio.Task[None]] = set()
@@ -205,29 +219,73 @@ class MemoryJobRunner:
         return jobs
 
     async def _process_job_safely(self, job: MemoryJob) -> None:
+        correlation_id = (
+            job.telemetry_context.correlation_id if job.telemetry_context is not None else None
+        )
+        attributes: dict[str, object] = {
+            OBSERVATION_TYPE: "chain",
+            "event_id": str(job.event_id),
+            "turn_id": job.reference.turn_id,
+            "kira.memory.job.attempt_count": job.attempt_count,
+            "kira.memory.job.requeue_count": job.requeue_count,
+            "kira.memory.job.reclaimed": job.reclaimed,
+        }
+        if correlation_id is not None:
+            attributes["correlation_id"] = correlation_id
+        queue_age = self._queue_age(job)
+        if queue_age is not None:
+            attributes["kira.memory.job.queue_age_seconds"] = queue_age
+
+        with bind_observability_context(
+            correlation_id=correlation_id,
+            turn_id=job.reference.turn_id,
+            event_id=str(job.event_id),
+        ):
+            with start_span(
+                self._tracer,
+                "memory_job.process",
+                kind=SpanKind.CONSUMER,
+                attributes=attributes,
+                links=telemetry_context_links(job.telemetry_context),
+                context=Context(),
+            ) as span:
+                try:
+                    started_at = self._timer()
+                except Exception as error:
+                    _log_observer_failure(error, "start_processing_timer")
+                    started_at = None
+                try:
+                    result = await self._processor.execute(job)
+                except asyncio.CancelledError:
+                    set_span_attribute(span, "kira.outcome", "cancelled")
+                    raise
+                except Exception as error:
+                    set_span_attribute(span, "kira.outcome", "transition_error")
+                    record_span_error(span, error)
+                    logger.warning(
+                        "Memory job transition failed; lease will be reclaimed",
+                        extra={
+                            "event": "memory_job.transition_failed",
+                            "dependency": "memory_job_runtime",
+                            "operation": "process_memory_job",
+                            "error_class": type(error).__name__,
+                            "fallback_mode": "lease_reclaim",
+                            "attempt_count": job.attempt_count,
+                        },
+                    )
+                else:
+                    set_span_attribute(span, "kira.outcome", result.outcome.value)
+                    if started_at is not None:
+                        self._observe_processed(job, result, started_at)
+
+    def _queue_age(self, job: MemoryJob) -> float | None:
+        if job.created_at is None:
+            return None
         try:
-            started_at = self._timer()
+            return max((self._clock() - job.created_at).total_seconds(), 0.0)
         except Exception as error:
-            _log_observer_failure(error, "start_processing_timer")
-            started_at = None
-        try:
-            result = await self._processor.execute(job)
-        except asyncio.CancelledError:
-            raise
-        except Exception as error:
-            logger.warning(
-                "Memory job transition failed; lease will be reclaimed",
-                extra={
-                    "event": "memory_job.transition_failed",
-                    "dependency": "memory_job_runtime",
-                    "operation": "process_memory_job",
-                    "error_class": type(error).__name__,
-                    "fallback_mode": "lease_reclaim",
-                },
-            )
-        else:
-            if started_at is not None:
-                self._observe_processed(job, result, started_at)
+            _log_observer_failure(error, "calculate_queue_age")
+            return None
 
     def _observe_claimed(self, jobs: tuple[MemoryJob, ...]) -> None:
         if self._observer is None or not jobs:

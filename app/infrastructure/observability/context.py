@@ -9,6 +9,7 @@ from opentelemetry import trace
 from opentelemetry.trace import Span, SpanKind, Status, StatusCode, Tracer
 from prometheus_client import CollectorRegistry, Counter, Histogram
 
+from app.domain.models.telemetry_context import TelemetryContext
 from app.domain.ports.context_observer import (
     ContextOperation,
     MemoryJobScheduleOutcome,
@@ -20,6 +21,7 @@ from app.domain.ports.context_observer import (
 )
 from app.infrastructure.observability.langfuse_attributes import OBSERVATION_TYPE
 from app.infrastructure.observability.tracing import (
+    capture_telemetry_context,
     mark_request_outcome,
     set_request_span_attribute,
     set_span_attribute,
@@ -92,18 +94,14 @@ class _StageObservation:
     def set_outcome(self, outcome: str) -> None:
         self.set_attribute("kira.outcome", outcome)
         try:
-            self._span.set_status(
-                Status(StatusCode.ERROR if outcome == "error" else StatusCode.OK)
-            )
+            self._span.set_status(Status(StatusCode.ERROR if outcome == "error" else StatusCode.OK))
         except Exception:
             pass
 
 
 class ContextTelemetry:
     def __init__(self, *, tracer: Tracer | None = None) -> None:
-        self._tracer = tracer or trace.NoOpTracerProvider().get_tracer(
-            "app.application.context"
-        )
+        self._tracer = tracer or trace.NoOpTracerProvider().get_tracer("app.application.context")
         self.registry = CollectorRegistry()
         self.recent_messages = Histogram(
             "kira_context_recent_messages",
@@ -170,6 +168,10 @@ class ContextTelemetry:
 
     def request_attribute(self, key: str, value: object) -> None:
         set_request_span_attribute(key, value)
+
+    def capture_telemetry_context(self, correlation_id: str) -> TelemetryContext | None:
+        """Capture the active enqueue span without exposing OTel to application code."""
+        return capture_telemetry_context(correlation_id)
 
     @contextmanager
     def stage(

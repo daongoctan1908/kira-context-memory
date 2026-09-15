@@ -1,7 +1,8 @@
 """Classify and persist the outcome of one leased memory-formation job."""
 
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
@@ -24,7 +25,18 @@ from app.domain.errors.memory import (
 from app.domain.models.conversation import CompletedTurnReference
 from app.domain.models.memory import MemoryProcessResult
 from app.domain.models.memory_job import MemoryJob
+from app.domain.ports.context_observer import StageObservationPort
+from app.domain.ports.memory_job_observer import MemoryJobProcessObserverPort
 from app.domain.ports.memory_job_queue import MemoryJobQueuePort
+
+
+class _NoOpObservation:
+    def set_attribute(self, key: str, value: object) -> None:
+        return None
+
+    def set_outcome(self, outcome: str) -> None:
+        return None
+
 
 _RETRYABLE_ERRORS = (
     ConversationStoreConnectionError,
@@ -80,6 +92,7 @@ class ProcessMemoryJobUseCase:
         max_attempts: int,
         retry_delays_seconds: tuple[float, ...],
         clock: Callable[[], datetime] | None = None,
+        observer: MemoryJobProcessObserverPort | None = None,
     ) -> None:
         if isinstance(max_attempts, bool) or not isinstance(max_attempts, int) or max_attempts < 1:
             raise ValueError("max_attempts must be a positive integer")
@@ -96,6 +109,7 @@ class ProcessMemoryJobUseCase:
         self._max_attempts = max_attempts
         self._retry_delays = tuple(float(delay) for delay in retry_delays_seconds)
         self._clock = clock or _utc_now
+        self._observer = observer
 
     async def execute(self, job: MemoryJob) -> ProcessMemoryJobResult:
         """Process one current lease and complete, retry, or dead-letter it."""
@@ -118,11 +132,17 @@ class ProcessMemoryJobUseCase:
             return await self._retry(job, error)
 
         lifecycle_event_count = len(result.events)
-        await self._queue.complete(
-            job.event_id,
-            job.lease_token,
-            lifecycle_event_count=lifecycle_event_count,
-        )
+        with self._transition_stage("complete") as observation:
+            try:
+                await self._queue.complete(
+                    job.event_id,
+                    job.lease_token,
+                    lifecycle_event_count=lifecycle_event_count,
+                )
+            except BaseException:
+                _observe(observation.set_outcome, "error")
+                raise
+            _observe(observation.set_outcome, "completed")
         return ProcessMemoryJobResult(
             outcome=MemoryJobProcessOutcome.COMPLETED,
             lifecycle_event_count=lifecycle_event_count,
@@ -138,12 +158,18 @@ class ProcessMemoryJobUseCase:
             raise ValueError("clock must return a timezone-aware datetime")
         next_attempt_at = now + timedelta(seconds=self._retry_delays[job.attempt_count - 1])
         error_class = type(error).__name__
-        await self._queue.retry(
-            job.event_id,
-            job.lease_token,
-            next_attempt_at=next_attempt_at,
-            error_class=error_class,
-        )
+        with self._transition_stage("retry") as observation:
+            try:
+                await self._queue.retry(
+                    job.event_id,
+                    job.lease_token,
+                    next_attempt_at=next_attempt_at,
+                    error_class=error_class,
+                )
+            except BaseException:
+                _observe(observation.set_outcome, "error")
+                raise
+            _observe(observation.set_outcome, "retry")
         return ProcessMemoryJobResult(
             outcome=MemoryJobProcessOutcome.RETRY,
             error_class=error_class,
@@ -156,15 +182,57 @@ class ProcessMemoryJobUseCase:
         error: Exception,
     ) -> ProcessMemoryJobResult:
         error_class = type(error).__name__
-        await self._queue.dead_letter(
-            job.event_id,
-            job.lease_token,
-            error_class=error_class,
-        )
+        with self._transition_stage("dead") as observation:
+            try:
+                await self._queue.dead_letter(
+                    job.event_id,
+                    job.lease_token,
+                    error_class=error_class,
+                )
+            except BaseException:
+                _observe(observation.set_outcome, "error")
+                raise
+            _observe(observation.set_outcome, "dead")
         return ProcessMemoryJobResult(
             outcome=MemoryJobProcessOutcome.DEAD,
             error_class=error_class,
         )
+
+    @contextmanager
+    def _transition_stage(self, transition: str) -> Iterator[StageObservationPort]:
+        if self._observer is None:
+            yield _NoOpObservation()
+            return
+        try:
+            manager = self._observer.stage(
+                "memory_job.transition",
+                kind="client",
+                attributes={"kira.memory.job.transition": transition},
+            )
+            observation = manager.__enter__()
+        except Exception:
+            yield _NoOpObservation()
+            return
+        try:
+            yield observation
+        except BaseException as error:
+            try:
+                manager.__exit__(type(error), error, error.__traceback__)
+            except Exception:
+                pass
+            raise
+        else:
+            try:
+                manager.__exit__(None, None, None)
+            except Exception:
+                pass
+
+
+def _observe(operation, *args: object) -> None:
+    try:
+        operation(*args)
+    except Exception:
+        pass
 
 
 def _utc_now() -> datetime:

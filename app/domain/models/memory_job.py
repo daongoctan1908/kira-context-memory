@@ -7,6 +7,7 @@ from enum import StrEnum
 from uuid import UUID
 
 from app.domain.models.conversation import CompletedTurnReference
+from app.domain.models.telemetry_context import TelemetryContext
 
 MEMORY_JOB_SCHEMA_VERSION = 1
 
@@ -31,6 +32,9 @@ class MemoryJob:
     lease_expires_at: datetime
     reclaimed: bool = False
     schema_version: int = MEMORY_JOB_SCHEMA_VERSION
+    requeue_count: int = 0
+    created_at: datetime | None = None
+    telemetry_context: TelemetryContext | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         _require_uuid(self.event_id, "event_id")
@@ -41,6 +45,13 @@ class MemoryJob:
         _require_aware_datetime(self.lease_expires_at, "lease_expires_at")
         if not isinstance(self.reclaimed, bool):
             raise ValueError("reclaimed must be a boolean")
+        _require_nonnegative_integer(self.requeue_count, "requeue_count")
+        if self.created_at is not None:
+            _require_aware_datetime(self.created_at, "created_at")
+        if self.telemetry_context is not None and not isinstance(
+            self.telemetry_context, TelemetryContext
+        ):
+            raise ValueError("telemetry_context must be a TelemetryContext")
         if (
             isinstance(self.schema_version, bool)
             or not isinstance(self.schema_version, int)

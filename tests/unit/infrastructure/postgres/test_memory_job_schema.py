@@ -6,7 +6,7 @@ from app.infrastructure.postgres.schema import EXPECTED_SCHEMA_REVISION, memory_
 
 
 def test_memory_job_schema_is_reference_only_and_versioned() -> None:
-    assert EXPECTED_SCHEMA_REVISION == "20260908_0003"
+    assert EXPECTED_SCHEMA_REVISION == "20260915_0004"
     assert list(memory_jobs.c.keys()) == [
         "event_id",
         "boundary_message_id",
@@ -24,6 +24,7 @@ def test_memory_job_schema_is_reference_only_and_versioned() -> None:
         "updated_at",
         "completed_at",
         "dead_at",
+        "telemetry_context",
     ]
     assert memory_jobs.c.schema_version.server_default is not None
     assert memory_jobs.c.status.server_default is not None

@@ -3,6 +3,7 @@
 import argparse
 import asyncio
 import json
+import logging
 import sys
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
@@ -23,6 +24,7 @@ from app.domain.errors.memory_job import (
 )
 from app.domain.models.memory_job import DeadMemoryJob, MemoryJobStats
 from app.domain.ports.memory_job_queue import MemoryJobQueuePort
+from app.infrastructure.observability.context import bind_observability_context
 from app.infrastructure.postgres.client import create_postgres_engine
 from app.infrastructure.postgres.memory_job_queue import PostgresMemoryJobQueueAdapter
 from worker.settings import MemoryJobAdminSettings, get_memory_job_admin_settings
@@ -30,6 +32,7 @@ from worker.settings import MemoryJobAdminSettings, get_memory_job_admin_setting
 DEFAULT_DEAD_JOB_LIMIT = 50
 MAX_DEAD_JOB_LIMIT = 1000
 _T = TypeVar("_T")
+logger = logging.getLogger(__name__)
 
 
 class AdminExitCode(IntEnum):
@@ -123,10 +126,19 @@ async def execute_command(
         return AdminExitCode.SUCCESS
 
     if args.command == "requeue":
-        requeued = await _bounded_call(
-            lambda: queue.requeue_dead(args.event_id),
-            timeout_seconds,
-        )
+        with bind_observability_context(event_id=str(args.event_id)):
+            requeued = await _bounded_call(
+                lambda: queue.requeue_dead(args.event_id),
+                timeout_seconds,
+            )
+            logger.info(
+                "Dead memory job requeue evaluated",
+                extra={
+                    "event": "memory_job.manual_requeue",
+                    "operation": "requeue_dead",
+                    "outcome": "requeued" if requeued else "not_found",
+                },
+            )
         if not isinstance(requeued, bool):
             raise MemoryJobQueueProtocolError
         _write_json(

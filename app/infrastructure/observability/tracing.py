@@ -8,8 +8,11 @@ from typing import Literal
 
 from opentelemetry import trace
 from opentelemetry.context import Context
+from opentelemetry.propagators.textmap import CarrierT
 from opentelemetry.trace import Span, SpanKind, Status, StatusCode, Tracer
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
+from app.domain.models.telemetry_context import TelemetryContext
 from app.infrastructure.observability.redaction import safe_log_value
 
 RequestOutcome = Literal["success", "degraded", "cancelled", "error"]
@@ -54,6 +57,40 @@ def current_trace_fields() -> dict[str, str]:
         }
     except Exception:
         return {}
+
+
+def capture_telemetry_context(correlation_id: str) -> TelemetryContext | None:
+    """Capture the active span plus an independent application correlation ID."""
+    carrier: CarrierT = {}
+    try:
+        TraceContextTextMapPropagator().inject(carrier)
+    except Exception:
+        carrier = {}
+    try:
+        return TelemetryContext(
+            correlation_id=correlation_id,
+            traceparent=carrier.get("traceparent"),
+            tracestate=carrier.get("tracestate"),
+        )
+    except (TypeError, ValueError):
+        return None
+
+
+def telemetry_context_links(value: TelemetryContext | None) -> tuple[trace.Link, ...]:
+    """Build at most one producer link; malformed context degrades to no link."""
+    if value is None or value.traceparent is None:
+        return ()
+    carrier: CarrierT = {"traceparent": value.traceparent}
+    if value.tracestate is not None:
+        carrier["tracestate"] = value.tracestate
+    try:
+        extracted = TraceContextTextMapPropagator().extract(carrier)
+        span_context = trace.get_current_span(extracted).get_span_context()
+        if not span_context.is_valid:
+            return ()
+        return (trace.Link(span_context),)
+    except Exception:
+        return ()
 
 
 @contextmanager

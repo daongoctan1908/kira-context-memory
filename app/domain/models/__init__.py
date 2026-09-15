@@ -25,6 +25,11 @@ from app.domain.models.memory_job import (
     MemoryJobStats,
     MemoryJobStatus,
 )
+from app.domain.models.telemetry_context import (
+    MAX_TELEMETRY_CONTEXT_BYTES,
+    TELEMETRY_CONTEXT_VERSION,
+    TelemetryContext,
+)
 
 __all__ = [
     "CONVERSATION_MESSAGE_SCHEMA_VERSION",
@@ -48,4 +53,7 @@ __all__ = [
     "MemoryJobStatus",
     "MemoryProcessResult",
     "MemorySource",
+    "MAX_TELEMETRY_CONTEXT_BYTES",
+    "TELEMETRY_CONTEXT_VERSION",
+    "TelemetryContext",
 ]

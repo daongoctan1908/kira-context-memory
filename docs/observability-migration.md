@@ -1,6 +1,6 @@
 # Observability migration plan
 
-Status: Phases 0–2 complete. Durable Gateway-to-Worker context begins in Phase 3. Every later
+Status: Phases 0–3 complete. AI-stage observations begin in Phase 4. Every later
 phase has an independent acceptance gate and may be rolled back without reverting business data.
 
 The architecture and identifier rules are normative in
@@ -189,6 +189,8 @@ Dependency: Phase 1.
 
 ## Phase 3 — durable context and Worker attempts
 
+Status: **DONE**.
+
 Goal: connect chat, job, and every Worker delivery across process restart and retry.
 
 Modify:
@@ -235,6 +237,18 @@ Acceptance:
 - each attempt has a new trace with a link to the producer when available;
 - retry/lease/idempotency decisions and provider call counts match the control behavior;
 - telemetry context can never make a valid job unprocessable.
+
+Acceptance evidence:
+
+- the bridge adapters accept only revisions `20260908_0003` and `20260915_0004`; the additive
+  migration was exercised through downgrade/upgrade and the local rollout sequence;
+- PostgreSQL integration passes with `72 passed`, `1 skipped`, including atomic enqueue, duplicate
+  scheduling, malformed/oversized/`NULL` carriers, reclaim, retry, and manual requeue;
+- Worker restart/redelivery tests create a distinct root trace for every attempt while preserving
+  the application correlation ID and producer span link;
+- the complete suite passes with `805 passed`, `74 skipped`, and `91.98%` coverage; and
+- the rebuilt observability overlay passes the asynchronous chat-to-memory smoke both with the
+  Collector available and stopped; Gateway and Worker readiness remain HTTP 200 during outage.
 
 Dependency: Phase 2.
 

@@ -109,6 +109,7 @@ class FakeConversationStore:
         assistant_message: ConversationMessage,
         *,
         schedule_memory: bool = False,
+        telemetry_context=None,
     ) -> AppendTurnResult:
         self.schedule_requests.append(schedule_memory)
         return AppendTurnResult(
@@ -141,6 +142,7 @@ class FailingAppendConversationStore(FakeConversationStore):
         assistant_message: ConversationMessage,
         *,
         schedule_memory: bool = False,
+        telemetry_context=None,
     ) -> AppendTurnResult:
         del user_id, user_message, assistant_message, schedule_memory
         raise RuntimeError("private persistence detail")
@@ -600,9 +602,7 @@ async def test_concurrent_chats_keep_distinct_application_correlation(
             )
 
     correlations = {response.headers["x-correlation-id"] for response in responses}
-    roots = [
-        span for span in trace_exporter.get_finished_spans() if span.name == "chat.request"
-    ]
+    roots = [span for span in trace_exporter.get_finished_spans() if span.name == "chat.request"]
     assert len(correlations) == 4
     assert len(roots) == 4
     assert {span.attributes["correlation_id"] for span in roots if span.attributes} == correlations

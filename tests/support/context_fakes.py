@@ -47,7 +47,15 @@ class MemoryStore:
             raise self.read_error
         return self.recent[-limit:]
 
-    async def append_turn(self, user_id, user, assistant, *, schedule_memory=False):
+    async def append_turn(
+        self,
+        user_id,
+        user,
+        assistant,
+        *,
+        schedule_memory=False,
+        telemetry_context=None,
+    ):
         if self.write_error:
             raise self.write_error
         self.writes.append((user, assistant))

@@ -9,6 +9,8 @@ from typing import Any, NoReturn
 from uuid import UUID, uuid4
 
 from asyncpg.exceptions import PostgresError
+from opentelemetry import trace
+from opentelemetry.trace import SpanKind, Tracer
 from sqlalchemy import case, delete, func, or_, select, text, update
 from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
@@ -29,8 +31,11 @@ from app.domain.models.memory_job import (
     MemoryJobStats,
     MemoryJobStatus,
 )
+from app.domain.models.telemetry_context import parse_telemetry_context
+from app.infrastructure.observability.tracing import set_span_attribute, start_span
 from app.infrastructure.postgres.schema import (
     EXPECTED_SCHEMA_REVISION,
+    SUPPORTED_SCHEMA_REVISIONS,
     conversation_messages,
     conversations,
     memory_jobs,
@@ -52,8 +57,12 @@ _ATTEMPTS_EXHAUSTED_ERROR_CLASS = "MemoryJobAttemptsExhaustedError"
 class PostgresMemoryJobQueueAdapter:
     """Claim and transition reference-only memory jobs with database-backed leases."""
 
-    def __init__(self, engine: AsyncEngine) -> None:
+    def __init__(self, engine: AsyncEngine, *, tracer: Tracer | None = None) -> None:
         self._engine = engine
+        self._schema_revision: str | None = None
+        self._tracer = tracer or trace.NoOpTracerProvider().get_tracer(
+            "app.infrastructure.postgres.memory_job_queue"
+        )
 
     async def validate_schema(self) -> None:
         """Check connectivity and require the exact application schema revision."""
@@ -62,8 +71,9 @@ class PostgresMemoryJobQueueAdapter:
                 revision = await connection.scalar(text("SELECT version_num FROM alembic_version"))
         except (BuiltinTimeoutError, OSError, PostgresError, SQLAlchemyError) as error:
             self._raise_mapped(error)
-        if revision != EXPECTED_SCHEMA_REVISION:
+        if revision not in SUPPORTED_SCHEMA_REVISIONS:
             raise MemoryJobQueueConfigurationError
+        self._schema_revision = revision
 
     async def claim_due(
         self,
@@ -79,26 +89,43 @@ class PostgresMemoryJobQueueAdapter:
         _require_positive_integer(max_attempts, "max_attempts", maximum=_MAX_SMALLINT)
         _require_positive_finite_number(lease_seconds, "lease_seconds")
 
-        try:
-            async with self._engine.begin() as connection:
-                rows = (
-                    (await connection.execute(self._claim_candidates(limit, max_attempts)))
-                    .mappings()
-                    .all()
-                )
-                claimed = [
-                    await self._lease_candidate(
-                        connection,
-                        row,
-                        lease_owner,
-                        float(lease_seconds),
+        with start_span(
+            self._tracer,
+            "memory_job.claim",
+            kind=SpanKind.CLIENT,
+            attributes={
+                "db.system.name": "postgresql",
+                "kira.memory.job.claim_limit": limit,
+                "kira.memory.job.max_attempts": max_attempts,
+                "kira.memory.job.exhausted_reclaim_sweep": True,
+            },
+        ) as span:
+            try:
+                async with self._engine.begin() as connection:
+                    rows = (
+                        (await connection.execute(self._claim_candidates(limit, max_attempts)))
+                        .mappings()
+                        .all()
                     )
-                    for row in rows
-                ]
-        except MemoryJobQueueProtocolError:
-            raise
-        except (BuiltinTimeoutError, OSError, PostgresError, SQLAlchemyError) as error:
-            self._raise_mapped(error)
+                    claimed = [
+                        await self._lease_candidate(
+                            connection,
+                            row,
+                            lease_owner,
+                            float(lease_seconds),
+                        )
+                        for row in rows
+                    ]
+            except MemoryJobQueueProtocolError:
+                raise
+            except (BuiltinTimeoutError, OSError, PostgresError, SQLAlchemyError) as error:
+                self._raise_mapped(error)
+            set_span_attribute(span, "kira.memory.job.claimed_count", len(claimed))
+            set_span_attribute(
+                span,
+                "kira.memory.job.reclaimed_count",
+                sum(job.reclaimed for job in claimed),
+            )
         return tuple(claimed)
 
     async def complete(
@@ -338,8 +365,7 @@ class PostgresMemoryJobQueueAdapter:
         except (BuiltinTimeoutError, OSError, PostgresError, SQLAlchemyError) as error:
             self._raise_mapped(error)
 
-    @staticmethod
-    def _claim_candidates(limit: int, max_attempts: int):
+    def _claim_candidates(self, limit: int, max_attempts: int):
         exhausted_ids = (
             select(memory_jobs.c.event_id)
             .where(
@@ -381,18 +407,23 @@ class PostgresMemoryJobQueueAdapter:
             ),
             else_=memory_jobs.c.lease_expires_at,
         )
+        columns = [
+            memory_jobs.c.event_id,
+            memory_jobs.c.boundary_message_id,
+            memory_jobs.c.schema_version,
+            memory_jobs.c.status,
+            memory_jobs.c.attempt_count,
+            memory_jobs.c.requeue_count,
+            memory_jobs.c.created_at,
+            conversation_messages.c.conversation_id,
+            conversation_messages.c.turn_id,
+            conversations.c.user_id,
+            conversations.c.session_id,
+        ]
+        if self._schema_revision == EXPECTED_SCHEMA_REVISION:
+            columns.append(memory_jobs.c.telemetry_context)
         return (
-            select(
-                memory_jobs.c.event_id,
-                memory_jobs.c.boundary_message_id,
-                memory_jobs.c.schema_version,
-                memory_jobs.c.status,
-                memory_jobs.c.attempt_count,
-                conversation_messages.c.conversation_id,
-                conversation_messages.c.turn_id,
-                conversations.c.user_id,
-                conversations.c.session_id,
-            )
+            select(*columns)
             .select_from(
                 memory_jobs.join(
                     conversation_messages,
@@ -473,6 +504,9 @@ class PostgresMemoryJobQueueAdapter:
                 lease_expires_at=updated["lease_expires_at"],
                 reclaimed=prior_status is MemoryJobStatus.PROCESSING,
                 schema_version=row["schema_version"],
+                requeue_count=row.get("requeue_count", 0),
+                created_at=row.get("created_at"),
+                telemetry_context=parse_telemetry_context(row.get("telemetry_context")),
             )
         except (KeyError, TypeError, ValueError) as error:
             raise MemoryJobQueueProtocolError from error

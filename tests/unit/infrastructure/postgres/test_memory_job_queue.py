@@ -23,7 +23,7 @@ from app.infrastructure.postgres.memory_job_queue import (
     _find_sqlstate,
     _is_connection,
 )
-from app.infrastructure.postgres.schema import EXPECTED_SCHEMA_REVISION
+from app.infrastructure.postgres.schema import EXPECTED_SCHEMA_REVISION, PREVIOUS_SCHEMA_REVISION
 
 
 class FakeMappings:
@@ -166,6 +166,18 @@ async def test_validate_schema_accepts_exact_revision_and_maps_failures() -> Non
         await adapter(
             FakeConnection(), enter_error=SqlAlchemyTimeoutError("unavailable")
         ).validate_schema()
+
+
+async def test_bridge_revision_claim_does_not_reference_new_column() -> None:
+    connection = FakeConnection(revision=PREVIOUS_SCHEMA_REVISION)
+    queue = adapter(connection)
+    await queue.validate_schema()
+
+    assert (
+        await queue.claim_due(lease_owner=uuid4(), limit=1, lease_seconds=120, max_attempts=5) == ()
+    )
+    claim_sql = str(connection.calls[-1].compile(dialect=postgresql.dialect()))
+    assert "telemetry_context" not in claim_sql
 
 
 async def test_claim_due_returns_typed_pending_and_reclaimed_jobs() -> None:

@@ -21,6 +21,7 @@ from app.domain.models.conversation import AppendTurnResult, ConversationMessage
 from app.domain.models.identity import AuthenticatedPrincipal
 from app.domain.models.kira import KiraStreamEvent
 from app.domain.models.memory import LongTermMemory
+from app.domain.models.telemetry_context import TelemetryContext
 from app.domain.ports.context_observer import ContextObserverPort, StageKind, StageName
 from app.domain.ports.conversation_store import ConversationStorePort
 from app.domain.ports.kira_client import KiraClientPort
@@ -209,10 +210,14 @@ class HandleChatUseCase:
                                 kind="producer",
                             ) as enqueue_observation:
                                 try:
+                                    telemetry_context = self._capture_telemetry_context(
+                                        correlation_id
+                                    )
                                     result = await self._append_turn(
                                         principal.user_id,
                                         user,
                                         assistant,
+                                        telemetry_context=telemetry_context,
                                     )
                                 except BaseException:
                                     enqueue_observation.set_outcome("error")
@@ -263,14 +268,30 @@ class HandleChatUseCase:
         user_id: str,
         user: ConversationMessage,
         assistant: ConversationMessage,
+        *,
+        telemetry_context: TelemetryContext | None = None,
     ) -> AppendTurnResult:
         async with asyncio.timeout(self._store_timeout):
+            options: dict[str, object] = {"schedule_memory": self._memory_formation_enabled}
+            if telemetry_context is not None:
+                options["telemetry_context"] = telemetry_context
             return await self._store.append_turn(
                 user_id,
                 user,
                 assistant,
-                schedule_memory=self._memory_formation_enabled,
+                **options,
             )
+
+    def _capture_telemetry_context(self, correlation_id: str) -> TelemetryContext | None:
+        """Keep instrumentation failures outside the completed-turn transaction."""
+        capture = getattr(self._observer, "capture_telemetry_context", None)
+        if not callable(capture):
+            return None
+        try:
+            value = capture(correlation_id)
+        except Exception:
+            return None
+        return value if isinstance(value, TelemetryContext) else None
 
     def _observe_memory_job_schedule(
         self,
@@ -359,9 +380,7 @@ class HandleChatUseCase:
                 )
                 build_observation.set_attribute(
                     "kira.context.trim_reason",
-                    "none"
-                    if len(context.recent_messages) == len(recent_result)
-                    else "bounded",
+                    "none" if len(context.recent_messages) == len(recent_result) else "bounded",
                 )
         except ValueError as error:
             # Store data already passed its session boundary. A remaining model invariant

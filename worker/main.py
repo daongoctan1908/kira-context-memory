@@ -47,6 +47,11 @@ def create_app(
             )
         )
         application.state.observability = observability
+        worker_tracer = observability.get_tracer(
+            "worker.memory_jobs",
+            resolved_settings.app_version,
+        )
+        telemetry.configure_tracer(worker_tracer)
         if observability.initialization_error_class is not None:
             logger.warning(
                 "Observability runtime degraded to no-op",
@@ -65,6 +70,8 @@ def create_app(
                 postgres_engine=postgres_engine,
                 long_term_memory=long_term_memory,
                 job_observer=telemetry,
+                process_observer=telemetry,
+                tracer=worker_tracer,
             ) as dependencies:
                 cleanup_runner = MemoryJobCleanupRunner(
                     dependencies.memory_job_queue,
