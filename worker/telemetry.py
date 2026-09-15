@@ -1,7 +1,5 @@
 """Process-local, low-cardinality Prometheus telemetry for the memory Worker."""
 
-import logging
-
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
 
 from app.application.use_cases.process_memory_job import (
@@ -9,7 +7,7 @@ from app.application.use_cases.process_memory_job import (
     ProcessMemoryJobResult,
 )
 from app.domain.models.memory_job import MemoryJob, MemoryJobPurgeResult, MemoryJobStats
-from app.infrastructure.observability.context import SafeJsonFormatter
+from app.infrastructure.observability.logging import configure_structured_logging
 from worker.runner import MemoryJobRunnerSnapshot
 
 _QUEUE_STATUSES = ("pending", "processing", "completed", "dead")
@@ -18,20 +16,14 @@ _PROCESSING_OUTCOMES = ("success", "retry", "dead")
 _CLEANUP_STATUSES = ("completed", "dead")
 
 
-def configure_worker_logging(level: str) -> None:
+def configure_worker_logging(level: str, *, deployment_environment: str = "development") -> None:
     """Install the allowlist-only logging boundary for Worker-owned loggers."""
-    worker_logger = logging.getLogger("worker")
-    worker_logger.setLevel(level)
-    if not any(getattr(handler, "kira_safe_handler", False) for handler in worker_logger.handlers):
-        handler = logging.StreamHandler()
-        handler.kira_safe_handler = True  # type: ignore[attr-defined]
-        handler.setFormatter(SafeJsonFormatter())
-        worker_logger.addHandler(handler)
-    worker_logger.propagate = False
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
-    logging.getLogger("mem0").setLevel(logging.CRITICAL)
-    logging.getLogger("mem0").propagate = False
+    configure_structured_logging(
+        "worker",
+        level=level,
+        service_name="kira-memory-worker",
+        deployment_environment=deployment_environment,
+    )
 
 
 class MemoryJobTelemetry:

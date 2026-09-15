@@ -26,6 +26,19 @@ class WorkerSettings(BaseSettings):
         frozen=True,
     )
 
+    app_environment: Literal["development", "test", "production"] = "development"
+    app_version: str = Field(default="0.4.1", min_length=1, max_length=64)
+
+    otel_enabled: bool = False
+    otel_exporter_otlp_endpoint: AnyHttpUrl | None = None
+    otel_export_timeout_seconds: float = Field(default=1.0, gt=0, le=30)
+    otel_batch_schedule_delay_seconds: float = Field(default=5.0, gt=0, le=60)
+    otel_batch_max_queue_size: int = Field(default=2048, ge=1, le=65_536)
+    otel_batch_max_export_batch_size: int = Field(default=512, ge=1, le=8192)
+    otel_metric_export_interval_seconds: float = Field(default=15.0, gt=0, le=300)
+    otel_trace_sample_ratio: float = Field(default=1.0, ge=0, le=1)
+    otel_shutdown_timeout_seconds: float = Field(default=2.0, gt=0, le=30)
+
     database_url: Secret[PostgresDsn]
     postgres_pool_size: int = Field(default=10, ge=1)
     postgres_max_overflow: int = Field(default=10, ge=0)
@@ -75,6 +88,17 @@ class WorkerSettings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_worker_contract(self) -> "WorkerSettings":
+        if self.otel_batch_max_export_batch_size > self.otel_batch_max_queue_size:
+            raise ValueError("OTel export batch size must not exceed its queue size")
+        if self.otel_exporter_otlp_endpoint is not None and any(
+            (
+                self.otel_exporter_otlp_endpoint.username,
+                self.otel_exporter_otlp_endpoint.password,
+                self.otel_exporter_otlp_endpoint.query,
+                self.otel_exporter_otlp_endpoint.fragment,
+            )
+        ):
+            raise ValueError("OTel Collector endpoint must not contain credentials or query data")
         if self.memory_postgres_max_connections < self.memory_postgres_min_connections:
             raise ValueError("memory PostgreSQL max connections must be at least min connections")
         if len(self.memory_job_retry_delays_seconds) != self.memory_job_max_attempts - 1:

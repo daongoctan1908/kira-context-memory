@@ -54,8 +54,8 @@ def test_log_assertion_requires_safe_operational_evidence() -> None:
     logs = "\n".join(
         (
             '{"operation": "postgres_read", "fallback_mode": "original_query"}',
-            '{"operation": "postgres_write", "fallback_mode": "answer_without_history"}',
-            '{"operation": "read_memory_job_stats"}',
+            '{"operation":"postgres_write","fallback_mode":"answer_without_history"}',
+            'worker-1 | {"operation":"read_memory_job_stats"}',
         )
     )
 

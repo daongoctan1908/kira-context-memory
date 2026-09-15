@@ -232,6 +232,29 @@ async def test_health_and_readiness_do_not_probe_kira() -> None:
     assert kira_client.messages == []
 
 
+async def test_gateway_lifespan_is_available_when_configured_collector_is_absent() -> None:
+    settings = make_settings().model_copy(
+        update={
+            "otel_enabled": True,
+            "otel_exporter_otlp_endpoint": "http://127.0.0.1:1",
+            "otel_shutdown_timeout_seconds": 0.1,
+        }
+    )
+    app = create_app(
+        settings=settings,
+        kira_client=FakeKiraClient(),
+        conversation_store=FakeConversationStore(),
+    )
+
+    async with app.router.lifespan_context(app):
+        assert app.state.observability.enabled is True
+        transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+        async with httpx.AsyncClient(transport=transport, base_url="http://gateway.test") as client:
+            assert (await client.get("/health")).status_code == 200
+
+    assert app.state.observability is None
+
+
 async def test_ready_is_503_before_lifespan_initialization() -> None:
     app = create_app(settings=make_settings(), kira_client=FakeKiraClient())
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)

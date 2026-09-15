@@ -151,6 +151,7 @@ class MemoryJobRunner:
                     logger.warning(
                         "Memory job queue poll failed",
                         extra={
+                            "event": "memory_job.queue_poll_failed",
                             "dependency": "postgresql",
                             "operation": "claim_memory_jobs",
                             "error_class": type(error).__name__,
@@ -217,6 +218,7 @@ class MemoryJobRunner:
             logger.warning(
                 "Memory job transition failed; lease will be reclaimed",
                 extra={
+                    "event": "memory_job.transition_failed",
                     "dependency": "memory_job_runtime",
                     "operation": "process_memory_job",
                     "error_class": type(error).__name__,
@@ -328,6 +330,7 @@ def _log_observer_failure(error: Exception, operation: str) -> None:
     logger.warning(
         "Memory job observation failed",
         extra={
+            "event": "observability.legacy_observer_failed",
             "dependency": "prometheus",
             "operation": operation,
             "error_class": type(error).__name__,

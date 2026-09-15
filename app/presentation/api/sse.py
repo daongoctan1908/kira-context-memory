@@ -26,6 +26,7 @@ async def stream_gateway_events(
         logger.warning(
             "KiRa stream failed",
             extra={
+                "event": "kira.stream_failed",
                 "correlation_id": correlation_id,
                 "operation": "stream",
                 "dependency": "kira",
@@ -38,6 +39,7 @@ async def stream_gateway_events(
         logger.error(
             "Unexpected Gateway stream failure",
             extra={
+                "event": "gateway.stream_failed",
                 "correlation_id": correlation_id,
                 "operation": "stream",
                 "dependency": "kira",
@@ -52,6 +54,7 @@ async def stream_gateway_events(
         logger.info(
             "KiRa stream closed",
             extra={
+                "event": "kira.stream_closed",
                 "correlation_id": correlation_id,
                 "operation": "close_stream",
                 "dependency": "kira",

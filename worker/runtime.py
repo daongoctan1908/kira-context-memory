@@ -114,6 +114,7 @@ class MemoryWorkerRuntime:
             logger.error(
                 "Memory job runner stopped unexpectedly",
                 extra={
+                    "event": "worker.runner_stopped",
                     "dependency": "memory_job_runtime",
                     "operation": "run_memory_jobs",
                     "error_class": type(error).__name__,
@@ -137,6 +138,7 @@ class MemoryWorkerRuntime:
             logger.error(
                 "Memory job cleanup runner stopped unexpectedly",
                 extra={
+                    "event": "worker.cleanup_runner_stopped",
                     "dependency": "memory_job_runtime",
                     "operation": "cleanup_memory_jobs",
                     "error_class": type(error).__name__,
@@ -159,6 +161,7 @@ class MemoryWorkerRuntime:
             logger.warning(
                 "Memory job queue metrics refresh failed",
                 extra={
+                    "event": "memory_job.queue_metrics_refresh_failed",
                     "dependency": "postgresql",
                     "operation": "read_memory_job_stats",
                     "error_class": type(error).__name__,

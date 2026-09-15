@@ -277,6 +277,17 @@ provider chỉ publish trên loopback. Stack dùng project `kira-context-week4`,
 cố định và volume riêng; không phụ thuộc giá trị `.env`, không gọi endpoint thật và không chứa
 Redis.
 
+Để bật nền OTel Phase 1 và Collector local cùng stack trên:
+
+```powershell
+docker compose -f compose.week4.yaml -f compose.observability.yaml up -d --build --wait
+```
+
+Gateway và Worker gửi OTLP/HTTP tới Collector nội bộ. Collector health được publish tại
+`http://127.0.0.1:13133`; self-metrics tại `http://127.0.0.1:18888/metrics` và metrics nhận từ app
+tại `http://127.0.0.1:18889/metrics`. Phase 1 chỉ dựng runtime/export path; business spans bắt đầu
+ở Phase 2. Tắt hoặc mất Collector không làm thay đổi readiness và luồng xử lý chat/memory.
+
 `DATABASE_URL` phải khớp `POSTGRES_DB`, `POSTGRES_USER` và `POSTGRES_PASSWORD` trong `.env`.
 Gateway không tự chạy migration. Cấu hình hoặc schema sai làm startup fail; connection timeout
 tạm thời chỉ đặt PostgreSQL ở degraded state và `/ready` vẫn trả 200.

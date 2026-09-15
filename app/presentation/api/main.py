@@ -22,7 +22,10 @@ from app.infrastructure.identity import NullIdentityAdapter, StaticIdentityAdapt
 from app.infrastructure.kira.http_kira_client import KiraHttpAdapter
 from app.infrastructure.llm.vllm_query_rewriter import VllmQueryRewriterAdapter
 from app.infrastructure.memory import Mem0Adapter
-from app.infrastructure.observability.context import ContextTelemetry, configure_app_logging
+from app.infrastructure.observability.context import ContextTelemetry
+from app.infrastructure.observability.logging import configure_app_logging
+from app.infrastructure.observability.runtime import create_observability_runtime
+from app.infrastructure.observability.settings import build_observability_settings
 from app.infrastructure.postgres import (
     PostgresConversationStoreAdapter,
     create_postgres_engine,
@@ -53,8 +56,30 @@ def create_app(
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         resolved_settings = settings or get_settings()
-        configure_app_logging(resolved_settings.app_log_level)
+        configure_app_logging(
+            resolved_settings.app_log_level,
+            deployment_environment=resolved_settings.app_environment,
+        )
         telemetry = ContextTelemetry()
+        observability = create_observability_runtime(
+            build_observability_settings(
+                resolved_settings,
+                service_name="kira-context-gateway",
+            )
+        )
+        application.state.observability = observability
+        if observability.initialization_error_class is not None:
+            logger.warning(
+                "Observability runtime degraded to no-op",
+                extra={
+                    "event": "observability.initialization_failed",
+                    "operation": "initialize",
+                    "dependency": "otel",
+                    "outcome": "disabled",
+                    "error_class": observability.initialization_error_class,
+                    "fallback_mode": "noop_telemetry",
+                },
+            )
 
         owned_http_client: httpx.AsyncClient | None = None
         owned_rewriter_http_client: httpx.AsyncClient | None = None
@@ -90,6 +115,7 @@ def create_app(
                     logger.warning(
                         "PostgreSQL conversation store unavailable during startup",
                         extra={
+                            "event": "postgres.schema_validation_failed",
                             "dependency": "postgresql",
                             "operation": "validate_schema",
                             "error_class": type(error).__name__,
@@ -161,19 +187,23 @@ def create_app(
         finally:
             application.state.ready = False
             try:
-                if owned_long_term_memory is not None:
-                    owned_long_term_memory.close()
-            finally:
                 try:
-                    if owned_http_client is not None:
-                        await owned_http_client.aclose()
+                    if owned_long_term_memory is not None:
+                        owned_long_term_memory.close()
                 finally:
                     try:
-                        if owned_rewriter_http_client is not None:
-                            await owned_rewriter_http_client.aclose()
+                        if owned_http_client is not None:
+                            await owned_http_client.aclose()
                     finally:
-                        if owned_postgres_engine is not None:
-                            await owned_postgres_engine.dispose()
+                        try:
+                            if owned_rewriter_http_client is not None:
+                                await owned_rewriter_http_client.aclose()
+                        finally:
+                            if owned_postgres_engine is not None:
+                                await owned_postgres_engine.dispose()
+            finally:
+                await observability.shutdown()
+                application.state.observability = None
 
     application = FastAPI(
         title="KiRa Context Gateway",
@@ -181,6 +211,7 @@ def create_app(
         lifespan=lifespan,
     )
     application.state.ready = False
+    application.state.observability = None
     application.add_exception_handler(KiraClientError, kira_client_exception_handler)
     application.include_router(health_router)
     application.include_router(chat_router)

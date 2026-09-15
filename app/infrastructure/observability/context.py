@@ -1,7 +1,9 @@
-"""Per-application Prometheus registry and content-free structured logging."""
+"""Application correlation context and the legacy Phase 0 Prometheus registry."""
 
-import json
 import logging
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 
 from prometheus_client import CollectorRegistry, Counter, Histogram
 
@@ -15,35 +17,43 @@ from app.domain.ports.context_observer import (
 
 logger = logging.getLogger(__name__)
 
-
-class SafeJsonFormatter(logging.Formatter):
-    """Allowlist operational fields; never serialize messages or exception traces."""
-
-    def format(self, record: logging.LogRecord) -> str:
-        fields = ("correlation_id", "operation", "dependency", "error_class", "fallback_mode")
-        return json.dumps(
-            {field: getattr(record, field) for field in fields if hasattr(record, field)},
-            ensure_ascii=False,
-        )
+_correlation_id: ContextVar[str | None] = ContextVar("correlation_id", default=None)
+_turn_id: ContextVar[str | None] = ContextVar("turn_id", default=None)
+_event_id: ContextVar[str | None] = ContextVar("event_id", default=None)
+_UNSET = object()
 
 
-def configure_app_logging(level: str) -> None:
-    """Scope the safe handler to app loggers, leaving server logging independent."""
-    app_logger = logging.getLogger("app")
-    app_logger.setLevel(level)
-    if not any(getattr(handler, "kira_safe_handler", False) for handler in app_logger.handlers):
-        handler = logging.StreamHandler()
-        handler.kira_safe_handler = True  # type: ignore[attr-defined]
-        handler.setFormatter(SafeJsonFormatter())
-        app_logger.addHandler(handler)
-    app_logger.propagate = False
-    # HTTPX logs complete URLs at INFO; dependency details do not belong in app logs.
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
-    # Mem0 upstream can log prompt/provider details. The application emits only
-    # sanitized dependency outcomes at its own boundary.
-    logging.getLogger("mem0").setLevel(logging.CRITICAL)
-    logging.getLogger("mem0").propagate = False
+def current_context_fields() -> dict[str, str]:
+    """Return independent application identifiers bound to the current async context."""
+    values = {
+        "correlation_id": _correlation_id.get(),
+        "turn_id": _turn_id.get(),
+        "event_id": _event_id.get(),
+    }
+    return {key: value for key, value in values.items() if value is not None}
+
+
+@contextmanager
+def bind_observability_context(
+    *,
+    correlation_id: str | None | object = _UNSET,
+    turn_id: str | None | object = _UNSET,
+    event_id: str | None | object = _UNSET,
+) -> Iterator[None]:
+    """Bind app identifiers for one synchronous or asynchronous execution context."""
+    tokens = []
+    for variable, value in (
+        (_correlation_id, correlation_id),
+        (_turn_id, turn_id),
+        (_event_id, event_id),
+    ):
+        if value is not _UNSET:
+            tokens.append((variable, variable.set(value)))  # type: ignore[arg-type]
+    try:
+        yield
+    finally:
+        for variable, token in reversed(tokens):
+            variable.reset(token)
 
 
 class ContextTelemetry:
@@ -152,6 +162,7 @@ class ContextTelemetry:
         logger.warning(
             "Context capability degraded",
             extra={
+                "event": "context.degraded",
                 "correlation_id": correlation_id,
                 "operation": operation,
                 "dependency": dependency,

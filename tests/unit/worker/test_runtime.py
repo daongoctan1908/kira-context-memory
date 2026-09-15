@@ -212,6 +212,7 @@ async def test_stopped_runner_makes_runtime_not_ready_and_logs_safely(monkeypatc
     assert runtime.is_ready is False
     assert log_extras == [
         {
+            "event": "worker.runner_stopped",
             "dependency": "memory_job_runtime",
             "operation": "run_memory_jobs",
             "error_class": "RuntimeError",

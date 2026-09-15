@@ -36,6 +36,10 @@ def test_worker_settings_have_pinned_runtime_defaults_without_gateway_dependenci
     assert settings.memory_job_dead_retention_seconds == 2_592_000.0
     assert settings.memory_job_cleanup_batch_size == 1000
     assert settings.memory_formation_message_limit == 10
+    assert settings.app_environment == "development"
+    assert settings.app_version == "0.4.1"
+    assert settings.otel_enabled is False
+    assert settings.otel_exporter_otlp_endpoint is None
     assert not hasattr(settings, "kira_base_url")
     assert not hasattr(settings, "kira_username")
     assert not hasattr(settings, "kira_basic_auth")
@@ -139,3 +143,16 @@ def test_worker_settings_validate_memory_pool_bounds() -> None:
             memory_postgres_min_connections=3,
             memory_postgres_max_connections=2,
         )
+
+
+def test_worker_otel_export_batch_must_fit_in_queue() -> None:
+    with pytest.raises(ValidationError, match="batch size"):
+        make_settings(
+            otel_batch_max_queue_size=10,
+            otel_batch_max_export_batch_size=11,
+        )
+
+
+def test_worker_otel_endpoint_rejects_embedded_credentials() -> None:
+    with pytest.raises(ValidationError, match="must not contain credentials"):
+        make_settings(otel_exporter_otlp_endpoint="http://user:password@collector.test:4318")

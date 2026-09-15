@@ -3,7 +3,8 @@ import logging
 
 from prometheus_client import generate_latest
 
-from app.infrastructure.observability.context import ContextTelemetry, SafeJsonFormatter
+from app.infrastructure.observability.context import ContextTelemetry
+from app.infrastructure.observability.logging import SafeJsonFormatter
 
 
 def test_structured_logs_exclude_content_secrets_and_exception_traces():
@@ -18,8 +19,21 @@ def test_structured_logs_exclude_content_secrets_and_exception_traces():
     record.session_id = "private-session"
     record.turn_id = "private-turn"
     record.exc_text = "private credential traceback"
-    assert json.loads(SafeJsonFormatter().format(record)) == {
+    payload = json.loads(
+        SafeJsonFormatter(
+            service_name="kira-context-gateway",
+            deployment_environment="test",
+        ).format(record)
+    )
+    assert payload == {
+        "timestamp": payload["timestamp"],
+        "severity": "ERROR",
+        "event": "application.log",
+        "logger": "app.test",
+        "service.name": "kira-context-gateway",
+        "deployment.environment": "test",
         "correlation_id": "correlation-1",
+        "turn_id": "private-turn",
         "operation": "postgres_write",
         "dependency": "postgresql",
         "error_class": "RuntimeError",
