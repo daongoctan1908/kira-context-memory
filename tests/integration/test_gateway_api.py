@@ -505,6 +505,11 @@ async def test_chat_success_trace_covers_stream_and_persistence(
     assert root.attributes["kira.outcome"] == "success"
     assert root.attributes["http.response.status_code"] == 200
     assert root.attributes["turn_id"]
+    origin_trace_id = f"{root.context.trace_id:032x}"
+    assert root.attributes["origin_trace_id"] == origin_trace_id
+    assert root.attributes["langfuse.trace.metadata.origin_trace_id"] == origin_trace_id
+    assert root.attributes["langfuse.trace.metadata.correlation_id"] == correlation_id
+    assert root.attributes["langfuse.trace.metadata.turn_id"] == root.attributes["turn_id"]
     assert correlation_id != f"{root.context.trace_id:032x}"
     assert root.context.trace_id != int("11" * 16, 16)
 

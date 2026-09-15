@@ -19,6 +19,7 @@ from opentelemetry.sdk.trace.sampling import ParentBased, TraceIdRatioBased
 from opentelemetry.trace import Tracer
 
 from app.infrastructure.observability.settings import ObservabilitySettings
+from app.infrastructure.observability.tracing import LangfuseMetadataSpanProcessor
 
 SpanExporterFactory = Callable[[ObservabilitySettings], SpanExporter]
 MetricExporterFactory = Callable[[ObservabilitySettings], Any]
@@ -133,6 +134,7 @@ def create_observability_runtime(
             resource=resource,
             sampler=ParentBased(TraceIdRatioBased(settings.trace_sample_ratio)),
         )
+        tracer_provider.add_span_processor(LangfuseMetadataSpanProcessor())
         tracer_provider.add_span_processor(
             BatchSpanProcessor(
                 span_exporter,

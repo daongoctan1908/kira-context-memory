@@ -305,6 +305,9 @@ async def test_every_delivery_starts_a_new_root_trace_linked_to_the_producer() -
         assert attempt.attributes["correlation_id"] == carrier.correlation_id
         assert attempt.attributes["turn_id"] == first.reference.turn_id
         assert attempt.attributes["event_id"] == str(first.event_id)
+        origin_trace_id = f"{producer.get_span_context().trace_id:032x}"
+        assert attempt.attributes["origin_trace_id"] == origin_trace_id
+        assert attempt.attributes["langfuse.trace.metadata.origin_trace_id"] == origin_trace_id
         assert attempt.attributes["kira.memory.job.attempt_count"] == attempt_count
         assert attempt.attributes["kira.memory.job.queue_age_seconds"] == 7.0
 

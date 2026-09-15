@@ -10,10 +10,12 @@ from opentelemetry.trace import SpanKind, Status, StatusCode, Tracer
 from starlette.requests import ClientDisconnect
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from app.infrastructure.observability.context import bind_observability_context
 from app.infrastructure.observability.langfuse_attributes import OBSERVATION_TYPE
 from app.infrastructure.observability.tracing import (
     RequestTraceState,
     bind_request_trace_state,
+    current_trace_fields,
     record_span_error,
     set_span_attribute,
     start_span,
@@ -52,6 +54,9 @@ class ChatTracingMiddleware:
         ) as span:
             state = RequestTraceState(span)
             status_code: int | None = None
+            origin_trace_id = current_trace_fields().get("trace_id")
+            if origin_trace_id is not None:
+                set_span_attribute(span, "origin_trace_id", origin_trace_id)
 
             async def send_with_status(message: Message) -> None:
                 nonlocal status_code
@@ -59,36 +64,40 @@ class ChatTracingMiddleware:
                     status_code = int(message["status"])
                 await send(message)
 
-            with bind_request_trace_state(state):
-                try:
-                    await self._app(scope, receive, send_with_status)
-                except BaseException as error:
-                    if _is_cancellation(error):
-                        state.mark_outcome("cancelled")
-                    else:
-                        state.mark_outcome("error")
-                        _record_error(span, error)
-                    raise
-                finally:
-                    elapsed = max(perf_counter() - started, 0.0)
-                    if status_code is not None:
-                        set_span_attribute(span, "http.response.status_code", status_code)
-                        if status_code >= 400:
-                            state.mark_outcome("error")
-                    set_span_attribute(span, "kira.outcome", state.outcome)
-                    set_span_attribute(
-                        span,
-                        "kira.request.duration_seconds",
-                        elapsed,
-                    )
-                    _observe_request_metric(scope, state.outcome, elapsed)
+            with bind_observability_context(
+                correlation_id=correlation_id if isinstance(correlation_id, str) else None,
+                origin_trace_id=origin_trace_id,
+            ):
+                with bind_request_trace_state(state):
                     try:
-                        if state.outcome == "error":
-                            span.set_status(Status(StatusCode.ERROR))
-                        elif state.outcome in {"success", "degraded"}:
-                            span.set_status(Status(StatusCode.OK))
-                    except Exception:
-                        pass
+                        await self._app(scope, receive, send_with_status)
+                    except BaseException as error:
+                        if _is_cancellation(error):
+                            state.mark_outcome("cancelled")
+                        else:
+                            state.mark_outcome("error")
+                            _record_error(span, error)
+                        raise
+                    finally:
+                        elapsed = max(perf_counter() - started, 0.0)
+                        if status_code is not None:
+                            set_span_attribute(span, "http.response.status_code", status_code)
+                            if status_code >= 400:
+                                state.mark_outcome("error")
+                        set_span_attribute(span, "kira.outcome", state.outcome)
+                        set_span_attribute(
+                            span,
+                            "kira.request.duration_seconds",
+                            elapsed,
+                        )
+                        _observe_request_metric(scope, state.outcome, elapsed)
+                        try:
+                            if state.outcome == "error":
+                                span.set_status(Status(StatusCode.ERROR))
+                            elif state.outcome in {"success", "degraded"}:
+                                span.set_status(Status(StatusCode.OK))
+                        except Exception:
+                            pass
 
 
 def _request_tracer(scope: Scope) -> Tracer:
@@ -126,7 +135,5 @@ def _is_cancellation(error: BaseException) -> bool:
 
 def _is_chat_request(scope: Scope) -> bool:
     return (
-        scope["type"] == "http"
-        and scope.get("method") == "POST"
-        and scope.get("path") == "/chat"
+        scope["type"] == "http" and scope.get("method") == "POST" and scope.get("path") == "/chat"
     )

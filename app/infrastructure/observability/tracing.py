@@ -9,10 +9,12 @@ from typing import Literal
 from opentelemetry import trace
 from opentelemetry.context import Context
 from opentelemetry.propagators.textmap import CarrierT
+from opentelemetry.sdk.trace import ReadableSpan, SpanProcessor
 from opentelemetry.trace import Span, SpanKind, Status, StatusCode, Tracer
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
 from app.domain.models.telemetry_context import TelemetryContext
+from app.infrastructure.observability.langfuse_attributes import searchable_trace_metadata
 from app.infrastructure.observability.redaction import safe_log_value
 
 RequestOutcome = Literal["success", "degraded", "cancelled", "error"]
@@ -98,6 +100,40 @@ def telemetry_context_links(value: TelemetryContext | None) -> tuple[trace.Link,
         return ()
 
 
+def telemetry_origin_trace_id(value: TelemetryContext | None) -> str | None:
+    """Return the validated producer trace ID without trusting an arbitrary carrier."""
+    if value is None or value.traceparent is None:
+        return None
+    return value.traceparent.split("-", 3)[1]
+
+
+class LangfuseMetadataSpanProcessor(SpanProcessor):
+    """Copy request-local IDs to filterable metadata without using network baggage."""
+
+    def on_start(self, span: Span, parent_context: Context | None = None) -> None:
+        del parent_context
+        try:
+            # Local import avoids making the context facade depend on the runtime.
+            from app.infrastructure.observability.context import current_context_fields
+
+            for key, value in current_context_fields().items():
+                mapped = searchable_trace_metadata(key, value)
+                if mapped is not None:
+                    span.set_attribute(*mapped)
+        except Exception:
+            return
+
+    def on_end(self, span: ReadableSpan) -> None:
+        del span
+
+    def shutdown(self) -> None:
+        return None
+
+    def force_flush(self, timeout_millis: int = 30_000) -> bool:
+        del timeout_millis
+        return True
+
+
 @contextmanager
 def start_span(
     tracer: Tracer,
@@ -165,6 +201,12 @@ def set_span_attribute(span: Span, key: str, value: object) -> None:
         span.set_attribute(safe_key, safe_value)
     except Exception:
         return
+    mapped = searchable_trace_metadata(safe_key, safe_value)
+    if mapped is not None:
+        try:
+            span.set_attribute(*mapped)
+        except Exception:
+            return
 
 
 def record_span_error(span: Span, error: BaseException) -> None:

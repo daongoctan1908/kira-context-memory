@@ -5,6 +5,7 @@ from app.infrastructure.observability.langfuse_attributes import (
     OBSERVATION_USAGE,
     masked_io_attributes,
     model_attribute,
+    searchable_trace_metadata,
     usage_attributes,
 )
 
@@ -66,3 +67,12 @@ def test_masking_failure_omits_content_without_exposing_exception() -> None:
     assert attributes["kira.observation.input.content_omitted"] == "masking_error"
     assert attributes["kira.observation.output.content_omitted"] == "masking_error"
     assert "private" not in str(attributes)
+
+
+def test_only_reviewed_identifiers_become_searchable_trace_metadata() -> None:
+    assert searchable_trace_metadata("correlation_id", "abc-123") == (
+        "langfuse.trace.metadata.correlation_id",
+        "abc-123",
+    )
+    assert searchable_trace_metadata("content", "private") is None
+    assert searchable_trace_metadata("event_id", "x" * 129) is None

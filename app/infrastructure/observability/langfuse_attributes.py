@@ -14,6 +14,23 @@ GEN_AI_INPUT_TOKENS = "gen_ai.usage.input_tokens"
 GEN_AI_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
 TRACE_USER_ID = "langfuse.trace.user_id"
 TRACE_SESSION_ID = "langfuse.trace.session_id"
+TRACE_METADATA_PREFIX = "langfuse.trace.metadata."
+SEARCHABLE_TRACE_IDENTIFIERS = frozenset(
+    {"correlation_id", "turn_id", "event_id", "origin_trace_id"}
+)
+
+
+def searchable_trace_metadata(key: object, value: object) -> tuple[str, str] | None:
+    """Map one reviewed application identifier to filterable Langfuse metadata."""
+    safe_key = safe_log_value(key)
+    safe_value = safe_log_value(value)
+    if (
+        not isinstance(safe_key, str)
+        or safe_key not in SEARCHABLE_TRACE_IDENTIFIERS
+        or not isinstance(safe_value, str)
+    ):
+        return None
+    return f"{TRACE_METADATA_PREFIX}{safe_key}", safe_value
 
 
 def masked_io_attributes(

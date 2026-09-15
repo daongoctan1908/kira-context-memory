@@ -29,6 +29,7 @@ from app.infrastructure.observability.tracing import (
     set_span_attribute,
     start_span,
     telemetry_context_links,
+    telemetry_origin_trace_id,
 )
 
 logger = logging.getLogger(__name__)
@@ -237,6 +238,7 @@ class MemoryJobRunner:
         correlation_id = (
             job.telemetry_context.correlation_id if job.telemetry_context is not None else None
         )
+        origin_trace_id = telemetry_origin_trace_id(job.telemetry_context)
         attributes: dict[str, object] = {
             OBSERVATION_TYPE: "chain",
             "event_id": str(job.event_id),
@@ -247,6 +249,8 @@ class MemoryJobRunner:
         }
         if correlation_id is not None:
             attributes["correlation_id"] = correlation_id
+        if origin_trace_id is not None:
+            attributes["origin_trace_id"] = origin_trace_id
         queue_age = self._queue_age(job)
         if queue_age is not None:
             attributes["kira.memory.job.queue_age_seconds"] = queue_age
@@ -255,6 +259,7 @@ class MemoryJobRunner:
             correlation_id=correlation_id,
             turn_id=job.reference.turn_id,
             event_id=str(job.event_id),
+            origin_trace_id=origin_trace_id,
         ):
             with start_span(
                 self._tracer,

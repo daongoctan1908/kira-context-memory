@@ -41,6 +41,7 @@ logger = logging.getLogger(__name__)
 _correlation_id: ContextVar[str | None] = ContextVar("correlation_id", default=None)
 _turn_id: ContextVar[str | None] = ContextVar("turn_id", default=None)
 _event_id: ContextVar[str | None] = ContextVar("event_id", default=None)
+_origin_trace_id: ContextVar[str | None] = ContextVar("origin_trace_id", default=None)
 _UNSET = object()
 
 _SPAN_KINDS: dict[StageKind, SpanKind] = {
@@ -65,6 +66,7 @@ def current_context_fields() -> dict[str, str]:
         "correlation_id": _correlation_id.get(),
         "turn_id": _turn_id.get(),
         "event_id": _event_id.get(),
+        "origin_trace_id": _origin_trace_id.get(),
     }
     return {key: value for key, value in values.items() if value is not None}
 
@@ -75,6 +77,7 @@ def bind_observability_context(
     correlation_id: str | None | object = _UNSET,
     turn_id: str | None | object = _UNSET,
     event_id: str | None | object = _UNSET,
+    origin_trace_id: str | None | object = _UNSET,
 ) -> Iterator[None]:
     """Bind app identifiers for one synchronous or asynchronous execution context."""
     tokens = []
@@ -82,6 +85,7 @@ def bind_observability_context(
         (_correlation_id, correlation_id),
         (_turn_id, turn_id),
         (_event_id, event_id),
+        (_origin_trace_id, origin_trace_id),
     ):
         if value is not _UNSET:
             tokens.append((variable, variable.set(value)))  # type: ignore[arg-type]

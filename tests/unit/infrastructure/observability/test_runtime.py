@@ -11,6 +11,7 @@ from opentelemetry.sdk.metrics.export import (
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
+from app.infrastructure.observability.context import bind_observability_context
 from app.infrastructure.observability.runtime import (
     ObservabilityRuntime,
     create_observability_runtime,
@@ -208,3 +209,32 @@ def test_metric_factory_failure_closes_the_partially_created_trace_provider() ->
     assert runtime.enabled is False
     assert runtime.initialization_error_class == "RuntimeError"
     assert spans.shutdown_calls == 1
+
+
+async def test_runtime_copies_request_local_ids_to_direct_child_spans() -> None:
+    spans = RecordingSpanExporter()
+    runtime = create_observability_runtime(
+        settings(),
+        span_exporter_factory=lambda _: spans,
+        metric_exporter_factory=lambda _: RecordingMetricExporter(),
+    )
+    tracer = runtime.get_tracer("test")
+
+    with bind_observability_context(
+        correlation_id="correlation-1",
+        turn_id="turn-1",
+        event_id="event-1",
+        origin_trace_id="origin-1",
+    ):
+        with tracer.start_as_current_span("direct-span"):
+            pass
+
+    await runtime.shutdown()
+    attributes = spans.spans[0].attributes
+    for key, value in {
+        "correlation_id": "correlation-1",
+        "turn_id": "turn-1",
+        "event_id": "event-1",
+        "origin_trace_id": "origin-1",
+    }.items():
+        assert attributes[f"langfuse.trace.metadata.{key}"] == value
