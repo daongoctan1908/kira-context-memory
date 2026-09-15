@@ -1,7 +1,10 @@
 """OpenTelemetry adapter for optional vendored-Mem0 observation hooks."""
 
+import asyncio
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
+from time import perf_counter
+from typing import Protocol
 
 from opentelemetry import trace
 from opentelemetry.trace import Span, SpanKind, Status, StatusCode, Tracer
@@ -29,10 +32,15 @@ _OBSERVATION_TYPES = {
 }
 
 
+class MemoryStageMetricObserver(Protocol):
+    def stage_observed(self, stage: str, outcome: str, seconds: float) -> None: ...
+
+
 class _MemoryObservation:
     def __init__(self, span: Span) -> None:
         self._span = span
         self._usage: dict[str, int] = {}
+        self.outcome = "unknown"
 
     def set_attribute(self, key: str, value: object) -> None:
         set_span_attribute(self._span, key, value)
@@ -40,6 +48,7 @@ class _MemoryObservation:
             set_span_attribute(self._span, OBSERVATION_MODEL, value)
 
     def set_outcome(self, outcome: str) -> None:
+        self.outcome = outcome
         self.set_attribute("kira.outcome", outcome)
         try:
             status = StatusCode.ERROR if outcome in {"error", "malformed"} else StatusCode.OK
@@ -68,8 +77,14 @@ class _MemoryObservation:
 class MemoryObserver:
     """Translate dependency-free Mem0 hooks into fail-open OTel spans."""
 
-    def __init__(self, tracer: Tracer | None = None) -> None:
+    def __init__(
+        self,
+        tracer: Tracer | None = None,
+        *,
+        metric_observer: MemoryStageMetricObserver | None = None,
+    ) -> None:
         self._tracer = tracer or trace.NoOpTracerProvider().get_tracer("app.infrastructure.memory")
+        self._metric_observer = metric_observer
 
     @contextmanager
     def observe(
@@ -81,10 +96,29 @@ class MemoryObserver:
     ) -> Iterator[_MemoryObservation]:
         span_attributes = dict(attributes or {})
         span_attributes[OBSERVATION_TYPE] = _OBSERVATION_TYPES.get(name, "span")
+        started = perf_counter()
         with start_span(
             self._tracer,
             name,
             kind=_SPAN_KINDS.get(kind, SpanKind.INTERNAL),
             attributes=span_attributes,
         ) as span:
-            yield _MemoryObservation(span)
+            observation = _MemoryObservation(span)
+            try:
+                yield observation
+            except BaseException as error:
+                if observation.outcome == "unknown":
+                    observation.set_outcome(
+                        "cancelled" if isinstance(error, asyncio.CancelledError) else "error"
+                    )
+                raise
+            finally:
+                if self._metric_observer is not None:
+                    try:
+                        self._metric_observer.stage_observed(
+                            name,
+                            observation.outcome,
+                            max(perf_counter() - started, 0.0),
+                        )
+                    except Exception:
+                        pass

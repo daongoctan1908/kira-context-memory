@@ -1,6 +1,8 @@
 import json
 import logging
 
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from prometheus_client import generate_latest
 
 from app.infrastructure.observability.context import ContextTelemetry
@@ -96,3 +98,27 @@ def test_memory_degradation_uses_mem0_dependency_without_sensitive_labels():
         "memory_id",
     ):
         assert forbidden not in payload
+
+
+def test_phase5_dual_read_emits_equivalent_prometheus_and_otel_outcomes() -> None:
+    reader = InMemoryMetricReader()
+    provider = MeterProvider(metric_readers=[reader])
+    telemetry = ContextTelemetry(meter=provider.get_meter("gateway-test"))
+
+    telemetry.memory_search_observed("success", 2, 0.03)
+
+    legacy = generate_latest(telemetry.registry).decode()
+    data = reader.get_metrics_data()
+    assert data is not None
+    metrics = [
+        metric
+        for resource in data.resource_metrics
+        for scope in resource.scope_metrics
+        for metric in scope.metrics
+    ]
+    otel_count = next(metric for metric in metrics if metric.name == "kira.memory.search.count")
+
+    assert 'kira_memory_search_total{outcome="success"} 1.0' in legacy
+    assert otel_count.data.data_points[0].attributes == {"outcome": "success"}
+    assert otel_count.data.data_points[0].value == 1
+    provider.shutdown()

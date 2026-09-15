@@ -112,7 +112,7 @@ class MemoryJobCleanupRunner:
                     "Memory job cleanup observation failed",
                     extra={
                         "event": "memory_job.cleanup_observation_failed",
-                        "dependency": "prometheus",
+                        "dependency": "otel",
                         "operation": "observe_memory_job_cleanup",
                         "error_class": type(error).__name__,
                         "fallback_mode": "continue_cleanup",

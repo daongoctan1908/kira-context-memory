@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager
 from time import perf_counter
-from typing import Any, Self
+from typing import Any, Protocol, Self
 
 import anyio
 import httpx
@@ -33,6 +33,19 @@ from app.infrastructure.observability.tracing import (
 )
 
 
+class KiraMetricObserver(Protocol):
+    """Content-free, fail-open metric boundary for one KiRa stream."""
+
+    def kira_stream_observed(
+        self,
+        outcome: str,
+        seconds: float,
+        *,
+        first_event_seconds: float | None,
+        first_content_seconds: float | None,
+    ) -> None: ...
+
+
 class KiraHttpAdapter:
     """Translate the confirmed KiRa HTTP/SSE contract into domain events."""
 
@@ -42,11 +55,13 @@ class KiraHttpAdapter:
         settings: Settings,
         *,
         clock: Clock | None = None,
+        metric_observer: KiraMetricObserver | None = None,
         tracer: Tracer | None = None,
     ) -> None:
         self._http_client = http_client
         self._settings = settings
         self._tracer = tracer or trace.NoOpTracerProvider().get_tracer("app.infrastructure.kira")
+        self._metric_observer = metric_observer
         self._timeout = httpx.Timeout(
             connect=settings.kira_connect_timeout_seconds,
             read=settings.kira_read_timeout_seconds,
@@ -128,10 +143,23 @@ class KiraHttpAdapter:
         except BaseException as error:
             outcome = "cancelled" if isinstance(error, asyncio.CancelledError) else "error"
             _finish_span(span, outcome, error if outcome == "error" else None)
+            _observe_stream_metrics(
+                self._metric_observer,
+                outcome,
+                max(perf_counter() - started, 0.0),
+                first_event_seconds=None,
+                first_content_seconds=None,
+            )
             raise
 
         set_span_attribute(span, "kira.open.outcome", "success")
-        return _KiraResponseStream(stream_context, response, span=span, started=started)
+        return _KiraResponseStream(
+            stream_context,
+            response,
+            span=span,
+            started=started,
+            metric_observer=self._metric_observer,
+        )
 
     async def invalidate_token(self) -> None:
         """Explicitly invalidate the in-process token cache."""
@@ -203,14 +231,18 @@ class _KiraResponseStream(AsyncIterator[KiraStreamEvent]):
         *,
         span: Span,
         started: float,
+        metric_observer: KiraMetricObserver | None,
     ) -> None:
         self._stream_context = stream_context
         self._lines = response.aiter_lines().__aiter__()
         self._closed = False
         self._span = span
         self._started = started
+        self._metric_observer = metric_observer
         self._first_event_observed = False
         self._first_content_observed = False
+        self._first_event_seconds: float | None = None
+        self._first_content_seconds: float | None = None
         self._output_fragments: list[str] = []
         self._output_bytes = 0
 
@@ -280,14 +312,23 @@ class _KiraResponseStream(AsyncIterator[KiraStreamEvent]):
                     self._output_bytes > 4096,
                 )
             _finish_span(self._span, outcome, error)
+            _observe_stream_metrics(
+                self._metric_observer,
+                outcome,
+                max(perf_counter() - self._started, 0.0),
+                first_event_seconds=self._first_event_seconds,
+                first_content_seconds=self._first_content_seconds,
+            )
 
     def _observe_event(self, event: KiraStreamEvent) -> None:
         elapsed = perf_counter() - self._started
         if not self._first_event_observed:
             self._first_event_observed = True
+            self._first_event_seconds = elapsed
             set_span_attribute(self._span, "kira.stream.first_event_seconds", elapsed)
         if event.text_fragment and not self._first_content_observed:
             self._first_content_observed = True
+            self._first_content_seconds = elapsed
             set_span_attribute(self._span, "kira.stream.first_content_seconds", elapsed)
         if event.text_fragment:
             self._output_bytes += len(event.text_fragment.encode("utf-8"))
@@ -311,6 +352,27 @@ def _finish_span(span: Span, outcome: str, error: BaseException | None = None) -
             pass
     try:
         span.end()
+    except Exception:
+        pass
+
+
+def _observe_stream_metrics(
+    observer: KiraMetricObserver | None,
+    outcome: str,
+    seconds: float,
+    *,
+    first_event_seconds: float | None,
+    first_content_seconds: float | None,
+) -> None:
+    if observer is None:
+        return
+    try:
+        observer.kira_stream_observed(
+            outcome,
+            seconds,
+            first_event_seconds=first_event_seconds,
+            first_content_seconds=first_content_seconds,
+        )
     except Exception:
         pass
 

@@ -349,6 +349,17 @@ Acceptance:
 - dashboards and alerts use only the new backend data and do not double-count;
 - all intentional semantic/name changes are recorded.
 
+Acceptance evidence:
+
+- the root suite passes with `847 passed`, `74 skipped`, and `91.77%` coverage;
+- all 22 legacy metrics have reviewed OTel mappings, with Collector-exported names and intentional
+  semantic changes recorded in `docs/observability-metrics.md`;
+- a rebuilt local stack exposes only Collector metrics to Prometheus; both scrape targets are up,
+  Grafana loads the provisioned dashboard, and all four Prometheus alert rules are healthy;
+- an asynchronous `/chat` smoke produces equal legacy/OTel schedule, search, claim, and processing
+  counts, while the new request, stage, and queue-wait measurements are present;
+- the same smoke passes with the Collector stopped, and Gateway/Worker readiness remains HTTP 200.
+
 Dependency: Phases 1–4.
 
 ## Phase 6 — Kubernetes, backends, and retention

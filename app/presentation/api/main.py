@@ -72,7 +72,11 @@ def create_app(
             tracer=observability.get_tracer(
                 "app.application.context",
                 resolved_settings.app_version,
-            )
+            ),
+            meter=observability.get_meter(
+                "app.application.context",
+                resolved_settings.app_version,
+            ),
         )
         application.state.observability = observability
         if observability.initialization_error_class is not None:
@@ -102,6 +106,7 @@ def create_app(
                 resolved_kira_client = KiraHttpAdapter(
                     resolved_http_client,
                     resolved_settings,
+                    metric_observer=telemetry,
                     tracer=observability.get_tracer(
                         "app.infrastructure.kira",
                         resolved_settings.app_version,

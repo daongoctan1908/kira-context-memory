@@ -1,11 +1,14 @@
-"""Application correlation context and the legacy Phase 0 Prometheus registry."""
+"""Application correlation, tracing, and dual-read Phase 5 metric facade."""
 
+import asyncio
 import logging
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
+from time import perf_counter
 
 from opentelemetry import trace
+from opentelemetry.metrics import Meter
 from opentelemetry.trace import Span, SpanKind, Status, StatusCode, Tracer
 from prometheus_client import CollectorRegistry, Counter, Histogram
 
@@ -24,6 +27,7 @@ from app.infrastructure.observability.langfuse_attributes import (
     masked_io_attributes,
     usage_attributes,
 )
+from app.infrastructure.observability.metrics import GatewayMetrics
 from app.infrastructure.observability.tracing import (
     capture_telemetry_context,
     mark_request_outcome,
@@ -91,11 +95,13 @@ def bind_observability_context(
 class _StageObservation:
     def __init__(self, span: Span) -> None:
         self._span = span
+        self.outcome = "unknown"
 
     def set_attribute(self, key: str, value: object) -> None:
         set_span_attribute(self._span, key, value)
 
     def set_outcome(self, outcome: str) -> None:
+        self.outcome = outcome
         self.set_attribute("kira.outcome", outcome)
         try:
             self._span.set_status(Status(StatusCode.ERROR if outcome == "error" else StatusCode.OK))
@@ -117,8 +123,9 @@ class _StageObservation:
 
 
 class ContextTelemetry:
-    def __init__(self, *, tracer: Tracer | None = None) -> None:
+    def __init__(self, *, tracer: Tracer | None = None, meter: Meter | None = None) -> None:
         self._tracer = tracer or trace.NoOpTracerProvider().get_tracer("app.application.context")
+        self._otel = GatewayMetrics(meter)
         self.registry = CollectorRegistry()
         self.recent_messages = Histogram(
             "kira_context_recent_messages",
@@ -200,17 +207,33 @@ class ContextTelemetry:
     ) -> Iterator[_StageObservation]:
         span_attributes = dict(attributes or {})
         span_attributes[OBSERVATION_TYPE] = _LANGFUSE_TYPES[name]
+        started = perf_counter()
         with start_span(
             self._tracer,
             name,
             kind=_SPAN_KINDS[kind],
             attributes=span_attributes,
         ) as span:
-            yield _StageObservation(span)
+            observation = _StageObservation(span)
+            try:
+                yield observation
+            except BaseException as error:
+                if observation.outcome == "unknown":
+                    observation.set_outcome(
+                        "cancelled" if isinstance(error, asyncio.CancelledError) else "error"
+                    )
+                raise
+            finally:
+                self._otel.stage_observed(
+                    name,
+                    observation.outcome,
+                    max(perf_counter() - started, 0.0),
+                )
 
     def context_observed(self, message_count: int, estimated_tokens: int) -> None:
         self.recent_messages.observe(message_count)
         self.recent_tokens.observe(estimated_tokens)
+        self._otel.context_observed(message_count, estimated_tokens)
 
     def memory_search_observed(
         self,
@@ -223,14 +246,17 @@ class ContextTelemetry:
             self.memory_search_latency.labels(outcome).observe(seconds)
         if result_count is not None:
             self.memory_search_results.observe(result_count)
+        self._otel.memory_search_observed(outcome, result_count, seconds)
 
     def rewrite_observed(self, outcome: RewriteOutcome, seconds: float | None) -> None:
         self.rewrites.labels(outcome).inc()
         if seconds is not None:
             self.rewrite_latency.labels(outcome).observe(seconds)
+        self._otel.rewrite_observed(outcome, seconds)
 
     def memory_job_schedule_observed(self, outcome: MemoryJobScheduleOutcome) -> None:
         self.memory_job_schedules.labels(outcome).inc()
+        self._otel.memory_job_schedule_observed(outcome)
 
     def degraded(
         self,
@@ -249,6 +275,7 @@ class ContextTelemetry:
             "rewriter": "vllm",
         }.get(operation, "postgresql")
         self.degradations.labels(dependency, operation).inc()
+        self._otel.degraded(dependency, operation)
         logger.warning(
             "Context capability degraded",
             extra={
@@ -263,3 +290,24 @@ class ContextTelemetry:
 
     def conversation_write_observed(self, outcome: WriteOutcome) -> None:
         self.writes.labels(outcome).inc()
+        self._otel.conversation_write_observed(outcome)
+
+    def request_observed(self, outcome: str, seconds: float) -> None:
+        """Record the complete `/chat` lifecycle, including SSE completion."""
+        self._otel.request_observed(outcome, seconds)
+
+    def kira_stream_observed(
+        self,
+        outcome: str,
+        seconds: float,
+        *,
+        first_event_seconds: float | None,
+        first_content_seconds: float | None,
+    ) -> None:
+        """Record KiRa stream completion and first-event/content latency."""
+        self._otel.kira_stream_observed(
+            outcome,
+            seconds,
+            first_event_seconds=first_event_seconds,
+            first_content_seconds=first_content_seconds,
+        )

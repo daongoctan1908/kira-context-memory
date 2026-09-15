@@ -73,6 +73,33 @@ class TrackingStream(httpx.AsyncByteStream):
         self.closed = True
 
 
+class RecordingStreamObserver:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def kira_stream_observed(
+        self,
+        outcome: str,
+        seconds: float,
+        *,
+        first_event_seconds: float | None,
+        first_content_seconds: float | None,
+    ) -> None:
+        self.calls.append(
+            {
+                "outcome": outcome,
+                "seconds": seconds,
+                "first_event_seconds": first_event_seconds,
+                "first_content_seconds": first_content_seconds,
+            }
+        )
+
+
+class FailingStreamObserver:
+    def kira_stream_observed(self, *args: object, **kwargs: object) -> None:
+        raise RuntimeError("private metric failure")
+
+
 async def test_authenticate_uses_confirmed_request_and_parses_token() -> None:
     requests: list[httpx.Request] = []
 
@@ -119,6 +146,7 @@ async def test_chat_stream_sends_exact_payload_and_yields_frames_in_order() -> N
     first = json.dumps(sse_payload("Dạ "), ensure_ascii=False).encode()
     second = json.dumps(sse_payload("đúng rồi"), ensure_ascii=False).encode()
     stream = TrackingStream(b"data: " + first + b"\n\n", b"data: " + second + b"\n\n")
+    metric_observer = RecordingStreamObserver()
 
     async def handler(request: httpx.Request) -> httpx.Response:
         requests.append(request)
@@ -132,7 +160,7 @@ async def test_chat_stream_sends_exact_payload_and_yields_frames_in_order() -> N
         )
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        adapter = KiraHttpAdapter(client, make_settings())
+        adapter = KiraHttpAdapter(client, make_settings(), metric_observer=metric_observer)
         iterator = await adapter.chat_stream("Hưng Yên thì sao?")
         events = [event async for event in iterator]
 
@@ -151,6 +179,11 @@ async def test_chat_stream_sends_exact_payload_and_yields_frames_in_order() -> N
         "token": "runtime-token",
         "stream": True,
     }
+    assert len(metric_observer.calls) == 1
+    assert metric_observer.calls[0]["outcome"] == "success"
+    assert metric_observer.calls[0]["seconds"] >= 0
+    assert metric_observer.calls[0]["first_event_seconds"] >= 0
+    assert metric_observer.calls[0]["first_content_seconds"] >= 0
 
 
 async def test_chat_trace_measures_stream_milestones_with_masked_bounded_content() -> None:
@@ -220,6 +253,32 @@ async def test_chat_stream_reuses_cached_token() -> None:
 
     assert auth_calls == 1
     assert chat_calls == 2
+
+
+async def test_stream_metric_failure_does_not_change_provider_calls_or_events() -> None:
+    calls: list[str] = []
+    data = json.dumps(sse_payload("ok")).encode()
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.path)
+        if request.url.path == "/authenticate":
+            return httpx.Response(200, json=auth_response(), request=request)
+        return httpx.Response(
+            200,
+            stream=TrackingStream(b"data: " + data + b"\n\n"),
+            request=request,
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        iterator = await KiraHttpAdapter(
+            client,
+            make_settings(),
+            metric_observer=FailingStreamObserver(),
+        ).chat_stream("question")
+        events = [event async for event in iterator]
+
+    assert calls == ["/authenticate", "/api/v1/chat"]
+    assert [event.text_fragment for event in events] == ["ok"]
 
 
 async def test_chat_stream_refreshes_once_on_unauthorized_before_forwarding() -> None:

@@ -82,9 +82,17 @@ async def worker_dependency_lifespan(
 
         resolved_memory = long_term_memory
         if resolved_memory is None:
+            metric_observer = (
+                process_observer
+                if callable(getattr(process_observer, "stage_observed", None))
+                else None
+            )
             owned_memory = Mem0Adapter.from_settings(
                 resolved_settings,
-                observer=MemoryObserver(tracer),
+                observer=MemoryObserver(
+                    tracer,
+                    metric_observer=metric_observer,  # type: ignore[arg-type]
+                ),
             )
             resolved_memory = owned_memory
 

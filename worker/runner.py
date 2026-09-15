@@ -57,6 +57,14 @@ class MemoryJobObserver(Protocol):
         """Observe one successfully persisted job transition."""
         ...
 
+    def queue_wait_observed(self, seconds: float) -> None:
+        """Observe elapsed time between durable enqueue and successful claim."""
+        ...
+
+    def runner_snapshot_observed(self, snapshot: "MemoryJobRunnerSnapshot") -> None:
+        """Refresh cached process state without querying an external dependency."""
+        ...
+
 
 @dataclass(frozen=True, slots=True)
 class MemoryJobRunnerSnapshot:
@@ -142,6 +150,7 @@ class MemoryJobRunner:
     def request_stop(self) -> None:
         """Stop new claims; in-flight work receives the configured grace period."""
         self._stop_requested.set()
+        self._observe_runtime_snapshot()
 
     async def run(self) -> None:
         """Poll until stopped, isolating per-job failures and honoring free capacity."""
@@ -149,6 +158,7 @@ class MemoryJobRunner:
             raise RuntimeError("memory job runner is single-use")
         self._started = True
         self._running = True
+        self._observe_runtime_snapshot()
         cancellation: asyncio.CancelledError | None = None
         try:
             while not self._stop_requested.is_set():
@@ -162,6 +172,7 @@ class MemoryJobRunner:
                     jobs = await self._claim_due(claim_limit)
                 except MemoryJobQueueError as error:
                     self._record_database_failure()
+                    self._observe_runtime_snapshot()
                     logger.warning(
                         "Memory job queue poll failed",
                         extra={
@@ -176,6 +187,7 @@ class MemoryJobRunner:
                     continue
 
                 self._record_database_success()
+                self._observe_runtime_snapshot()
                 self._observe_claimed(jobs)
                 for job in jobs:
                     task = asyncio.create_task(
@@ -183,7 +195,9 @@ class MemoryJobRunner:
                         name="memory-job-processing",
                     )
                     self._in_flight.add(task)
-                    task.add_done_callback(self._in_flight.discard)
+                    task.add_done_callback(self._job_done)
+                if jobs:
+                    self._observe_runtime_snapshot()
 
                 if not jobs:
                     await self._pause(self._poll_interval)
@@ -195,6 +209,7 @@ class MemoryJobRunner:
                 await self._drain_in_flight()
             finally:
                 self._running = False
+                self._observe_runtime_snapshot()
 
         if cancellation is not None:
             raise cancellation
@@ -292,6 +307,12 @@ class MemoryJobRunner:
             return
         try:
             self._observer.jobs_claimed(jobs)
+            observe_wait = getattr(self._observer, "queue_wait_observed", None)
+            if callable(observe_wait):
+                for job in jobs:
+                    queue_age = self._queue_age(job)
+                    if queue_age is not None:
+                        observe_wait(queue_age)
         except Exception as error:
             _log_observer_failure(error, "observe_claimed_jobs")
 
@@ -308,6 +329,21 @@ class MemoryJobRunner:
             self._observer.job_processed(job, result, seconds)
         except Exception as error:
             _log_observer_failure(error, "observe_processed_job")
+
+    def _job_done(self, task: asyncio.Task[None]) -> None:
+        self._in_flight.discard(task)
+        self._observe_runtime_snapshot()
+
+    def _observe_runtime_snapshot(self) -> None:
+        if self._observer is None:
+            return
+        observe_snapshot = getattr(self._observer, "runner_snapshot_observed", None)
+        if not callable(observe_snapshot):
+            return
+        try:
+            observe_snapshot(self.snapshot)
+        except Exception as error:
+            _log_observer_failure(error, "observe_runner_snapshot")
 
     async def _pause(self, delay_seconds: float) -> None:
         try:
@@ -388,8 +424,8 @@ def _log_observer_failure(error: Exception, operation: str) -> None:
     logger.warning(
         "Memory job observation failed",
         extra={
-            "event": "observability.legacy_observer_failed",
-            "dependency": "prometheus",
+            "event": "observability.metric_observer_failed",
+            "dependency": "otel",
             "operation": operation,
             "error_class": type(error).__name__,
             "fallback_mode": "continue_processing",

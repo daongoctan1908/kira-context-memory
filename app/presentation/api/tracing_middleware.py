@@ -70,6 +70,7 @@ class ChatTracingMiddleware:
                         _record_error(span, error)
                     raise
                 finally:
+                    elapsed = max(perf_counter() - started, 0.0)
                     if status_code is not None:
                         set_span_attribute(span, "http.response.status_code", status_code)
                         if status_code >= 400:
@@ -78,8 +79,9 @@ class ChatTracingMiddleware:
                     set_span_attribute(
                         span,
                         "kira.request.duration_seconds",
-                        perf_counter() - started,
+                        elapsed,
                     )
+                    _observe_request_metric(scope, state.outcome, elapsed)
                     try:
                         if state.outcome == "error":
                             span.set_status(Status(StatusCode.ERROR))
@@ -97,6 +99,13 @@ def _request_tracer(scope: Scope) -> Tracer:
         )
     except Exception:
         return trace.NoOpTracerProvider().get_tracer("app.presentation.api")
+
+
+def _observe_request_metric(scope: Scope, outcome: str, seconds: float) -> None:
+    try:
+        scope["app"].state.telemetry.request_observed(outcome, seconds)
+    except Exception:
+        pass
 
 
 def _record_error(span, error: BaseException) -> None:

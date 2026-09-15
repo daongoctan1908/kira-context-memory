@@ -1,0 +1,43 @@
+groups:
+  - name: kira-observability
+    rules:
+      - alert: KiraChatErrorRateHigh
+        expr: |
+          sum(rate(kira_chat_request_duration_seconds_count{outcome="error"}[5m]))
+          /
+          clamp_min(sum(rate(kira_chat_request_duration_seconds_count[5m])), 0.001)
+          > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: KiRa chat error rate exceeds 5%
+
+      - alert: KiraMemoryQueueOldestPendingHigh
+        expr: max(kira_memory_job_oldest_pending_age_seconds) > 300
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Oldest pending memory job is older than five minutes
+
+      - alert: KiraMemoryWorkerQueueDatabaseUnavailable
+        expr: min(kira_memory_job_queue_database_available_ratio) < 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: At least one memory Worker cannot observe the PostgreSQL queue
+
+      - alert: KiraOtelMetricPointsDropped
+        expr: |
+          sum(increase(otelcol_receiver_refused_metric_points[5m]))
+          +
+          sum(increase(otelcol_receiver_failed_metric_points[5m]))
+          > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: The OTel Collector refused or failed application metric points
+

@@ -52,6 +52,12 @@ def create_app(
             resolved_settings.app_version,
         )
         telemetry.configure_tracer(worker_tracer)
+        telemetry.configure_meter(
+            observability.get_meter(
+                "worker.memory_jobs",
+                resolved_settings.app_version,
+            )
+        )
         if observability.initialization_error_class is not None:
             logger.warning(
                 "Observability runtime degraded to no-op",
