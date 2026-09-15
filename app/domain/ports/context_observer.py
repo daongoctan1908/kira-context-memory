@@ -1,5 +1,7 @@
 """Framework-free, low-cardinality contextual instrumentation."""
 
+from collections.abc import Mapping
+from contextlib import AbstractContextManager
 from typing import Literal, Protocol
 
 ContextOperation = Literal[
@@ -13,9 +15,37 @@ MemorySearchOutcome = Literal["success", "error", "bypass"]
 MemoryJobScheduleOutcome = Literal["scheduled", "disabled", "duplicate", "error"]
 RewriteOutcome = Literal["success", "error", "bypass"]
 WriteOutcome = Literal["inserted", "duplicate", "error"]
+StageKind = Literal["internal", "client", "producer"]
+StageName = Literal[
+    "identity.resolve",
+    "conversation.read_recent",
+    "memory.search",
+    "context.build",
+    "rewrite.generate",
+    "conversation.append_turn",
+    "memory_job.enqueue",
+]
+
+
+class StageObservationPort(Protocol):
+    """One request-local operation without exposing an observability SDK type."""
+
+    def set_attribute(self, key: str, value: object) -> None: ...
+
+    def set_outcome(self, outcome: str) -> None: ...
 
 
 class ContextObserverPort(Protocol):
+    def request_attribute(self, key: str, value: object) -> None: ...
+
+    def stage(
+        self,
+        name: StageName,
+        *,
+        kind: StageKind = "internal",
+        attributes: Mapping[str, object] | None = None,
+    ) -> AbstractContextManager[StageObservationPort]: ...
+
     def context_observed(self, message_count: int, estimated_tokens: int) -> None: ...
 
     def memory_search_observed(

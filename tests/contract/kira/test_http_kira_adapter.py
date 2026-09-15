@@ -5,6 +5,9 @@ import anyio
 import anyio.lowlevel
 import httpx
 import pytest
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from app.config.settings import Settings
 from app.domain.errors.kira import (
@@ -148,6 +151,50 @@ async def test_chat_stream_sends_exact_payload_and_yields_frames_in_order() -> N
         "token": "runtime-token",
         "stream": True,
     }
+
+
+async def test_chat_trace_measures_stream_milestones_without_recording_content() -> None:
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = provider.get_tracer("test.kira")
+    data = json.dumps(sse_payload("sensitive answer")).encode()
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/authenticate":
+            return httpx.Response(200, json=auth_response(), request=request)
+        return httpx.Response(
+            200,
+            stream=TrackingStream(b"data: " + data + b"\n\n"),
+            request=request,
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with tracer.start_as_current_span("chat.request") as root:
+            iterator = await KiraHttpAdapter(
+                client,
+                make_settings(),
+                tracer=tracer,
+            ).chat_stream("sensitive question")
+            assert [event.text_fragment async for event in iterator] == ["sensitive answer"]
+
+    spans = exporter.get_finished_spans()
+    auth_span = next(span for span in spans if span.name == "kira.authenticate")
+    chat_span = next(span for span in spans if span.name == "kira.chat")
+    assert auth_span.parent is not None and auth_span.parent.span_id == root.context.span_id
+    assert chat_span.parent is not None and chat_span.parent.span_id == root.context.span_id
+    assert auth_span.attributes is not None
+    assert auth_span.attributes["kira.auth.cache_status"] == "miss"
+    assert auth_span.attributes["kira.outcome"] == "success"
+    assert chat_span.attributes is not None
+    assert chat_span.attributes["kira.outcome"] == "success"
+    assert chat_span.attributes["kira.request_id"] == "request-1"
+    assert chat_span.attributes["kira.message_id"] == "message-1"
+    assert chat_span.attributes["kira.stream.first_event_seconds"] >= 0
+    assert chat_span.attributes["kira.stream.first_content_seconds"] >= 0
+    assert "sensitive question" not in str(chat_span.attributes)
+    assert "sensitive answer" not in str(chat_span.attributes)
+    provider.shutdown()
 
 
 async def test_chat_stream_reuses_cached_token() -> None:

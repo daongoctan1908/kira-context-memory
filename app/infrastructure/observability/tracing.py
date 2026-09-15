@@ -1,12 +1,42 @@
-"""Fail-open tracing helpers that never swallow business exceptions."""
+"""Fail-open tracing helpers and request-local trace outcome state."""
 
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass
+from typing import Literal
 
 from opentelemetry import trace
+from opentelemetry.context import Context
 from opentelemetry.trace import Span, SpanKind, Status, StatusCode, Tracer
 
 from app.infrastructure.observability.redaction import safe_log_value
+
+RequestOutcome = Literal["success", "degraded", "cancelled", "error"]
+_OUTCOME_PRIORITY: dict[RequestOutcome, int] = {
+    "success": 0,
+    "degraded": 1,
+    "cancelled": 2,
+    "error": 3,
+}
+
+
+@dataclass(slots=True)
+class RequestTraceState:
+    """Mutable state shared by the ASGI request and its streaming child tasks."""
+
+    span: Span
+    outcome: RequestOutcome = "success"
+
+    def mark_outcome(self, outcome: RequestOutcome) -> None:
+        if _OUTCOME_PRIORITY[outcome] > _OUTCOME_PRIORITY[self.outcome]:
+            self.outcome = outcome
+
+
+_request_trace_state: ContextVar[RequestTraceState | None] = ContextVar(
+    "request_trace_state",
+    default=None,
+)
 
 
 def current_trace_fields() -> dict[str, str]:
@@ -34,10 +64,18 @@ def start_span(
     kind: SpanKind = SpanKind.INTERNAL,
     attributes: Mapping[str, object] | None = None,
     links: Sequence[trace.Link] = (),
+    context: Context | None = None,
 ) -> Iterator[Span]:
     """Start a span fail-open while preserving exceptions raised by the wrapped operation."""
     try:
-        manager = tracer.start_as_current_span(name, kind=kind, links=links)
+        manager = tracer.start_as_current_span(
+            name,
+            context=context,
+            kind=kind,
+            links=links,
+            record_exception=False,
+            set_status_on_exception=False,
+        )
         span = manager.__enter__()
     except Exception:
         yield trace.INVALID_SPAN
@@ -50,11 +88,7 @@ def start_span(
         try:
             yield span
         except BaseException as error:
-            try:
-                span.record_exception(error)
-                span.set_status(Status(StatusCode.ERROR, type(error).__name__))
-            except Exception:
-                pass
+            record_span_error(span, error)
             try:
                 manager.__exit__(type(error), error, error.__traceback__)
             except Exception:
@@ -81,3 +115,61 @@ def set_span_attribute(span: Span, key: str, value: object) -> None:
         span.set_attribute(safe_key, safe_value)
     except Exception:
         return
+
+
+def record_span_error(span: Span, error: BaseException) -> None:
+    """Record only a safe error class, never exception messages or stack traces."""
+    error_class = type(error).__name__
+    set_span_attribute(span, "error.type", error_class)
+    try:
+        span.add_event("exception", attributes={"exception.type": error_class})
+        span.set_status(Status(StatusCode.ERROR, error_class))
+    except Exception:
+        pass
+
+
+@contextmanager
+def bind_request_trace_state(state: RequestTraceState) -> Iterator[None]:
+    """Bind one mutable request state without coupling callers to ASGI objects."""
+    token = _request_trace_state.set(state)
+    try:
+        yield
+    finally:
+        _request_trace_state.reset(token)
+
+
+def mark_request_outcome(outcome: RequestOutcome) -> None:
+    """Raise the current request outcome severity when a trace is active."""
+    state = _request_trace_state.get()
+    if state is not None:
+        state.mark_outcome(outcome)
+
+
+def set_request_span_attribute(key: str, value: object) -> None:
+    """Attach a safe value to the request root span when one exists."""
+    state = _request_trace_state.get()
+    if state is not None:
+        set_span_attribute(state.span, key, value)
+
+
+@contextmanager
+def use_span_safely(span: Span) -> Iterator[None]:
+    """Make an existing span current without allowing SDK failures into business flow."""
+    try:
+        manager = trace.use_span(
+            span,
+            end_on_exit=False,
+            record_exception=False,
+            set_status_on_exception=False,
+        )
+        manager.__enter__()
+    except Exception:
+        yield
+        return
+    try:
+        yield
+    finally:
+        try:
+            manager.__exit__(None, None, None)
+        except Exception:
+            pass

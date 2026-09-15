@@ -21,7 +21,7 @@ from app.domain.models.conversation import AppendTurnResult, ConversationMessage
 from app.domain.models.identity import AuthenticatedPrincipal
 from app.domain.models.kira import KiraStreamEvent
 from app.domain.models.memory import LongTermMemory
-from app.domain.ports.context_observer import ContextObserverPort
+from app.domain.ports.context_observer import ContextObserverPort, StageKind, StageName
 from app.domain.ports.conversation_store import ConversationStorePort
 from app.domain.ports.kira_client import KiraClientPort
 from app.domain.ports.long_term_memory import LongTermMemoryPort
@@ -42,11 +42,17 @@ class ChatStreamSession(AsyncIterator[KiraStreamEvent]):
         self._source_closed = False
         self._on_complete = on_complete
         self._completion_started = False
+        self._source_exhausted = False
 
     @property
     def final_text(self) -> str:
         """Return text chunks received so far in their original order."""
         return "".join(self._text_fragments)
+
+    @property
+    def source_exhausted(self) -> bool:
+        """Whether KiRa ended normally rather than through cancellation or failure."""
+        return self._source_exhausted
 
     def __aiter__(self) -> Self:
         return self
@@ -57,6 +63,7 @@ class ChatStreamSession(AsyncIterator[KiraStreamEvent]):
         try:
             event = await anext(self._source)
         except StopAsyncIteration:
+            self._source_exhausted = True
             await self.aclose()
             await self._complete_once()
             raise
@@ -144,10 +151,11 @@ class HandleChatUseCase:
         *,
         principal: AuthenticatedPrincipal | None = None,
         correlation_id: str | None = None,
+        turn_id: str | None = None,
     ) -> ChatStreamSession:
         """Never persist a rewritten user query or a partial/failed assistant turn."""
         correlation_id = correlation_id or uuid4().hex
-        turn_id = uuid4().hex
+        turn_id = turn_id or uuid4().hex
         started_at = datetime.now(UTC)
         if principal is None:
             self._observer.degraded(
@@ -159,6 +167,9 @@ class HandleChatUseCase:
             self._observer.context_observed(0, 0)
             self._observer.memory_search_observed("bypass", None, None)
             self._observer.rewrite_observed("bypass", None)
+            self._record_bypass_stage("memory.search", kind="client")
+            self._record_bypass_stage("context.build")
+            self._record_bypass_stage("rewrite.generate", kind="client")
             return ChatStreamSession(await self._kira_client.chat_stream(command.message))
 
         query = await self._resolve_query(command, principal.user_id, correlation_id)
@@ -167,6 +178,11 @@ class HandleChatUseCase:
         async def persist(final_text: str) -> None:
             if not self._memory_formation_enabled:
                 self._observer.memory_job_schedule_observed("disabled")
+                with self._observer.stage(
+                    "memory_job.enqueue",
+                    kind="producer",
+                ) as enqueue_observation:
+                    enqueue_observation.set_outcome("disabled")
             try:
                 user = ConversationMessage(
                     command.session_id,
@@ -182,12 +198,48 @@ class HandleChatUseCase:
                     final_text,
                     datetime.now(UTC),
                 )
-                async with asyncio.timeout(self._store_timeout):
-                    result = await self._store.append_turn(
-                        principal.user_id,
-                        user,
-                        assistant,
-                        schedule_memory=self._memory_formation_enabled,
+                with self._observer.stage(
+                    "conversation.append_turn",
+                    kind="client",
+                ) as write_observation:
+                    try:
+                        if self._memory_formation_enabled:
+                            with self._observer.stage(
+                                "memory_job.enqueue",
+                                kind="producer",
+                            ) as enqueue_observation:
+                                try:
+                                    result = await self._append_turn(
+                                        principal.user_id,
+                                        user,
+                                        assistant,
+                                    )
+                                except BaseException:
+                                    enqueue_observation.set_outcome("error")
+                                    raise
+                                schedule_outcome = self._observe_memory_job_schedule(
+                                    correlation_id,
+                                    result,
+                                )
+                                enqueue_observation.set_outcome(schedule_outcome)
+                                if result.memory_job_event_id is not None:
+                                    event_id = str(result.memory_job_event_id)
+                                    enqueue_observation.set_attribute("event_id", event_id)
+                                    self._observer.request_attribute("event_id", event_id)
+                        else:
+                            result = await self._append_turn(
+                                principal.user_id,
+                                user,
+                                assistant,
+                            )
+                    except BaseException:
+                        write_observation.set_outcome("error")
+                        raise
+                    write_outcome = "inserted" if result.inserted else "duplicate"
+                    write_observation.set_outcome(write_outcome)
+                    write_observation.set_attribute(
+                        "kira.conversation.boundary_message_id",
+                        result.reference.boundary_message_id,
                     )
             except Exception as error:
                 # Never turn a persistence failure into a synthetic SSE error. Cancellation
@@ -202,25 +254,35 @@ class HandleChatUseCase:
                 if self._memory_formation_enabled:
                     self._observer.memory_job_schedule_observed("error")
             else:
-                self._observer.conversation_write_observed(
-                    "inserted" if result.inserted else "duplicate"
-                )
-                if self._memory_formation_enabled:
-                    self._observe_memory_job_schedule(correlation_id, result)
+                self._observer.conversation_write_observed(write_outcome)
 
         return ChatStreamSession(source, on_complete=persist)
+
+    async def _append_turn(
+        self,
+        user_id: str,
+        user: ConversationMessage,
+        assistant: ConversationMessage,
+    ) -> AppendTurnResult:
+        async with asyncio.timeout(self._store_timeout):
+            return await self._store.append_turn(
+                user_id,
+                user,
+                assistant,
+                schedule_memory=self._memory_formation_enabled,
+            )
 
     def _observe_memory_job_schedule(
         self,
         correlation_id: str,
         result: AppendTurnResult,
-    ) -> None:
+    ) -> str:
         if not result.inserted:
             self._observer.memory_job_schedule_observed("duplicate")
-            return
+            return "duplicate"
         if result.memory_job_event_id is not None:
             self._observer.memory_job_schedule_observed("scheduled")
-            return
+            return "scheduled"
         # A newly inserted turn requested atomic scheduling, so a missing event ID
         # means the store broke its completion contract even if the answer was saved.
         self._observer.memory_job_schedule_observed("error")
@@ -230,6 +292,7 @@ class HandleChatUseCase:
             "ConversationStoreProtocolError",
             "answer_without_memory_job",
         )
+        return "error"
 
     async def _resolve_query(
         self,
@@ -253,6 +316,8 @@ class HandleChatUseCase:
             )
             self._observer.context_observed(0, 0)
             self._observer.rewrite_observed("bypass", None)
+            self._record_bypass_stage("context.build")
+            self._record_bypass_stage("rewrite.generate", kind="client")
             return command.message
 
         try:
@@ -267,11 +332,37 @@ class HandleChatUseCase:
             )
             self._observer.context_observed(0, 0)
             self._observer.rewrite_observed("bypass", None)
+            self._record_bypass_stage("context.build")
+            self._record_bypass_stage("rewrite.generate", kind="client")
             return command.message
 
         memories = () if isinstance(memory_result, LongTermMemoryError) else memory_result
         try:
-            context = self._builder.build(recent_result, command.message, memories)
+            with self._observer.stage("context.build") as build_observation:
+                try:
+                    context = self._builder.build(recent_result, command.message, memories)
+                except BaseException:
+                    build_observation.set_outcome("error")
+                    raise
+                build_observation.set_outcome("success")
+                build_observation.set_attribute(
+                    "kira.context.recent_message_count",
+                    len(context.recent_messages),
+                )
+                build_observation.set_attribute(
+                    "kira.context.memory_count",
+                    len(context.long_term_memories),
+                )
+                build_observation.set_attribute(
+                    "kira.context.estimated_tokens",
+                    context.estimated_recent_tokens,
+                )
+                build_observation.set_attribute(
+                    "kira.context.trim_reason",
+                    "none"
+                    if len(context.recent_messages) == len(recent_result)
+                    else "bounded",
+                )
         except ValueError as error:
             # Store data already passed its session boundary. A remaining model invariant
             # failure can only make contextual rewrite unsafe, so fail closed to current-only.
@@ -283,6 +374,7 @@ class HandleChatUseCase:
             )
             self._observer.context_observed(0, 0)
             self._observer.rewrite_observed("bypass", None)
+            self._record_bypass_stage("rewrite.generate", kind="client")
             return command.message
 
         self._observer.context_observed(
@@ -290,10 +382,24 @@ class HandleChatUseCase:
         )
         if not context.recent_messages and not context.long_term_memories:
             self._observer.rewrite_observed("bypass", None)
+            self._record_bypass_stage("rewrite.generate", kind="client")
             return command.message
         started = perf_counter()
         try:
-            query = await self._rewriter.rewrite(context)
+            with self._observer.stage(
+                "rewrite.generate",
+                kind="client",
+            ) as rewrite_observation:
+                try:
+                    query = await self._rewriter.rewrite(context)
+                except BaseException:
+                    rewrite_observation.set_outcome("error")
+                    rewrite_observation.set_attribute(
+                        "kira.fallback_mode",
+                        "original_query",
+                    )
+                    raise
+                rewrite_observation.set_outcome("success")
         except QueryRewriterError as error:
             self._observer.rewrite_observed("error", perf_counter() - started)
             self._observer.degraded(
@@ -334,15 +440,26 @@ class HandleChatUseCase:
         user_id: str,
         session_id: str,
     ) -> tuple[ConversationMessage, ...] | ConversationStoreError | TimeoutError:
-        try:
-            async with asyncio.timeout(self._store_timeout):
-                return await self._store.read_recent(
-                    user_id,
-                    session_id,
-                    self._recent_limit,
-                )
-        except (ConversationStoreError, TimeoutError) as error:
-            return error
+        with self._observer.stage(
+            "conversation.read_recent",
+            kind="client",
+        ) as observation:
+            try:
+                async with asyncio.timeout(self._store_timeout):
+                    messages = await self._store.read_recent(
+                        user_id,
+                        session_id,
+                        self._recent_limit,
+                    )
+            except (ConversationStoreError, TimeoutError) as error:
+                observation.set_outcome("error")
+                return error
+            except BaseException:
+                observation.set_outcome("error")
+                raise
+            observation.set_outcome("success")
+            observation.set_attribute("kira.context.returned_message_count", len(messages))
+            return messages
 
     async def _search_memory(
         self,
@@ -350,41 +467,66 @@ class HandleChatUseCase:
         query: str,
         correlation_id: str,
     ) -> tuple[LongTermMemory, ...] | LongTermMemoryError:
-        if self._memory is None:
-            self._observer.memory_search_observed("bypass", None, None)
-            return ()
-        started = perf_counter()
-        try:
-            async with asyncio.timeout(self._memory_search_timeout):
-                memories = await self._memory.search(
-                    user_id,
-                    query,
-                    top_k=self._memory_search_top_k,
-                    threshold=self._memory_search_threshold,
-                )
-        except TimeoutError:
-            error = LongTermMemoryTimeoutError()
-            self._observe_memory_failure(correlation_id, error, perf_counter() - started)
-            return error
-        except LongTermMemoryError as error:
-            self._observe_memory_failure(correlation_id, error, perf_counter() - started)
-            return error
-        except Exception:
-            self._observer.memory_search_observed("error", None, perf_counter() - started)
-            raise
+        with self._observer.stage(
+            "memory.search",
+            kind="client",
+            attributes={
+                "kira.memory.top_k": self._memory_search_top_k,
+                "kira.memory.threshold": self._memory_search_threshold,
+            },
+        ) as observation:
+            if self._memory is None:
+                self._observer.memory_search_observed("bypass", None, None)
+                observation.set_outcome("bypass")
+                return ()
+            started = perf_counter()
+            try:
+                async with asyncio.timeout(self._memory_search_timeout):
+                    memories = await self._memory.search(
+                        user_id,
+                        query,
+                        top_k=self._memory_search_top_k,
+                        threshold=self._memory_search_threshold,
+                    )
+            except TimeoutError:
+                error = LongTermMemoryTimeoutError()
+                observation.set_outcome("error")
+                self._observe_memory_failure(correlation_id, error, perf_counter() - started)
+                return error
+            except LongTermMemoryError as error:
+                observation.set_outcome("error")
+                self._observe_memory_failure(correlation_id, error, perf_counter() - started)
+                return error
+            except Exception:
+                observation.set_outcome("error")
+                self._observer.memory_search_observed("error", None, perf_counter() - started)
+                raise
 
-        if not isinstance(memories, tuple) or any(
-            not isinstance(memory, LongTermMemory) for memory in memories
-        ):
-            error = LongTermMemoryProtocolError()
-            self._observe_memory_failure(correlation_id, error, perf_counter() - started)
-            return error
-        self._observer.memory_search_observed(
-            "success",
-            len(memories),
-            perf_counter() - started,
-        )
-        return memories
+            if not isinstance(memories, tuple) or any(
+                not isinstance(memory, LongTermMemory) for memory in memories
+            ):
+                error = LongTermMemoryProtocolError()
+                observation.set_outcome("error")
+                self._observe_memory_failure(correlation_id, error, perf_counter() - started)
+                return error
+            observation.set_outcome("success")
+            observation.set_attribute("kira.memory.returned_count", len(memories))
+            observation.set_attribute("kira.memory.selected_count", len(memories))
+            self._observer.memory_search_observed(
+                "success",
+                len(memories),
+                perf_counter() - started,
+            )
+            return memories
+
+    def _record_bypass_stage(
+        self,
+        name: StageName,
+        *,
+        kind: StageKind = "internal",
+    ) -> None:
+        with self._observer.stage(name, kind=kind) as observation:
+            observation.set_outcome("bypass")
 
     def _observe_memory_failure(
         self,

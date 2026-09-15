@@ -1,10 +1,12 @@
 """Application correlation context and the legacy Phase 0 Prometheus registry."""
 
 import logging
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 
+from opentelemetry import trace
+from opentelemetry.trace import Span, SpanKind, Status, StatusCode, Tracer
 from prometheus_client import CollectorRegistry, Counter, Histogram
 
 from app.domain.ports.context_observer import (
@@ -12,7 +14,16 @@ from app.domain.ports.context_observer import (
     MemoryJobScheduleOutcome,
     MemorySearchOutcome,
     RewriteOutcome,
+    StageKind,
+    StageName,
     WriteOutcome,
+)
+from app.infrastructure.observability.langfuse_attributes import OBSERVATION_TYPE
+from app.infrastructure.observability.tracing import (
+    mark_request_outcome,
+    set_request_span_attribute,
+    set_span_attribute,
+    start_span,
 )
 
 logger = logging.getLogger(__name__)
@@ -21,6 +32,21 @@ _correlation_id: ContextVar[str | None] = ContextVar("correlation_id", default=N
 _turn_id: ContextVar[str | None] = ContextVar("turn_id", default=None)
 _event_id: ContextVar[str | None] = ContextVar("event_id", default=None)
 _UNSET = object()
+
+_SPAN_KINDS: dict[StageKind, SpanKind] = {
+    "internal": SpanKind.INTERNAL,
+    "client": SpanKind.CLIENT,
+    "producer": SpanKind.PRODUCER,
+}
+_LANGFUSE_TYPES: dict[StageName, str] = {
+    "identity.resolve": "span",
+    "conversation.read_recent": "span",
+    "memory.search": "retriever",
+    "context.build": "chain",
+    "rewrite.generate": "generation",
+    "conversation.append_turn": "span",
+    "memory_job.enqueue": "span",
+}
 
 
 def current_context_fields() -> dict[str, str]:
@@ -56,8 +82,28 @@ def bind_observability_context(
             variable.reset(token)
 
 
+class _StageObservation:
+    def __init__(self, span: Span) -> None:
+        self._span = span
+
+    def set_attribute(self, key: str, value: object) -> None:
+        set_span_attribute(self._span, key, value)
+
+    def set_outcome(self, outcome: str) -> None:
+        self.set_attribute("kira.outcome", outcome)
+        try:
+            self._span.set_status(
+                Status(StatusCode.ERROR if outcome == "error" else StatusCode.OK)
+            )
+        except Exception:
+            pass
+
+
 class ContextTelemetry:
-    def __init__(self) -> None:
+    def __init__(self, *, tracer: Tracer | None = None) -> None:
+        self._tracer = tracer or trace.NoOpTracerProvider().get_tracer(
+            "app.application.context"
+        )
         self.registry = CollectorRegistry()
         self.recent_messages = Histogram(
             "kira_context_recent_messages",
@@ -122,6 +168,27 @@ class ContextTelemetry:
             registry=self.registry,
         )
 
+    def request_attribute(self, key: str, value: object) -> None:
+        set_request_span_attribute(key, value)
+
+    @contextmanager
+    def stage(
+        self,
+        name: StageName,
+        *,
+        kind: StageKind = "internal",
+        attributes: Mapping[str, object] | None = None,
+    ) -> Iterator[_StageObservation]:
+        span_attributes = dict(attributes or {})
+        span_attributes[OBSERVATION_TYPE] = _LANGFUSE_TYPES[name]
+        with start_span(
+            self._tracer,
+            name,
+            kind=_SPAN_KINDS[kind],
+            attributes=span_attributes,
+        ) as span:
+            yield _StageObservation(span)
+
     def context_observed(self, message_count: int, estimated_tokens: int) -> None:
         self.recent_messages.observe(message_count)
         self.recent_tokens.observe(estimated_tokens)
@@ -153,6 +220,10 @@ class ContextTelemetry:
         error_class: str,
         fallback_mode: str,
     ) -> None:
+        mark_request_outcome("degraded")
+        set_request_span_attribute("kira.degraded.operation", operation)
+        set_request_span_attribute("error.type", error_class)
+        set_request_span_attribute("kira.fallback_mode", fallback_mode)
         dependency = {
             "identity": "identity",
             "memory_search": "mem0",

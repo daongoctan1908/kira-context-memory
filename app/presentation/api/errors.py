@@ -7,6 +7,10 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 
 from app.domain.errors.kira import KiraClientError, KiraTimeoutError
+from app.infrastructure.observability.tracing import (
+    mark_request_outcome,
+    set_request_span_attribute,
+)
 from app.presentation.schemas.errors import GatewayError
 
 
@@ -30,6 +34,8 @@ async def kira_client_exception_handler(
     error: KiraClientError,
 ) -> JSONResponse:
     """Handle KiRa failures raised before client-facing SSE begins."""
+    mark_request_outcome("error")
+    set_request_span_attribute("error.type", type(error).__name__)
     correlation_id = getattr(request.state, "correlation_id", uuid4().hex)
     payload = gateway_error(error, correlation_id)
     return JSONResponse(

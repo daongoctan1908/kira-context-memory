@@ -1,7 +1,7 @@
 # Observability migration plan
 
-Status: Phase 0 complete. Runtime implementation starts in Phase 1. Every later phase has an
-independent acceptance gate and may be rolled back without reverting business data.
+Status: Phases 0–2 complete. Durable Gateway-to-Worker context begins in Phase 3. Every later
+phase has an independent acceptance gate and may be rolled back without reverting business data.
 
 The architecture and identifier rules are normative in
 [`observability-architecture.md`](observability-architecture.md). Data capture and retention are
@@ -129,6 +129,8 @@ Dependency: Phase 0.
 
 ## Phase 2 — Gateway and SSE trace
 
+Status: **DONE**.
+
 Goal: trace one `/chat` through response streaming and clean-completion persistence while keeping
 application correlation independent.
 
@@ -163,6 +165,25 @@ Acceptance:
 - first-event, first-content, stream, and persistence timings are present;
 - `correlation_id != trace_id` is enforced by construction and tests;
 - no partial answer is persisted after cancellation.
+
+Acceptance evidence:
+
+- pure ASGI correlation runs before request validation, always creates an application-owned ID,
+  and preserves the existing `X-Correlation-ID`, JSON error, and SSE frame contracts;
+- `chat.request` remains active through upstream SSE close and the clean-completion persistence
+  callback; application stage spans share that root even when recent reads and memory search run
+  concurrently;
+- KiRa instrumentation records token cache outcome, stream open/outcome, first event, first
+  content, and bounded provider request/message IDs without recording prompts, answers, tokens, or
+  credentials;
+- acceptance tests cover 422, 502, 504, mid-stream failure, successful persistence, persistence
+  fallback, disconnect/cancellation, ignored public `traceparent`, and concurrent correlation
+  isolation;
+- the complete suite passes with `787 passed`, `70 skipped`, and `92.76%` coverage; and
+- the rebuilt Compose stack passes the asynchronous Gateway/Worker/PostgreSQL smoke while the
+  Collector receives a 20-span batch, and structured Gateway close logs contain independent
+  `trace_id`, `correlation_id`, and `turn_id` values; the same smoke also passes while the Collector
+  is stopped, after which Collector health recovers normally.
 
 Dependency: Phase 1.
 

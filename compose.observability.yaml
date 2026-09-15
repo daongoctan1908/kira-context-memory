@@ -1,4 +1,4 @@
-# Local Phase 1 overlay. Use with: docker compose -f compose.week4.yaml
+# Local OTel overlay. Use with: docker compose -f compose.week4.yaml
 # -f compose.observability.yaml up -d --build --wait
 services:
   otel-collector:

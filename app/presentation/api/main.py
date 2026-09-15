@@ -32,9 +32,11 @@ from app.infrastructure.postgres import (
 )
 from app.infrastructure.postgres.managed_store import ManagedPostgresConversationStore
 from app.presentation.api.chat_router import router as chat_router
+from app.presentation.api.correlation_middleware import CorrelationMiddleware
 from app.presentation.api.errors import kira_client_exception_handler
 from app.presentation.api.health_router import router as health_router
 from app.presentation.api.metrics_router import router as metrics_router
+from app.presentation.api.tracing_middleware import ChatTracingMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -60,11 +62,16 @@ def create_app(
             resolved_settings.app_log_level,
             deployment_environment=resolved_settings.app_environment,
         )
-        telemetry = ContextTelemetry()
         observability = create_observability_runtime(
             build_observability_settings(
                 resolved_settings,
                 service_name="kira-context-gateway",
+            )
+        )
+        telemetry = ContextTelemetry(
+            tracer=observability.get_tracer(
+                "app.application.context",
+                resolved_settings.app_version,
             )
         )
         application.state.observability = observability
@@ -92,7 +99,14 @@ def create_app(
                 if resolved_http_client is None:
                     owned_http_client = httpx.AsyncClient()
                     resolved_http_client = owned_http_client
-                resolved_kira_client = KiraHttpAdapter(resolved_http_client, resolved_settings)
+                resolved_kira_client = KiraHttpAdapter(
+                    resolved_http_client,
+                    resolved_settings,
+                    tracer=observability.get_tracer(
+                        "app.infrastructure.kira",
+                        resolved_settings.app_version,
+                    ),
+                )
 
             resolved_conversation_store = conversation_store
             postgres_status = "injected" if conversation_store is not None else "initializing"
@@ -212,6 +226,10 @@ def create_app(
     )
     application.state.ready = False
     application.state.observability = None
+    # ``add_middleware`` prepends entries. Add tracing first so correlation is outermost
+    # and therefore available before validation and before the root span is created.
+    application.add_middleware(ChatTracingMiddleware)
+    application.add_middleware(CorrelationMiddleware)
     application.add_exception_handler(KiraClientError, kira_client_exception_handler)
     application.include_router(health_router)
     application.include_router(chat_router)
