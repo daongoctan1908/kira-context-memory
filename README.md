@@ -359,6 +359,17 @@ lỗi masking bỏ field thay vì xuất raw content. Collector local bỏ riên
 `memory_job.claim` không claim/reclaim được job nào để tránh làm đầy Langfuse; claim có công việc và
 mọi trace `memory_job.process` vẫn được giữ.
 
+Muốn dùng tài khoản local khác khi khởi tạo volume Langfuse mới, đặt biến trong phiên PowerShell
+trước khi chạy Compose; không ghi email/password thật vào file tracked:
+
+```powershell
+$env:LANGFUSE_INIT_USER_EMAIL="your-local-email@example.com"
+$env:LANGFUSE_INIT_USER_PASSWORD="your-local-password"
+```
+
+Hai biến chỉ dùng cho lần khởi tạo database Langfuse đầu tiên. Đổi chúng không tự đổi user đã tồn
+tại trong volume `langfuse-postgres-data`.
+
 `DATABASE_URL` phải khớp `POSTGRES_DB`, `POSTGRES_USER` và `POSTGRES_PASSWORD` trong `.env`.
 Gateway không tự chạy migration. Cấu hình hoặc schema sai làm startup fail; connection timeout
 tạm thời chỉ đặt PostgreSQL ở degraded state và `/ready` vẫn trả 200.

@@ -132,9 +132,9 @@ services:
       LANGFUSE_INIT_PROJECT_NAME: KiRa Local Acceptance
       LANGFUSE_INIT_PROJECT_PUBLIC_KEY: lf_pk_kira_local_acceptance
       LANGFUSE_INIT_PROJECT_SECRET_KEY: lf_sk_kira_local_acceptance
-      LANGFUSE_INIT_USER_EMAIL: local@example.invalid
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-local@example.invalid}
       LANGFUSE_INIT_USER_NAME: Local Developer
-      LANGFUSE_INIT_USER_PASSWORD: local-acceptance-only
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-local-acceptance-only}
 
   langfuse-worker:
     image: langfuse/langfuse-worker:3
