@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import json
 import os
 import time
 from dataclasses import dataclass
@@ -294,14 +295,23 @@ def _metric_value_or_zero(payload: str, prefix: str) -> float:
 def _assert_logs_sanitized(logs: str, *, forbidden: tuple[str, ...]) -> None:
     if any(value in logs for value in forbidden):
         raise Week4SmokeError
-    required_operations = (
-        '"operation": "postgres_read"',
-        '"operation": "postgres_write"',
-        '"operation": "read_memory_job_stats"',
-        '"fallback_mode": "original_query"',
-        '"fallback_mode": "answer_without_history"',
-    )
-    if any(operation not in logs for operation in required_operations):
+    records: list[dict[str, object]] = []
+    for line in logs.splitlines():
+        start = line.find("{")
+        if start < 0:
+            continue
+        try:
+            payload = json.loads(line[start:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            records.append(payload)
+
+    operations = {record.get("operation") for record in records}
+    fallback_modes = {record.get("fallback_mode") for record in records}
+    if not {"postgres_read", "postgres_write", "read_memory_job_stats"} <= operations:
+        raise Week4SmokeError
+    if not {"original_query", "answer_without_history"} <= fallback_modes:
         raise Week4SmokeError
 
 

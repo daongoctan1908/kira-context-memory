@@ -12,6 +12,7 @@ from app.domain.errors.conversation import (
     ConversationStoreError,
 )
 from app.domain.models.conversation import AppendTurnResult, ConversationMessage
+from app.domain.models.telemetry_context import TelemetryContext
 from app.infrastructure.postgres.conversation_store import PostgresConversationStoreAdapter
 
 
@@ -64,14 +65,18 @@ class ManagedPostgresConversationStore:
         assistant_message: ConversationMessage,
         *,
         schedule_memory: bool = False,
+        telemetry_context: TelemetryContext | None = None,
     ) -> AppendTurnResult:
         async with self._operation():
             await self.validate_schema()
+            options: dict[str, object] = {"schedule_memory": schedule_memory}
+            if telemetry_context is not None:
+                options["telemetry_context"] = telemetry_context
             return await self._adapter.append_turn(
                 user_id,
                 user_message,
                 assistant_message,
-                schedule_memory=schedule_memory,
+                **options,
             )
 
     async def read_through_boundary(

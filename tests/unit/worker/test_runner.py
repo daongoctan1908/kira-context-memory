@@ -1,9 +1,13 @@
 import asyncio
 from collections import deque
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from app.application.use_cases.process_memory_job import (
     MemoryJobProcessOutcome,
@@ -16,6 +20,7 @@ from app.domain.errors.memory_job import (
 )
 from app.domain.models.conversation import CompletedTurnReference
 from app.domain.models.memory_job import MemoryJob
+from app.infrastructure.observability.tracing import capture_telemetry_context
 from worker.runner import MemoryJobRunner, _database_backoff_seconds
 
 NOW = datetime(2026, 9, 9, 13, 0, tzinfo=UTC)
@@ -264,6 +269,47 @@ async def test_runner_observes_claim_and_persisted_processing_result() -> None:
 
     assert observer.claimed == [(job,)]
     assert observer.processed == [(job, result, 0.25)]
+
+
+async def test_every_delivery_starts_a_new_root_trace_linked_to_the_producer() -> None:
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = provider.get_tracer("test.memory-worker")
+    with tracer.start_as_current_span("memory_job.enqueue") as producer:
+        carrier = capture_telemetry_context("0123456789abcdef0123456789abcdef")
+    assert carrier is not None
+
+    first = replace(
+        make_job(attempt_count=1),
+        telemetry_context=carrier,
+        created_at=NOW - timedelta(seconds=7),
+    )
+    second = replace(first, attempt_count=2, reclaimed=True, lease_token=uuid4())
+    processor = BlockingProcessor(release_immediately=True)
+    first_runner = make_runner(FakeClaimQueue(), processor, tracer=tracer)
+    restarted_runner = make_runner(FakeClaimQueue(), processor, tracer=tracer)
+
+    await first_runner._process_job_safely(first)
+    await restarted_runner._process_job_safely(second)
+
+    attempts = [span for span in exporter.get_finished_spans() if span.name == "memory_job.process"]
+    assert len(attempts) == 2
+    assert attempts[0].parent is None and attempts[1].parent is None
+    assert attempts[0].context.trace_id != attempts[1].context.trace_id
+    for attempt, attempt_count in zip(attempts, (1, 2), strict=True):
+        assert len(attempt.links) == 1
+        assert attempt.links[0].context.trace_id == producer.get_span_context().trace_id
+        assert attempt.links[0].context.span_id == producer.get_span_context().span_id
+        assert attempt.attributes is not None
+        assert attempt.attributes["correlation_id"] == carrier.correlation_id
+        assert attempt.attributes["turn_id"] == first.reference.turn_id
+        assert attempt.attributes["event_id"] == str(first.event_id)
+        origin_trace_id = f"{producer.get_span_context().trace_id:032x}"
+        assert attempt.attributes["origin_trace_id"] == origin_trace_id
+        assert attempt.attributes["langfuse.trace.metadata.origin_trace_id"] == origin_trace_id
+        assert attempt.attributes["kira.memory.job.attempt_count"] == attempt_count
+        assert attempt.attributes["kira.memory.job.queue_age_seconds"] == 7.0
 
 
 async def test_observer_failure_never_changes_job_processing(monkeypatch) -> None:

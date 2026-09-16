@@ -1,11 +1,13 @@
 """Immutable input to the query-rewriting capability."""
 
 from dataclasses import dataclass, field
+from typing import Literal
 
 from app.domain.models.conversation import ConversationMessage
 from app.domain.models.memory import LongTermMemory
 
 MAX_LONG_TERM_MEMORIES = 10
+ContextTrimReason = Literal["none", "message_limit", "orphan_assistant", "token_budget"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,6 +18,7 @@ class ConversationContext:
     current_query: str = field(repr=False)
     estimated_recent_tokens: int
     long_term_memories: tuple[LongTermMemory, ...] = field(default=(), repr=False)
+    trim_reason: ContextTrimReason = "none"
 
     def __post_init__(self) -> None:
         if not isinstance(self.recent_messages, tuple) or any(
@@ -38,3 +41,10 @@ class ConversationContext:
             raise ValueError(
                 f"long_term_memories must contain at most {MAX_LONG_TERM_MEMORIES} items"
             )
+        if self.trim_reason not in {
+            "none",
+            "message_limit",
+            "orphan_assistant",
+            "token_budget",
+        }:
+            raise ValueError("trim_reason is invalid")

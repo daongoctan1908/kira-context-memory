@@ -38,3 +38,27 @@ Schema and extension creation remain available only when `auto_create=true` for
 backward compatibility. KiRa configures `auto_create=false`; its separate admin
 initializer owns extension, schema, table, and index DDL. Memory formation stays
 the pristine upstream V3 ADD-only pipeline.
+
+## Event-scoped formation receipts: `2.0.20+viettel.3`
+
+- Accept an optional `formation_event_id` on the asynchronous add path.
+- Check a collection-scoped PostgreSQL receipt before provider calls.
+- Commit vector rows and the receipt in one transaction, and return the first committed result on
+  replay.
+
+This makes at-least-once Worker delivery idempotent without changing extraction policy. The
+application-owned memory initializer creates and validates the receipt table.
+
+## Dependency-free observation hook: `2.0.20+viettel.4`
+
+- Add an optional, request-local observer protocol with a no-op default and fail-open callbacks.
+- Observe receipt, existing-memory search, extraction, parse, embedding, deduplication, and
+  persistence stages without importing OpenTelemetry or Langfuse into the vendored package.
+- Expose model and token usage before provider adapters reduce responses to strings or vectors.
+- Preserve observer context across `asyncio.to_thread` and isolate concurrent requests with
+  `ContextVar` bindings.
+
+Observer-enabled and observer-disabled tests assert identical provider requests, returned facts,
+memory rows, and receipts. Because this patch changes no persisted contract, the `.4` package keeps
+the `.3` schema-contract marker; no metadata, vector schema, receipt, or stored-memory migration is
+required, and the Phase 3 runtime remains rollback-compatible.

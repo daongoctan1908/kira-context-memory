@@ -25,8 +25,13 @@ from app.domain.models.conversation import (
     ConversationRole,
 )
 from app.domain.models.memory_job import MEMORY_JOB_SCHEMA_VERSION
+from app.domain.models.telemetry_context import (
+    TelemetryContext,
+    serialize_telemetry_context,
+)
 from app.infrastructure.postgres.schema import (
     EXPECTED_SCHEMA_REVISION,
+    SUPPORTED_SCHEMA_REVISIONS,
     conversation_messages,
     conversations,
     memory_jobs,
@@ -47,6 +52,7 @@ class PostgresConversationStoreAdapter:
 
     def __init__(self, engine: AsyncEngine) -> None:
         self._engine = engine
+        self._schema_revision: str | None = None
 
     async def validate_schema(self) -> None:
         """Check connectivity and require the exact migration revision for this build."""
@@ -56,8 +62,9 @@ class PostgresConversationStoreAdapter:
         except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
             self._raise_mapped(error)
 
-        if revision != EXPECTED_SCHEMA_REVISION:
+        if revision not in SUPPORTED_SCHEMA_REVISIONS:
             raise ConversationStoreConfigurationError
+        self._schema_revision = revision
 
     async def read_recent(
         self,
@@ -199,6 +206,7 @@ class PostgresConversationStoreAdapter:
         assistant_message: ConversationMessage,
         *,
         schedule_memory: bool = False,
+        telemetry_context: TelemetryContext | None = None,
     ) -> AppendTurnResult:
         """Atomically append a completed pair and its optional memory job."""
         if not user_id.strip():
@@ -280,6 +288,10 @@ class PostgresConversationStoreAdapter:
                     memory_job_event_id = await self._schedule_memory_job(
                         connection,
                         boundary_message_id,
+                        telemetry_context,
+                        supports_telemetry_context=(
+                            self._schema_revision == EXPECTED_SCHEMA_REVISION
+                        ),
                     )
         except ConversationStoreProtocolError:
             raise
@@ -322,17 +334,23 @@ class PostgresConversationStoreAdapter:
     async def _schedule_memory_job(
         connection: AsyncConnection,
         boundary_message_id: int,
+        telemetry_context: TelemetryContext | None = None,
+        *,
+        supports_telemetry_context: bool = False,
     ) -> UUID:
         """Insert once per assistant boundary and return the stable event identifier."""
         candidate_event_id = uuid4()
+        values: dict[str, object] = {
+            "event_id": candidate_event_id,
+            "boundary_message_id": boundary_message_id,
+            "schema_version": MEMORY_JOB_SCHEMA_VERSION,
+        }
+        if supports_telemetry_context:
+            values["telemetry_context"] = serialize_telemetry_context(telemetry_context)
         inserted = (
             await connection.execute(
                 postgres_insert(memory_jobs)
-                .values(
-                    event_id=candidate_event_id,
-                    boundary_message_id=boundary_message_id,
-                    schema_version=MEMORY_JOB_SCHEMA_VERSION,
-                )
+                .values(**values)
                 .on_conflict_do_nothing(index_elements=[memory_jobs.c.boundary_message_id])
                 .returning(memory_jobs.c.event_id)
             )

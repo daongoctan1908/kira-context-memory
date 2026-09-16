@@ -124,6 +124,7 @@ async def test_cleanup_database_failure_retries_only_on_next_interval(monkeypatc
     assert observer.results[0] == MemoryJobPurgeResult(completed=1)
     assert log_extras == [
         {
+            "event": "memory_job.cleanup_failed",
             "dependency": "postgresql",
             "operation": "purge_terminal_memory_jobs",
             "error_class": "MemoryJobQueueConnectionError",

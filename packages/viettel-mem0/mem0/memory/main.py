@@ -58,6 +58,7 @@ from mem0.memory.utils import (
     process_telemetry_filters,
     remove_code_blocks,
 )
+from mem0.observability import observe
 from mem0.utils.entity_extraction import extract_entities, extract_entities_batch
 from mem0.utils.factory import (
     EmbedderFactory,
@@ -2655,32 +2656,53 @@ class AsyncMemory(MemoryBase):
         session_scope = _build_session_scope(effective_filters)
         search_filters = {k: v for k, v in effective_filters.items() if k in ("user_id", "agent_id", "run_id") and v}
         formation_identity = _formation_identity(metadata, search_filters)
-        if formation_identity is not None:
-            committed = await asyncio.to_thread(
-                _formation_method(self.vector_store, "get_formation_result"),
-                *formation_identity,
-            )
-            if committed is not None:
-                return committed
+        with observe(
+            "mem0.receipt",
+            kind="client",
+            attributes={"kira.memory.receipt.enabled": formation_identity is not None},
+        ) as receipt_observation:
+            if formation_identity is not None:
+                committed = await asyncio.to_thread(
+                    _formation_method(self.vector_store, "get_formation_result"),
+                    *formation_identity,
+                )
+                if committed is not None:
+                    receipt_observation.set_attribute("kira.memory.receipt.hit", True)
+                    receipt_observation.set_output(committed)
+                    receipt_observation.set_outcome("replay")
+                    return committed
+                receipt_observation.set_attribute("kira.memory.receipt.hit", False)
+                receipt_observation.set_outcome("miss")
+            else:
+                receipt_observation.set_outcome("disabled")
         last_messages = await asyncio.to_thread(self.db.get_last_messages, session_scope, 10)
         parsed_messages = parse_messages(messages)
 
         # Phase 1: Existing memory retrieval
-        query_embedding = await asyncio.to_thread(self.embedding_model.embed, parsed_messages, "search")
-        existing_results = await asyncio.to_thread(
-            self.vector_store.search,
-            query=parsed_messages,
-            vectors=query_embedding,
-            top_k=10,
-            filters=search_filters,
-        )
+        with observe(
+            "mem0.existing_memory.search",
+            kind="client",
+            attributes={"kira.memory.top_k": 10},
+        ) as search_observation:
+            search_observation.set_input(parsed_messages)
+            query_embedding = await asyncio.to_thread(self.embedding_model.embed, parsed_messages, "search")
+            existing_results = await asyncio.to_thread(
+                self.vector_store.search,
+                query=parsed_messages,
+                vectors=query_embedding,
+                top_k=10,
+                filters=search_filters,
+            )
 
-        # Map UUIDs to integers (anti-hallucination)
-        existing_memories = []
-        uuid_mapping = {}
-        for idx, mem in enumerate(existing_results):
-            uuid_mapping[str(idx)] = mem.id
-            existing_memories.append({"id": str(idx), "text": mem.payload.get("data", "")})
+            # Map UUIDs to integers (anti-hallucination)
+            existing_memories = []
+            uuid_mapping = {}
+            for idx, mem in enumerate(existing_results):
+                uuid_mapping[str(idx)] = mem.id
+                existing_memories.append({"id": str(idx), "text": mem.payload.get("data", "")})
+            search_observation.set_attribute("kira.memory.returned_count", len(existing_memories))
+            search_observation.set_output(existing_memories)
+            search_observation.set_outcome("success")
 
         # Phase 2: LLM extraction (single call)
         is_agent_scoped = bool(effective_filters.get("agent_id")) and not effective_filters.get("user_id")
@@ -2697,39 +2719,150 @@ class AsyncMemory(MemoryBase):
             custom_instructions=custom_instr,
         )
 
-        try:
-            response = await asyncio.to_thread(
-                self.llm.generate_response,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                response_format={"type": "json_object"},
-            )
-        except Exception as e:
-            # Re-raise so callers can implement provider fallback / retry
-            # (see sync counterpart for rationale).
-            logger.error(f"LLM extraction failed (async): {e}")
-            raise LLMError(f"LLM extraction failed: {e}") from e
+        extraction_messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        with observe("mem0.extract", kind="client") as extract_observation:
+            extract_observation.set_input(extraction_messages)
+            try:
+                response = await asyncio.to_thread(
+                    self.llm.generate_response,
+                    messages=extraction_messages,
+                    response_format={"type": "json_object"},
+                )
+            except Exception as e:
+                # Re-raise so callers can implement provider fallback / retry
+                # (see sync counterpart for rationale).
+                logger.error("LLM extraction failed (async): %s", type(e).__name__)
+                raise LLMError(f"LLM extraction failed: {e}") from e
+            extract_observation.set_output(response)
+            extract_observation.set_outcome("success")
 
         # Parse response
-        try:
-            response = remove_code_blocks(response)
-            if not response or not response.strip():
+        with observe("mem0.extract.parse") as parse_observation:
+            parse_observation.set_input(response)
+            try:
+                response = remove_code_blocks(response)
+                if not response or not response.strip():
+                    extracted_memories = []
+                else:
+                    try:
+                        extracted_memories = json.loads(response, strict=False).get("memory", [])
+                    except json.JSONDecodeError:
+                        extracted_json = extract_json(response)
+                        extracted_memories = json.loads(extracted_json, strict=False).get("memory", [])
+            except Exception as e:
+                logger.error("Error parsing extraction response (async): %s", type(e).__name__)
                 extracted_memories = []
+                parse_observation.set_outcome("malformed")
             else:
-                try:
-                    extracted_memories = json.loads(response, strict=False).get("memory", [])
-                except json.JSONDecodeError:
-                    extracted_json = extract_json(response)
-                    extracted_memories = json.loads(extracted_json, strict=False).get("memory", [])
-        except Exception as e:
-            logger.error(f"Error parsing extraction response (async): {e}")
-            extracted_memories = []
+                parse_observation.set_outcome("parsed" if extracted_memories else "empty_valid")
+            parse_observation.set_attribute("kira.memory.fact_count", len(extracted_memories))
+            parse_observation.set_output(extracted_memories)
 
         if not extracted_memories:
             if formation_identity is not None:
-                _, committed = await asyncio.to_thread(
+                with observe(
+                    "mem0.persist",
+                    kind="client",
+                    attributes={"kira.memory.candidate_count": 0},
+                ) as persist_observation:
+                    created, committed = await asyncio.to_thread(
+                        _formation_method(self.vector_store, "insert_with_formation_receipt"),
+                        [],
+                        [],
+                        [],
+                        event_id=formation_identity[0],
+                        user_id=formation_identity[1],
+                        result=[],
+                    )
+                    persist_observation.set_attribute("kira.memory.receipt.created", created)
+                    persist_observation.set_output(committed)
+                    persist_observation.set_outcome("empty" if created else "receipt_replay")
+                await asyncio.to_thread(self.db.save_messages, messages, session_scope)
+                return committed
+            await asyncio.to_thread(self.db.save_messages, messages, session_scope)
+            return []
+
+        # Phase 3: Batch embed all extracted memory texts
+        mem_texts = [m.get("text", "") for m in extracted_memories if m.get("text")]
+        with observe(
+            "mem0.memory.embed",
+            kind="client",
+            attributes={"kira.memory.item_count": len(mem_texts)},
+        ) as embed_observation:
+            embed_observation.set_input(mem_texts)
+            try:
+                mem_embeddings_list = await asyncio.to_thread(self.embedding_model.embed_batch, mem_texts, "add")
+                embed_map = dict(zip(mem_texts, mem_embeddings_list))
+            except Exception:
+                embed_observation.set_attribute("kira.memory.embedding_fallback", True)
+                embed_map = {}
+                for text in mem_texts:
+                    try:
+                        embed_map[text] = await asyncio.to_thread(self.embedding_model.embed, text, "add")
+                    except Exception as e:
+                        logger.warning("Failed to embed memory text (async): %s", type(e).__name__)
+            embed_observation.set_attribute("kira.memory.embedded_count", len(embed_map))
+            if formation_identity is not None and any(text not in embed_map for text in mem_texts):
+                raise RuntimeError("atomic formation requires embeddings for every extracted memory")
+            embed_observation.set_outcome("success" if len(embed_map) == len(mem_texts) else "partial")
+
+        # Phase 4: Per-memory CPU processing + Phase 5: Hash dedup
+        with observe(
+            "mem0.deduplicate",
+            attributes={"kira.memory.candidate_count": len(extracted_memories)},
+        ) as dedup_observation:
+            existing_hashes = set()
+            for mem in existing_results:
+                h = mem.payload.get("hash") if hasattr(mem, "payload") and mem.payload else None
+                if h:
+                    existing_hashes.add(h)
+
+            records = []
+            seen_hashes = set()
+            duplicate_count = 0
+            dropped_count = 0
+            for mem in extracted_memories:
+                text = mem.get("text")
+                if not text or text not in embed_map:
+                    dropped_count += 1
+                    continue
+
+                mem_hash = hashlib.md5(text.encode()).hexdigest()
+                if mem_hash in existing_hashes or mem_hash in seen_hashes:
+                    logger.debug("Skipping duplicate memory (hash match, async)")
+                    duplicate_count += 1
+                    continue
+                seen_hashes.add(mem_hash)
+
+                text_lemmatized = lemmatize_for_bm25(text)
+
+                memory_id = str(uuid.uuid4())
+                mem_metadata = deepcopy(metadata)
+                mem_metadata["data"] = text
+                mem_metadata["text_lemmatized"] = text_lemmatized
+                mem_metadata["hash"] = mem_hash
+                if "created_at" not in mem_metadata:
+                    mem_metadata["created_at"] = datetime.now(timezone.utc).isoformat()
+                mem_metadata["updated_at"] = mem_metadata["created_at"]
+                if mem.get("attributed_to"):
+                    mem_metadata["attributed_to"] = mem["attributed_to"]
+
+                records.append((memory_id, text, embed_map[text], mem_metadata))
+            dedup_observation.set_attribute("kira.memory.retained_count", len(records))
+            dedup_observation.set_attribute("kira.memory.duplicate_count", duplicate_count)
+            dedup_observation.set_attribute("kira.memory.dropped_count", dropped_count)
+            dedup_observation.set_outcome("success" if records else "empty")
+
+        if not records and formation_identity is not None:
+            with observe(
+                "mem0.persist",
+                kind="client",
+                attributes={"kira.memory.candidate_count": 0},
+            ) as persist_observation:
+                created, committed = await asyncio.to_thread(
                     _formation_method(self.vector_store, "insert_with_formation_receipt"),
                     [],
                     [],
@@ -2738,71 +2871,9 @@ class AsyncMemory(MemoryBase):
                     user_id=formation_identity[1],
                     result=[],
                 )
-                await asyncio.to_thread(self.db.save_messages, messages, session_scope)
-                return committed
-            await asyncio.to_thread(self.db.save_messages, messages, session_scope)
-            return []
-
-        # Phase 3: Batch embed all extracted memory texts
-        mem_texts = [m.get("text", "") for m in extracted_memories if m.get("text")]
-        try:
-            mem_embeddings_list = await asyncio.to_thread(self.embedding_model.embed_batch, mem_texts, "add")
-            embed_map = dict(zip(mem_texts, mem_embeddings_list))
-        except Exception:
-            embed_map = {}
-            for text in mem_texts:
-                try:
-                    embed_map[text] = await asyncio.to_thread(self.embedding_model.embed, text, "add")
-                except Exception as e:
-                    logger.warning(f"Failed to embed memory text (async): {e}")
-        if formation_identity is not None and any(text not in embed_map for text in mem_texts):
-            raise RuntimeError("atomic formation requires embeddings for every extracted memory")
-
-        # Phase 4: Per-memory CPU processing + Phase 5: Hash dedup
-        existing_hashes = set()
-        for mem in existing_results:
-            h = mem.payload.get("hash") if hasattr(mem, "payload") and mem.payload else None
-            if h:
-                existing_hashes.add(h)
-
-        records = []
-        seen_hashes = set()
-        for mem in extracted_memories:
-            text = mem.get("text")
-            if not text or text not in embed_map:
-                continue
-
-            mem_hash = hashlib.md5(text.encode()).hexdigest()
-            if mem_hash in existing_hashes or mem_hash in seen_hashes:
-                logger.debug(f"Skipping duplicate memory (hash match, async): {text[:50]}")
-                continue
-            seen_hashes.add(mem_hash)
-
-            text_lemmatized = lemmatize_for_bm25(text)
-
-            memory_id = str(uuid.uuid4())
-            mem_metadata = deepcopy(metadata)
-            mem_metadata["data"] = text
-            mem_metadata["text_lemmatized"] = text_lemmatized
-            mem_metadata["hash"] = mem_hash
-            if "created_at" not in mem_metadata:
-                mem_metadata["created_at"] = datetime.now(timezone.utc).isoformat()
-            mem_metadata["updated_at"] = mem_metadata["created_at"]
-            if mem.get("attributed_to"):
-                mem_metadata["attributed_to"] = mem["attributed_to"]
-
-            records.append((memory_id, text, embed_map[text], mem_metadata))
-
-        if not records and formation_identity is not None:
-            _, committed = await asyncio.to_thread(
-                _formation_method(self.vector_store, "insert_with_formation_receipt"),
-                [],
-                [],
-                [],
-                event_id=formation_identity[0],
-                user_id=formation_identity[1],
-                result=[],
-            )
+                persist_observation.set_attribute("kira.memory.receipt.created", created)
+                persist_observation.set_output(committed)
+                persist_observation.set_outcome("deduplicated_empty" if created else "receipt_replay")
             await asyncio.to_thread(self.db.save_messages, messages, session_scope)
             return committed
         if not records:
@@ -2818,33 +2889,48 @@ class AsyncMemory(MemoryBase):
             for r in records
         ]
 
-        if formation_identity is not None:
-            created, committed = await asyncio.to_thread(
-                _formation_method(self.vector_store, "insert_with_formation_receipt"),
-                vectors=all_vectors,
-                ids=all_ids,
-                payloads=all_payloads,
-                event_id=formation_identity[0],
-                user_id=formation_identity[1],
-                result=returned_memories,
-            )
-            if not created:
-                return committed
-            returned_memories = committed
-        else:
-            try:
-                await asyncio.to_thread(
-                    self.vector_store.insert,
+        with observe(
+            "mem0.persist",
+            kind="client",
+            attributes={"kira.memory.candidate_count": len(records)},
+        ) as persist_observation:
+            if formation_identity is not None:
+                created, committed = await asyncio.to_thread(
+                    _formation_method(self.vector_store, "insert_with_formation_receipt"),
                     vectors=all_vectors,
                     ids=all_ids,
                     payloads=all_payloads,
+                    event_id=formation_identity[0],
+                    user_id=formation_identity[1],
+                    result=returned_memories,
                 )
-            except Exception:
-                for mid, vec, pay in zip(all_ids, all_vectors, all_payloads):
-                    try:
-                        await asyncio.to_thread(self.vector_store.insert, vectors=[vec], ids=[mid], payloads=[pay])
-                    except Exception as e:
-                        logger.error(f"Failed to insert memory {mid} (async): {e}")
+                persist_observation.set_attribute("kira.memory.receipt.created", created)
+                persist_observation.set_output(committed)
+                if not created:
+                    persist_observation.set_outcome("receipt_replay")
+                    return committed
+                returned_memories = committed
+                persist_observation.set_outcome("created")
+            else:
+                failed_count = 0
+                try:
+                    await asyncio.to_thread(
+                        self.vector_store.insert,
+                        vectors=all_vectors,
+                        ids=all_ids,
+                        payloads=all_payloads,
+                    )
+                except Exception:
+                    for mid, vec, pay in zip(all_ids, all_vectors, all_payloads):
+                        try:
+                            await asyncio.to_thread(
+                                self.vector_store.insert, vectors=[vec], ids=[mid], payloads=[pay]
+                            )
+                        except Exception as e:
+                            failed_count += 1
+                            logger.error("Failed to insert memory (async): %s", type(e).__name__)
+                persist_observation.set_attribute("kira.memory.persisted_count", len(records) - failed_count)
+                persist_observation.set_outcome("success" if failed_count == 0 else "partial")
 
         # Batch history
         history_records = [

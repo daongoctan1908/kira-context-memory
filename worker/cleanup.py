@@ -95,6 +95,7 @@ class MemoryJobCleanupRunner:
             logger.warning(
                 "Memory job retention cleanup failed",
                 extra={
+                    "event": "memory_job.cleanup_failed",
                     "dependency": "postgresql",
                     "operation": "purge_terminal_memory_jobs",
                     "error_class": type(error).__name__,
@@ -110,7 +111,8 @@ class MemoryJobCleanupRunner:
                 logger.warning(
                     "Memory job cleanup observation failed",
                     extra={
-                        "dependency": "prometheus",
+                        "event": "memory_job.cleanup_observation_failed",
+                        "dependency": "otel",
                         "operation": "observe_memory_job_cleanup",
                         "error_class": type(error).__name__,
                         "fallback_mode": "continue_cleanup",

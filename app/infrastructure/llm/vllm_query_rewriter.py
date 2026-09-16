@@ -1,6 +1,7 @@
 """HTTPX adapter for the vLLM OpenAI-compatible chat completions endpoint."""
 
 import httpx
+from opentelemetry import trace
 
 from app.application.services.rewrite_prompt import build_rewrite_messages
 from app.config.settings import Settings
@@ -12,6 +13,12 @@ from app.domain.errors.query_rewriter import (
     QueryRewriterTimeoutError,
 )
 from app.domain.models.context import ConversationContext
+from app.infrastructure.observability.langfuse_attributes import (
+    masked_io_attributes,
+    model_attribute,
+    usage_attributes,
+)
+from app.infrastructure.observability.tracing import set_span_attribute
 
 
 class VllmQueryRewriterAdapter:
@@ -50,12 +57,19 @@ class VllmQueryRewriterAdapter:
         )
 
     async def rewrite(self, context: ConversationContext) -> str:
+        messages = build_rewrite_messages(context)
+        self._observe_attributes(
+            {
+                **model_attribute(self._model),
+                **masked_io_attributes(input_value=messages),
+            }
+        )
         try:
             response = await self._client.post(
                 self._url,
                 json={
                     "model": self._model,
-                    "messages": build_rewrite_messages(context),
+                    "messages": messages,
                     "temperature": 0,
                     "stream": False,
                     "max_tokens": 256,
@@ -76,6 +90,7 @@ class VllmQueryRewriterAdapter:
             body = response.json()
             if not isinstance(body, dict):
                 raise ValueError
+            self._observe_attributes(usage_attributes(_provider_usage(body.get("usage"))))
             choices = body["choices"]
             if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
                 raise ValueError
@@ -94,4 +109,32 @@ class VllmQueryRewriterAdapter:
         except (ValueError, KeyError, TypeError) as error:
             raise QueryRewriterProtocolError from error
 
+        self._observe_attributes(masked_io_attributes(output_value=standalone_query))
         return standalone_query
+
+    @staticmethod
+    def _observe_attributes(attributes: dict[str, object]) -> None:
+        try:
+            span = trace.get_current_span()
+            for key, value in attributes.items():
+                set_span_attribute(span, key, value)
+        except Exception:
+            pass
+
+
+def _provider_usage(value: object) -> dict[str, int]:
+    if not isinstance(value, dict):
+        return {}
+    normalized: dict[str, int] = {}
+    aliases = {
+        "input": ("prompt_tokens", "input_tokens"),
+        "output": ("completion_tokens", "output_tokens"),
+        "total": ("total_tokens",),
+    }
+    for target, keys in aliases.items():
+        for key in keys:
+            candidate = value.get(key)
+            if isinstance(candidate, int) and not isinstance(candidate, bool) and candidate >= 0:
+                normalized[target] = candidate
+                break
+    return normalized

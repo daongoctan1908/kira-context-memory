@@ -1,53 +1,135 @@
-"""Per-application Prometheus registry and content-free structured logging."""
+"""Application correlation, tracing, and dual-read Phase 5 metric facade."""
 
-import json
+import asyncio
 import logging
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar
+from time import perf_counter
 
+from opentelemetry import trace
+from opentelemetry.metrics import Meter
+from opentelemetry.trace import Span, SpanKind, Status, StatusCode, Tracer
 from prometheus_client import CollectorRegistry, Counter, Histogram
 
+from app.domain.models.telemetry_context import TelemetryContext
 from app.domain.ports.context_observer import (
     ContextOperation,
     MemoryJobScheduleOutcome,
     MemorySearchOutcome,
     RewriteOutcome,
+    StageKind,
+    StageName,
     WriteOutcome,
+)
+from app.infrastructure.observability.langfuse_attributes import (
+    OBSERVATION_TYPE,
+    masked_io_attributes,
+    usage_attributes,
+)
+from app.infrastructure.observability.metrics import GatewayMetrics
+from app.infrastructure.observability.tracing import (
+    capture_telemetry_context,
+    mark_request_outcome,
+    set_request_span_attribute,
+    set_span_attribute,
+    start_span,
 )
 
 logger = logging.getLogger(__name__)
 
+_correlation_id: ContextVar[str | None] = ContextVar("correlation_id", default=None)
+_turn_id: ContextVar[str | None] = ContextVar("turn_id", default=None)
+_event_id: ContextVar[str | None] = ContextVar("event_id", default=None)
+_origin_trace_id: ContextVar[str | None] = ContextVar("origin_trace_id", default=None)
+_UNSET = object()
 
-class SafeJsonFormatter(logging.Formatter):
-    """Allowlist operational fields; never serialize messages or exception traces."""
+_SPAN_KINDS: dict[StageKind, SpanKind] = {
+    "internal": SpanKind.INTERNAL,
+    "client": SpanKind.CLIENT,
+    "producer": SpanKind.PRODUCER,
+}
+_LANGFUSE_TYPES: dict[StageName, str] = {
+    "identity.resolve": "span",
+    "conversation.read_recent": "span",
+    "memory.search": "retriever",
+    "context.build": "chain",
+    "rewrite.generate": "generation",
+    "conversation.append_turn": "span",
+    "memory_job.enqueue": "span",
+}
 
-    def format(self, record: logging.LogRecord) -> str:
-        fields = ("correlation_id", "operation", "dependency", "error_class", "fallback_mode")
-        return json.dumps(
-            {field: getattr(record, field) for field in fields if hasattr(record, field)},
-            ensure_ascii=False,
-        )
+
+def current_context_fields() -> dict[str, str]:
+    """Return independent application identifiers bound to the current async context."""
+    values = {
+        "correlation_id": _correlation_id.get(),
+        "turn_id": _turn_id.get(),
+        "event_id": _event_id.get(),
+        "origin_trace_id": _origin_trace_id.get(),
+    }
+    return {key: value for key, value in values.items() if value is not None}
 
 
-def configure_app_logging(level: str) -> None:
-    """Scope the safe handler to app loggers, leaving server logging independent."""
-    app_logger = logging.getLogger("app")
-    app_logger.setLevel(level)
-    if not any(getattr(handler, "kira_safe_handler", False) for handler in app_logger.handlers):
-        handler = logging.StreamHandler()
-        handler.kira_safe_handler = True  # type: ignore[attr-defined]
-        handler.setFormatter(SafeJsonFormatter())
-        app_logger.addHandler(handler)
-    app_logger.propagate = False
-    # HTTPX logs complete URLs at INFO; dependency details do not belong in app logs.
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
-    # Mem0 upstream can log prompt/provider details. The application emits only
-    # sanitized dependency outcomes at its own boundary.
-    logging.getLogger("mem0").setLevel(logging.CRITICAL)
-    logging.getLogger("mem0").propagate = False
+@contextmanager
+def bind_observability_context(
+    *,
+    correlation_id: str | None | object = _UNSET,
+    turn_id: str | None | object = _UNSET,
+    event_id: str | None | object = _UNSET,
+    origin_trace_id: str | None | object = _UNSET,
+) -> Iterator[None]:
+    """Bind app identifiers for one synchronous or asynchronous execution context."""
+    tokens = []
+    for variable, value in (
+        (_correlation_id, correlation_id),
+        (_turn_id, turn_id),
+        (_event_id, event_id),
+        (_origin_trace_id, origin_trace_id),
+    ):
+        if value is not _UNSET:
+            tokens.append((variable, variable.set(value)))  # type: ignore[arg-type]
+    try:
+        yield
+    finally:
+        for variable, token in reversed(tokens):
+            variable.reset(token)
+
+
+class _StageObservation:
+    def __init__(self, span: Span) -> None:
+        self._span = span
+        self.outcome = "unknown"
+
+    def set_attribute(self, key: str, value: object) -> None:
+        set_span_attribute(self._span, key, value)
+
+    def set_outcome(self, outcome: str) -> None:
+        self.outcome = outcome
+        self.set_attribute("kira.outcome", outcome)
+        try:
+            self._span.set_status(Status(StatusCode.ERROR if outcome == "error" else StatusCode.OK))
+        except Exception:
+            pass
+
+    def set_input(self, value: object) -> None:
+        self._set_attributes(masked_io_attributes(input_value=value))
+
+    def set_output(self, value: object) -> None:
+        self._set_attributes(masked_io_attributes(output_value=value))
+
+    def set_usage(self, usage: Mapping[str, object]) -> None:
+        self._set_attributes(usage_attributes(usage))
+
+    def _set_attributes(self, attributes: Mapping[str, object]) -> None:
+        for key, value in attributes.items():
+            self.set_attribute(key, value)
 
 
 class ContextTelemetry:
-    def __init__(self) -> None:
+    def __init__(self, *, tracer: Tracer | None = None, meter: Meter | None = None) -> None:
+        self._tracer = tracer or trace.NoOpTracerProvider().get_tracer("app.application.context")
+        self._otel = GatewayMetrics(meter)
         self.registry = CollectorRegistry()
         self.recent_messages = Histogram(
             "kira_context_recent_messages",
@@ -112,9 +194,50 @@ class ContextTelemetry:
             registry=self.registry,
         )
 
+    def request_attribute(self, key: str, value: object) -> None:
+        set_request_span_attribute(key, value)
+
+    def capture_telemetry_context(self, correlation_id: str) -> TelemetryContext | None:
+        """Capture the active enqueue span without exposing OTel to application code."""
+        return capture_telemetry_context(correlation_id)
+
+    @contextmanager
+    def stage(
+        self,
+        name: StageName,
+        *,
+        kind: StageKind = "internal",
+        attributes: Mapping[str, object] | None = None,
+    ) -> Iterator[_StageObservation]:
+        span_attributes = dict(attributes or {})
+        span_attributes[OBSERVATION_TYPE] = _LANGFUSE_TYPES[name]
+        started = perf_counter()
+        with start_span(
+            self._tracer,
+            name,
+            kind=_SPAN_KINDS[kind],
+            attributes=span_attributes,
+        ) as span:
+            observation = _StageObservation(span)
+            try:
+                yield observation
+            except BaseException as error:
+                if observation.outcome == "unknown":
+                    observation.set_outcome(
+                        "cancelled" if isinstance(error, asyncio.CancelledError) else "error"
+                    )
+                raise
+            finally:
+                self._otel.stage_observed(
+                    name,
+                    observation.outcome,
+                    max(perf_counter() - started, 0.0),
+                )
+
     def context_observed(self, message_count: int, estimated_tokens: int) -> None:
         self.recent_messages.observe(message_count)
         self.recent_tokens.observe(estimated_tokens)
+        self._otel.context_observed(message_count, estimated_tokens)
 
     def memory_search_observed(
         self,
@@ -127,14 +250,17 @@ class ContextTelemetry:
             self.memory_search_latency.labels(outcome).observe(seconds)
         if result_count is not None:
             self.memory_search_results.observe(result_count)
+        self._otel.memory_search_observed(outcome, result_count, seconds)
 
     def rewrite_observed(self, outcome: RewriteOutcome, seconds: float | None) -> None:
         self.rewrites.labels(outcome).inc()
         if seconds is not None:
             self.rewrite_latency.labels(outcome).observe(seconds)
+        self._otel.rewrite_observed(outcome, seconds)
 
     def memory_job_schedule_observed(self, outcome: MemoryJobScheduleOutcome) -> None:
         self.memory_job_schedules.labels(outcome).inc()
+        self._otel.memory_job_schedule_observed(outcome)
 
     def degraded(
         self,
@@ -143,15 +269,21 @@ class ContextTelemetry:
         error_class: str,
         fallback_mode: str,
     ) -> None:
+        mark_request_outcome("degraded")
+        set_request_span_attribute("kira.degraded.operation", operation)
+        set_request_span_attribute("error.type", error_class)
+        set_request_span_attribute("kira.fallback_mode", fallback_mode)
         dependency = {
             "identity": "identity",
             "memory_search": "mem0",
             "rewriter": "vllm",
         }.get(operation, "postgresql")
         self.degradations.labels(dependency, operation).inc()
+        self._otel.degraded(dependency, operation)
         logger.warning(
             "Context capability degraded",
             extra={
+                "event": "context.degraded",
                 "correlation_id": correlation_id,
                 "operation": operation,
                 "dependency": dependency,
@@ -162,3 +294,24 @@ class ContextTelemetry:
 
     def conversation_write_observed(self, outcome: WriteOutcome) -> None:
         self.writes.labels(outcome).inc()
+        self._otel.conversation_write_observed(outcome)
+
+    def request_observed(self, outcome: str, seconds: float) -> None:
+        """Record the complete `/chat` lifecycle, including SSE completion."""
+        self._otel.request_observed(outcome, seconds)
+
+    def kira_stream_observed(
+        self,
+        outcome: str,
+        seconds: float,
+        *,
+        first_event_seconds: float | None,
+        first_content_seconds: float | None,
+    ) -> None:
+        """Record KiRa stream completion and first-event/content latency."""
+        self._otel.kira_stream_observed(
+            outcome,
+            seconds,
+            first_event_seconds=first_event_seconds,
+            first_content_seconds=first_content_seconds,
+        )

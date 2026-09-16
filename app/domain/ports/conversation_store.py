@@ -4,6 +4,7 @@ from typing import Protocol
 from uuid import UUID
 
 from app.domain.models.conversation import AppendTurnResult, ConversationMessage
+from app.domain.models.telemetry_context import TelemetryContext
 
 
 class ConversationStorePort(Protocol):
@@ -25,6 +26,7 @@ class ConversationStorePort(Protocol):
         assistant_message: ConversationMessage,
         *,
         schedule_memory: bool = False,
+        telemetry_context: TelemetryContext | None = None,
     ) -> AppendTurnResult:
         """Atomically append a completed turn and its optional memory job."""
         ...

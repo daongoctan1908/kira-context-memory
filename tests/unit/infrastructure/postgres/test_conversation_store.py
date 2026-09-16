@@ -19,7 +19,7 @@ from app.infrastructure.postgres.conversation_store import (
     _find_sqlstate,
     _is_connection,
 )
-from app.infrastructure.postgres.schema import EXPECTED_SCHEMA_REVISION
+from app.infrastructure.postgres.schema import EXPECTED_SCHEMA_REVISION, PREVIOUS_SCHEMA_REVISION
 
 USER_ID = "user-1"
 
@@ -135,6 +135,14 @@ async def test_validate_schema_accepts_expected_revision() -> None:
     await adapter(connection).validate_schema()
 
     assert len(connection.calls) == 1
+
+
+async def test_validate_schema_accepts_explicit_bridge_revision() -> None:
+    store = adapter(FakeConnection(scalar=PREVIOUS_SCHEMA_REVISION))
+
+    await store.validate_schema()
+
+    assert store._schema_revision == PREVIOUS_SCHEMA_REVISION
 
 
 async def test_validate_schema_rejects_wrong_revision() -> None:

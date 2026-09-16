@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
+from opentelemetry.trace import Tracer
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.application.use_cases.process_memory import ProcessMemoryUseCase
@@ -13,9 +14,11 @@ from app.domain.errors.memory import LongTermMemoryTimeoutError
 from app.domain.errors.memory_job import MemoryJobQueueConnectionError
 from app.domain.ports.conversation_store import ConversationStorePort
 from app.domain.ports.long_term_memory import LongTermMemoryPort
+from app.domain.ports.memory_job_observer import MemoryJobProcessObserverPort
 from app.domain.ports.memory_job_queue import MemoryJobQueuePort
 from app.infrastructure.memory.mem0_adapter import Mem0Adapter
 from app.infrastructure.memory.postgres_admin import validate_memory_schema
+from app.infrastructure.observability.memory_observer import MemoryObserver
 from app.infrastructure.postgres.client import create_postgres_engine
 from app.infrastructure.postgres.conversation_store import PostgresConversationStoreAdapter
 from app.infrastructure.postgres.managed_store import ManagedPostgresConversationStore
@@ -44,6 +47,8 @@ async def worker_dependency_lifespan(
     postgres_engine: AsyncEngine | None = None,
     long_term_memory: LongTermMemoryPort | None = None,
     job_observer: MemoryJobObserver | None = None,
+    process_observer: MemoryJobProcessObserverPort | None = None,
+    tracer: Tracer | None = None,
 ) -> AsyncIterator[WorkerDependencies]:
     """Validate, construct, and close dependencies owned by one Worker process."""
     resolved_settings = settings or get_worker_settings()
@@ -60,7 +65,7 @@ async def worker_dependency_lifespan(
             PostgresConversationStoreAdapter(resolved_engine),
             resolved_settings.conversation_operation_timeout_seconds,
         )
-        memory_job_queue = PostgresMemoryJobQueueAdapter(resolved_engine)
+        memory_job_queue = PostgresMemoryJobQueueAdapter(resolved_engine, tracer=tracer)
 
         await conversation_store.validate_schema()
         try:
@@ -77,19 +82,32 @@ async def worker_dependency_lifespan(
 
         resolved_memory = long_term_memory
         if resolved_memory is None:
-            owned_memory = Mem0Adapter.from_settings(resolved_settings)
+            metric_observer = (
+                process_observer
+                if callable(getattr(process_observer, "stage_observed", None))
+                else None
+            )
+            owned_memory = Mem0Adapter.from_settings(
+                resolved_settings,
+                observer=MemoryObserver(
+                    tracer,
+                    metric_observer=metric_observer,  # type: ignore[arg-type]
+                ),
+            )
             resolved_memory = owned_memory
 
         process_memory = ProcessMemoryUseCase(
             conversation_store,
             resolved_memory,
             message_limit=resolved_settings.memory_formation_message_limit,
+            observer=process_observer,
         )
         process_memory_job = ProcessMemoryJobUseCase(
             process_memory,
             memory_job_queue,
             max_attempts=resolved_settings.memory_job_max_attempts,
             retry_delays_seconds=resolved_settings.memory_job_retry_delays_seconds,
+            observer=process_observer,
         )
         runner = MemoryJobRunner(
             memory_job_queue,
@@ -102,6 +120,7 @@ async def worker_dependency_lifespan(
             database_timeout_seconds=resolved_settings.memory_job_db_timeout_seconds,
             shutdown_grace_seconds=resolved_settings.memory_job_shutdown_grace_seconds,
             observer=job_observer,
+            tracer=tracer,
         )
         yield WorkerDependencies(
             settings=resolved_settings,

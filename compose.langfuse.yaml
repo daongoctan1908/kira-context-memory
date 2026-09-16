@@ -1,0 +1,160 @@
+# Disposable local Langfuse acceptance overlay. Credentials are synthetic and loopback-only.
+x-langfuse-environment: &langfuse-environment
+  NEXTAUTH_URL: http://localhost:13001
+  DATABASE_URL: postgresql://langfuse:local-langfuse-only@langfuse-postgres:5432/langfuse
+  SALT: local-langfuse-acceptance-salt
+  ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+  TELEMETRY_ENABLED: "false"
+  LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "false"
+  CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+  CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+  CLICKHOUSE_USER: langfuse
+  CLICKHOUSE_PASSWORD: local-clickhouse-only
+  CLICKHOUSE_CLUSTER_ENABLED: "false"
+  LANGFUSE_USE_AZURE_BLOB: "false"
+  LANGFUSE_USE_OCI_NATIVE_OBJECT_STORAGE: "false"
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: local-minio-only
+  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+  LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+  LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
+  LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: local-minio-only
+  LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+  LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+  LANGFUSE_S3_BATCH_EXPORT_ENABLED: "false"
+  REDIS_HOST: langfuse-redis
+  REDIS_PORT: "6379"
+  REDIS_AUTH: local-redis-only
+  REDIS_TLS_ENABLED: "false"
+
+x-langfuse-dependencies: &langfuse-dependencies
+  langfuse-postgres:
+    condition: service_healthy
+  langfuse-clickhouse:
+    condition: service_healthy
+  langfuse-redis:
+    condition: service_healthy
+  langfuse-minio:
+    condition: service_healthy
+
+services:
+  langfuse-postgres:
+    image: postgres:17
+    restart: "no"
+    mem_limit: 384m
+    environment:
+      POSTGRES_DB: langfuse
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: local-langfuse-only
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - langfuse-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse -d langfuse"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 3s
+
+  langfuse-redis:
+    image: redis:7
+    restart: "no"
+    mem_limit: 192m
+    command: ["redis-server", "--requirepass", "local-redis-only", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - langfuse-redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a local-redis-only ping | grep PONG"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 2s
+
+  langfuse-minio:
+    image: cgr.dev/chainguard/minio
+    restart: "no"
+    mem_limit: 384m
+    entrypoint: sh
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: local-minio-only
+    volumes:
+      - langfuse-minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+      start_period: 2s
+
+  langfuse-clickhouse:
+    image: clickhouse/clickhouse-server:25.12
+    restart: "no"
+    mem_limit: 1536m
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: langfuse
+      CLICKHOUSE_PASSWORD: local-clickhouse-only
+    volumes:
+      - langfuse-clickhouse-data:/var/lib/clickhouse
+      - langfuse-clickhouse-logs:/var/log/clickhouse-server
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:8123/ping || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 3s
+
+  langfuse-web:
+    image: langfuse/langfuse:3
+    restart: "no"
+    mem_limit: 1280m
+    depends_on: *langfuse-dependencies
+    ports:
+      - "127.0.0.1:13001:3000"
+    environment:
+      <<: *langfuse-environment
+      NODE_OPTIONS: --max-old-space-size=896
+      NEXTAUTH_SECRET: local-langfuse-nextauth-secret
+      AUTH_DISABLE_SIGNUP: "true"
+      LANGFUSE_INIT_ORG_ID: kira-local-org
+      LANGFUSE_INIT_ORG_NAME: KiRa Local
+      LANGFUSE_INIT_PROJECT_ID: kira-local-project
+      LANGFUSE_INIT_PROJECT_NAME: KiRa Local Acceptance
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: lf_pk_kira_local_acceptance
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: lf_sk_kira_local_acceptance
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-local@example.invalid}
+      LANGFUSE_INIT_USER_NAME: Local Developer
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-local-acceptance-only}
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3
+    restart: "no"
+    mem_limit: 1g
+    depends_on: *langfuse-dependencies
+    environment:
+      <<: *langfuse-environment
+      NODE_OPTIONS: --max-old-space-size=640
+
+  otel-collector:
+    mem_limit: 192m
+    environment:
+      LANGFUSE_OTEL_AUTH: Basic bGZfcGtfa2lyYV9sb2NhbF9hY2NlcHRhbmNlOmxmX3NrX2tpcmFfbG9jYWxfYWNjZXB0YW5jZQ==
+    volumes:
+      - ./deploy/observability/collector-langfuse-local.yaml:/etc/otelcol-contrib/config.yaml:ro
+
+volumes:
+  langfuse-postgres-data:
+  langfuse-clickhouse-data:
+  langfuse-clickhouse-logs:
+  langfuse-minio-data:
+  langfuse-redis-data:

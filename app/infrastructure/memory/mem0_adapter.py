@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from typing import Any, Protocol
 
 import httpx
+from mem0.observability import bind_observer
 
 from app.application.services.memory_policy import MEMORY_EXTRACTION_INSTRUCTIONS
 from app.config.runtime_contracts import MemoryRuntimeSettings
@@ -129,17 +130,25 @@ class Mem0Adapter:
         *,
         search_timeout_seconds: float,
         operation_timeout_seconds: float,
+        observer: object | None = None,
     ) -> None:
         self._client = client
         self._search_timeout = search_timeout_seconds
         self._operation_timeout = operation_timeout_seconds
+        self._observer = observer
 
     @classmethod
-    def from_settings(cls, settings: MemoryRuntimeSettings) -> "Mem0Adapter":
+    def from_settings(
+        cls,
+        settings: MemoryRuntimeSettings,
+        *,
+        observer: object | None = None,
+    ) -> "Mem0Adapter":
         return cls(
             create_mem0_client(settings),
             search_timeout_seconds=settings.memory_search_timeout_seconds,
             operation_timeout_seconds=settings.memory_operation_timeout_seconds,
+            observer=observer,
         )
 
     async def search(
@@ -154,13 +163,14 @@ class Mem0Adapter:
             raise ValueError("user_id and query must not be empty")
         try:
             async with asyncio.timeout(self._search_timeout):
-                response = await self._client.search(
-                    query,
-                    top_k=top_k,
-                    threshold=threshold,
-                    filters={"user_id": user_id},
-                    rerank=False,
-                )
+                with bind_observer(self._observer):
+                    response = await self._client.search(
+                        query,
+                        top_k=top_k,
+                        threshold=threshold,
+                        filters={"user_id": user_id},
+                        rerank=False,
+                    )
         except TimeoutError as error:
             raise LongTermMemoryTimeoutError from error
         except Exception as error:
@@ -183,17 +193,18 @@ class Mem0Adapter:
         reference = source.reference
         try:
             async with asyncio.timeout(self._operation_timeout):
-                response = await self._client.add(
-                    messages,
-                    user_id=reference.user_id,
-                    metadata={
-                        "formation_event_id": str(source.formation_event_id),
-                        "conversation_id": str(reference.conversation_id),
-                        "turn_id": reference.turn_id,
-                        "boundary_message_id": reference.boundary_message_id,
-                    },
-                    infer=True,
-                )
+                with bind_observer(self._observer):
+                    response = await self._client.add(
+                        messages,
+                        user_id=reference.user_id,
+                        metadata={
+                            "formation_event_id": str(source.formation_event_id),
+                            "conversation_id": str(reference.conversation_id),
+                            "turn_id": reference.turn_id,
+                            "boundary_message_id": reference.boundary_message_id,
+                        },
+                        infer=True,
+                    )
         except TimeoutError as error:
             raise LongTermMemoryTimeoutError from error
         except Exception as error:

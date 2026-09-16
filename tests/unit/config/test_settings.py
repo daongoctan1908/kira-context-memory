@@ -62,6 +62,14 @@ def test_settings_have_safe_baseline_defaults(monkeypatch) -> None:
     assert settings.vllm_read_timeout_seconds == 8.0
     assert settings.vllm_max_output_chars == 2048
     assert settings.dev_static_identity_enabled is False
+    assert settings.app_version == "0.4.1"
+    assert settings.otel_enabled is False
+    assert settings.otel_exporter_otlp_endpoint is None
+    assert settings.otel_export_timeout_seconds == 1.0
+    assert settings.otel_batch_max_queue_size == 2048
+    assert settings.otel_batch_max_export_batch_size == 512
+    assert settings.otel_trace_sample_ratio == 1.0
+    assert settings.otel_shutdown_timeout_seconds == 2.0
     assert settings.ltm_enabled is False
     assert settings.memory_formation_enabled is False
     assert settings.memory_schema == "memory"
@@ -243,3 +251,51 @@ def test_memory_secrets_are_redacted() -> None:
     assert "memory-password" not in rendered
     assert "embedding-secret" not in rendered
     assert "llm-secret" not in rendered
+
+
+def test_otel_settings_read_environment(monkeypatch) -> None:
+    monkeypatch.setenv("KIRA_BASE_URL", "http://kira.test")
+    monkeypatch.setenv("KIRA_USERNAME", "service-account")
+    monkeypatch.setenv("KIRA_BASIC_AUTH", "secret")
+    monkeypatch.setenv("APP_VERSION", "0.5.0")
+    monkeypatch.setenv("OTEL_ENABLED", "true")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://collector.test:4318")
+    monkeypatch.setenv("OTEL_TRACE_SAMPLE_RATIO", "0.25")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.app_version == "0.5.0"
+    assert settings.otel_enabled is True
+    assert str(settings.otel_exporter_otlp_endpoint) == "http://collector.test:4318/"
+    assert settings.otel_trace_sample_ratio == 0.25
+
+
+def test_otel_export_batch_must_fit_in_queue() -> None:
+    with pytest.raises(ValidationError, match="batch size"):
+        Settings(
+            _env_file=None,
+            kira_base_url="http://kira.test",
+            kira_username="service-account",
+            kira_basic_auth="secret",
+            otel_batch_max_queue_size=10,
+            otel_batch_max_export_batch_size=11,
+        )
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        "http://user:password@collector.test:4318",
+        "http://collector.test:4318?api_key=secret",
+        "http://collector.test:4318#secret",
+    ],
+)
+def test_otel_endpoint_rejects_embedded_sensitive_data(endpoint: str) -> None:
+    with pytest.raises(ValidationError, match="must not contain credentials"):
+        Settings(
+            _env_file=None,
+            kira_base_url="http://kira.test",
+            kira_username="service-account",
+            kira_basic_auth="secret",
+            otel_exporter_otlp_endpoint=endpoint,
+        )

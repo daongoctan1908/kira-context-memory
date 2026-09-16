@@ -277,6 +277,99 @@ provider chỉ publish trên loopback. Stack dùng project `kira-context-week4`,
 cố định và volume riêng; không phụ thuộc giá trị `.env`, không gọi endpoint thật và không chứa
 Redis.
 
+Để bật OTel và Collector local cùng stack trên (không khởi động giao diện metrics):
+
+```powershell
+docker compose -f compose.week4.yaml -f compose.observability.yaml up -d --build --wait
+```
+
+Gateway và Worker gửi OTLP/HTTP tới Collector nội bộ. Collector health được publish tại
+`http://127.0.0.1:13133`; self-metrics tại `http://127.0.0.1:18888/metrics` và metrics nhận từ app
+tại `http://127.0.0.1:18889/metrics`. Phase 2 đã phát business spans cho toàn bộ vòng đời `/chat`
+và KiRa SSE; migration business metrics sang OTel bắt đầu ở Phase 5. Tắt hoặc mất Collector không
+làm thay đổi readiness và luồng xử lý chat/memory.
+
+Prometheus và Grafana là profile `metrics` độc lập, không cần cho Langfuse acceptance. Chỉ bật khi
+cần kiểm tra metric parity/dashboard:
+
+```powershell
+docker compose -f compose.week4.yaml -f compose.observability.yaml `
+  --profile metrics up -d prometheus grafana
+```
+
+### Local Langfuse acceptance
+
+Overlay `compose.langfuse.yaml` dựng Langfuse self-host tối thiểu trên loopback cùng các dependency
+bắt buộc của chính Langfuse: PostgreSQL, ClickHouse, Redis và MinIO. Đây là stack disposable dùng
+credential synthetic cố định; không dùng cho production. Prometheus/Grafana, Loki, Kubernetes,
+HA và retention automation không thuộc acceptance này.
+
+Khởi động theo thứ tự sau để tránh sáu container Langfuse cùng tạo peak RAM. Stack KiRa synthetic
+được dựng trước; sau đó lần lượt là storage nhẹ, ClickHouse, Web, Langfuse Worker, Collector và cuối
+cùng recreate Gateway/Worker để gửi OTLP/HTTP qua Collector:
+
+```powershell
+$compose = @(
+  "-f", "compose.week4.yaml",
+  "-f", "compose.observability.yaml",
+  "-f", "compose.langfuse.yaml"
+)
+
+docker compose @compose config --quiet
+docker compose -f compose.week4.yaml build gateway
+docker compose -f compose.week4.yaml up -d --no-build --wait
+docker compose @compose --profile metrics stop prometheus grafana
+
+docker compose @compose up -d langfuse-postgres langfuse-redis langfuse-minio
+docker compose @compose up -d langfuse-clickhouse
+docker compose @compose up -d --no-deps langfuse-web
+
+$deadline = (Get-Date).AddSeconds(90)
+do {
+  try {
+    $langfuseReady = (Invoke-WebRequest -UseBasicParsing `
+      http://127.0.0.1:13001/api/public/health -TimeoutSec 2).StatusCode -eq 200
+  } catch {
+    $langfuseReady = $false
+  }
+  if (-not $langfuseReady) { Start-Sleep -Seconds 2 }
+} until ($langfuseReady -or (Get-Date) -ge $deadline)
+if (-not $langfuseReady) { throw "Langfuse did not become ready" }
+
+docker compose @compose up -d --no-deps langfuse-worker
+docker compose @compose up -d --no-deps --force-recreate otel-collector
+docker compose @compose up -d --no-deps --force-recreate gateway worker
+docker compose @compose up -d --no-deps --wait gateway worker
+```
+
+Chạy gate. Script tạo hai chat synthetic: lượt đầu được Worker formation thành memory; lượt sau ở
+session khác retrieval memory đó, rewrite rồi gọi KiRa. Sau đó script đọc Langfuse API và xác nhận
+đủ stage, liên kết Gateway/Worker, model/token usage cùng bốn metadata tìm kiếm được:
+`correlation_id`, `turn_id`, `event_id`, `origin_trace_id`.
+
+```powershell
+uv run python -m scripts.smoke_langfuse_acceptance
+```
+
+Mở `http://127.0.0.1:13001`, đăng nhập bằng user local `local@example.invalid` / password
+`local-acceptance-only`, vào **Tracing → Filters → Metadata** và lọc theo một trong bốn key trên.
+Một `event_id` phải trả đúng trace `chat.request` và `memory_job.process`; `origin_trace_id` của
+Worker phải trỏ về trace ID của chat nguồn. Input/output AI hiển thị sau redaction/truncation; các
+lỗi masking bỏ field thay vì xuất raw content. Collector local bỏ riêng các poll
+`memory_job.claim` không claim/reclaim được job nào để tránh làm đầy Langfuse; claim có công việc và
+mọi trace `memory_job.process` vẫn được giữ.
+
+Muốn dùng tài khoản local khác khi khởi tạo volume Langfuse mới, đặt biến trong phiên PowerShell
+trước khi chạy Compose; không ghi email/password thật vào file tracked:
+
+```powershell
+$env:LANGFUSE_INIT_USER_EMAIL="your-local-email@example.com"
+$env:LANGFUSE_INIT_USER_PASSWORD="your-local-password"
+```
+
+Hai biến chỉ dùng cho lần khởi tạo database Langfuse đầu tiên. Đổi chúng không tự đổi user đã tồn
+tại trong volume `langfuse-postgres-data`.
+
 `DATABASE_URL` phải khớp `POSTGRES_DB`, `POSTGRES_USER` và `POSTGRES_PASSWORD` trong `.env`.
 Gateway không tự chạy migration. Cấu hình hoặc schema sai làm startup fail; connection timeout
 tạm thời chỉ đặt PostgreSQL ở degraded state và `/ready` vẫn trả 200.

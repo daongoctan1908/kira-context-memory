@@ -22,16 +22,21 @@ from app.infrastructure.identity import NullIdentityAdapter, StaticIdentityAdapt
 from app.infrastructure.kira.http_kira_client import KiraHttpAdapter
 from app.infrastructure.llm.vllm_query_rewriter import VllmQueryRewriterAdapter
 from app.infrastructure.memory import Mem0Adapter
-from app.infrastructure.observability.context import ContextTelemetry, configure_app_logging
+from app.infrastructure.observability.context import ContextTelemetry
+from app.infrastructure.observability.logging import configure_app_logging
+from app.infrastructure.observability.runtime import create_observability_runtime
+from app.infrastructure.observability.settings import build_observability_settings
 from app.infrastructure.postgres import (
     PostgresConversationStoreAdapter,
     create_postgres_engine,
 )
 from app.infrastructure.postgres.managed_store import ManagedPostgresConversationStore
 from app.presentation.api.chat_router import router as chat_router
+from app.presentation.api.correlation_middleware import CorrelationMiddleware
 from app.presentation.api.errors import kira_client_exception_handler
 from app.presentation.api.health_router import router as health_router
 from app.presentation.api.metrics_router import router as metrics_router
+from app.presentation.api.tracing_middleware import ChatTracingMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +58,39 @@ def create_app(
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         resolved_settings = settings or get_settings()
-        configure_app_logging(resolved_settings.app_log_level)
-        telemetry = ContextTelemetry()
+        configure_app_logging(
+            resolved_settings.app_log_level,
+            deployment_environment=resolved_settings.app_environment,
+        )
+        observability = create_observability_runtime(
+            build_observability_settings(
+                resolved_settings,
+                service_name="kira-context-gateway",
+            )
+        )
+        telemetry = ContextTelemetry(
+            tracer=observability.get_tracer(
+                "app.application.context",
+                resolved_settings.app_version,
+            ),
+            meter=observability.get_meter(
+                "app.application.context",
+                resolved_settings.app_version,
+            ),
+        )
+        application.state.observability = observability
+        if observability.initialization_error_class is not None:
+            logger.warning(
+                "Observability runtime degraded to no-op",
+                extra={
+                    "event": "observability.initialization_failed",
+                    "operation": "initialize",
+                    "dependency": "otel",
+                    "outcome": "disabled",
+                    "error_class": observability.initialization_error_class,
+                    "fallback_mode": "noop_telemetry",
+                },
+            )
 
         owned_http_client: httpx.AsyncClient | None = None
         owned_rewriter_http_client: httpx.AsyncClient | None = None
@@ -67,7 +103,15 @@ def create_app(
                 if resolved_http_client is None:
                     owned_http_client = httpx.AsyncClient()
                     resolved_http_client = owned_http_client
-                resolved_kira_client = KiraHttpAdapter(resolved_http_client, resolved_settings)
+                resolved_kira_client = KiraHttpAdapter(
+                    resolved_http_client,
+                    resolved_settings,
+                    metric_observer=telemetry,
+                    tracer=observability.get_tracer(
+                        "app.infrastructure.kira",
+                        resolved_settings.app_version,
+                    ),
+                )
 
             resolved_conversation_store = conversation_store
             postgres_status = "injected" if conversation_store is not None else "initializing"
@@ -90,6 +134,7 @@ def create_app(
                     logger.warning(
                         "PostgreSQL conversation store unavailable during startup",
                         extra={
+                            "event": "postgres.schema_validation_failed",
                             "dependency": "postgresql",
                             "operation": "validate_schema",
                             "error_class": type(error).__name__,
@@ -161,19 +206,23 @@ def create_app(
         finally:
             application.state.ready = False
             try:
-                if owned_long_term_memory is not None:
-                    owned_long_term_memory.close()
-            finally:
                 try:
-                    if owned_http_client is not None:
-                        await owned_http_client.aclose()
+                    if owned_long_term_memory is not None:
+                        owned_long_term_memory.close()
                 finally:
                     try:
-                        if owned_rewriter_http_client is not None:
-                            await owned_rewriter_http_client.aclose()
+                        if owned_http_client is not None:
+                            await owned_http_client.aclose()
                     finally:
-                        if owned_postgres_engine is not None:
-                            await owned_postgres_engine.dispose()
+                        try:
+                            if owned_rewriter_http_client is not None:
+                                await owned_rewriter_http_client.aclose()
+                        finally:
+                            if owned_postgres_engine is not None:
+                                await owned_postgres_engine.dispose()
+            finally:
+                await observability.shutdown()
+                application.state.observability = None
 
     application = FastAPI(
         title="KiRa Context Gateway",
@@ -181,6 +230,11 @@ def create_app(
         lifespan=lifespan,
     )
     application.state.ready = False
+    application.state.observability = None
+    # ``add_middleware`` prepends entries. Add tracing first so correlation is outermost
+    # and therefore available before validation and before the root span is created.
+    application.add_middleware(ChatTracingMiddleware)
+    application.add_middleware(CorrelationMiddleware)
     application.add_exception_handler(KiraClientError, kira_client_exception_handler)
     application.include_router(health_router)
     application.include_router(chat_router)

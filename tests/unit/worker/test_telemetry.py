@@ -1,6 +1,8 @@
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from prometheus_client import generate_latest
 
 from app.application.use_cases.process_memory_job import (
@@ -98,3 +100,33 @@ def test_worker_telemetry_uses_one_isolated_registry_per_process_instance() -> N
     assert (
         'kira_memory_job_claim_total{kind="new"} 0.0' in generate_latest(second.registry).decode()
     )
+
+
+def test_phase5_maps_legacy_success_to_otel_completed_without_changing_old_scrape() -> None:
+    reader = InMemoryMetricReader()
+    provider = MeterProvider(metric_readers=[reader])
+    telemetry = MemoryJobTelemetry(meter=provider.get_meter("worker-test"))
+
+    telemetry.job_processed(
+        make_job(),
+        ProcessMemoryJobResult(MemoryJobProcessOutcome.COMPLETED, lifecycle_event_count=1),
+        0.25,
+    )
+
+    legacy = generate_latest(telemetry.registry).decode()
+    data = reader.get_metrics_data()
+    assert data is not None
+    metrics = [
+        metric
+        for resource in data.resource_metrics
+        for scope in resource.scope_metrics
+        for metric in scope.metrics
+    ]
+    otel_count = next(
+        metric for metric in metrics if metric.name == "kira.memory.job.process.count"
+    )
+
+    assert 'kira_memory_job_processing_total{outcome="success"} 1.0' in legacy
+    assert otel_count.data.data_points[0].attributes == {"outcome": "completed"}
+    assert otel_count.data.data_points[0].value == 1
+    provider.shutdown()

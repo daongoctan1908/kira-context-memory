@@ -16,6 +16,7 @@ from app.domain.errors.conversation import (
 )
 from app.domain.errors.kira import KiraTimeoutError
 from app.domain.models.conversation import ConversationMessage, ConversationRole
+from app.domain.models.telemetry_context import TelemetryContext
 from app.infrastructure.postgres import conversation_store as conversation_store_module
 from app.infrastructure.postgres.conversation_store import PostgresConversationStoreAdapter
 from app.infrastructure.postgres.schema import (
@@ -185,6 +186,7 @@ async def test_full_history_is_retained_while_recent_read_is_bounded(
     session_id: str,
 ) -> None:
     adapter = PostgresConversationStoreAdapter(engine)
+    await adapter.validate_schema()
 
     for turn_number in range(1, 7):
         assert await _append(adapter, session_id, turn_number) is True
@@ -355,6 +357,7 @@ async def test_memory_job_insert_failure_rolls_back_new_conversation_turn(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     adapter = PostgresConversationStoreAdapter(engine)
+    await adapter.validate_schema()
     seed_turn_id = f"seed-{uuid4()}"
     seed = await adapter.append_turn(
         USER_ID,
@@ -378,6 +381,7 @@ async def test_memory_job_insert_failure_rolls_back_new_conversation_turn(
             _message(failing_session, failing_turn_id, ConversationRole.USER, "question", 3),
             _message(failing_session, failing_turn_id, ConversationRole.ASSISTANT, "answer", 4),
             schedule_memory=True,
+            telemetry_context=TelemetryContext(correlation_id="a" * 32),
         )
 
     async with engine.connect() as connection:

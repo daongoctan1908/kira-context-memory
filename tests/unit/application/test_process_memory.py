@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -66,6 +67,72 @@ class FakeMemory:
         return self.result
 
 
+class RecordingObservation:
+    def __init__(self, name):
+        self.name = name
+        self.attributes = {}
+        self.inputs = []
+        self.outputs = []
+        self.outcomes = []
+
+    def set_attribute(self, key, value):
+        self.attributes[key] = value
+
+    def set_input(self, value):
+        self.inputs.append(value)
+
+    def set_output(self, value):
+        self.outputs.append(value)
+
+    def set_outcome(self, outcome):
+        self.outcomes.append(outcome)
+
+
+class RecordingObserver:
+    def __init__(self, *, fail=False):
+        self.observations = []
+        self.fail = fail
+
+    @contextmanager
+    def stage(self, name, *, kind="internal", attributes=None):
+        if self.fail:
+            raise RuntimeError("observer unavailable")
+        observation = RecordingObservation(name)
+        observation.attributes.update(attributes or {})
+        self.observations.append(observation)
+        yield observation
+
+
+class CallbackFailingObservation:
+    @staticmethod
+    def _fail(*args):
+        raise RuntimeError("observer callback unavailable")
+
+    set_attribute = _fail
+    set_input = _fail
+    set_output = _fail
+    set_outcome = _fail
+
+
+class CallbackFailingObserver:
+    @contextmanager
+    def stage(self, name, *, kind="internal", attributes=None):
+        yield CallbackFailingObservation()
+
+
+class ExitFailingManager:
+    def __enter__(self):
+        return RecordingObservation("failing-exit")
+
+    def __exit__(self, *args):
+        raise RuntimeError("observer exit unavailable")
+
+
+class ExitFailingObserver:
+    def stage(self, name, *, kind="internal", attributes=None):
+        return ExitFailingManager()
+
+
 async def test_reads_exact_boundary_and_preserves_provider_lifecycle_result():
     ref = reference()
     formation_event_id = uuid4()
@@ -90,6 +157,46 @@ async def test_reads_exact_boundary_and_preserves_provider_lifecycle_result():
     assert memory.sources[0].reference is ref
     assert memory.sources[0].messages == messages()
     assert memory.sources[0].formation_event_id == formation_event_id
+
+
+async def test_observes_boundary_and_formation_without_changing_result():
+    observer = RecordingObserver()
+    memory = FakeMemory(MemoryProcessResult((MemoryLifecycleEvent("ADD", "id", "fact"),)))
+
+    result = await ProcessMemoryUseCase(
+        FakeStore(messages()),
+        memory,
+        observer=observer,
+    ).execute(reference(), uuid4())
+
+    assert [item.name for item in observer.observations] == [
+        "conversation.read_boundary",
+        "mem0.formation",
+    ]
+    assert observer.observations[0].attributes["kira.memory.message_count"] == 4
+    assert observer.observations[1].attributes["kira.memory.lifecycle_event_count"] == 1
+    assert observer.observations[1].outcomes == ["success"]
+    assert result is memory.result
+
+
+@pytest.mark.parametrize(
+    "observer",
+    [
+        RecordingObserver(fail=True),
+        CallbackFailingObserver(),
+        ExitFailingObserver(),
+    ],
+)
+async def test_observer_failure_is_fail_open_for_memory_processing(observer):
+    memory = FakeMemory()
+
+    result = await ProcessMemoryUseCase(
+        FakeStore(messages()),
+        memory,
+        observer=observer,
+    ).execute(reference(), uuid4())
+
+    assert result is memory.result
 
 
 @pytest.mark.parametrize(
@@ -126,6 +233,29 @@ async def test_store_and_memory_typed_failures_propagate_to_runtime_boundary():
             reference(),
             uuid4(),
         )
+
+
+@pytest.mark.parametrize(
+    "observer",
+    [
+        None,
+        RecordingObserver(),
+        RecordingObserver(fail=True),
+        CallbackFailingObserver(),
+        ExitFailingObserver(),
+    ],
+)
+async def test_observer_mode_preserves_retryable_formation_error(observer):
+    memory_error = LongTermMemoryTimeoutError()
+
+    with pytest.raises(LongTermMemoryTimeoutError) as captured:
+        await ProcessMemoryUseCase(
+            FakeStore(messages()),
+            FakeMemory(error=memory_error),
+            observer=observer,
+        ).execute(reference(), uuid4())
+
+    assert captured.value is memory_error
 
 
 async def test_rejects_non_uuid_formation_event_before_reading_store():

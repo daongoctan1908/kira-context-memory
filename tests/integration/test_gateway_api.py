@@ -1,3 +1,4 @@
+import asyncio
 import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -5,6 +6,9 @@ from uuid import UUID, uuid4
 
 import httpx
 import pytest
+from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 
 from app.config.settings import Settings
@@ -18,6 +22,7 @@ from app.domain.models.conversation import (
 from app.domain.models.kira import KiraAuthResult, KiraEventKind, KiraStreamEvent
 from app.domain.models.memory import LongTermMemory, MemoryProcessResult, MemorySource
 from app.infrastructure.memory.mem0_adapter import Mem0Adapter
+from app.infrastructure.observability.runtime import ObservabilityRuntime
 from app.infrastructure.postgres.managed_store import ManagedPostgresConversationStore
 from app.infrastructure.postgres.schema import EXPECTED_SCHEMA_REVISION
 from app.presentation.api.main import create_app
@@ -104,6 +109,7 @@ class FakeConversationStore:
         assistant_message: ConversationMessage,
         *,
         schedule_memory: bool = False,
+        telemetry_context=None,
     ) -> AppendTurnResult:
         self.schedule_requests.append(schedule_memory)
         return AppendTurnResult(
@@ -126,6 +132,20 @@ class FakeConversationStore:
         limit: int,
     ) -> tuple[ConversationMessage, ...]:
         return ()
+
+
+class FailingAppendConversationStore(FakeConversationStore):
+    async def append_turn(
+        self,
+        user_id: str,
+        user_message: ConversationMessage,
+        assistant_message: ConversationMessage,
+        *,
+        schedule_memory: bool = False,
+        telemetry_context=None,
+    ) -> AppendTurnResult:
+        del user_id, user_message, assistant_message, schedule_memory
+        raise RuntimeError("private persistence detail")
 
 
 class FormationTrapLongTermMemory:
@@ -230,6 +250,51 @@ async def test_health_and_readiness_do_not_probe_kira() -> None:
     assert ready.status_code == 200
     assert ready.json() == {"status": "ready"}
     assert kira_client.messages == []
+
+
+async def test_gateway_lifespan_is_available_when_configured_collector_is_absent() -> None:
+    settings = make_settings().model_copy(
+        update={
+            "otel_enabled": True,
+            "otel_exporter_otlp_endpoint": "http://127.0.0.1:1",
+            "otel_shutdown_timeout_seconds": 0.1,
+        }
+    )
+    app = create_app(
+        settings=settings,
+        kira_client=FakeKiraClient(),
+        conversation_store=FakeConversationStore(),
+    )
+
+    async with app.router.lifespan_context(app):
+        assert app.state.observability.enabled is True
+        transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+        async with httpx.AsyncClient(transport=transport, base_url="http://gateway.test") as client:
+            assert (await client.get("/health")).status_code == 200
+
+    assert app.state.observability is None
+
+
+@pytest.fixture
+def trace_exporter(monkeypatch: pytest.MonkeyPatch) -> InMemorySpanExporter:
+    exporter = InMemorySpanExporter()
+
+    def create_runtime(settings) -> ObservabilityRuntime:
+        provider = TracerProvider()
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        return ObservabilityRuntime(settings=settings, tracer_provider=provider)
+
+    monkeypatch.setattr(
+        "app.presentation.api.main.create_observability_runtime",
+        create_runtime,
+    )
+    return exporter
+
+
+def span_named(exporter: InMemorySpanExporter, name: str) -> ReadableSpan:
+    matches = [span for span in exporter.get_finished_spans() if span.name == name]
+    assert len(matches) == 1
+    return matches[0]
 
 
 async def test_ready_is_503_before_lifespan_initialization() -> None:
@@ -402,9 +467,155 @@ async def test_chat_rejects_client_supplied_user_id() -> None:
         )
 
     assert response.status_code == 422
+    assert response.headers["x-correlation-id"]
 
 
-async def test_pre_stream_timeout_maps_to_504_json() -> None:
+async def test_chat_success_trace_covers_stream_and_persistence(
+    trace_exporter: InMemorySpanExporter,
+) -> None:
+    kira_client = FakeKiraClient(events=[kira_event('{"text":"ok"}', "answer")])
+
+    async with gateway_client(kira_client) as client:
+        response = await client.post(
+            "/chat",
+            headers={
+                "traceparent": "00-11111111111111111111111111111111-2222222222222222-01",
+                "x-correlation-id": "client-cannot-select-this",
+            },
+            json={"session_id": "session-1", "message": "question"},
+        )
+
+    spans = trace_exporter.get_finished_spans()
+    names = {span.name for span in spans}
+    assert {
+        "chat.request",
+        "identity.resolve",
+        "conversation.read_recent",
+        "memory.search",
+        "context.build",
+        "rewrite.generate",
+        "conversation.append_turn",
+        "memory_job.enqueue",
+    } <= names
+    root = span_named(trace_exporter, "chat.request")
+    correlation_id = response.headers["x-correlation-id"]
+    assert correlation_id != "client-cannot-select-this"
+    assert root.attributes is not None
+    assert root.attributes["correlation_id"] == correlation_id
+    assert root.attributes["kira.outcome"] == "success"
+    assert root.attributes["http.response.status_code"] == 200
+    assert root.attributes["turn_id"]
+    origin_trace_id = f"{root.context.trace_id:032x}"
+    assert root.attributes["origin_trace_id"] == origin_trace_id
+    assert root.attributes["langfuse.trace.metadata.origin_trace_id"] == origin_trace_id
+    assert root.attributes["langfuse.trace.metadata.correlation_id"] == correlation_id
+    assert root.attributes["langfuse.trace.metadata.turn_id"] == root.attributes["turn_id"]
+    assert correlation_id != f"{root.context.trace_id:032x}"
+    assert root.context.trace_id != int("11" * 16, 16)
+
+    append = span_named(trace_exporter, "conversation.append_turn")
+    assert append.end_time is not None and root.end_time is not None
+    assert root.end_time >= append.end_time
+    for span in spans:
+        if span is not root:
+            assert span.parent is not None
+            assert span.parent.span_id == root.context.span_id
+
+
+async def test_validation_failure_is_correlated_and_traced(
+    trace_exporter: InMemorySpanExporter,
+) -> None:
+    async with gateway_client(FakeKiraClient()) as client:
+        response = await client.post("/chat", json={"session_id": "missing-message"})
+
+    assert response.status_code == 422
+    assert response.headers["x-correlation-id"]
+    root = span_named(trace_exporter, "chat.request")
+    assert root.attributes is not None
+    assert root.attributes["correlation_id"] == response.headers["x-correlation-id"]
+    assert root.attributes["http.response.status_code"] == 422
+    assert root.attributes["kira.outcome"] == "error"
+
+
+async def test_midstream_failure_marks_request_trace_error(
+    trace_exporter: InMemorySpanExporter,
+) -> None:
+    kira_client = FakeKiraClient(
+        events=[kira_event('{"text":"partial"}', "partial")],
+        stream_error=KiraTimeoutError(stage="chat stream"),
+    )
+
+    async with gateway_client(kira_client) as client:
+        response = await client.post(
+            "/chat",
+            json={"session_id": "session-1", "message": "question"},
+        )
+
+    assert response.status_code == 200
+    assert b"gateway_error" in response.content
+    root = span_named(trace_exporter, "chat.request")
+    assert root.attributes is not None
+    assert root.attributes["kira.outcome"] == "error"
+
+
+async def test_persistence_fallback_marks_request_degraded_without_changing_answer(
+    trace_exporter: InMemorySpanExporter,
+) -> None:
+    app = create_app(
+        settings=make_settings(),
+        kira_client=FakeKiraClient(events=[kira_event('{"text":"ok"}', "answer")]),
+        conversation_store=FailingAppendConversationStore(),
+    )
+
+    async with app.router.lifespan_context(app):
+        transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+        async with httpx.AsyncClient(transport=transport, base_url="http://gateway.test") as client:
+            response = await client.post(
+                "/chat",
+                json={"session_id": "session-1", "message": "question"},
+            )
+
+    assert response.status_code == 200
+    assert response.text == 'data: {"text":"ok"}\n\n'
+    assert "private persistence detail" not in response.text
+    root = span_named(trace_exporter, "chat.request")
+    assert root.attributes is not None
+    assert root.attributes["kira.outcome"] == "degraded"
+    assert "private persistence detail" not in str(trace_exporter.get_finished_spans())
+
+
+async def test_concurrent_chats_keep_distinct_application_correlation(
+    trace_exporter: InMemorySpanExporter,
+) -> None:
+    app = create_app(
+        settings=make_settings(),
+        kira_client=FakeKiraClient(events=[kira_event('{"text":"ok"}', "answer")]),
+        conversation_store=FakeConversationStore(),
+    )
+
+    async with app.router.lifespan_context(app):
+        transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+        async with httpx.AsyncClient(transport=transport, base_url="http://gateway.test") as client:
+            responses = await asyncio.gather(
+                *(
+                    client.post(
+                        "/chat",
+                        json={"session_id": f"session-{index}", "message": "question"},
+                    )
+                    for index in range(4)
+                )
+            )
+
+    correlations = {response.headers["x-correlation-id"] for response in responses}
+    roots = [span for span in trace_exporter.get_finished_spans() if span.name == "chat.request"]
+    assert len(correlations) == 4
+    assert len(roots) == 4
+    assert {span.attributes["correlation_id"] for span in roots if span.attributes} == correlations
+
+
+async def test_pre_stream_timeout_maps_to_504_json(
+    trace_exporter: InMemorySpanExporter,
+) -> None:
     kira_client = FakeKiraClient(open_error=KiraTimeoutError(stage="chat connection"))
 
     async with gateway_client(kira_client) as client:
@@ -421,9 +632,15 @@ async def test_pre_stream_timeout_maps_to_504_json() -> None:
         "correlation_id": response.headers["x-correlation-id"],
         "retryable": True,
     }
+    root = span_named(trace_exporter, "chat.request")
+    assert root.attributes is not None
+    assert root.attributes["http.response.status_code"] == 504
+    assert root.attributes["kira.outcome"] == "error"
 
 
-async def test_pre_stream_http_failure_maps_to_sanitized_502_json() -> None:
+async def test_pre_stream_http_failure_maps_to_sanitized_502_json(
+    trace_exporter: InMemorySpanExporter,
+) -> None:
     kira_client = FakeKiraClient(open_error=KiraHttpError(status_code=503))
 
     async with gateway_client(kira_client) as client:
@@ -439,6 +656,10 @@ async def test_pre_stream_http_failure_maps_to_sanitized_502_json() -> None:
         "correlation_id": response.headers["x-correlation-id"],
         "retryable": True,
     }
+    root = span_named(trace_exporter, "chat.request")
+    assert root.attributes is not None
+    assert root.attributes["http.response.status_code"] == 502
+    assert root.attributes["kira.outcome"] == "error"
 
 
 async def test_midstream_timeout_emits_gateway_error_and_closes_stream() -> None:

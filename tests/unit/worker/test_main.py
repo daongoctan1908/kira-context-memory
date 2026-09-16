@@ -104,6 +104,8 @@ async def test_worker_app_exposes_only_internal_read_endpoints_and_cached_metric
     )
 
     async with app.router.lifespan_context(app):
+        assert app.state.observability is not None
+        assert app.state.observability.enabled is False
         transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
         async with httpx.AsyncClient(transport=transport, base_url="http://worker.test") as client:
             await asyncio.wait_for(queue.sampled.wait(), timeout=1)
@@ -127,6 +129,7 @@ async def test_worker_app_exposes_only_internal_read_endpoints_and_cached_metric
         assert queue.purge_calls[0]["limit"] == 1000
 
     assert runner.stop_requested.is_set()
+    assert app.state.observability is None
     assert captured["settings"] is settings
     assert captured["job_observer"] is app.state.telemetry
     exposed = {
@@ -157,6 +160,25 @@ async def test_health_stays_live_while_queue_readiness_is_degraded() -> None:
     assert health.status_code == 200
     assert ready.status_code == 503
     assert ready.json() == {"status": "not_ready"}
+
+
+async def test_worker_lifespan_is_available_when_configured_collector_is_absent() -> None:
+    app = create_app(
+        settings=make_settings(
+            otel_enabled=True,
+            otel_exporter_otlp_endpoint="http://127.0.0.1:1",
+            otel_shutdown_timeout_seconds=0.1,
+        ),
+        dependency_lifespan=dependency_factory(FakeRunner(), FakeQueue(), {}),
+    )
+
+    async with app.router.lifespan_context(app):
+        assert app.state.observability.enabled is True
+        transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+        async with httpx.AsyncClient(transport=transport, base_url="http://worker.test") as client:
+            assert (await client.get("/health")).status_code == 200
+
+    assert app.state.observability is None
 
 
 async def test_ready_is_503_before_lifespan_initialization() -> None:

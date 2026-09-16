@@ -100,6 +100,7 @@ class FakeCleanupRunner:
 def make_runtime(
     runner: FakeRunner,
     queue: FakeStatsQueue,
+    telemetry: MemoryJobTelemetry | None = None,
     **overrides: object,
 ) -> MemoryWorkerRuntime:
     values: dict[str, object] = {
@@ -111,9 +112,17 @@ def make_runtime(
     return MemoryWorkerRuntime(
         runner,  # type: ignore[arg-type]
         queue,  # type: ignore[arg-type]
-        MemoryJobTelemetry(),
+        telemetry or MemoryJobTelemetry(),
         **values,  # type: ignore[arg-type]
     )
+
+
+class BrokenMeter:
+    def create_counter(self, *args: object, **kwargs: object) -> object:
+        raise RuntimeError("private exporter failure")
+
+    create_histogram = create_counter
+    create_observable_gauge = create_counter
 
 
 async def test_runtime_is_ready_only_with_active_runner_and_fresh_queue_snapshot() -> None:
@@ -132,6 +141,21 @@ async def test_runtime_is_ready_only_with_active_runner_and_fresh_queue_snapshot
     await runtime.stop()
     assert runtime.is_ready is False
     assert runner.stop_requested.is_set()
+
+
+async def test_metric_initialization_failure_does_not_change_worker_readiness() -> None:
+    runner = FakeRunner()
+    queue = FakeStatsQueue()
+    telemetry = MemoryJobTelemetry(meter=BrokenMeter())  # type: ignore[arg-type]
+    runtime = make_runtime(runner, queue, telemetry)
+
+    await runtime.start()
+    await asyncio.wait_for(runner.started.wait(), timeout=1)
+    await asyncio.wait_for(queue.succeeded.wait(), timeout=1)
+    await asyncio.sleep(0)
+
+    assert runtime.is_ready is True
+    await runtime.stop()
 
 
 async def test_queue_failure_marks_not_ready_then_success_recovers() -> None:
@@ -212,6 +236,7 @@ async def test_stopped_runner_makes_runtime_not_ready_and_logs_safely(monkeypatc
     assert runtime.is_ready is False
     assert log_extras == [
         {
+            "event": "worker.runner_stopped",
             "dependency": "memory_job_runtime",
             "operation": "run_memory_jobs",
             "error_class": "RuntimeError",

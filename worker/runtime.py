@@ -80,6 +80,7 @@ class MemoryWorkerRuntime:
                 name="memory-job-cleanup",
             )
         await asyncio.sleep(0)
+        self.observe_runtime()
 
     async def stop(self) -> None:
         if not self._started or self._stopped:
@@ -114,12 +115,15 @@ class MemoryWorkerRuntime:
             logger.error(
                 "Memory job runner stopped unexpectedly",
                 extra={
+                    "event": "worker.runner_stopped",
                     "dependency": "memory_job_runtime",
                     "operation": "run_memory_jobs",
                     "error_class": type(error).__name__,
                     "fallback_mode": "not_ready",
                 },
             )
+        finally:
+            self.observe_runtime()
 
     async def _sample_queue_loop(self) -> None:
         while not self._stop_requested.is_set():
@@ -137,6 +141,7 @@ class MemoryWorkerRuntime:
             logger.error(
                 "Memory job cleanup runner stopped unexpectedly",
                 extra={
+                    "event": "worker.cleanup_runner_stopped",
                     "dependency": "memory_job_runtime",
                     "operation": "cleanup_memory_jobs",
                     "error_class": type(error).__name__,
@@ -156,9 +161,11 @@ class MemoryWorkerRuntime:
             raise
         except Exception as error:
             self._queue_snapshot_available = False
+            self.observe_runtime()
             logger.warning(
                 "Memory job queue metrics refresh failed",
                 extra={
+                    "event": "memory_job.queue_metrics_refresh_failed",
                     "dependency": "postgresql",
                     "operation": "read_memory_job_stats",
                     "error_class": type(error).__name__,
@@ -170,6 +177,7 @@ class MemoryWorkerRuntime:
         self._telemetry.queue_stats_observed(stats)
         self._last_queue_refresh_at = now
         self._queue_snapshot_available = True
+        self.observe_runtime()
 
     def _queue_snapshot_is_fresh(self) -> bool:
         refreshed_at = self._last_queue_refresh_at

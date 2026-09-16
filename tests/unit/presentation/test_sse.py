@@ -4,11 +4,16 @@ from collections.abc import AsyncIterator
 from unittest.mock import AsyncMock
 
 import pytest
+from opentelemetry.sdk.trace import TracerProvider
 from starlette.requests import ClientDisconnect
 
 from app.application.use_cases.handle_chat import ChatStreamSession
 from app.domain.errors.kira import KiraTimeoutError
 from app.domain.models.kira import KiraEventKind, KiraStreamEvent
+from app.infrastructure.observability.tracing import (
+    RequestTraceState,
+    bind_request_trace_state,
+)
 from app.presentation.api.sse import ChatStreamingResponse, stream_gateway_events
 
 
@@ -112,15 +117,26 @@ async def test_client_disconnect_closes_suspended_stream_and_never_completes(spe
             if spec_version == "2.4":
                 raise OSError("client disconnected")
 
-    async with asyncio.timeout(1):
-        if spec_version == "2.4":
-            with pytest.raises(ClientDisconnect):
+    span = TracerProvider().get_tracer("test").start_span("chat.request")
+    trace_state = RequestTraceState(span)
+    with bind_request_trace_state(trace_state):
+        async with asyncio.timeout(1):
+            if spec_version == "2.4":
+                with pytest.raises(ClientDisconnect):
+                    await response(
+                        {"type": "http", "asgi": {"spec_version": spec_version}},
+                        receive,
+                        send,
+                    )
+            else:
                 await response(
-                    {"type": "http", "asgi": {"spec_version": spec_version}}, receive, send
+                    {"type": "http", "asgi": {"spec_version": spec_version}},
+                    receive,
+                    send,
                 )
-        else:
-            await response({"type": "http", "asgi": {"spec_version": spec_version}}, receive, send)
+    span.end()
     assert source.closed
+    assert trace_state.outcome == "cancelled"
     complete.assert_not_awaited()
 
 

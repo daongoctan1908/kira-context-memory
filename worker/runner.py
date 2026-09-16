@@ -10,6 +10,10 @@ from datetime import UTC, datetime
 from typing import Protocol
 from uuid import UUID, uuid4
 
+from opentelemetry import trace
+from opentelemetry.context import Context
+from opentelemetry.trace import SpanKind, Tracer
+
 from app.application.use_cases.process_memory_job import ProcessMemoryJobResult
 from app.domain.errors.memory_job import (
     MemoryJobQueueConnectionError,
@@ -18,6 +22,15 @@ from app.domain.errors.memory_job import (
 )
 from app.domain.models.memory_job import MemoryJob
 from app.domain.ports.memory_job_queue import MemoryJobQueuePort
+from app.infrastructure.observability.context import bind_observability_context
+from app.infrastructure.observability.langfuse_attributes import OBSERVATION_TYPE
+from app.infrastructure.observability.tracing import (
+    record_span_error,
+    set_span_attribute,
+    start_span,
+    telemetry_context_links,
+    telemetry_origin_trace_id,
+)
 
 logger = logging.getLogger(__name__)
 _MAX_DATABASE_BACKOFF_SECONDS = 30.0
@@ -43,6 +56,14 @@ class MemoryJobObserver(Protocol):
         seconds: float,
     ) -> None:
         """Observe one successfully persisted job transition."""
+        ...
+
+    def queue_wait_observed(self, seconds: float) -> None:
+        """Observe elapsed time between durable enqueue and successful claim."""
+        ...
+
+    def runner_snapshot_observed(self, snapshot: "MemoryJobRunnerSnapshot") -> None:
+        """Refresh cached process state without querying an external dependency."""
         ...
 
 
@@ -78,6 +99,7 @@ class MemoryJobRunner:
         clock: Callable[[], datetime] | None = None,
         observer: MemoryJobObserver | None = None,
         timer: Callable[[], float] | None = None,
+        tracer: Tracer | None = None,
     ) -> None:
         _require_positive_finite(poll_interval_seconds, "poll_interval_seconds")
         _require_positive_integer(batch_size, "batch_size")
@@ -102,6 +124,7 @@ class MemoryJobRunner:
         self._clock = clock or _utc_now
         self._observer = observer
         self._timer = timer or time.perf_counter
+        self._tracer = tracer or trace.NoOpTracerProvider().get_tracer("worker.runner")
 
         self._stop_requested = asyncio.Event()
         self._in_flight: set[asyncio.Task[None]] = set()
@@ -128,6 +151,7 @@ class MemoryJobRunner:
     def request_stop(self) -> None:
         """Stop new claims; in-flight work receives the configured grace period."""
         self._stop_requested.set()
+        self._observe_runtime_snapshot()
 
     async def run(self) -> None:
         """Poll until stopped, isolating per-job failures and honoring free capacity."""
@@ -135,6 +159,7 @@ class MemoryJobRunner:
             raise RuntimeError("memory job runner is single-use")
         self._started = True
         self._running = True
+        self._observe_runtime_snapshot()
         cancellation: asyncio.CancelledError | None = None
         try:
             while not self._stop_requested.is_set():
@@ -148,9 +173,11 @@ class MemoryJobRunner:
                     jobs = await self._claim_due(claim_limit)
                 except MemoryJobQueueError as error:
                     self._record_database_failure()
+                    self._observe_runtime_snapshot()
                     logger.warning(
                         "Memory job queue poll failed",
                         extra={
+                            "event": "memory_job.queue_poll_failed",
                             "dependency": "postgresql",
                             "operation": "claim_memory_jobs",
                             "error_class": type(error).__name__,
@@ -161,6 +188,7 @@ class MemoryJobRunner:
                     continue
 
                 self._record_database_success()
+                self._observe_runtime_snapshot()
                 self._observe_claimed(jobs)
                 for job in jobs:
                     task = asyncio.create_task(
@@ -168,7 +196,9 @@ class MemoryJobRunner:
                         name="memory-job-processing",
                     )
                     self._in_flight.add(task)
-                    task.add_done_callback(self._in_flight.discard)
+                    task.add_done_callback(self._job_done)
+                if jobs:
+                    self._observe_runtime_snapshot()
 
                 if not jobs:
                     await self._pause(self._poll_interval)
@@ -180,6 +210,7 @@ class MemoryJobRunner:
                 await self._drain_in_flight()
             finally:
                 self._running = False
+                self._observe_runtime_snapshot()
 
         if cancellation is not None:
             raise cancellation
@@ -204,34 +235,89 @@ class MemoryJobRunner:
         return jobs
 
     async def _process_job_safely(self, job: MemoryJob) -> None:
+        correlation_id = (
+            job.telemetry_context.correlation_id if job.telemetry_context is not None else None
+        )
+        origin_trace_id = telemetry_origin_trace_id(job.telemetry_context)
+        attributes: dict[str, object] = {
+            OBSERVATION_TYPE: "chain",
+            "event_id": str(job.event_id),
+            "turn_id": job.reference.turn_id,
+            "kira.memory.job.attempt_count": job.attempt_count,
+            "kira.memory.job.requeue_count": job.requeue_count,
+            "kira.memory.job.reclaimed": job.reclaimed,
+        }
+        if correlation_id is not None:
+            attributes["correlation_id"] = correlation_id
+        if origin_trace_id is not None:
+            attributes["origin_trace_id"] = origin_trace_id
+        queue_age = self._queue_age(job)
+        if queue_age is not None:
+            attributes["kira.memory.job.queue_age_seconds"] = queue_age
+
+        with bind_observability_context(
+            correlation_id=correlation_id,
+            turn_id=job.reference.turn_id,
+            event_id=str(job.event_id),
+            origin_trace_id=origin_trace_id,
+        ):
+            with start_span(
+                self._tracer,
+                "memory_job.process",
+                kind=SpanKind.CONSUMER,
+                attributes=attributes,
+                links=telemetry_context_links(job.telemetry_context),
+                context=Context(),
+            ) as span:
+                try:
+                    started_at = self._timer()
+                except Exception as error:
+                    _log_observer_failure(error, "start_processing_timer")
+                    started_at = None
+                try:
+                    result = await self._processor.execute(job)
+                except asyncio.CancelledError:
+                    set_span_attribute(span, "kira.outcome", "cancelled")
+                    raise
+                except Exception as error:
+                    set_span_attribute(span, "kira.outcome", "transition_error")
+                    record_span_error(span, error)
+                    logger.warning(
+                        "Memory job transition failed; lease will be reclaimed",
+                        extra={
+                            "event": "memory_job.transition_failed",
+                            "dependency": "memory_job_runtime",
+                            "operation": "process_memory_job",
+                            "error_class": type(error).__name__,
+                            "fallback_mode": "lease_reclaim",
+                            "attempt_count": job.attempt_count,
+                        },
+                    )
+                else:
+                    set_span_attribute(span, "kira.outcome", result.outcome.value)
+                    if started_at is not None:
+                        self._observe_processed(job, result, started_at)
+
+    def _queue_age(self, job: MemoryJob) -> float | None:
+        if job.created_at is None:
+            return None
         try:
-            started_at = self._timer()
+            return max((self._clock() - job.created_at).total_seconds(), 0.0)
         except Exception as error:
-            _log_observer_failure(error, "start_processing_timer")
-            started_at = None
-        try:
-            result = await self._processor.execute(job)
-        except asyncio.CancelledError:
-            raise
-        except Exception as error:
-            logger.warning(
-                "Memory job transition failed; lease will be reclaimed",
-                extra={
-                    "dependency": "memory_job_runtime",
-                    "operation": "process_memory_job",
-                    "error_class": type(error).__name__,
-                    "fallback_mode": "lease_reclaim",
-                },
-            )
-        else:
-            if started_at is not None:
-                self._observe_processed(job, result, started_at)
+            _log_observer_failure(error, "calculate_queue_age")
+            return None
 
     def _observe_claimed(self, jobs: tuple[MemoryJob, ...]) -> None:
         if self._observer is None or not jobs:
             return
         try:
             self._observer.jobs_claimed(jobs)
+            observe_wait = getattr(self._observer, "queue_wait_observed", None)
+            if callable(observe_wait):
+                for job in jobs:
+                    queue_age = self._queue_age(job)
+                    if queue_age is not None:
+                        observe_wait(queue_age)
         except Exception as error:
             _log_observer_failure(error, "observe_claimed_jobs")
 
@@ -248,6 +334,21 @@ class MemoryJobRunner:
             self._observer.job_processed(job, result, seconds)
         except Exception as error:
             _log_observer_failure(error, "observe_processed_job")
+
+    def _job_done(self, task: asyncio.Task[None]) -> None:
+        self._in_flight.discard(task)
+        self._observe_runtime_snapshot()
+
+    def _observe_runtime_snapshot(self) -> None:
+        if self._observer is None:
+            return
+        observe_snapshot = getattr(self._observer, "runner_snapshot_observed", None)
+        if not callable(observe_snapshot):
+            return
+        try:
+            observe_snapshot(self.snapshot)
+        except Exception as error:
+            _log_observer_failure(error, "observe_runner_snapshot")
 
     async def _pause(self, delay_seconds: float) -> None:
         try:
@@ -328,7 +429,8 @@ def _log_observer_failure(error: Exception, operation: str) -> None:
     logger.warning(
         "Memory job observation failed",
         extra={
-            "dependency": "prometheus",
+            "event": "observability.metric_observer_failed",
+            "dependency": "otel",
             "operation": operation,
             "error_class": type(error).__name__,
             "fallback_mode": "continue_processing",

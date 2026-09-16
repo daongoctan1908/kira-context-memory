@@ -8,6 +8,12 @@ from mem0.configs.llms.base import BaseLlmConfig
 from mem0.configs.llms.vllm import VllmConfig
 from mem0.llms.base import LLMBase
 from mem0.memory.utils import extract_json
+from mem0.observability import (
+    current_observation_attribute,
+    current_observation_input,
+    current_observation_output,
+    current_observation_response_usage,
+)
 
 
 class VllmLLM(LLMBase):
@@ -104,5 +110,10 @@ class VllmLLM(LLMBase):
             params["tools"] = tools
             params["tool_choice"] = tool_choice
 
+        current_observation_attribute("gen_ai.request.model", self.config.model)
+        current_observation_input(messages)
         response = self.client.chat.completions.create(**params)
-        return self._parse_response(response, tools)
+        current_observation_response_usage(response)
+        parsed = self._parse_response(response, tools)
+        current_observation_output(parsed)
+        return parsed

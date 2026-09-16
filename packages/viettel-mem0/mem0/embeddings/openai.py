@@ -6,6 +6,7 @@ from openai import OpenAI
 
 from mem0.configs.embeddings.base import BaseEmbedderConfig
 from mem0.embeddings.base import EmbeddingBase
+from mem0.observability import current_observation_attribute, current_observation_response_usage
 
 
 class OpenAIEmbedding(EmbeddingBase):
@@ -52,7 +53,10 @@ class OpenAIEmbedding(EmbeddingBase):
         }
         if self._pass_dimensions_to_api:
             kwargs["dimensions"] = self.config.embedding_dims
-        return self.client.embeddings.create(**kwargs).data[0].embedding
+        current_observation_attribute("gen_ai.request.model", self.config.model)
+        response = self.client.embeddings.create(**kwargs)
+        current_observation_response_usage(response)
+        return response.data[0].embedding
 
     def embed_batch(self, texts, memory_action="add"):
         """Embed multiple texts in a single OpenAI API call.
@@ -71,7 +75,9 @@ class OpenAIEmbedding(EmbeddingBase):
             }
             if self._pass_dimensions_to_api:
                 kwargs["dimensions"] = self.config.embedding_dims
+            current_observation_attribute("gen_ai.request.model", self.config.model)
             response = self.client.embeddings.create(**kwargs)
+            current_observation_response_usage(response)
             all_embeddings.extend(item.embedding for item in sorted(response.data, key=lambda x: x.index))
         if len(all_embeddings) != len(texts):
             raise ValueError(
