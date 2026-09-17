@@ -1,0 +1,2308 @@
+{
+  "conversation_id": "conv_01_FREEZE_v10_FINAL",
+  "do_not_ingest": true,
+  "summary": {
+    "sessions": 22,
+    "turns": 174,
+    "kira_fill_slots": 39,
+    "assistant_bridge_count": 48,
+    "assistant_bridge_unique": 48,
+    "gold_memory_events": 17,
+    "active_memory_events_at_end": 10,
+    "qa_total": 55,
+    "qa_category_distribution": {
+      "single_hop": 16,
+      "multi_hop": 10,
+      "temporal_reasoning": 6,
+      "state_update": 7,
+      "temporal_business_action": 6,
+      "false_premise": 5,
+      "abstention": 5
+    },
+    "evaluation_tiers": {
+      "hard_gate": 36,
+      "diagnostic_history": 19
+    },
+    "scenario_groups": 24,
+    "bridge_policy_leak_audit": "PASS",
+    "hard_gate_inactive_memory_dependency_audit": "PASS",
+    "top_date_no_invention_audit": "PASS",
+    "growth_relative_time_grounding_audit": "PASS",
+    "evidence_id_audit": "PASS",
+    "json_gold_final_consistency": "PASS",
+    "temporal_fill_policy": "see fill_slots.json",
+    "ct28_semantic_fixture_split": "PASS",
+    "policy_overlap_qa_count": 3,
+    "conversation_id": "conv_01_FREEZE_v10_FINAL",
+    "status": "FREEZE",
+    "relative_time_fill_slots": 11,
+    "ct28_fill_slots": 14,
+    "formation_only_memory_ids": [
+      "M03",
+      "M17"
+    ],
+    "hard_gate_qa": 36,
+    "diagnostic_history_qa": 19,
+    "scenario_group_size_range": [
+      1,
+      6
+    ],
+    "policy_overlap_qa": 3,
+    "abstention_qa": 5,
+    "q_abstention_005_fixed": "PASS",
+    "diagnostic_history_definition_fixed": "PASS",
+    "fixture_word_removed_from_visible_questions": "PASS",
+    "memory_gold_audit": "PASS",
+    "fill_slots_audit": "PASS",
+    "fill_pairing": "PASS",
+    "evidence_ids": "PASS",
+    "gold_final_consistency": "PASS",
+    "ct28_contract": "PASS"
+  },
+  "baseline_scope": {
+    "hard_gate_definition": "Answerable from final active semantic-memory snapshot without superseded/ephemeral history.",
+    "diagnostic_history_definition": "Requires historical occurrence/order information and/or past, superseded, or ephemeral context not guaranteed by the final active semantic-memory snapshot. Evaluate only when memory-history/versioning or transcript-oracle mode is enabled.",
+    "hard_gate_qa_count": 36,
+    "diagnostic_history_qa_count": 19
+  },
+  "evaluation_scope": {
+    "mode": "full_corpus",
+    "scenario_group_role": "reporting_slice",
+    "memory_family_role": "audit_dimension"
+  },
+  "qa": [
+    {
+      "question_id": "Q_SINGLE_HOP_001",
+      "category": "single_hop",
+      "question": "Hiện giờ “bên mình” là khu vực nào?",
+      "required_memory_ids": [
+        "M13"
+      ],
+      "evidence_turn_ids": [
+        "D16:7"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Thượng Long, Phú Thọ",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Thượng Long, Phú Thọ",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "scope_alias_current",
+      "memory_families": [
+        "scope"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_002",
+      "category": "single_hop",
+      "question": "Mình thích câu trả lời kiểu nào?",
+      "required_memory_ids": [
+        "M02"
+      ],
+      "evidence_turn_ids": [
+        "D1:9"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Gọn.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Gọn.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "response_style",
+      "memory_families": [
+        "response_style"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_003",
+      "category": "single_hop",
+      "question": "Nếu chỉ nói “top” mà không ghi số, mình thường muốn mấy dòng?",
+      "required_memory_ids": [
+        "M04"
+      ],
+      "evidence_turn_ids": [
+        "D6:5"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "3 dòng.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "3 dòng.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "ranking_top3_preference",
+      "memory_families": [
+        "ranking_preference"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_004",
+      "category": "single_hop",
+      "question": "Trong báo cáo ngắn, “so cùng kỳ” thường được hiểu theo mốc nào?",
+      "required_memory_ids": [
+        "M09"
+      ],
+      "evidence_turn_ids": [
+        "D12:7"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Cùng kỳ tháng.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Cùng kỳ tháng.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "growth_short_report_preference",
+      "memory_families": [
+        "growth_preference"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_005",
+      "category": "single_hop",
+      "question": "Chí Tiên là phân công dài hạn hay hỗ trợ tạm?",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [
+        "D10:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Hỗ trợ tạm trong buổi.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Hỗ trợ tạm trong buổi.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "history_memory_ids": [
+        "M08"
+      ],
+      "architecture_note": "Requires historical/superseded/ephemeral context. Not a hard gate for the current active-semantic-memory baseline unless memory history/versioning is enabled.",
+      "scenario_group": "temporary_chi_tien",
+      "memory_families": [
+        "temporary_task"
+      ],
+      "ltm_attribution": "normal",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_006",
+      "category": "single_hop",
+      "question": "Hiện 5G hay 4G được mình xem thường xuyên hơn?",
+      "required_memory_ids": [
+        "M11"
+      ],
+      "evidence_turn_ids": [
+        "D15:7"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "5G được xem thường xuyên hơn, nhưng 4G vẫn giữ để đối chiếu.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "5G được xem thường xuyên hơn, nhưng 4G vẫn giữ để đối chiếu.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "subscriber_5g_priority",
+      "memory_families": [
+        "subscriber_preference"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_007",
+      "category": "single_hop",
+      "question": "Thanh Sơn còn vai trò gì sau khi chuyển trọng tâm?",
+      "required_memory_ids": [
+        "M14"
+      ],
+      "evidence_turn_ids": [
+        "D16:7"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Vẫn dùng khi tổng hợp cụm.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Vẫn dùng khi tổng hợp cụm.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "scope_roles_after_update",
+      "memory_families": [
+        "scope"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_008",
+      "category": "single_hop",
+      "question": "Khi gọi rõ tên KPI cũ, có được tự đổi sang KPI đang được xem nhiều hơn không?",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [
+        "D21:7"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Không; phải giữ KPI được gọi rõ.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Không; phải giữ KPI được gọi rõ.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "explicit_kpi_precedence",
+      "memory_families": [
+        "explicit_precedence"
+      ],
+      "capability_tags": [
+        "policy_overlap",
+        "precedence_safety"
+      ],
+      "ltm_attribution": "non_exclusive",
+      "ltm_uplift_reporting": {
+        "count_in_overall_correctness": true,
+        "count_as_unique_evidence_of_ltm_benefit": false,
+        "reason": "Global explicit-query precedence policy can produce the correct behavior without retrieving M15."
+      },
+      "supporting_memory_ids": [
+        "M15"
+      ],
+      "retrieval_scoring_contract": {
+        "strict_required_memory_ids": [],
+        "supporting_policy_overlap_memory_ids": [
+          "M15"
+        ],
+        "exclude_supporting_from_recall_at_k": true,
+        "note": "M15 may support the answer but is not strictly required because Current explicit query > LTM is a global invariant.",
+        "precision_relevant_memory_ids": [
+          "M15"
+        ],
+        "supporting_retrieval_is_false_positive": false,
+        "precision_rule": "For policy-overlap QA, Recall@K requires only strict_required_memory_ids. For retrieval precision, both strict_required_memory_ids and supporting_policy_overlap_memory_ids are relevant; retrieving M15 must not be counted as a false positive.",
+        "no_hit_fpr_eligible": false,
+        "no_hit_fpr_rule": "A policy-overlap QA with supporting relevant memory is not a no-hit query, even when strict_required_memory_ids is empty."
+      },
+      "no_hit_fpr_eligible": false
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_009",
+      "category": "single_hop",
+      "question": "Năm 2026, doanh thu tiêu dùng di động của bên mình là bao nhiêu?",
+      "required_memory_ids": [
+        "M13"
+      ],
+      "evidence_turn_ids": [
+        "D16:7"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "source_indicator": "Doanh thu tiêu dùng di động",
+      "source_service_id": "33",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "33",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Năm 2026, Doanh thu tiêu dùng di động của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "scope_alias_current",
+      "memory_families": [
+        "scope"
+      ],
+      "fixture_expected_api": {
+        "service_id": "33",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "fixture_metadata": {
+        "source_testcase": "CT_28",
+        "fixture_as_of_date": "2026-09-08",
+        "fixture_prd_id": "20260907",
+        "note": "This cutoff comes from the KiRa source testcase, not from the user question or LTM."
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ],
+        "exact_match_full_fixture_api": false,
+        "downstream_fixture_replay_field": "fixture_expected_api"
+      },
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_010",
+      "category": "single_hop",
+      "question": "Năm 2026, 5G thực lũy kế của bên mình là bao nhiêu?",
+      "required_memory_ids": [
+        "M13"
+      ],
+      "evidence_turn_ids": [
+        "D16:7"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "source_indicator": "TB Di động 5G thực Lũy kế",
+      "source_service_id": "413",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "413",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Năm 2026, TB Di động 5G thực Lũy kế của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "scope_alias_current",
+      "memory_families": [
+        "scope"
+      ],
+      "fixture_expected_api": {
+        "service_id": "413",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "fixture_metadata": {
+        "source_testcase": "CT_28",
+        "fixture_as_of_date": "2026-09-08",
+        "fixture_prd_id": "20260907",
+        "note": "This cutoff comes from the KiRa source testcase, not from the user question or LTM."
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ],
+        "exact_match_full_fixture_api": false,
+        "downstream_fixture_replay_field": "fixture_expected_api"
+      },
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_011",
+      "category": "single_hop",
+      "question": "Năm 2026, FTTH phát triển thực lũy kế của bên mình là bao nhiêu?",
+      "required_memory_ids": [
+        "M13"
+      ],
+      "evidence_turn_ids": [
+        "D16:7"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "source_indicator": "Thuê bao FTTH phát triển thực LK",
+      "source_service_id": "38",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "38",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Năm 2026, Thuê bao FTTH phát triển thực LK của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "scope_alias_current",
+      "memory_families": [
+        "scope"
+      ],
+      "fixture_expected_api": {
+        "service_id": "38",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "fixture_metadata": {
+        "source_testcase": "CT_28",
+        "fixture_as_of_date": "2026-09-08",
+        "fixture_prd_id": "20260907",
+        "note": "This cutoff comes from the KiRa source testcase, not from the user question or LTM."
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ],
+        "exact_match_full_fixture_api": false,
+        "downstream_fixture_replay_field": "fixture_expected_api"
+      },
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_012",
+      "category": "single_hop",
+      "question": "Cho top tỉnh về doanh thu tiêu dùng di động theo số dòng mình thường lấy trong tháng 8/2026.",
+      "required_memory_ids": [
+        "M04"
+      ],
+      "evidence_turn_ids": [
+        "D6:5"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "source_indicator": "Doanh thu tiêu dùng di động",
+      "source_service_id": "33",
+      "source_testcase": "CT_67",
+      "expected_intent": "xep_hang_chi_tieu",
+      "expected_api": {
+        "service_id": "33",
+        "prd_id": "20260831",
+        "province_code": "",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "month",
+        "limit": "3",
+        "order_by": "thuc_hien",
+        "order_type": "DESC",
+        "condition": []
+      },
+      "gold_rewrite": "Top 3 tỉnh xếp hạng đầu về Doanh thu tiêu dùng di động tháng 08/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "ranking_top3_preference",
+      "memory_families": [
+        "ranking_preference"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_013",
+      "category": "single_hop",
+      "question": "Cho top tỉnh về 5G thực lũy kế theo số dòng mình thường lấy trong tháng 8/2026.",
+      "required_memory_ids": [
+        "M04"
+      ],
+      "evidence_turn_ids": [
+        "D6:5"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "source_indicator": "TB Di động 5G thực Lũy kế",
+      "source_service_id": "413",
+      "source_testcase": "CT_67",
+      "expected_intent": "xep_hang_chi_tieu",
+      "expected_api": {
+        "service_id": "413",
+        "prd_id": "20260831",
+        "province_code": "",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "month",
+        "limit": "3",
+        "order_by": "thuc_hien",
+        "order_type": "DESC",
+        "condition": []
+      },
+      "gold_rewrite": "Top 3 tỉnh xếp hạng đầu về TB Di động 5G thực Lũy kế tháng 08/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "ranking_top3_preference",
+      "memory_families": [
+        "ranking_preference"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_014",
+      "category": "single_hop",
+      "question": "Tại ngày 08/09/2026, lấy tăng trưởng doanh thu trừ VAS của Thanh Sơn lũy kế đến hôm trước theo kiểu 'so cùng kỳ' của báo cáo ngắn.",
+      "required_memory_ids": [
+        "M09"
+      ],
+      "evidence_turn_ids": [
+        "D12:7"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "source_indicator": "Doanh thu tiêu dùng di động trừ VAS hợp tác",
+      "source_service_id": "59",
+      "source_testcase": "CT_79",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "59",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Cụm Thanh Sơn trong tỉnh Phú Thọ lũy kế đến ngày 07/09/2026 so với cùng kỳ tháng, tăng trưởng Doanh thu tiêu dùng di động trừ VAS hợp tác là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "temporal_fixture": {
+        "as_of_date": "2026-09-08",
+        "relative_phrase": "hôm trước",
+        "resolved_prd_id": "20260907",
+        "provenance": "KiRa source testcase fixture"
+      },
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "growth_short_report_preference",
+      "memory_families": [
+        "growth_preference"
+      ],
+      "ltm_attribution": "normal",
+      "rewrite_contract": {
+        "standalone_relative_time_resolution": true,
+        "question_anchor_date": "2026-09-08",
+        "resolved_relative_date": "2026-09-07"
+      }
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_015",
+      "category": "single_hop",
+      "question": "Tại ngày 08/09/2026, lấy tăng trưởng 4G của Thanh Sơn lũy kế đến hôm trước theo kiểu 'so cùng kỳ' mình thường dùng.",
+      "required_memory_ids": [
+        "M09"
+      ],
+      "evidence_turn_ids": [
+        "D12:7"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "source_indicator": "Thuê bao Di động 4G thực Lũy kế",
+      "source_service_id": "36",
+      "source_testcase": "CT_79",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "36",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Cụm Thanh Sơn trong tỉnh Phú Thọ lũy kế đến ngày 07/09/2026 so với cùng kỳ tháng, tăng trưởng Thuê bao Di động 4G thực Lũy kế là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "temporal_fixture": {
+        "as_of_date": "2026-09-08",
+        "relative_phrase": "hôm trước",
+        "resolved_prd_id": "20260907",
+        "provenance": "KiRa source testcase fixture"
+      },
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "growth_short_report_preference",
+      "memory_families": [
+        "growth_preference"
+      ],
+      "ltm_attribution": "normal",
+      "rewrite_contract": {
+        "standalone_relative_time_resolution": true,
+        "question_anchor_date": "2026-09-08",
+        "resolved_relative_date": "2026-09-07"
+      }
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_016",
+      "category": "single_hop",
+      "question": "Năm 2026, doanh thu trừ VAS của bên mình là bao nhiêu?",
+      "required_memory_ids": [
+        "M13"
+      ],
+      "evidence_turn_ids": [
+        "D16:7"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "source_indicator": "Doanh thu tiêu dùng di động trừ VAS hợp tác",
+      "source_service_id": "59",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "59",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Năm 2026, Doanh thu tiêu dùng di động trừ VAS hợp tác của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "scope_alias_current",
+      "memory_families": [
+        "scope"
+      ],
+      "fixture_expected_api": {
+        "service_id": "59",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "fixture_metadata": {
+        "source_testcase": "CT_28",
+        "fixture_as_of_date": "2026-09-08",
+        "fixture_prd_id": "20260907",
+        "note": "This cutoff comes from the KiRa source testcase, not from the user question or LTM."
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ],
+        "exact_match_full_fixture_api": false,
+        "downstream_fixture_replay_field": "fixture_expected_api"
+      },
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_MULTI_HOP_001",
+      "category": "multi_hop",
+      "question": "Năm 2026, lấy số thuê bao mình đang xem thường xuyên hơn ở bên mình.",
+      "required_memory_ids": [
+        "M11",
+        "M13"
+      ],
+      "evidence_turn_ids": [
+        "D15:7",
+        "D16:7"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "source_indicator": "TB Di động 5G thực Lũy kế",
+      "source_service_id": "413",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "413",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Năm 2026, TB Di động 5G thực Lũy kế của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "subscriber_priority_x_scope",
+      "memory_families": [
+        "scope",
+        "subscriber_preference"
+      ],
+      "fixture_expected_api": {
+        "service_id": "413",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "fixture_metadata": {
+        "source_testcase": "CT_28",
+        "fixture_as_of_date": "2026-09-08",
+        "fixture_prd_id": "20260907",
+        "note": "This cutoff comes from the KiRa source testcase, not from the user question or LTM."
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ],
+        "exact_match_full_fixture_api": false,
+        "downstream_fixture_replay_field": "fixture_expected_api"
+      },
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_MULTI_HOP_002",
+      "category": "multi_hop",
+      "question": "Năm 2026, lấy bản doanh thu mình đang xem nhiều hơn ở bên mình.",
+      "required_memory_ids": [
+        "M16",
+        "M13"
+      ],
+      "evidence_turn_ids": [
+        "D21:7",
+        "D16:7"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "source_indicator": "Doanh thu tiêu dùng di động trừ VAS hợp tác",
+      "source_service_id": "59",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "59",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Năm 2026, Doanh thu tiêu dùng di động trừ VAS hợp tác của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "revenue_priority_x_scope",
+      "memory_families": [
+        "revenue_preference",
+        "scope"
+      ],
+      "fixture_expected_api": {
+        "service_id": "59",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "fixture_metadata": {
+        "source_testcase": "CT_28",
+        "fixture_as_of_date": "2026-09-08",
+        "fixture_prd_id": "20260907",
+        "note": "This cutoff comes from the KiRa source testcase, not from the user question or LTM."
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ],
+        "exact_match_full_fixture_api": false,
+        "downstream_fixture_replay_field": "fixture_expected_api"
+      },
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_MULTI_HOP_003",
+      "category": "multi_hop",
+      "question": "Cho top tỉnh về số thuê bao mình đang xem thường xuyên hơn, theo số dòng mình hay lấy trong tháng 8/2026.",
+      "required_memory_ids": [
+        "M11",
+        "M04"
+      ],
+      "evidence_turn_ids": [
+        "D15:7",
+        "D6:5"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "source_indicator": "TB Di động 5G thực Lũy kế",
+      "source_service_id": "413",
+      "source_testcase": "CT_67",
+      "expected_intent": "xep_hang_chi_tieu",
+      "expected_api": {
+        "service_id": "413",
+        "prd_id": "20260831",
+        "province_code": "",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "month",
+        "limit": "3",
+        "order_by": "thuc_hien",
+        "order_type": "DESC",
+        "condition": []
+      },
+      "gold_rewrite": "Top 3 tỉnh xếp hạng đầu về TB Di động 5G thực Lũy kế tháng 08/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "subscriber_priority_x_ranking",
+      "memory_families": [
+        "ranking_preference",
+        "subscriber_preference"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_MULTI_HOP_004",
+      "category": "multi_hop",
+      "question": "Cho top tỉnh về bản doanh thu mình đang xem nhiều hơn, theo số dòng mình hay lấy trong tháng 8/2026.",
+      "required_memory_ids": [
+        "M16",
+        "M04"
+      ],
+      "evidence_turn_ids": [
+        "D21:7",
+        "D6:5"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "source_indicator": "Doanh thu tiêu dùng di động trừ VAS hợp tác",
+      "source_service_id": "59",
+      "source_testcase": "CT_67",
+      "expected_intent": "xep_hang_chi_tieu",
+      "expected_api": {
+        "service_id": "59",
+        "prd_id": "20260831",
+        "province_code": "",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "month",
+        "limit": "3",
+        "order_by": "thuc_hien",
+        "order_type": "DESC",
+        "condition": []
+      },
+      "gold_rewrite": "Top 3 tỉnh xếp hạng đầu về Doanh thu tiêu dùng di động trừ VAS hợp tác tháng 08/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "revenue_priority_x_ranking",
+      "memory_families": [
+        "ranking_preference",
+        "revenue_preference"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_MULTI_HOP_005",
+      "category": "multi_hop",
+      "question": "Tại ngày 08/09/2026, lấy tăng trưởng bản doanh thu mình đang xem nhiều hơn ở Thanh Sơn lũy kế đến hôm trước theo mốc so sánh quen dùng.",
+      "required_memory_ids": [
+        "M16",
+        "M09"
+      ],
+      "evidence_turn_ids": [
+        "D21:7",
+        "D12:7"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "source_indicator": "Doanh thu tiêu dùng di động trừ VAS hợp tác",
+      "source_service_id": "59",
+      "source_testcase": "CT_79",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "59",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Cụm Thanh Sơn trong tỉnh Phú Thọ lũy kế đến ngày 07/09/2026 so với cùng kỳ tháng, tăng trưởng Doanh thu tiêu dùng di động trừ VAS hợp tác là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "temporal_fixture": {
+        "as_of_date": "2026-09-08",
+        "relative_phrase": "hôm trước",
+        "resolved_prd_id": "20260907",
+        "provenance": "KiRa source testcase fixture"
+      },
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "revenue_priority_x_growth",
+      "memory_families": [
+        "growth_preference",
+        "revenue_preference"
+      ],
+      "ltm_attribution": "normal",
+      "rewrite_contract": {
+        "standalone_relative_time_resolution": true,
+        "question_anchor_date": "2026-09-08",
+        "resolved_relative_date": "2026-09-07"
+      }
+    },
+    {
+      "question_id": "Q_MULTI_HOP_006",
+      "category": "multi_hop",
+      "question": "Nếu hỏi 4G ở bên mình, cần dùng phạm vi nào và có được đổi KPI sang 5G không?",
+      "required_memory_ids": [
+        "M13"
+      ],
+      "evidence_turn_ids": [
+        "D16:7",
+        "D21:7"
+      ],
+      "answer_type": "memory_reasoning",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Dùng Thượng Long; không được tự đổi 4G sang 5G vì KPI được gọi rõ phải giữ nguyên.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Dùng Thượng Long; không được tự đổi 4G sang 5G vì KPI được gọi rõ phải giữ nguyên.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "scope_x_explicit_kpi",
+      "memory_families": [
+        "explicit_precedence",
+        "scope"
+      ],
+      "capability_tags": [
+        "policy_overlap",
+        "precedence_safety"
+      ],
+      "ltm_attribution": "non_exclusive",
+      "ltm_uplift_reporting": {
+        "count_in_overall_correctness": true,
+        "count_as_unique_evidence_of_ltm_benefit": false,
+        "reason": "Global explicit-query precedence policy can produce the correct behavior without retrieving M15."
+      },
+      "supporting_memory_ids": [
+        "M15"
+      ],
+      "retrieval_scoring_contract": {
+        "strict_required_memory_ids": [
+          "M13"
+        ],
+        "supporting_policy_overlap_memory_ids": [
+          "M15"
+        ],
+        "exclude_supporting_from_recall_at_k": true,
+        "note": "M15 may support the answer but is not strictly required because Current explicit query > LTM is a global invariant.",
+        "precision_relevant_memory_ids": [
+          "M13",
+          "M15"
+        ],
+        "supporting_retrieval_is_false_positive": false,
+        "precision_rule": "For policy-overlap QA, Recall@K requires only strict_required_memory_ids. For retrieval precision, both strict_required_memory_ids and supporting_policy_overlap_memory_ids are relevant; retrieving M15 must not be counted as a false positive.",
+        "no_hit_fpr_eligible": false,
+        "no_hit_fpr_rule": "A policy-overlap QA with supporting relevant memory is not a no-hit query, even when strict_required_memory_ids is empty."
+      },
+      "no_hit_fpr_eligible": false
+    },
+    {
+      "question_id": "Q_MULTI_HOP_007",
+      "category": "multi_hop",
+      "question": "Nếu mình hỏi số ở “bên mình”, hệ thống nên dùng địa bàn nào và câu trả lời nên theo style nào?",
+      "required_memory_ids": [
+        "M13",
+        "M02"
+      ],
+      "evidence_turn_ids": [
+        "D16:7",
+        "D1:9"
+      ],
+      "answer_type": "memory_reasoning",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Dùng Thượng Long, Phú Thọ và trả lời gọn.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Dùng Thượng Long, Phú Thọ và trả lời gọn.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "response_style",
+      "memory_families": [
+        "response_style",
+        "scope"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_MULTI_HOP_008",
+      "category": "multi_hop",
+      "question": "Tóm tắt sự thay đổi vai trò của Thượng Long từ lúc mới xuất hiện tới hiện tại.",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [
+        "D7:7",
+        "D13:1",
+        "D16:1"
+      ],
+      "answer_type": "memory_reasoning",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Ban đầu chỉ drill-down; sau đó theo dõi song song Thanh Sơn; cuối cùng trở thành phạm vi chính.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Ban đầu chỉ drill-down; sau đó theo dõi song song Thanh Sơn; cuối cùng trở thành phạm vi chính.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "history_memory_ids": [
+        "M05",
+        "M10",
+        "M12"
+      ],
+      "architecture_note": "Requires historical/superseded/ephemeral context. Not a hard gate for the current active-semantic-memory baseline unless memory history/versioning is enabled.",
+      "scenario_group": "thuong_long_role_evolution",
+      "memory_families": [
+        "scope"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_MULTI_HOP_009",
+      "category": "multi_hop",
+      "question": "Sau khi chuyển trọng tâm, Thượng Long và Thanh Sơn lần lượt giữ vai trò gì?",
+      "required_memory_ids": [
+        "M12",
+        "M14"
+      ],
+      "evidence_turn_ids": [
+        "D16:1",
+        "D16:7"
+      ],
+      "answer_type": "memory_reasoning",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Thượng Long là phạm vi chính; Thanh Sơn vẫn dùng khi tổng hợp cụm.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Thượng Long là phạm vi chính; Thanh Sơn vẫn dùng khi tổng hợp cụm.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "scope_roles_after_update",
+      "memory_families": [
+        "scope"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_MULTI_HOP_010",
+      "category": "multi_hop",
+      "question": "Quan hệ 4G/5G thay đổi thế nào nhưng vẫn giữ được khả năng hỏi KPI cũ?",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [
+        "D8:5",
+        "D15:7",
+        "D21:7"
+      ],
+      "answer_type": "memory_reasoning",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Ban đầu 5G chỉ bổ sung; sau đó được xem thường xuyên hơn, nhưng 4G vẫn giữ để đối chiếu và KPI explicit phải được tôn trọng.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Ban đầu 5G chỉ bổ sung; sau đó được xem thường xuyên hơn, nhưng 4G vẫn giữ để đối chiếu và KPI explicit phải được tôn trọng.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "history_memory_ids": [
+        "M06",
+        "M11",
+        "M15"
+      ],
+      "architecture_note": "Requires historical/superseded/ephemeral context. Not a hard gate for the current active-semantic-memory baseline unless memory history/versioning is enabled.",
+      "scenario_group": "subscriber_priority_evolution",
+      "memory_families": [
+        "explicit_precedence",
+        "subscriber_preference"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_001",
+      "category": "temporal_reasoning",
+      "question": "Việc hỗ trợ Chí Tiên xảy ra trước hay sau khi Thượng Long trở thành phạm vi chính?",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [
+        "D10:1",
+        "D16:1"
+      ],
+      "answer_type": "memory_reasoning",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Trước.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Trước.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "history_memory_ids": [
+        "M08",
+        "M12"
+      ],
+      "architecture_note": "Requires historical/superseded/ephemeral context. Not a hard gate for the current active-semantic-memory baseline unless memory history/versioning is enabled.",
+      "scenario_group": "temporary_chi_tien",
+      "memory_families": [
+        "scope",
+        "temporary_task"
+      ],
+      "ltm_attribution": "normal",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_002",
+      "category": "temporal_reasoning",
+      "question": "5G bắt đầu được theo dõi thêm trước hay sau khi Thượng Long trở thành phạm vi chính?",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [
+        "D8:5",
+        "D16:1"
+      ],
+      "answer_type": "memory_reasoning",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Trước.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Trước.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "history_memory_ids": [
+        "M06",
+        "M12"
+      ],
+      "architecture_note": "Requires historical/superseded/ephemeral context. Not a hard gate for the current active-semantic-memory baseline unless memory history/versioning is enabled.",
+      "scenario_group": "subscriber_interest_vs_scope_update",
+      "memory_families": [
+        "scope",
+        "subscriber_preference"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_003",
+      "category": "temporal_reasoning",
+      "question": "Thứ tự đúng của Thượng Long là drill-down → theo dõi song song → phạm vi chính đúng không?",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [
+        "D7:7",
+        "D13:1",
+        "D16:1"
+      ],
+      "answer_type": "memory_reasoning",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Đúng.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Đúng.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "history_memory_ids": [
+        "M05",
+        "M10",
+        "M12"
+      ],
+      "architecture_note": "Requires historical/superseded/ephemeral context. Not a hard gate for the current active-semantic-memory baseline unless memory history/versioning is enabled.",
+      "scenario_group": "thuong_long_role_evolution",
+      "memory_families": [
+        "scope"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_004",
+      "category": "temporal_reasoning",
+      "question": "Preference top 3 xuất hiện trước hay sau khi Thượng Long thành phạm vi chính?",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [
+        "D6:5",
+        "D16:1"
+      ],
+      "answer_type": "memory_reasoning",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Trước.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Trước.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "history_memory_ids": [
+        "M04",
+        "M12"
+      ],
+      "architecture_note": "Requires historical/superseded/ephemeral context. Not a hard gate for the current active-semantic-memory baseline unless memory history/versioning is enabled.",
+      "scenario_group": "ranking_vs_scope_update",
+      "memory_families": [
+        "ranking_preference",
+        "scope"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_005",
+      "category": "temporal_reasoning",
+      "question": "Quy ước 'so cùng kỳ' = cùng kỳ tháng xuất hiện trước hay sau khi đổi phạm vi chính?",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [
+        "D12:7",
+        "D16:1"
+      ],
+      "answer_type": "memory_reasoning",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Trước.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Trước.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "history_memory_ids": [
+        "M09",
+        "M12"
+      ],
+      "architecture_note": "Requires historical/superseded/ephemeral context. Not a hard gate for the current active-semantic-memory baseline unless memory history/versioning is enabled.",
+      "scenario_group": "growth_vs_scope_update",
+      "memory_families": [
+        "growth_preference",
+        "scope"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_006",
+      "category": "temporal_reasoning",
+      "question": "Việc bản trừ VAS được xem nhiều hơn bản cũ được xác nhận trước hay sau khi chuyển trọng tâm sang Thượng Long?",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [
+        "D16:1",
+        "D21:7"
+      ],
+      "answer_type": "memory_reasoning",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Sau.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Sau.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "history_memory_ids": [
+        "M12",
+        "M16"
+      ],
+      "architecture_note": "Requires historical/superseded/ephemeral context. Not a hard gate for the current active-semantic-memory baseline unless memory history/versioning is enabled.",
+      "scenario_group": "revenue_priority_evolution",
+      "memory_families": [
+        "revenue_preference",
+        "scope"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_001",
+      "category": "state_update",
+      "question": "Phạm vi chính hiện tại là gì, và phạm vi cũ là gì?",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [
+        "D7:7",
+        "D16:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Hiện tại: Thượng Long; trước đó: Thanh Sơn.",
+      "notes": "D7:7 states Thanh Sơn was still the primary scope; D16:1 updates the primary scope to Thượng Long.",
+      "gold_rewrite": null,
+      "final_answer": "Hiện tại: Thượng Long; trước đó: Thanh Sơn.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "history_memory_ids": [
+        "M05",
+        "M12"
+      ],
+      "architecture_note": "Requires historical/superseded/ephemeral context. Not a hard gate for the current active-semantic-memory baseline unless memory history/versioning is enabled.",
+      "scenario_group": "scope_state_evolution",
+      "memory_families": [
+        "scope"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_002",
+      "category": "state_update",
+      "question": "Alias “bên mình” đã thay đổi thế nào?",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [
+        "D1:7",
+        "D16:7"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Từ Thanh Sơn sang Thượng Long.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Từ Thanh Sơn sang Thượng Long.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "history_memory_ids": [
+        "M01",
+        "M13"
+      ],
+      "architecture_note": "Requires historical/superseded/ephemeral context. Not a hard gate for the current active-semantic-memory baseline unless memory history/versioning is enabled.",
+      "scenario_group": "scope_state_evolution",
+      "memory_families": [
+        "scope"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_003",
+      "category": "state_update",
+      "question": "Vai trò Thượng Long thay đổi qua những giai đoạn nào?",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [
+        "D7:7",
+        "D13:1",
+        "D16:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Drill-down → theo dõi song song → phạm vi chính.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Drill-down → theo dõi song song → phạm vi chính.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "history_memory_ids": [
+        "M05",
+        "M10",
+        "M12"
+      ],
+      "architecture_note": "Requires historical/superseded/ephemeral context. Not a hard gate for the current active-semantic-memory baseline unless memory history/versioning is enabled.",
+      "scenario_group": "thuong_long_role_evolution",
+      "memory_families": [
+        "scope"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_004",
+      "category": "state_update",
+      "question": "Thói quen theo dõi 5G thay đổi thế nào?",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [
+        "D8:5",
+        "D15:7"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Từ chỉ bổ sung sang được xem thường xuyên hơn; 4G vẫn giữ đối chiếu.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Từ chỉ bổ sung sang được xem thường xuyên hơn; 4G vẫn giữ đối chiếu.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "history_memory_ids": [
+        "M06",
+        "M11"
+      ],
+      "architecture_note": "Requires historical/superseded/ephemeral context. Not a hard gate for the current active-semantic-memory baseline unless memory history/versioning is enabled.",
+      "scenario_group": "subscriber_priority_evolution",
+      "memory_families": [
+        "subscriber_preference"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_005",
+      "category": "state_update",
+      "question": "Cách dùng bản doanh thu trừ VAS thay đổi thế nào?",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [
+        "D9:5",
+        "D21:7"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Từ chỉ thêm để đối chiếu sang được xem nhiều hơn bản cũ.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Từ chỉ thêm để đối chiếu sang được xem nhiều hơn bản cũ.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "history_memory_ids": [
+        "M07",
+        "M16"
+      ],
+      "architecture_note": "Requires historical/superseded/ephemeral context. Not a hard gate for the current active-semantic-memory baseline unless memory history/versioning is enabled.",
+      "scenario_group": "revenue_priority_evolution",
+      "memory_families": [
+        "revenue_preference"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_006",
+      "category": "state_update",
+      "question": "Chí Tiên có làm thay đổi state phạm vi dài hạn không?",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [
+        "D10:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Không.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Không.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "history_memory_ids": [
+        "M08"
+      ],
+      "architecture_note": "Requires historical/superseded/ephemeral context. Not a hard gate for the current active-semantic-memory baseline unless memory history/versioning is enabled.",
+      "scenario_group": "temporary_chi_tien",
+      "memory_families": [
+        "temporary_task"
+      ],
+      "ltm_attribution": "normal",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_007",
+      "category": "state_update",
+      "question": "Sau cập nhật phạm vi, Thanh Sơn còn giữ vai trò gì?",
+      "required_memory_ids": [
+        "M14"
+      ],
+      "evidence_turn_ids": [
+        "D16:7"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Thanh Sơn vẫn dùng khi tổng hợp cụm.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Thanh Sơn vẫn dùng khi tổng hợp cụm.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "scope_roles_after_update",
+      "memory_families": [
+        "scope"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_TEMPORAL_BUSINESS_ACTION_001",
+      "category": "temporal_business_action",
+      "question": "Theo trạng thái đầu conversation, lấy doanh thu tiêu dùng di động của bên mình tháng 8.",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [
+        "D1:7"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "source_indicator": "Doanh thu tiêu dùng di động",
+      "source_service_id": "33",
+      "source_testcase": "CT_20",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "33",
+        "prd_id": "20260831",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Doanh thu tiêu dùng di động của Cụm Thanh Sơn - Phú Thọ tháng 08/2026 là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "history_memory_ids": [
+        "M01"
+      ],
+      "architecture_note": "Requires historical/superseded/ephemeral context. Not a hard gate for the current active-semantic-memory baseline unless memory history/versioning is enabled.",
+      "scenario_group": "historical_initial_scope_actions",
+      "memory_families": [
+        "scope"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_TEMPORAL_BUSINESS_ACTION_002",
+      "category": "temporal_business_action",
+      "question": "Theo trạng thái đầu conversation, lấy 4G thực lũy kế của bên mình tháng 8.",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [
+        "D1:7"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "source_indicator": "Thuê bao Di động 4G thực Lũy kế",
+      "source_service_id": "36",
+      "source_testcase": "CT_20",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "36",
+        "prd_id": "20260831",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Thuê bao Di động 4G thực Lũy kế của Cụm Thanh Sơn - Phú Thọ tháng 08/2026 là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "history_memory_ids": [
+        "M01"
+      ],
+      "architecture_note": "Requires historical/superseded/ephemeral context. Not a hard gate for the current active-semantic-memory baseline unless memory history/versioning is enabled.",
+      "scenario_group": "historical_initial_scope_actions",
+      "memory_families": [
+        "scope"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_TEMPORAL_BUSINESS_ACTION_003",
+      "category": "temporal_business_action",
+      "question": "Sau khi đổi phân công, lấy doanh thu tiêu dùng di động của bên mình năm 2026.",
+      "required_memory_ids": [
+        "M13"
+      ],
+      "evidence_turn_ids": [
+        "D16:7"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "source_indicator": "Doanh thu tiêu dùng di động",
+      "source_service_id": "33",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "33",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Năm 2026, Doanh thu tiêu dùng di động của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "current_scope_after_update",
+      "memory_families": [
+        "scope"
+      ],
+      "fixture_expected_api": {
+        "service_id": "33",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "fixture_metadata": {
+        "source_testcase": "CT_28",
+        "fixture_as_of_date": "2026-09-08",
+        "fixture_prd_id": "20260907",
+        "note": "This cutoff comes from the KiRa source testcase, not from the user question or LTM."
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ],
+        "exact_match_full_fixture_api": false,
+        "downstream_fixture_replay_field": "fixture_expected_api"
+      },
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_TEMPORAL_BUSINESS_ACTION_004",
+      "category": "temporal_business_action",
+      "question": "Sau khi 5G được xem thường xuyên hơn và phạm vi đã đổi, lấy số thuê bao mình đang xem nhiều hơn ở bên mình năm 2026.",
+      "required_memory_ids": [
+        "M11",
+        "M13"
+      ],
+      "evidence_turn_ids": [
+        "D15:7",
+        "D16:7"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "source_indicator": "TB Di động 5G thực Lũy kế",
+      "source_service_id": "413",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "413",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Năm 2026, TB Di động 5G thực Lũy kế của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "subscriber_priority_x_scope",
+      "memory_families": [
+        "scope",
+        "subscriber_preference"
+      ],
+      "fixture_expected_api": {
+        "service_id": "413",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "fixture_metadata": {
+        "source_testcase": "CT_28",
+        "fixture_as_of_date": "2026-09-08",
+        "fixture_prd_id": "20260907",
+        "note": "This cutoff comes from the KiRa source testcase, not from the user question or LTM."
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ],
+        "exact_match_full_fixture_api": false,
+        "downstream_fixture_replay_field": "fixture_expected_api"
+      },
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_TEMPORAL_BUSINESS_ACTION_005",
+      "category": "temporal_business_action",
+      "question": "Trước khi đổi phạm vi chính, lấy bản doanh thu trừ VAS của bên mình tháng 8/2026.",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [
+        "D1:7"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "source_indicator": "Doanh thu tiêu dùng di động trừ VAS hợp tác",
+      "source_service_id": "59",
+      "source_testcase": "CT_20",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "59",
+        "prd_id": "20260831",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Doanh thu tiêu dùng di động trừ VAS hợp tác của Cụm Thanh Sơn - Phú Thọ tháng 08/2026 là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "history_memory_ids": [
+        "M01"
+      ],
+      "architecture_note": "Requires historical/superseded/ephemeral context. Not a hard gate for the current active-semantic-memory baseline unless memory history/versioning is enabled.",
+      "scenario_group": "historical_initial_scope_actions",
+      "memory_families": [
+        "scope"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_TEMPORAL_BUSINESS_ACTION_006",
+      "category": "temporal_business_action",
+      "question": "Ở trạng thái cuối, lấy bản doanh thu đang được xem nhiều hơn ở bên mình năm 2026.",
+      "required_memory_ids": [
+        "M16",
+        "M13"
+      ],
+      "evidence_turn_ids": [
+        "D21:7",
+        "D16:7"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "source_indicator": "Doanh thu tiêu dùng di động trừ VAS hợp tác",
+      "source_service_id": "59",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "59",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Năm 2026, Doanh thu tiêu dùng di động trừ VAS hợp tác của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "revenue_priority_x_scope",
+      "memory_families": [
+        "revenue_preference",
+        "scope"
+      ],
+      "fixture_expected_api": {
+        "service_id": "59",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "fixture_metadata": {
+        "source_testcase": "CT_28",
+        "fixture_as_of_date": "2026-09-08",
+        "fixture_prd_id": "20260907",
+        "note": "This cutoff comes from the KiRa source testcase, not from the user question or LTM."
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ],
+        "exact_match_full_fixture_api": false,
+        "downstream_fixture_replay_field": "fixture_expected_api"
+      },
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_FALSE_PREMISE_001",
+      "category": "false_premise",
+      "question": "Bây giờ 'bên mình' vẫn là Thanh Sơn đúng không?",
+      "required_memory_ids": [
+        "M13"
+      ],
+      "evidence_turn_ids": [
+        "D16:7"
+      ],
+      "answer_type": "adversarial",
+      "expected_action": "reject_false_premise",
+      "gold_answer": "Không. Hiện 'bên mình' là Thượng Long.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Không. Hiện 'bên mình' là Thượng Long.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "scope_alias_current",
+      "memory_families": [
+        "scope"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_FALSE_PREMISE_002",
+      "category": "false_premise",
+      "question": "Chí Tiên từng trở thành phạm vi phụ trách chính đúng không?",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [
+        "D10:1"
+      ],
+      "answer_type": "adversarial",
+      "expected_action": "reject_false_premise",
+      "gold_answer": "Không, chỉ là hỗ trợ tạm.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Không, chỉ là hỗ trợ tạm.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "history_memory_ids": [
+        "M08"
+      ],
+      "architecture_note": "Requires historical/superseded/ephemeral context. Not a hard gate for the current active-semantic-memory baseline unless memory history/versioning is enabled.",
+      "scenario_group": "temporary_chi_tien",
+      "memory_families": [
+        "temporary_task"
+      ],
+      "ltm_attribution": "normal",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_FALSE_PREMISE_003",
+      "category": "false_premise",
+      "question": "5G được xem nhiều hơn nghĩa là 4G bị bỏ hẳn đúng không?",
+      "required_memory_ids": [
+        "M11"
+      ],
+      "evidence_turn_ids": [
+        "D15:7"
+      ],
+      "answer_type": "adversarial",
+      "expected_action": "reject_false_premise",
+      "gold_answer": "Không, 4G vẫn được giữ để đối chiếu.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Không, 4G vẫn được giữ để đối chiếu.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "subscriber_5g_priority",
+      "memory_families": [
+        "subscriber_preference"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_FALSE_PREMISE_004",
+      "category": "false_premise",
+      "question": "Nếu gọi rõ 4G thì vẫn nên đổi sang 5G đúng không?",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [
+        "D21:7"
+      ],
+      "answer_type": "adversarial",
+      "expected_action": "reject_false_premise",
+      "gold_answer": "Không, KPI gọi rõ phải được giữ.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Không, KPI gọi rõ phải được giữ.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "explicit_kpi_precedence",
+      "memory_families": [
+        "explicit_precedence"
+      ],
+      "capability_tags": [
+        "policy_overlap",
+        "precedence_safety"
+      ],
+      "ltm_attribution": "non_exclusive",
+      "ltm_uplift_reporting": {
+        "count_in_overall_correctness": true,
+        "count_as_unique_evidence_of_ltm_benefit": false,
+        "reason": "Global explicit-query precedence policy can produce the correct behavior without retrieving M15."
+      },
+      "supporting_memory_ids": [
+        "M15"
+      ],
+      "retrieval_scoring_contract": {
+        "strict_required_memory_ids": [],
+        "supporting_policy_overlap_memory_ids": [
+          "M15"
+        ],
+        "exclude_supporting_from_recall_at_k": true,
+        "note": "M15 may support the answer but is not strictly required because Current explicit query > LTM is a global invariant.",
+        "precision_relevant_memory_ids": [
+          "M15"
+        ],
+        "supporting_retrieval_is_false_positive": false,
+        "precision_rule": "For policy-overlap QA, Recall@K requires only strict_required_memory_ids. For retrieval precision, both strict_required_memory_ids and supporting_policy_overlap_memory_ids are relevant; retrieving M15 must not be counted as a false positive.",
+        "no_hit_fpr_eligible": false,
+        "no_hit_fpr_rule": "A policy-overlap QA with supporting relevant memory is not a no-hit query, even when strict_required_memory_ids is empty."
+      },
+      "no_hit_fpr_eligible": false
+    },
+    {
+      "question_id": "Q_FALSE_PREMISE_005",
+      "category": "false_premise",
+      "question": "Thanh Sơn không còn được dùng sau khi chuyển Thượng Long đúng không?",
+      "required_memory_ids": [
+        "M14"
+      ],
+      "evidence_turn_ids": [
+        "D16:7"
+      ],
+      "answer_type": "adversarial",
+      "expected_action": "reject_false_premise",
+      "gold_answer": "Không. Thanh Sơn vẫn dùng khi tổng hợp cụm.",
+      "notes": "",
+      "gold_rewrite": null,
+      "final_answer": "Không. Thanh Sơn vẫn dùng khi tổng hợp cụm.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "scope_roles_after_update",
+      "memory_families": [
+        "scope"
+      ],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_ABSTENTION_001",
+      "category": "abstention",
+      "question": "Ngưỡng cảnh báo 5G mình thường dùng là bao nhiêu?",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [],
+      "answer_type": "unanswerable",
+      "expected_action": "abstain",
+      "gold_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "notes": "Không được suy diễn preference/profile từ pattern sử dụng.",
+      "gold_rewrite": null,
+      "final_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "unanswerable_user_profile",
+      "memory_families": [],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_ABSTENTION_002",
+      "category": "abstention",
+      "question": "Mình thích biểu đồ cột hay biểu đồ đường?",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [],
+      "answer_type": "unanswerable",
+      "expected_action": "abstain",
+      "gold_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "notes": "Không được suy diễn preference/profile từ pattern sử dụng.",
+      "gold_rewrite": null,
+      "final_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "unanswerable_user_profile",
+      "memory_families": [],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_ABSTENTION_003",
+      "category": "abstention",
+      "question": "Mình muốn xuất báo cáo PDF hay Excel?",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [],
+      "answer_type": "unanswerable",
+      "expected_action": "abstain",
+      "gold_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "notes": "Không được suy diễn preference/profile từ pattern sử dụng.",
+      "gold_rewrite": null,
+      "final_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "unanswerable_user_profile",
+      "memory_families": [],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_ABSTENTION_004",
+      "category": "abstention",
+      "question": "Mình thường gửi báo cáo cho phòng nào?",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [],
+      "answer_type": "unanswerable",
+      "expected_action": "abstain",
+      "gold_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "notes": "Không được suy diễn preference/profile từ pattern sử dụng.",
+      "gold_rewrite": null,
+      "final_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "unanswerable_user_profile",
+      "memory_families": [],
+      "ltm_attribution": "normal"
+    },
+    {
+      "question_id": "Q_ABSTENTION_005",
+      "category": "abstention",
+      "question": "Khi xem bảng xếp hạng, mình thường muốn hiển thị kèm mã đơn vị không?",
+      "required_memory_ids": [],
+      "evidence_turn_ids": [],
+      "answer_type": "unanswerable",
+      "expected_action": "abstain",
+      "gold_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "notes": "Không được suy diễn preference hiển thị mã đơn vị từ các preference ranking khác.",
+      "gold_rewrite": null,
+      "final_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "history_memory_ids": [],
+      "scenario_group": "unanswerable_user_profile",
+      "memory_families": [],
+      "ltm_attribution": "normal"
+    }
+  ],
+  "api_scoring_contract": {
+    "default": "For ordinary testcase-backed QA, score expected_api normally.",
+    "CT_28": "Do not score hidden prd_id=20260907 as an LTM/rewrite requirement. Score semantic fields only; fixture_expected_api is reserved for downstream KiRa fixture replay.",
+    "CT_79": "Relative-time semantics are explicit in the question and temporal_fixture; expected_api can be scored with that fixture."
+  },
+  "score_reporting_contract": {
+    "required_metrics": [
+      {
+        "name": "micro_accuracy",
+        "definition": "Total correct QA / total evaluated QA."
+      },
+      {
+        "name": "macro_scenario_accuracy",
+        "definition": "Compute accuracy within each scenario_group, then average equally across scenario groups."
+      }
+    ],
+    "recommended_slices": [
+      "evaluation_tier",
+      "category",
+      "memory_families",
+      "ltm_attribution"
+    ],
+    "reporting_note": "Do not rely on QA-row micro accuracy alone because some scenario groups contain more paraphrases than others.",
+    "headline_scope": {
+      "baseline_headline": "hard_gate_only",
+      "hard_gate_micro": "Compute micro accuracy only over hard_gate=true QA.",
+      "hard_gate_macro_scenario": "Compute scenario-group macro accuracy using only hard_gate=true QA.",
+      "diagnostic_history": "Report separately; do not mix into baseline headline accuracy and do not fail the active-memory baseline on diagnostic_history cases."
+    }
+  },
+  "retrieval_scoring_global_contract": {
+    "policy_overlap_no_hit_rule": "If a QA has supporting relevant memory, it is excluded from the no-hit FPR bucket. Precision-relevant memories are strict_required_memory_ids ∪ supporting_memory_ids."
+  }
+}

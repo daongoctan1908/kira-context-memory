@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kira.local/schemas/conversation-v1.json",
+  "title": "KiRa synthetic conversation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["conversation_id", "persona", "metadata", "conversation"],
+  "properties": {
+    "conversation_id": { "type": "string", "minLength": 1 },
+    "persona": { "type": "object" },
+    "metadata": {
+      "type": "object",
+      "required": ["language", "version", "review_status", "sessions", "turns", "kira_fill_slots", "session_turn_counts"],
+      "properties": {
+        "language": { "const": "vi" },
+        "version": { "type": "string", "minLength": 1 },
+        "review_status": { "type": "string", "minLength": 1 },
+        "sessions": { "type": "integer", "minimum": 1 },
+        "turns": { "type": "integer", "minimum": 1 },
+        "kira_fill_slots": { "type": "integer", "minimum": 0 },
+        "session_turn_counts": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "conversation": {
+      "type": "object",
+      "patternProperties": {
+        "^session_[1-9][0-9]*$": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/turn" }
+        },
+        "^session_[1-9][0-9]*_date_time$": { "type": "string", "format": "date-time" },
+        "^session_[1-9][0-9]*_goal$": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "turn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dia_id", "role", "text"],
+      "properties": {
+        "dia_id": { "type": "string", "minLength": 1 },
+        "role": { "enum": ["user", "assistant"] },
+        "text": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,772 @@
+{
+  "conversation_id": "conv_04_FREEZE_v4_FINAL",
+  "persona": {
+    "role": "Chuyên viên phân tích sức khỏe thuê bao",
+    "job_story": "Theo dõi các KPI thuê bao có tên gần giống nhau, dùng shorthand theo vai trò nghiệp vụ, đổi semantic của một alias qua thời gian, và áp quy ước xếp hạng khác nhau theo KPI."
+  },
+  "metadata": {
+    "language": "vi",
+    "design_goal": "Test semantic disambiguation among lexical-near-duplicate subscriber KPIs, semantic-definition updates, ranking polarity, current-instruction precedence, and temporary overrides.",
+    "source_basis": "Both KiRa testcase documents were reviewed. Conv 4 intentionally materializes subscriber testcases because the subscriber source contains the strongest lexical-near-duplicate KPI families.",
+    "business_responses": "blank_until_filled_from_original_kira",
+    "version": "v4_FINAL",
+    "review_status": "FROZEN_CONTRACT_PENDING_KIRA_FILL",
+    "business_time_window_note": "Business actions replay fixed historical source-testcase windows (08/2026 and 06/09/2026). Do not infer business period from synthetic session_datetime.",
+    "fill_id_policy": {
+      "stable_across_revisions": true,
+      "note": "CONV04_FILL_### identifiers should remain stable after real KiRa responses are collected."
+    },
+    "sessions": 22,
+    "turns": 102,
+    "kira_fill_slots": 32,
+    "session_turn_counts": [
+      8,
+      8,
+      2,
+      10,
+      4,
+      8,
+      2,
+      4,
+      4,
+      6,
+      2,
+      6,
+      2,
+      4,
+      4,
+      6,
+      2,
+      6,
+      2,
+      6,
+      2,
+      4
+    ],
+    "zero_fill_sessions": [
+      3,
+      7,
+      9,
+      13,
+      19,
+      21
+    ],
+    "assistant_bridge_count": 19,
+    "assistant_bridge_unique": 19
+  },
+  "conversation": {
+    "session_1_date_time": "2026-09-05T09:10:00+07:00",
+    "session_1_goal": "Đặt vai trò cho các KPI 5G chính",
+    "session_1": [
+      {
+        "role": "user",
+        "dia_id": "D1:1",
+        "text": "Từ giờ mình gọi “5G chính” là Thuê bao Register 5G lũy kế."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D1:2",
+        "text": "Rõ, mình ghi nhận quy ước anh vừa nêu.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D1:3",
+        "text": "Còn “nền 5G” là TB Di động 5G thực lũy kế; tách riêng với Register nhé."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D1:4",
+        "text": "Được, mình sẽ bám theo cách gọi này.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D1:5",
+        "text": "Lấy 5G chính toàn quốc tháng 8.",
+        "fill_id": "CONV04_FILL_001"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D1:6",
+        "text": "",
+        "fill_id": "CONV04_FILL_001",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D1:7",
+        "text": "Lấy nền 5G toàn quốc tháng 8.",
+        "fill_id": "CONV04_FILL_002"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D1:8",
+        "text": "",
+        "fill_id": "CONV04_FILL_002",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_2_date_time": "2026-09-10T14:20:00+07:00",
+    "session_2_goal": "Bổ sung vai trò 5G vào mới và biến động",
+    "session_2": [
+      {
+        "role": "user",
+        "dia_id": "D2:1",
+        "text": "“Dòng vào 5G” thì hiểu là Thuê bao 5G phát triển mới."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D2:2",
+        "text": "Ừ, mình đã nắm ý cho phần tiếp theo.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D2:3",
+        "text": "Còn “biến động 5G” là TB Di động 5G thực lũy kế tăng giảm, không phải số thực lũy kế."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D2:4",
+        "text": "Rõ rồi, mình theo đúng quy ước vừa chốt.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D2:5",
+        "text": "So dòng vào 5G của Phú Thọ với Đà Nẵng ngày 06/09/2026.",
+        "fill_id": "CONV04_FILL_003"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D2:6",
+        "text": "",
+        "fill_id": "CONV04_FILL_003",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D2:7",
+        "text": "Xem tăng trưởng biến động 5G ở Hà Nội lũy kế đến tháng 8.",
+        "fill_id": "CONV04_FILL_004"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D2:8",
+        "text": "",
+        "fill_id": "CONV04_FILL_004",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_3_date_time": "2026-09-16T08:50:00+07:00",
+    "session_3_goal": "Giữ các vai trò 5G tách biệt",
+    "session_3": [
+      {
+        "role": "user",
+        "dia_id": "D3:1",
+        "text": "Các nhãn 5G này là vai trò riêng, đừng thấy cùng chữ 5G rồi gộp Register, thực lũy kế, phát triển mới với tăng giảm vào một chỉ tiêu."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D3:2",
+        "text": "Được, mình ghi nhận cách phân biệt này.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_4_date_time": "2026-09-22T10:30:00+07:00",
+    "session_4_goal": "Đặt vai trò cho nhóm FTTH",
+    "session_4": [
+      {
+        "role": "user",
+        "dia_id": "D4:1",
+        "text": "Với FTTH, “nền FTTH” là Thuê bao FTTH phát triển thực lũy kế."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D4:2",
+        "text": "Rõ, mình sẽ dùng theo phạm vi anh vừa nêu.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D4:3",
+        "text": "“Dòng vào FTTH” là Thuê bao FTTH phát triển mới."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D4:4",
+        "text": "Ừ, mình giữ nguyên nguyên tắc đó.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D4:5",
+        "text": "“Dòng ra FTTH” là Thuê bao FTTH rời mạng."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D4:6",
+        "text": "Được, mình theo cách anh vừa quy ước.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D4:7",
+        "text": "Lấy nền FTTH toàn quốc tháng 8.",
+        "fill_id": "CONV04_FILL_005"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D4:8",
+        "text": "",
+        "fill_id": "CONV04_FILL_005",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D4:9",
+        "text": "Lấy dòng ra FTTH toàn quốc tháng 8.",
+        "fill_id": "CONV04_FILL_006"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D4:10",
+        "text": "",
+        "fill_id": "CONV04_FILL_006",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_5_date_time": "2026-09-28T15:10:00+07:00",
+    "session_5_goal": "Quy ước top tốt cho FTTH vào mới",
+    "session_5": [
+      {
+        "role": "user",
+        "dia_id": "D5:1",
+        "text": "Với “dòng vào FTTH”, khi mình nói “top tốt” thì lấy các tỉnh có giá trị cao nhất."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D5:2",
+        "text": "Rõ, mình cập nhật theo thay đổi vừa nêu.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D5:3",
+        "text": "Lấy 3 tỉnh top tốt cho dòng vào FTTH tháng 8.",
+        "fill_id": "CONV04_FILL_007"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D5:4",
+        "text": "",
+        "fill_id": "CONV04_FILL_007",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_6_date_time": "2026-10-03T09:35:00+07:00",
+    "session_6_goal": "Quy ước top tốt và cảnh báo cho FTTH rời mạng",
+    "session_6": [
+      {
+        "role": "user",
+        "dia_id": "D6:1",
+        "text": "Riêng “dòng ra FTTH”, “top tốt” là các tỉnh có giá trị thấp nhất."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D6:2",
+        "text": "Được, mình ghi nhận vai trò mới.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D6:3",
+        "text": "Còn “top cảnh báo” của dòng ra FTTH là các tỉnh có giá trị cao nhất."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D6:4",
+        "text": "Ừ, mình nắm trạng thái hiện tại.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D6:5",
+        "text": "Lấy 3 tỉnh top tốt cho dòng ra FTTH tháng 8.",
+        "fill_id": "CONV04_FILL_008"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D6:6",
+        "text": "",
+        "fill_id": "CONV04_FILL_008",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D6:7",
+        "text": "Lấy 3 tỉnh top cảnh báo cho dòng ra FTTH tháng 8.",
+        "fill_id": "CONV04_FILL_009"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D6:8",
+        "text": "",
+        "fill_id": "CONV04_FILL_009",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_7_date_time": "2026-10-08T13:15:00+07:00",
+    "session_7_goal": "Phân biệt polarity theo vai trò",
+    "session_7": [
+      {
+        "role": "user",
+        "dia_id": "D7:1",
+        "text": "Khi gặp “top tốt”, cứ áp đúng quy ước của từng vai trò KPI; đừng suy ra một chiều xếp hạng chung cho tất cả."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D7:2",
+        "text": "Rõ, mình sẽ áp đúng chiều xếp hạng theo từng vai trò KPI.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_8_date_time": "2026-10-14T11:05:00+07:00",
+    "session_8_goal": "Dùng các vai trò 5G ban đầu",
+    "session_8": [
+      {
+        "role": "user",
+        "dia_id": "D8:1",
+        "text": "Lấy top 3 tỉnh cho 5G chính tháng 8.",
+        "fill_id": "CONV04_FILL_010"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D8:2",
+        "text": "",
+        "fill_id": "CONV04_FILL_010",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D8:3",
+        "text": "So nền 5G của Phú Thọ với Đà Nẵng ngày 06/09/2026.",
+        "fill_id": "CONV04_FILL_011"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D8:4",
+        "text": "",
+        "fill_id": "CONV04_FILL_011",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_9_date_time": "2026-10-20T16:00:00+07:00",
+    "session_9_goal": "Đổi chuẩn 5G chính",
+    "session_9": [
+      {
+        "role": "user",
+        "dia_id": "D9:1",
+        "text": "Từ kỳ này đổi chuẩn nhé: “5G chính” chuyển sang TB Di động 5G thực lũy kế, không dùng Register làm chỉ số chính nữa."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D9:2",
+        "text": "Rõ, mình áp chuẩn mới từ kỳ này.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D9:3",
+        "text": "Thuê bao Register 5G lũy kế từ giờ chỉ dùng làm chỉ số đối chiếu."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D9:4",
+        "text": "Rõ, mình tiếp tục theo trạng thái đã chốt.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_10_date_time": "2026-10-26T09:40:00+07:00",
+    "session_10_goal": "Dùng chuẩn 5G chính mới",
+    "session_10": [
+      {
+        "role": "user",
+        "dia_id": "D10:1",
+        "text": "So 5G chính hiện tại của Phú Thọ với Đà Nẵng ngày 06/09/2026.",
+        "fill_id": "CONV04_FILL_012"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D10:2",
+        "text": "",
+        "fill_id": "CONV04_FILL_012",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D10:3",
+        "text": "Lấy top 3 tỉnh cho 5G chính hiện tại tháng 8.",
+        "fill_id": "CONV04_FILL_013"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D10:4",
+        "text": "",
+        "fill_id": "CONV04_FILL_013",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D10:5",
+        "text": "Lấy chỉ số Register đối chiếu toàn quốc tháng 8.",
+        "fill_id": "CONV04_FILL_014"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D10:6",
+        "text": "",
+        "fill_id": "CONV04_FILL_014",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_11_date_time": "2026-11-01T14:25:00+07:00",
+    "session_11_goal": "Kiểm tra chỉ số Register đối chiếu",
+    "session_11": [
+      {
+        "role": "user",
+        "dia_id": "D11:1",
+        "text": "Xem tăng trưởng chỉ số Register đối chiếu ở Hà Nội lũy kế đến tháng 8.",
+        "fill_id": "CONV04_FILL_015"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D11:2",
+        "text": "",
+        "fill_id": "CONV04_FILL_015",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_12_date_time": "2026-11-06T10:10:00+07:00",
+    "session_12_goal": "Ngoại lệ 5G cho một cuộc họp",
+    "session_12": [
+      {
+        "role": "user",
+        "dia_id": "D12:1",
+        "text": "Riêng cuộc họp hôm nay, tạm dùng Register 5G thay cho “5G chính”. Chỉ dùng trong buổi này thôi, xong họp quay lại chuẩn hiện tại."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D12:2",
+        "text": "Rõ, mình chỉ áp ngoại lệ trong buổi này.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D12:3",
+        "text": "Trong cuộc họp, lấy 5G chính toàn quốc tháng 8.",
+        "fill_id": "CONV04_FILL_016"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D12:4",
+        "text": "",
+        "fill_id": "CONV04_FILL_016",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D12:5",
+        "text": "Trong cuộc họp, lấy top 3 tỉnh cho 5G chính tháng 8.",
+        "fill_id": "CONV04_FILL_017"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D12:6",
+        "text": "",
+        "fill_id": "CONV04_FILL_017",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_13_date_time": "2026-11-10T09:00:00+07:00",
+    "session_13_goal": "Kết thúc ngoại lệ 5G",
+    "session_13": [
+      {
+        "role": "user",
+        "dia_id": "D13:1",
+        "text": "Cuộc họp xong rồi. “5G chính” vẫn theo chuẩn hiện tại là TB Di động 5G thực lũy kế."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D13:2",
+        "text": "Rõ, mình quay lại chuẩn 5G chính hiện tại.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_14_date_time": "2026-11-16T15:35:00+07:00",
+    "session_14_goal": "Dùng current mapping 5G sau ngoại lệ",
+    "session_14": [
+      {
+        "role": "user",
+        "dia_id": "D14:1",
+        "text": "Xem tăng trưởng 5G chính ở Hà Nội lũy kế đến tháng 8.",
+        "fill_id": "CONV04_FILL_018"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D14:2",
+        "text": "",
+        "fill_id": "CONV04_FILL_018",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D14:3",
+        "text": "So dòng vào 5G của Phú Thọ với Đà Nẵng ngày 06/09/2026.",
+        "fill_id": "CONV04_FILL_019"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D14:4",
+        "text": "",
+        "fill_id": "CONV04_FILL_019",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_15_date_time": "2026-11-22T10:45:00+07:00",
+    "session_15_goal": "Dùng polarity FTTH hiện tại",
+    "session_15": [
+      {
+        "role": "user",
+        "dia_id": "D15:1",
+        "text": "Lấy 3 tỉnh top tốt cho dòng ra FTTH tháng 8.",
+        "fill_id": "CONV04_FILL_020"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D15:2",
+        "text": "",
+        "fill_id": "CONV04_FILL_020",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D15:3",
+        "text": "Lấy 3 tỉnh top cảnh báo cho dòng ra FTTH tháng 8.",
+        "fill_id": "CONV04_FILL_021"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D15:4",
+        "text": "",
+        "fill_id": "CONV04_FILL_021",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_16_date_time": "2026-11-28T13:30:00+07:00",
+    "session_16_goal": "Ngoại lệ xếp hạng một lần",
+    "session_16": [
+      {
+        "role": "user",
+        "dia_id": "D16:1",
+        "text": "Riêng lần này, với “top tốt” của dòng ra FTTH cứ lấy phía cao nhất để mình đối chiếu. Chỉ lần này thôi."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D16:2",
+        "text": "Rõ, mình áp ngoại lệ cho lần đối chiếu này.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D16:3",
+        "text": "Riêng lần này lấy 3 tỉnh top tốt cho dòng ra FTTH tháng 8.",
+        "fill_id": "CONV04_FILL_022"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D16:4",
+        "text": "",
+        "fill_id": "CONV04_FILL_022",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D16:5",
+        "text": "So dòng ra FTTH của Phú Thọ với Đà Nẵng ngày 06/09/2026.",
+        "fill_id": "CONV04_FILL_023"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D16:6",
+        "text": "",
+        "fill_id": "CONV04_FILL_023",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_17_date_time": "2026-12-02T09:20:00+07:00",
+    "session_17_goal": "Quay lại polarity rời mạng mặc định",
+    "session_17": [
+      {
+        "role": "user",
+        "dia_id": "D17:1",
+        "text": "Lấy 3 tỉnh top tốt cho dòng ra FTTH tháng 8.",
+        "fill_id": "CONV04_FILL_024"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D17:2",
+        "text": "",
+        "fill_id": "CONV04_FILL_024",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_18_date_time": "2026-12-08T16:10:00+07:00",
+    "session_18_goal": "Rà nhóm FTTH",
+    "session_18": [
+      {
+        "role": "user",
+        "dia_id": "D18:1",
+        "text": "So dòng vào FTTH của Phú Thọ với Đà Nẵng ngày 06/09/2026.",
+        "fill_id": "CONV04_FILL_025"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D18:2",
+        "text": "",
+        "fill_id": "CONV04_FILL_025",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D18:3",
+        "text": "Xem tăng trưởng nền FTTH ở Hà Nội lũy kế đến tháng 8.",
+        "fill_id": "CONV04_FILL_026"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D18:4",
+        "text": "",
+        "fill_id": "CONV04_FILL_026",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D18:5",
+        "text": "Lấy dòng vào FTTH toàn quốc tháng 8.",
+        "fill_id": "CONV04_FILL_027"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D18:6",
+        "text": "",
+        "fill_id": "CONV04_FILL_027",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_19_date_time": "2026-12-13T11:30:00+07:00",
+    "session_19_goal": "Nhắc nguyên tắc semantic trước khi đóng kỳ",
+    "session_19": [
+      {
+        "role": "user",
+        "dia_id": "D19:1",
+        "text": "Khi mình dùng các nhãn ngắn như 5G chính, nền 5G, dòng vào 5G hay dòng vào FTTH, cứ hiểu theo đúng vai trò đã chốt; đừng chỉ thấy tên gần giống nhau rồi chọn đại chỉ tiêu."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D19:2",
+        "text": "Được, mình tiếp tục theo các vai trò đã chốt.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_20_date_time": "2026-12-19T14:15:00+07:00",
+    "session_20_goal": "Rà thêm các lát cắt cuối kỳ",
+    "session_20": [
+      {
+        "role": "user",
+        "dia_id": "D20:1",
+        "text": "Lấy biến động 5G toàn quốc tháng 8.",
+        "fill_id": "CONV04_FILL_028"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D20:2",
+        "text": "",
+        "fill_id": "CONV04_FILL_028",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D20:3",
+        "text": "Lấy top 3 tỉnh về dòng vào 5G tháng 8.",
+        "fill_id": "CONV04_FILL_029"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D20:4",
+        "text": "",
+        "fill_id": "CONV04_FILL_029",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D20:5",
+        "text": "Xem tăng trưởng dòng ra FTTH ở Hà Nội lũy kế đến tháng 8.",
+        "fill_id": "CONV04_FILL_030"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D20:6",
+        "text": "",
+        "fill_id": "CONV04_FILL_030",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_21_date_time": "2026-12-24T09:45:00+07:00",
+    "session_21_goal": "Giữ nguyên semantic cuối kỳ",
+    "session_21": [
+      {
+        "role": "user",
+        "dia_id": "D21:1",
+        "text": "Cuối kỳ cứ giữ nguyên các mapping 5G và FTTH hiện tại, không đổi thêm quy ước nào nữa."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D21:2",
+        "text": "Rõ, mình sẽ bám đúng các nhãn nghiệp vụ đã thống nhất.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_22_date_time": "2026-12-30T15:00:00+07:00",
+    "session_22_goal": "Dùng semantic cuối kỳ",
+    "session_22": [
+      {
+        "role": "user",
+        "dia_id": "D22:1",
+        "text": "So 5G chính của Phú Thọ với Đà Nẵng ngày 06/09/2026.",
+        "fill_id": "CONV04_FILL_031"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D22:2",
+        "text": "",
+        "fill_id": "CONV04_FILL_031",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D22:3",
+        "text": "Lấy 3 tỉnh top tốt cho dòng ra FTTH tháng 8.",
+        "fill_id": "CONV04_FILL_032"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D22:4",
+        "text": "",
+        "fill_id": "CONV04_FILL_032",
+        "needs_kira_fill": true
+      }
+    ]
+  }
+}

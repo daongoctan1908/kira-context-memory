@@ -7,10 +7,13 @@ thuộc trực tiếp vào FastAPI, HTTPX, PostgreSQL SDK hoặc vLLM.
 ## Trạng thái
 
 **Week 5:** T5.1 đã lưu [plan và backlog](docs/week5-plan.md),
-[benchmark contract v1](docs/week5-benchmark-contract.md) và
+[benchmark contract v2](docs/week5-benchmark-contract.md) và
 [control manifest](docs/week5-baseline.json) tại baseline `75deb1d`.
 [T5.2](docs/week5-t5.2-preflight.md) đã có eval types và CLI preflight; ba OpenAI probes cùng
-PostgreSQL/pgvector live pass. T5.3–T5.20 chưa triển khai; chưa có semantic benchmark Week 5.
+PostgreSQL/pgvector live pass. T5.3–T5.4 đang triển khai: [dataset KiRa LTM v1](dataset/kira_ltm_v1/README.md)
+có bốn storyline, manifest/checksum, full-corpus scope, schema, typed loader và validator. Corpus
+vẫn ở trạng thái `contract_frozen`: 140 KiRa fill và 54 answer chưa materialize, gold chưa được
+reviewer ký revision và chưa chuyển thành bốn suite `EvalCase`; chưa có semantic benchmark Week 5.
 Để kiểm tra Gateway + Worker bằng OpenAI thật nhưng vẫn giữ dữ liệu/KiRa synthetic, dùng
 [Week 5 OpenAI runtime smoke](docs/week5-openai-runtime-smoke.md). Stack này thay ba provider mock
 bằng OpenAI và giữ database Week 5 tách biệt; kết quả smoke không được coi là benchmark chất lượng.

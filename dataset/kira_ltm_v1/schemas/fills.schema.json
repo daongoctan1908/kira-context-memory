@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kira.local/schemas/fills-v1.json",
+  "title": "KiRa fill contracts",
+  "type": "object",
+  "required": ["conversation_id", "instructions", "execution_contract", "fill_id_policy", "fills"],
+  "properties": {
+    "conversation_id": { "type": "string", "minLength": 1 },
+    "instructions": { "type": "string", "minLength": 1 },
+    "execution_contract": { "type": "object" },
+    "fill_id_policy": { "type": "object" },
+    "fills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "fill_id",
+          "session",
+          "user_turn_id",
+          "assistant_turn_id",
+          "surface_text",
+          "kira_fill_query",
+          "expected_intent",
+          "expected_api",
+          "session_datetime",
+          "fill_execution_query",
+          "fill_execution_mode",
+          "runner_contract"
+        ],
+        "properties": {
+          "fill_id": { "type": "string", "minLength": 1 },
+          "session": { "type": "integer", "minimum": 1 },
+          "user_turn_id": { "type": "string", "minLength": 1 },
+          "assistant_turn_id": { "type": "string", "minLength": 1 },
+          "surface_text": { "type": "string", "minLength": 1 },
+          "kira_fill_query": { "type": "string", "minLength": 1 },
+          "expected_intent": { "type": "string", "minLength": 1 },
+          "expected_api": { "type": "object" },
+          "session_datetime": { "type": "string", "format": "date-time" },
+          "fill_execution_query": { "type": "string", "minLength": 1 },
+          "fill_execution_mode": { "type": "string", "minLength": 1 },
+          "runner_contract": {
+            "type": "object",
+            "required": ["send_field", "do_not_send_field"],
+            "properties": {
+              "send_field": { "enum": ["kira_fill_query", "fill_execution_query"] },
+              "do_not_send_field": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,410 @@
+{
+  "conversation_id": "conv_03_FREEZE_v5_FINAL",
+  "do_not_ingest": true,
+  "artifact_semantics": "Gold memory EVENTS, not a closed-world list of final Mem0 rows.",
+  "formation_negative_event_ids": [
+    "M07",
+    "M11",
+    "M15"
+  ],
+  "active_memory_event_ids_at_end": [
+    "M03",
+    "M04",
+    "M05",
+    "M06",
+    "M09",
+    "M10",
+    "M12",
+    "M13",
+    "M14"
+  ],
+  "expected_active_memory_row_source_event_ids": [
+    "M03",
+    "M04",
+    "M05",
+    "M06",
+    "M09",
+    "M10"
+  ],
+  "expected_active_memory_row_count": 6,
+  "expected_active_memory_row_count_semantics": {
+    "value": 6,
+    "role": "reference_only",
+    "hard_exact_gate": false,
+    "reason": "Open-world semantic formation allows valid extra memories and equivalent merges."
+  },
+  "event_vs_row_contract": {
+    "memory_event": "Annotation of add/update/reinforce/do_not_persist behavior.",
+    "active_memory_row": "Distinct durable semantic memory expected in the final active state.",
+    "reinforce_existing_event": "May confirm one or multiple existing rows without creating a separate row."
+  },
+  "formation_precision_contract": {
+    "world_assumption": "open_world_semantic",
+    "gold_events_exhaustive_for_required_events": false,
+    "extra_valid_memory_policy": "Semantically valid unannotated memories are not automatically false positives.",
+    "precision_penalty_rule": "Penalize contradicted, malformed, or improperly persisted ephemeral memories."
+  },
+  "memory_gold": [
+    {
+      "memory_id": "M01",
+      "key": "comparison.province_pair_default",
+      "canonical_fact": "Ban đầu, khi user nói “cặp tỉnh chuẩn”, mặc định so Phú Thọ với Đà Nẵng.",
+      "source_turn_ids": [
+        "D1:1"
+      ],
+      "primary_source_turn_ids": [
+        "D1:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": false,
+      "supersedes_memory_id": null,
+      "memory_family": "comparator_convention",
+      "memory_type": "preference",
+      "inactive_reason": "superseded_by_M10",
+      "qa_reference_status": "used_by_qa",
+      "durability_semantics": "durable_until_explicitly_cancelled",
+      "durability_note": "D1:1 says 'Từ giờ' and explicitly says the user will announce cancellation."
+    },
+    {
+      "memory_id": "M02",
+      "key": "metric.core_bundle",
+      "canonical_fact": "Ban đầu, “bộ lõi” gồm hai chỉ tiêu theo thứ tự: Doanh thu dịch vụ (VTT+VTS+VDS), rồi Doanh thu IOT.",
+      "source_turn_ids": [
+        "D1:3"
+      ],
+      "primary_source_turn_ids": [
+        "D1:3"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": false,
+      "supersedes_memory_id": null,
+      "memory_family": "metric_bundle",
+      "memory_type": "user_convention",
+      "inactive_reason": "superseded_by_M09",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M03",
+      "key": "ranking.bottom_province_default",
+      "canonical_fact": "Khi user nói “nhóm cuối” mà không ghi số lượng, mặc định lấy 3 tỉnh đứng cuối.",
+      "source_turn_ids": [
+        "D2:1"
+      ],
+      "primary_source_turn_ids": [
+        "D2:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "ranking_convention",
+      "memory_type": "preference",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M04",
+      "key": "response.comparison_style",
+      "canonical_fact": "Khi trả lời so sánh, ưu tiên nêu bên nào cao hơn và số của hai bên; không giải thích dài nếu user không hỏi.",
+      "source_turn_ids": [
+        "D3:1"
+      ],
+      "primary_source_turn_ids": [
+        "D3:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "response_style",
+      "memory_type": "preference",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M05",
+      "key": "comparison.cluster_pair_default",
+      "canonical_fact": "Khi user nói “cặp cụm”, mặc định so Cụm Núi Thành (Đà Nẵng) với Cụm Vũng Tàu (Hồ Chí Minh).",
+      "source_turn_ids": [
+        "D4:1"
+      ],
+      "primary_source_turn_ids": [
+        "D4:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "comparator_convention",
+      "memory_type": "preference",
+      "qa_reference_status": "used_by_qa",
+      "provenance_note": "Province qualifiers are explicitly stated in D4:1; no hidden entity enrichment is needed for this memory fact."
+    },
+    {
+      "memory_id": "M06",
+      "key": "ranking.commune_detail_default",
+      "canonical_fact": "Khi user nói “bảng xã chi tiết”, mặc định lấy top 10 xã trong Cụm Núi Thành, Đà Nẵng.",
+      "source_turn_ids": [
+        "D5:1"
+      ],
+      "primary_source_turn_ids": [
+        "D5:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "ranking_convention",
+      "memory_type": "user_convention",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M07",
+      "key": "temporary.workshop_commune_pair",
+      "canonical_fact": "Cặp Xã Đông Thành (Phú Thọ) – Xã Minh Sơn (Thanh Hóa) chỉ dùng cho workshop hôm đó và không trở thành cặp so sánh mặc định.",
+      "source_turn_ids": [
+        "D6:1"
+      ],
+      "primary_source_turn_ids": [
+        "D6:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": false,
+      "expected_operation": "do_not_persist",
+      "active_at_end": false,
+      "supersedes_memory_id": null,
+      "memory_family": "temporary_task",
+      "memory_type": "ephemeral",
+      "diagnostic_retrieval_scope": "transcript_oracle_only",
+      "history_versioning_expectation": "not_guaranteed",
+      "inactive_reason": "ephemeral_task_context",
+      "qa_reference_status": "used_by_qa",
+      "provenance_note": "Province qualifiers are explicitly stated in D6:1; the diagnostic business-action rewrite does not rely on hidden LTM entity enrichment."
+    },
+    {
+      "memory_id": "M08",
+      "key": "metric.core_bundle",
+      "canonical_fact": "Trước khi được mở rộng, bộ lõi vẫn chỉ gồm Doanh thu dịch vụ và IOT, chưa có chỉ tiêu thuê bao.",
+      "source_turn_ids": [
+        "D7:1"
+      ],
+      "primary_source_turn_ids": [
+        "D7:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "reinforce_existing",
+      "active_at_end": false,
+      "supersedes_memory_id": null,
+      "memory_family": "metric_bundle",
+      "memory_type": "reinforcement",
+      "should_create_new_memory": false,
+      "reinforces_memory_id": "M02",
+      "inactive_reason": "reinforced fact was later superseded by M09",
+      "qa_reference_status": "formation_only"
+    },
+    {
+      "memory_id": "M09",
+      "key": "metric.core_bundle",
+      "canonical_fact": "Hiện tại, bộ lõi gồm ba chỉ tiêu theo thứ tự: Doanh thu dịch vụ (VTT+VTS+VDS), Doanh thu IOT, FTTH phát triển thực lũy kế.",
+      "source_turn_ids": [
+        "D8:1"
+      ],
+      "primary_source_turn_ids": [
+        "D8:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "update",
+      "active_at_end": true,
+      "supersedes_memory_id": "M02",
+      "memory_family": "metric_bundle",
+      "memory_type": "preference_update",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M10",
+      "key": "comparison.province_pair_default",
+      "canonical_fact": "Hiện tại không có cặp tỉnh mặc định; nếu user yêu cầu so tỉnh mà không nêu đủ hai tỉnh thì phải hỏi lại.",
+      "source_turn_ids": [
+        "D11:1"
+      ],
+      "primary_source_turn_ids": [
+        "D11:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "update",
+      "active_at_end": true,
+      "supersedes_memory_id": "M01",
+      "memory_family": "comparator_convention",
+      "memory_type": "preference_cancellation",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M11",
+      "key": "temporary.bundle_tv_substitution",
+      "canonical_fact": "Chỉ trong buổi review đó, truyền hình tạm thay FTTH trong bộ lõi; thay đổi này không được persist.",
+      "source_turn_ids": [
+        "D14:1"
+      ],
+      "primary_source_turn_ids": [
+        "D14:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": false,
+      "expected_operation": "do_not_persist",
+      "active_at_end": false,
+      "supersedes_memory_id": null,
+      "memory_family": "temporary_task",
+      "memory_type": "ephemeral",
+      "diagnostic_retrieval_scope": "transcript_oracle_only",
+      "history_versioning_expectation": "not_guaranteed",
+      "inactive_reason": "ephemeral_task_context",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M12",
+      "key": "comparison.province_pair_default",
+      "canonical_fact": "Không có cặp tỉnh mặc định; thiếu tên hai tỉnh thì phải hỏi lại.",
+      "source_turn_ids": [
+        "D19:1"
+      ],
+      "primary_source_turn_ids": [
+        "D19:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "reinforce_existing",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "comparator_convention",
+      "memory_type": "reinforcement",
+      "should_create_new_memory": false,
+      "reinforces_memory_id": "M10",
+      "qa_reference_status": "formation_only"
+    },
+    {
+      "memory_id": "M13",
+      "key": "metric.core_bundle",
+      "canonical_fact": "Sau ngoại lệ tạm, bộ lõi vẫn là Doanh thu dịch vụ, IOT và FTTH theo thứ tự đã chốt.",
+      "source_turn_ids": [
+        "D15:1"
+      ],
+      "primary_source_turn_ids": [
+        "D15:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "reinforce_existing",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "metric_bundle",
+      "memory_type": "reinforcement",
+      "should_create_new_memory": false,
+      "reinforces_memory_id": "M09",
+      "qa_reference_status": "formation_only"
+    },
+    {
+      "memory_id": "M14",
+      "key": "analysis.current_conventions_summary",
+      "canonical_fact": "Quy ước hiện tại xác nhận: bộ lõi gồm Doanh thu dịch vụ, IOT, FTTH; nhóm cuối là 3 tỉnh đứng cuối; cặp cụm là Núi Thành–Vũng Tàu; bảng xã chi tiết là top 10 xã ở Núi Thành; so tỉnh không có cặp mặc định.",
+      "source_turn_ids": [
+        "D21:1"
+      ],
+      "primary_source_turn_ids": [
+        "D21:1"
+      ],
+      "supporting_turn_ids": [
+        "D21:3"
+      ],
+      "should_store": true,
+      "expected_operation": "reinforce_existing",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "summary_confirmation",
+      "memory_type": "multi_memory_confirmation",
+      "should_create_new_memory": false,
+      "reinforces_memory_ids": [
+        "M03",
+        "M05",
+        "M06",
+        "M09",
+        "M10"
+      ],
+      "reinforcement_scope": "multi_memory_summary_confirmation",
+      "qa_reference_status": "formation_only"
+    },
+    {
+      "memory_id": "M15",
+      "key": "temporary.slide_province_pair",
+      "canonical_fact": "Phú Thọ–Đà Nẵng chỉ được dùng cho slide hôm đó như một cặp explicit tạm thời.",
+      "source_turn_ids": [
+        "D12:1"
+      ],
+      "primary_source_turn_ids": [
+        "D12:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": false,
+      "expected_operation": "do_not_persist",
+      "active_at_end": false,
+      "supersedes_memory_id": null,
+      "memory_family": "temporary_task",
+      "memory_type": "ephemeral",
+      "diagnostic_retrieval_scope": "transcript_oracle_only",
+      "history_versioning_expectation": "not_guaranteed",
+      "inactive_reason": "one_slide_explicit_exception",
+      "qa_reference_status": "used_by_qa",
+      "provenance_note": "D12:1 also confirms that the cancelled province-pair default remains cancelled; that durable confirmation may validly reinforce M10 and is intentionally outside M15's negative-event scope."
+    }
+  ],
+  "qa_reference_summary": {
+    "used_memory_ids": [
+      "M01",
+      "M02",
+      "M03",
+      "M04",
+      "M05",
+      "M06",
+      "M07",
+      "M09",
+      "M10",
+      "M11",
+      "M15"
+    ],
+    "formation_only_memory_ids": [
+      "M08",
+      "M12",
+      "M13",
+      "M14"
+    ]
+  },
+  "chronology_contract": {
+    "authoritative_order": "source_turn_session_time",
+    "do_not_use": [
+      "memory_id_numeric_order",
+      "memory_gold_array_order"
+    ],
+    "rule": "Temporal order must come from source turn/session timestamps. Mxx IDs and array order are stable identifiers only, not chronology."
+  },
+  "negative_event_contract": {
+    "scope": "do_not_persist applies only to the ephemeral claim represented by the negative gold event, not to every semantic claim present in the same source turn.",
+    "same_turn_valid_reinforcement_policy": "A source turn may also reinforce an existing durable memory. A valid reinforcement must not cause the negative event to fail.",
+    "known_allowed_reinforcements": {
+      "M11": [
+        "M09"
+      ],
+      "M15": [
+        "M10"
+      ]
+    },
+    "scoring_rule": "Fail a negative event only when the ephemeral claim itself is persisted as durable state; do not fail because a durable fact from the same turn is correctly reinforced."
+  }
+}

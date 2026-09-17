@@ -1,0 +1,2165 @@
+{
+  "conversation_id": "conv_01_FREEZE_v10_FINAL",
+  "instructions": "For each fill, follow `runner_contract.send_field` exactly. Send the value from that field to KiRa; do not assume `kira_fill_query` is always the execution query.",
+  "fills": [
+    {
+      "fill_id": "CONV01V2_FILL_001",
+      "session": 1,
+      "session_goal": "Rà báo cáo tháng 8 của Thanh Sơn",
+      "user_turn_id": "D1:3",
+      "assistant_turn_id": "D1:4",
+      "surface_text": "Cho mình doanh thu tiêu dùng di động Thanh Sơn tháng 8.",
+      "kira_fill_query": "Doanh thu tiêu dùng di động của Cụm Thanh Sơn - Phú Thọ tháng 08/2026 là bao nhiêu?",
+      "source_indicator": "Doanh thu tiêu dùng di động",
+      "source_service_id": "33",
+      "source_testcase": "CT_20",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "33",
+        "prd_id": "20260831",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-09-10T08:35:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-09-10T08:35:00+07:00"
+      },
+      "fill_execution_query": "Doanh thu tiêu dùng di động của Cụm Thanh Sơn - Phú Thọ tháng 08/2026 là bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_002",
+      "session": 1,
+      "session_goal": "Rà báo cáo tháng 8 của Thanh Sơn",
+      "user_turn_id": "D1:5",
+      "assistant_turn_id": "D1:6",
+      "surface_text": "Lấy luôn thuê bao 4G thực lũy kế của Thanh Sơn tháng 8 giúp mình.",
+      "kira_fill_query": "Thuê bao Di động 4G thực Lũy kế của Cụm Thanh Sơn - Phú Thọ tháng 08/2026 là bao nhiêu?",
+      "source_indicator": "Thuê bao Di động 4G thực Lũy kế",
+      "source_service_id": "36",
+      "source_testcase": "CT_20",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "36",
+        "prd_id": "20260831",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-09-10T08:35:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-09-10T08:35:00+07:00"
+      },
+      "fill_execution_query": "Thuê bao Di động 4G thực Lũy kế của Cụm Thanh Sơn - Phú Thọ tháng 08/2026 là bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_003",
+      "session": 2,
+      "session_goal": "Rà mobile cuối ngày",
+      "user_turn_id": "D2:3",
+      "assistant_turn_id": "D2:4",
+      "surface_text": "Xem doanh thu tiêu dùng di động trừ VAS hợp tác của Thanh Sơn lũy kế đến hôm trước.",
+      "kira_fill_query": "Doanh thu tiêu dùng di động trừ VAS hợp tác của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày hôm trước là bao nhiêu?",
+      "source_indicator": "Doanh thu tiêu dùng di động trừ VAS hợp tác",
+      "source_service_id": "59",
+      "source_testcase": "CT_61",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "59",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-09-15T14:10:00+07:00",
+      "has_relative_time": true,
+      "temporal_fill_policy": {
+        "recommended_mode": "explicit_fixture_rewrite",
+        "reason": "Source testcase expected_api uses a fixed fixture date; raw relative wording would resolve differently at the synthetic session date.",
+        "do_not_send_raw_relative_query_as_if_session_date_matches_fixture": true,
+        "session_datetime": "2026-09-15T14:10:00+07:00",
+        "source_expected_prd_id": "20260907",
+        "action": "Use an explicit-date equivalent query matching the source testcase fixture, or re-run KiRa with a session-date-consistent expected_api and regenerate gold."
+      },
+      "fill_execution_query": "Doanh thu tiêu dùng di động trừ VAS hợp tác của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
+      "fill_execution_mode": "explicit_fixture_rewrite",
+      "runner_contract": {
+        "send_field": "fill_execution_query",
+        "do_not_send_field": "kira_fill_query",
+        "reason": "Raw relative wording would resolve against the synthetic session date, not the fixed KiRa source fixture."
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_004",
+      "session": 2,
+      "session_goal": "Rà mobile cuối ngày",
+      "user_turn_id": "D2:5",
+      "assistant_turn_id": "D2:6",
+      "surface_text": "Còn 4G thực lũy kế của Thanh Sơn đến hôm trước thì sao?",
+      "kira_fill_query": "Thuê bao Di động 4G thực Lũy kế của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày hôm trước là bao nhiêu?",
+      "source_indicator": "Thuê bao Di động 4G thực Lũy kế",
+      "source_service_id": "36",
+      "source_testcase": "CT_61",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "36",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-09-15T14:10:00+07:00",
+      "has_relative_time": true,
+      "temporal_fill_policy": {
+        "recommended_mode": "explicit_fixture_rewrite",
+        "reason": "Source testcase expected_api uses a fixed fixture date; raw relative wording would resolve differently at the synthetic session date.",
+        "do_not_send_raw_relative_query_as_if_session_date_matches_fixture": true,
+        "session_datetime": "2026-09-15T14:10:00+07:00",
+        "source_expected_prd_id": "20260907",
+        "action": "Use an explicit-date equivalent query matching the source testcase fixture, or re-run KiRa with a session-date-consistent expected_api and regenerate gold."
+      },
+      "fill_execution_query": "Thuê bao Di động 4G thực Lũy kế của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
+      "fill_execution_mode": "explicit_fixture_rewrite",
+      "runner_contract": {
+        "send_field": "fill_execution_query",
+        "do_not_send_field": "kira_fill_query",
+        "reason": "Raw relative wording would resolve against the synthetic session date, not the fixed KiRa source fixture."
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_005",
+      "session": 3,
+      "session_goal": "Bổ sung FTTH",
+      "user_turn_id": "D3:3",
+      "assistant_turn_id": "D3:4",
+      "surface_text": "Cho mình FTTH phát triển thực lũy kế của Thanh Sơn tháng 8.",
+      "kira_fill_query": "Thuê bao FTTH phát triển thực LK của Cụm Thanh Sơn - Phú Thọ tháng 08/2026 là bao nhiêu?",
+      "source_indicator": "Thuê bao FTTH phát triển thực LK",
+      "source_service_id": "38",
+      "source_testcase": "CT_20",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "38",
+        "prd_id": "20260831",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-09-21T10:20:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-09-21T10:20:00+07:00"
+      },
+      "fill_execution_query": "Thuê bao FTTH phát triển thực LK của Cụm Thanh Sơn - Phú Thọ tháng 08/2026 là bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_006",
+      "session": 4,
+      "session_goal": "SME, IOT và truyền hình",
+      "user_turn_id": "D4:3",
+      "assistant_turn_id": "D4:4",
+      "surface_text": "Lấy doanh thu SME Thanh Sơn tháng 8.",
+      "kira_fill_query": "Doanh thu dịch vụ SME của Cụm Thanh Sơn - Phú Thọ tháng 08/2026 là bao nhiêu?",
+      "source_indicator": "Doanh thu dịch vụ SME",
+      "source_service_id": "58",
+      "source_testcase": "CT_20",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "58",
+        "prd_id": "20260831",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-09-28T16:05:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-09-28T16:05:00+07:00"
+      },
+      "fill_execution_query": "Doanh thu dịch vụ SME của Cụm Thanh Sơn - Phú Thọ tháng 08/2026 là bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_007",
+      "session": 4,
+      "session_goal": "SME, IOT và truyền hình",
+      "user_turn_id": "D4:5",
+      "assistant_turn_id": "D4:6",
+      "surface_text": "Tiện lấy thêm doanh thu IOT cùng tháng.",
+      "kira_fill_query": "Doanh thu dịch vụ IOT của Cụm Thanh Sơn - Phú Thọ tháng 08/2026 là bao nhiêu?",
+      "source_indicator": "Doanh thu dịch vụ IOT",
+      "source_service_id": "14330",
+      "source_testcase": "CT_20",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "14330",
+        "prd_id": "20260831",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-09-28T16:05:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-09-28T16:05:00+07:00"
+      },
+      "fill_execution_query": "Doanh thu dịch vụ IOT của Cụm Thanh Sơn - Phú Thọ tháng 08/2026 là bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_008",
+      "session": 4,
+      "session_goal": "SME, IOT và truyền hình",
+      "user_turn_id": "D4:7",
+      "assistant_turn_id": "D4:8",
+      "surface_text": "Và thuê bao truyền hình phát triển thực lũy kế của Thanh Sơn tháng 8.",
+      "kira_fill_query": "Thuê bao truyền hình phát triển thực LK của Cụm Thanh Sơn - Phú Thọ tháng 08/2026 là bao nhiêu?",
+      "source_indicator": "Thuê bao truyền hình phát triển thực LK",
+      "source_service_id": "777",
+      "source_testcase": "CT_20",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "777",
+        "prd_id": "20260831",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-09-28T16:05:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-09-28T16:05:00+07:00"
+      },
+      "fill_execution_query": "Thuê bao truyền hình phát triển thực LK của Cụm Thanh Sơn - Phú Thọ tháng 08/2026 là bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_009",
+      "session": 5,
+      "session_goal": "Đặt Thanh Sơn vào bối cảnh tỉnh",
+      "user_turn_id": "D5:3",
+      "assistant_turn_id": "D5:4",
+      "surface_text": "So doanh thu tiêu dùng di động Phú Thọ với Đà Nẵng giúp mình.",
+      "kira_fill_query": "So sánh Doanh thu tiêu dùng di động của tỉnh Phú Thọ và tỉnh Đà Nẵng ngày 06/09/2026.",
+      "source_indicator": "Doanh thu tiêu dùng di động",
+      "source_service_id": "33",
+      "source_testcase": "CT_64",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "33",
+        "province_code": "DNG,PTO",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "day",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-10-05T09:40:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "fixture_date_replay",
+        "session_datetime": "2026-10-05T09:40:00+07:00"
+      },
+      "fill_execution_query": "So sánh Doanh thu tiêu dùng di động của tỉnh Phú Thọ và tỉnh Đà Nẵng ngày 06/09/2026.",
+      "fill_execution_mode": "fixture_date_replay",
+      "runner_contract": {
+        "send_field": "fill_execution_query",
+        "do_not_send_field": null,
+        "reason": "This fill deliberately replays a source testcase with an explicit fixture date not present in the natural surface turn."
+      },
+      "fixture_expected_api": {
+        "service_id": "33",
+        "prd_id": "20260906",
+        "province_code": "DNG,PTO",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "day",
+        "limit": "",
+        "condition": []
+      },
+      "semantic_time_scope": {
+        "type": "unspecified_in_conversation",
+        "date": null
+      },
+      "fixture_date_contract": {
+        "fixture_date": "2026-09-06",
+        "fixture_prd_id": "20260906",
+        "date_is_not_inferred_from_conversation": true,
+        "semantic_scoring_ignore_fields": [
+          "prd_id"
+        ],
+        "replay_query": "So sánh Doanh thu tiêu dùng di động của tỉnh Phú Thọ và tỉnh Đà Nẵng ngày 06/09/2026."
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_010",
+      "session": 5,
+      "session_goal": "Đặt Thanh Sơn vào bối cảnh tỉnh",
+      "user_turn_id": "D5:5",
+      "assistant_turn_id": "D5:6",
+      "surface_text": "So luôn thuê bao 4G thực lũy kế của hai tỉnh đó.",
+      "kira_fill_query": "So sánh Thuê bao Di động 4G thực Lũy kế của tỉnh Phú Thọ và tỉnh Đà Nẵng ngày 06/09/2026.",
+      "source_indicator": "Thuê bao Di động 4G thực Lũy kế",
+      "source_service_id": "36",
+      "source_testcase": "CT_64",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "36",
+        "province_code": "DNG,PTO",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-10-05T09:40:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "fixture_date_replay",
+        "session_datetime": "2026-10-05T09:40:00+07:00"
+      },
+      "fill_execution_query": "So sánh Thuê bao Di động 4G thực Lũy kế của tỉnh Phú Thọ và tỉnh Đà Nẵng ngày 06/09/2026.",
+      "fill_execution_mode": "fixture_date_replay",
+      "runner_contract": {
+        "send_field": "fill_execution_query",
+        "do_not_send_field": null,
+        "reason": "This fill deliberately replays a source testcase with an explicit fixture date not present in the natural surface turn."
+      },
+      "fixture_expected_api": {
+        "service_id": "36",
+        "prd_id": "20260906",
+        "province_code": "DNG,PTO",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "semantic_time_scope": {
+        "type": "unspecified_in_conversation",
+        "date": null
+      },
+      "fixture_date_contract": {
+        "fixture_date": "2026-09-06",
+        "fixture_prd_id": "20260906",
+        "date_is_not_inferred_from_conversation": true,
+        "semantic_scoring_ignore_fields": [
+          "prd_id"
+        ],
+        "replay_query": "So sánh Thuê bao Di động 4G thực Lũy kế của tỉnh Phú Thọ và tỉnh Đà Nẵng ngày 06/09/2026."
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_011",
+      "session": 6,
+      "session_goal": "Bảng xếp hạng nhanh",
+      "user_turn_id": "D6:3",
+      "assistant_turn_id": "D6:4",
+      "surface_text": "Cho top 3 tỉnh về doanh thu tiêu dùng di động tháng 8.",
+      "kira_fill_query": "Top 3 tỉnh xếp hạng đầu về Doanh thu tiêu dùng di động tháng 08/2026.",
+      "source_indicator": "Doanh thu tiêu dùng di động",
+      "source_service_id": "33",
+      "source_testcase": "CT_67",
+      "expected_intent": "xep_hang_chi_tieu",
+      "expected_api": {
+        "service_id": "33",
+        "prd_id": "20260831",
+        "province_code": "",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "month",
+        "limit": "3",
+        "order_by": "thuc_hien",
+        "order_type": "DESC",
+        "condition": []
+      },
+      "session_datetime": "2026-10-10T17:25:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-10-10T17:25:00+07:00"
+      },
+      "fill_execution_query": "Top 3 tỉnh xếp hạng đầu về Doanh thu tiêu dùng di động tháng 08/2026.",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_012",
+      "session": 7,
+      "session_goal": "Bắt đầu soi Thượng Long",
+      "user_turn_id": "D7:3",
+      "assistant_turn_id": "D7:4",
+      "surface_text": "Xem doanh thu tiêu dùng di động của Thượng Long năm 2026.",
+      "kira_fill_query": "Năm 2026, Doanh thu tiêu dùng di động của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "source_indicator": "Doanh thu tiêu dùng di động",
+      "source_service_id": "33",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "33",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-10-15T08:50:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-10-15T08:50:00+07:00"
+      },
+      "fixture_expected_api": {
+        "service_id": "33",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ]
+      },
+      "fill_execution_contract": {
+        "class": "ct28_hidden_fixture_date",
+        "source_fixture_as_of_date": "2026-09-08",
+        "source_fixture_prd_id": "20260907",
+        "warning": "The natural query 'Năm 2026' does not determine the source fixture cutoff.",
+        "allowed_uses": [
+          "Use expected_api semantic fields to evaluate LTM/rewrite/parameter grounding.",
+          "Use fixture_expected_api only when deliberately replaying the original KiRa CT_28 fixture."
+        ],
+        "do_not_claim": "Do not claim that prd_id=20260907 was inferred from the conversation or memory."
+      },
+      "fill_execution_query": "Năm 2026, Doanh thu tiêu dùng di động của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_013",
+      "session": 7,
+      "session_goal": "Bắt đầu soi Thượng Long",
+      "user_turn_id": "D7:5",
+      "assistant_turn_id": "D7:6",
+      "surface_text": "Lấy thêm FTTH phát triển thực lũy kế của Thượng Long năm 2026.",
+      "kira_fill_query": "Năm 2026, Thuê bao FTTH phát triển thực LK của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "source_indicator": "Thuê bao FTTH phát triển thực LK",
+      "source_service_id": "38",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "38",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-10-15T08:50:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-10-15T08:50:00+07:00"
+      },
+      "fixture_expected_api": {
+        "service_id": "38",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ]
+      },
+      "fill_execution_contract": {
+        "class": "ct28_hidden_fixture_date",
+        "source_fixture_as_of_date": "2026-09-08",
+        "source_fixture_prd_id": "20260907",
+        "warning": "The natural query 'Năm 2026' does not determine the source fixture cutoff.",
+        "allowed_uses": [
+          "Use expected_api semantic fields to evaluate LTM/rewrite/parameter grounding.",
+          "Use fixture_expected_api only when deliberately replaying the original KiRa CT_28 fixture."
+        ],
+        "do_not_claim": "Do not claim that prd_id=20260907 was inferred from the conversation or memory."
+      },
+      "fill_execution_query": "Năm 2026, Thuê bao FTTH phát triển thực LK của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_014",
+      "session": 8,
+      "session_goal": "Bổ sung 5G",
+      "user_turn_id": "D8:3",
+      "assistant_turn_id": "D8:4",
+      "surface_text": "Cho mình 5G thực lũy kế của Thanh Sơn tháng 8.",
+      "kira_fill_query": "TB Di động 5G thực Lũy kế của Cụm Thanh Sơn - Phú Thọ tháng 08/2026 là bao nhiêu?",
+      "source_indicator": "TB Di động 5G thực Lũy kế",
+      "source_service_id": "413",
+      "source_testcase": "CT_20",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "413",
+        "prd_id": "20260831",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-10-20T13:30:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-10-20T13:30:00+07:00"
+      },
+      "fill_execution_query": "TB Di động 5G thực Lũy kế của Cụm Thanh Sơn - Phú Thọ tháng 08/2026 là bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_015",
+      "session": 9,
+      "session_goal": "Theo dõi bản doanh thu trừ VAS",
+      "user_turn_id": "D9:3",
+      "assistant_turn_id": "D9:4",
+      "surface_text": "Lấy doanh thu tiêu dùng di động trừ VAS hợp tác của Thanh Sơn tháng 8.",
+      "kira_fill_query": "Doanh thu tiêu dùng di động trừ VAS hợp tác của Cụm Thanh Sơn - Phú Thọ tháng 08/2026 là bao nhiêu?",
+      "source_indicator": "Doanh thu tiêu dùng di động trừ VAS hợp tác",
+      "source_service_id": "59",
+      "source_testcase": "CT_20",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "59",
+        "prd_id": "20260831",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-10-26T11:05:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-10-26T11:05:00+07:00"
+      },
+      "fill_execution_query": "Doanh thu tiêu dùng di động trừ VAS hợp tác của Cụm Thanh Sơn - Phú Thọ tháng 08/2026 là bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_016",
+      "session": 10,
+      "session_goal": "Hỗ trợ Chí Tiên",
+      "user_turn_id": "D10:3",
+      "assistant_turn_id": "D10:4",
+      "surface_text": "Lấy doanh thu SME của Chí Tiên lũy kế đến hôm trước.",
+      "kira_fill_query": "Doanh thu dịch vụ SME của Xã Chí Tiên (Phú Thọ) lũy kế đến ngày hôm trước là bao nhiêu?",
+      "source_indicator": "Doanh thu dịch vụ SME",
+      "source_service_id": "58",
+      "source_testcase": "CT_63",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "58",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001244100_DVTM",
+        "precinct_code": "PTO022",
+        "dept_level": "4",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-11-01T15:45:00+07:00",
+      "has_relative_time": true,
+      "temporal_fill_policy": {
+        "recommended_mode": "explicit_fixture_rewrite",
+        "reason": "Source testcase expected_api uses a fixed fixture date; raw relative wording would resolve differently at the synthetic session date.",
+        "do_not_send_raw_relative_query_as_if_session_date_matches_fixture": true,
+        "session_datetime": "2026-11-01T15:45:00+07:00",
+        "source_expected_prd_id": "20260907",
+        "action": "Use an explicit-date equivalent query matching the source testcase fixture, or re-run KiRa with a session-date-consistent expected_api and regenerate gold."
+      },
+      "fill_execution_query": "Doanh thu dịch vụ SME của Xã Chí Tiên (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
+      "fill_execution_mode": "explicit_fixture_rewrite",
+      "runner_contract": {
+        "send_field": "fill_execution_query",
+        "do_not_send_field": "kira_fill_query",
+        "reason": "Raw relative wording would resolve against the synthetic session date, not the fixed KiRa source fixture."
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_017",
+      "session": 10,
+      "session_goal": "Hỗ trợ Chí Tiên",
+      "user_turn_id": "D10:5",
+      "assistant_turn_id": "D10:6",
+      "surface_text": "Lấy thêm FTTH phát triển thực lũy kế của Chí Tiên cùng mốc.",
+      "kira_fill_query": "Thuê bao FTTH phát triển thực LK của Xã Chí Tiên (Phú Thọ) lũy kế đến ngày hôm trước là bao nhiêu?",
+      "source_indicator": "Thuê bao FTTH phát triển thực LK",
+      "source_service_id": "38",
+      "source_testcase": "CT_63",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "38",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001244100_DVTM",
+        "precinct_code": "PTO022",
+        "dept_level": "4",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-11-01T15:45:00+07:00",
+      "has_relative_time": true,
+      "temporal_fill_policy": {
+        "recommended_mode": "explicit_fixture_rewrite",
+        "reason": "Source testcase expected_api uses a fixed fixture date; raw relative wording would resolve differently at the synthetic session date.",
+        "do_not_send_raw_relative_query_as_if_session_date_matches_fixture": true,
+        "session_datetime": "2026-11-01T15:45:00+07:00",
+        "source_expected_prd_id": "20260907",
+        "action": "Use an explicit-date equivalent query matching the source testcase fixture, or re-run KiRa with a session-date-consistent expected_api and regenerate gold."
+      },
+      "fill_execution_query": "Thuê bao FTTH phát triển thực LK của Xã Chí Tiên (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
+      "fill_execution_mode": "explicit_fixture_rewrite",
+      "runner_contract": {
+        "send_field": "fill_execution_query",
+        "do_not_send_field": "kira_fill_query",
+        "reason": "Raw relative wording would resolve against the synthetic session date, not the fixed KiRa source fixture."
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_018",
+      "session": 11,
+      "session_goal": "Chốt báo cáo tháng",
+      "user_turn_id": "D11:3",
+      "assistant_turn_id": "D11:4",
+      "surface_text": "Cho mình doanh thu tiêu dùng di động của Thanh Sơn lũy kế đến hôm trước.",
+      "kira_fill_query": "Doanh thu tiêu dùng di động của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày hôm trước là bao nhiêu?",
+      "source_indicator": "Doanh thu tiêu dùng di động",
+      "source_service_id": "33",
+      "source_testcase": "CT_61",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "33",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-11-06T08:15:00+07:00",
+      "has_relative_time": true,
+      "temporal_fill_policy": {
+        "recommended_mode": "explicit_fixture_rewrite",
+        "reason": "Source testcase expected_api uses a fixed fixture date; raw relative wording would resolve differently at the synthetic session date.",
+        "do_not_send_raw_relative_query_as_if_session_date_matches_fixture": true,
+        "session_datetime": "2026-11-06T08:15:00+07:00",
+        "source_expected_prd_id": "20260907",
+        "action": "Use an explicit-date equivalent query matching the source testcase fixture, or re-run KiRa with a session-date-consistent expected_api and regenerate gold."
+      },
+      "fill_execution_query": "Doanh thu tiêu dùng di động của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
+      "fill_execution_mode": "explicit_fixture_rewrite",
+      "runner_contract": {
+        "send_field": "fill_execution_query",
+        "do_not_send_field": "kira_fill_query",
+        "reason": "Raw relative wording would resolve against the synthetic session date, not the fixed KiRa source fixture."
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_019",
+      "session": 11,
+      "session_goal": "Chốt báo cáo tháng",
+      "user_turn_id": "D11:5",
+      "assistant_turn_id": "D11:6",
+      "surface_text": "Lấy thêm bản trừ VAS để đặt cạnh.",
+      "kira_fill_query": "Doanh thu tiêu dùng di động trừ VAS hợp tác của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày hôm trước là bao nhiêu?",
+      "source_indicator": "Doanh thu tiêu dùng di động trừ VAS hợp tác",
+      "source_service_id": "59",
+      "source_testcase": "CT_61",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "59",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-11-06T08:15:00+07:00",
+      "has_relative_time": true,
+      "temporal_fill_policy": {
+        "recommended_mode": "explicit_fixture_rewrite",
+        "reason": "Source testcase expected_api uses a fixed fixture date; raw relative wording would resolve differently at the synthetic session date.",
+        "do_not_send_raw_relative_query_as_if_session_date_matches_fixture": true,
+        "session_datetime": "2026-11-06T08:15:00+07:00",
+        "source_expected_prd_id": "20260907",
+        "action": "Use an explicit-date equivalent query matching the source testcase fixture, or re-run KiRa with a session-date-consistent expected_api and regenerate gold."
+      },
+      "fill_execution_query": "Doanh thu tiêu dùng di động trừ VAS hợp tác của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
+      "fill_execution_mode": "explicit_fixture_rewrite",
+      "runner_contract": {
+        "send_field": "fill_execution_query",
+        "do_not_send_field": "kira_fill_query",
+        "reason": "Raw relative wording would resolve against the synthetic session date, not the fixed KiRa source fixture."
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_020",
+      "session": 11,
+      "session_goal": "Chốt báo cáo tháng",
+      "user_turn_id": "D11:7",
+      "assistant_turn_id": "D11:8",
+      "surface_text": "Và 4G thực lũy kế của Thanh Sơn.",
+      "kira_fill_query": "Thuê bao Di động 4G thực Lũy kế của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày hôm trước là bao nhiêu?",
+      "source_indicator": "Thuê bao Di động 4G thực Lũy kế",
+      "source_service_id": "36",
+      "source_testcase": "CT_61",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "36",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-11-06T08:15:00+07:00",
+      "has_relative_time": true,
+      "temporal_fill_policy": {
+        "recommended_mode": "explicit_fixture_rewrite",
+        "reason": "Source testcase expected_api uses a fixed fixture date; raw relative wording would resolve differently at the synthetic session date.",
+        "do_not_send_raw_relative_query_as_if_session_date_matches_fixture": true,
+        "session_datetime": "2026-11-06T08:15:00+07:00",
+        "source_expected_prd_id": "20260907",
+        "action": "Use an explicit-date equivalent query matching the source testcase fixture, or re-run KiRa with a session-date-consistent expected_api and regenerate gold."
+      },
+      "fill_execution_query": "Thuê bao Di động 4G thực Lũy kế của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
+      "fill_execution_mode": "explicit_fixture_rewrite",
+      "runner_contract": {
+        "send_field": "fill_execution_query",
+        "do_not_send_field": "kira_fill_query",
+        "reason": "Raw relative wording would resolve against the synthetic session date, not the fixed KiRa source fixture."
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_021",
+      "session": 12,
+      "session_goal": "Xem tăng trưởng ngắn hạn",
+      "user_turn_id": "D12:3",
+      "assistant_turn_id": "D12:4",
+      "surface_text": "Xem tăng trưởng doanh thu trừ VAS của Thanh Sơn so cùng kỳ tháng.",
+      "kira_fill_query": "Cụm Thanh Sơn trong tỉnh Phú Thọ lũy kế đến ngày hôm trước so với cùng kỳ tháng, tăng trưởng Doanh thu tiêu dùng di động trừ VAS hợp tác là bao nhiêu?",
+      "source_indicator": "Doanh thu tiêu dùng di động trừ VAS hợp tác",
+      "source_service_id": "59",
+      "source_testcase": "CT_79",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "59",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-11-11T16:20:00+07:00",
+      "has_relative_time": true,
+      "temporal_fill_policy": {
+        "recommended_mode": "explicit_fixture_rewrite",
+        "reason": "Source testcase expected_api uses a fixed fixture date; raw relative wording would resolve differently at the synthetic session date.",
+        "do_not_send_raw_relative_query_as_if_session_date_matches_fixture": true,
+        "session_datetime": "2026-11-11T16:20:00+07:00",
+        "source_expected_prd_id": "20260907",
+        "action": "Use an explicit-date equivalent query matching the source testcase fixture, or re-run KiRa with a session-date-consistent expected_api and regenerate gold."
+      },
+      "fill_execution_query": "Cụm Thanh Sơn trong tỉnh Phú Thọ lũy kế đến ngày 07/09/2026 so với cùng kỳ tháng, tăng trưởng Doanh thu tiêu dùng di động trừ VAS hợp tác là bao nhiêu?",
+      "fill_execution_mode": "explicit_fixture_rewrite",
+      "runner_contract": {
+        "send_field": "fill_execution_query",
+        "do_not_send_field": "kira_fill_query",
+        "reason": "Raw relative wording would resolve against the synthetic session date, not the fixed KiRa source fixture."
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_022",
+      "session": 12,
+      "session_goal": "Xem tăng trưởng ngắn hạn",
+      "user_turn_id": "D12:5",
+      "assistant_turn_id": "D12:6",
+      "surface_text": "Còn tăng trưởng 4G thực lũy kế của Thanh Sơn theo cùng kỳ tháng?",
+      "kira_fill_query": "Cụm Thanh Sơn trong tỉnh Phú Thọ lũy kế đến ngày hôm trước so với cùng kỳ tháng, tăng trưởng Thuê bao Di động 4G thực Lũy kế là bao nhiêu?",
+      "source_indicator": "Thuê bao Di động 4G thực Lũy kế",
+      "source_service_id": "36",
+      "source_testcase": "CT_79",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "36",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-11-11T16:20:00+07:00",
+      "has_relative_time": true,
+      "temporal_fill_policy": {
+        "recommended_mode": "explicit_fixture_rewrite",
+        "reason": "Source testcase expected_api uses a fixed fixture date; raw relative wording would resolve differently at the synthetic session date.",
+        "do_not_send_raw_relative_query_as_if_session_date_matches_fixture": true,
+        "session_datetime": "2026-11-11T16:20:00+07:00",
+        "source_expected_prd_id": "20260907",
+        "action": "Use an explicit-date equivalent query matching the source testcase fixture, or re-run KiRa with a session-date-consistent expected_api and regenerate gold."
+      },
+      "fill_execution_query": "Cụm Thanh Sơn trong tỉnh Phú Thọ lũy kế đến ngày 07/09/2026 so với cùng kỳ tháng, tăng trưởng Thuê bao Di động 4G thực Lũy kế là bao nhiêu?",
+      "fill_execution_mode": "explicit_fixture_rewrite",
+      "runner_contract": {
+        "send_field": "fill_execution_query",
+        "do_not_send_field": "kira_fill_query",
+        "reason": "Raw relative wording would resolve against the synthetic session date, not the fixed KiRa source fixture."
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_023",
+      "session": 13,
+      "session_goal": "Theo dõi thêm Thượng Long",
+      "user_turn_id": "D13:3",
+      "assistant_turn_id": "D13:4",
+      "surface_text": "Cho mình bản doanh thu trừ VAS của Thượng Long năm 2026.",
+      "kira_fill_query": "Năm 2026, Doanh thu tiêu dùng di động trừ VAS hợp tác của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "source_indicator": "Doanh thu tiêu dùng di động trừ VAS hợp tác",
+      "source_service_id": "59",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "59",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-11-16T09:25:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-11-16T09:25:00+07:00"
+      },
+      "fixture_expected_api": {
+        "service_id": "59",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ]
+      },
+      "fill_execution_contract": {
+        "class": "ct28_hidden_fixture_date",
+        "source_fixture_as_of_date": "2026-09-08",
+        "source_fixture_prd_id": "20260907",
+        "warning": "The natural query 'Năm 2026' does not determine the source fixture cutoff.",
+        "allowed_uses": [
+          "Use expected_api semantic fields to evaluate LTM/rewrite/parameter grounding.",
+          "Use fixture_expected_api only when deliberately replaying the original KiRa CT_28 fixture."
+        ],
+        "do_not_claim": "Do not claim that prd_id=20260907 was inferred from the conversation or memory."
+      },
+      "fill_execution_query": "Năm 2026, Doanh thu tiêu dùng di động trừ VAS hợp tác của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_024",
+      "session": 13,
+      "session_goal": "Theo dõi thêm Thượng Long",
+      "user_turn_id": "D13:5",
+      "assistant_turn_id": "D13:6",
+      "surface_text": "Lấy thêm 5G thực lũy kế của Thượng Long năm 2026.",
+      "kira_fill_query": "Năm 2026, TB Di động 5G thực Lũy kế của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "source_indicator": "TB Di động 5G thực Lũy kế",
+      "source_service_id": "413",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "413",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-11-16T09:25:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-11-16T09:25:00+07:00"
+      },
+      "fixture_expected_api": {
+        "service_id": "413",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ]
+      },
+      "fill_execution_contract": {
+        "class": "ct28_hidden_fixture_date",
+        "source_fixture_as_of_date": "2026-09-08",
+        "source_fixture_prd_id": "20260907",
+        "warning": "The natural query 'Năm 2026' does not determine the source fixture cutoff.",
+        "allowed_uses": [
+          "Use expected_api semantic fields to evaluate LTM/rewrite/parameter grounding.",
+          "Use fixture_expected_api only when deliberately replaying the original KiRa CT_28 fixture."
+        ],
+        "do_not_claim": "Do not claim that prd_id=20260907 was inferred from the conversation or memory."
+      },
+      "fill_execution_query": "Năm 2026, TB Di động 5G thực Lũy kế của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_025",
+      "session": 14,
+      "session_goal": "Đi sâu FTTH Thượng Long",
+      "user_turn_id": "D14:3",
+      "assistant_turn_id": "D14:4",
+      "surface_text": "Cho mình FTTH rời mạng của Thượng Long năm 2026.",
+      "kira_fill_query": "Năm 2026, Thuê bao FTTH rời mạng của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "source_indicator": "Thuê bao FTTH rời mạng",
+      "source_service_id": "1484",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "1484",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-11-21T14:50:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-11-21T14:50:00+07:00"
+      },
+      "fixture_expected_api": {
+        "service_id": "1484",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ]
+      },
+      "fill_execution_contract": {
+        "class": "ct28_hidden_fixture_date",
+        "source_fixture_as_of_date": "2026-09-08",
+        "source_fixture_prd_id": "20260907",
+        "warning": "The natural query 'Năm 2026' does not determine the source fixture cutoff.",
+        "allowed_uses": [
+          "Use expected_api semantic fields to evaluate LTM/rewrite/parameter grounding.",
+          "Use fixture_expected_api only when deliberately replaying the original KiRa CT_28 fixture."
+        ],
+        "do_not_claim": "Do not claim that prd_id=20260907 was inferred from the conversation or memory."
+      },
+      "fill_execution_query": "Năm 2026, Thuê bao FTTH rời mạng của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_026",
+      "session": 15,
+      "session_goal": "Đặt 4G và 5G cạnh nhau",
+      "user_turn_id": "D15:3",
+      "assistant_turn_id": "D15:4",
+      "surface_text": "Lấy 4G thực lũy kế của Thượng Long năm 2026.",
+      "kira_fill_query": "Năm 2026, Thuê bao Di động 4G thực Lũy kế của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "source_indicator": "Thuê bao Di động 4G thực Lũy kế",
+      "source_service_id": "36",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "36",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-11-26T10:40:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-11-26T10:40:00+07:00"
+      },
+      "fixture_expected_api": {
+        "service_id": "36",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ]
+      },
+      "fill_execution_contract": {
+        "class": "ct28_hidden_fixture_date",
+        "source_fixture_as_of_date": "2026-09-08",
+        "source_fixture_prd_id": "20260907",
+        "warning": "The natural query 'Năm 2026' does not determine the source fixture cutoff.",
+        "allowed_uses": [
+          "Use expected_api semantic fields to evaluate LTM/rewrite/parameter grounding.",
+          "Use fixture_expected_api only when deliberately replaying the original KiRa CT_28 fixture."
+        ],
+        "do_not_claim": "Do not claim that prd_id=20260907 was inferred from the conversation or memory."
+      },
+      "fill_execution_query": "Năm 2026, Thuê bao Di động 4G thực Lũy kế của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_027",
+      "session": 15,
+      "session_goal": "Đặt 4G và 5G cạnh nhau",
+      "user_turn_id": "D15:5",
+      "assistant_turn_id": "D15:6",
+      "surface_text": "Lấy luôn 5G thực lũy kế cùng phạm vi.",
+      "kira_fill_query": "Năm 2026, TB Di động 5G thực Lũy kế của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "source_indicator": "TB Di động 5G thực Lũy kế",
+      "source_service_id": "413",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "413",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-11-26T10:40:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-11-26T10:40:00+07:00"
+      },
+      "fixture_expected_api": {
+        "service_id": "413",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ]
+      },
+      "fill_execution_contract": {
+        "class": "ct28_hidden_fixture_date",
+        "source_fixture_as_of_date": "2026-09-08",
+        "source_fixture_prd_id": "20260907",
+        "warning": "The natural query 'Năm 2026' does not determine the source fixture cutoff.",
+        "allowed_uses": [
+          "Use expected_api semantic fields to evaluate LTM/rewrite/parameter grounding.",
+          "Use fixture_expected_api only when deliberately replaying the original KiRa CT_28 fixture."
+        ],
+        "do_not_claim": "Do not claim that prd_id=20260907 was inferred from the conversation or memory."
+      },
+      "fill_execution_query": "Năm 2026, TB Di động 5G thực Lũy kế của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_028",
+      "session": 16,
+      "session_goal": "Chuyển trọng tâm sang Thượng Long",
+      "user_turn_id": "D16:3",
+      "assistant_turn_id": "D16:4",
+      "surface_text": "Cho mình doanh thu trừ VAS của Thượng Long năm 2026.",
+      "kira_fill_query": "Năm 2026, Doanh thu tiêu dùng di động trừ VAS hợp tác của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "source_indicator": "Doanh thu tiêu dùng di động trừ VAS hợp tác",
+      "source_service_id": "59",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "59",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-12-01T08:05:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-12-01T08:05:00+07:00"
+      },
+      "fixture_expected_api": {
+        "service_id": "59",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ]
+      },
+      "fill_execution_contract": {
+        "class": "ct28_hidden_fixture_date",
+        "source_fixture_as_of_date": "2026-09-08",
+        "source_fixture_prd_id": "20260907",
+        "warning": "The natural query 'Năm 2026' does not determine the source fixture cutoff.",
+        "allowed_uses": [
+          "Use expected_api semantic fields to evaluate LTM/rewrite/parameter grounding.",
+          "Use fixture_expected_api only when deliberately replaying the original KiRa CT_28 fixture."
+        ],
+        "do_not_claim": "Do not claim that prd_id=20260907 was inferred from the conversation or memory."
+      },
+      "fill_execution_query": "Năm 2026, Doanh thu tiêu dùng di động trừ VAS hợp tác của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_029",
+      "session": 16,
+      "session_goal": "Chuyển trọng tâm sang Thượng Long",
+      "user_turn_id": "D16:5",
+      "assistant_turn_id": "D16:6",
+      "surface_text": "Lấy luôn 5G thực lũy kế của Thượng Long.",
+      "kira_fill_query": "Năm 2026, TB Di động 5G thực Lũy kế của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "source_indicator": "TB Di động 5G thực Lũy kế",
+      "source_service_id": "413",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "413",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-12-01T08:05:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-12-01T08:05:00+07:00"
+      },
+      "fixture_expected_api": {
+        "service_id": "413",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ]
+      },
+      "fill_execution_contract": {
+        "class": "ct28_hidden_fixture_date",
+        "source_fixture_as_of_date": "2026-09-08",
+        "source_fixture_prd_id": "20260907",
+        "warning": "The natural query 'Năm 2026' does not determine the source fixture cutoff.",
+        "allowed_uses": [
+          "Use expected_api semantic fields to evaluate LTM/rewrite/parameter grounding.",
+          "Use fixture_expected_api only when deliberately replaying the original KiRa CT_28 fixture."
+        ],
+        "do_not_claim": "Do not claim that prd_id=20260907 was inferred from the conversation or memory."
+      },
+      "fill_execution_query": "Năm 2026, TB Di động 5G thực Lũy kế của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_030",
+      "session": 17,
+      "session_goal": "Một ngày làm việc bình thường",
+      "user_turn_id": "D17:3",
+      "assistant_turn_id": "D17:4",
+      "surface_text": "Cho mình doanh thu tiêu dùng di động của Thượng Long năm 2026.",
+      "kira_fill_query": "Năm 2026, Doanh thu tiêu dùng di động của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "source_indicator": "Doanh thu tiêu dùng di động",
+      "source_service_id": "33",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "33",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-12-06T13:15:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-12-06T13:15:00+07:00"
+      },
+      "fixture_expected_api": {
+        "service_id": "33",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ]
+      },
+      "fill_execution_contract": {
+        "class": "ct28_hidden_fixture_date",
+        "source_fixture_as_of_date": "2026-09-08",
+        "source_fixture_prd_id": "20260907",
+        "warning": "The natural query 'Năm 2026' does not determine the source fixture cutoff.",
+        "allowed_uses": [
+          "Use expected_api semantic fields to evaluate LTM/rewrite/parameter grounding.",
+          "Use fixture_expected_api only when deliberately replaying the original KiRa CT_28 fixture."
+        ],
+        "do_not_claim": "Do not claim that prd_id=20260907 was inferred from the conversation or memory."
+      },
+      "fill_execution_query": "Năm 2026, Doanh thu tiêu dùng di động của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_031",
+      "session": 18,
+      "session_goal": "Quay lên Thanh Sơn để đối chiếu",
+      "user_turn_id": "D18:3",
+      "assistant_turn_id": "D18:4",
+      "surface_text": "Lấy doanh thu trừ VAS của Thanh Sơn lũy kế đến hôm trước.",
+      "kira_fill_query": "Doanh thu tiêu dùng di động trừ VAS hợp tác của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày hôm trước là bao nhiêu?",
+      "source_indicator": "Doanh thu tiêu dùng di động trừ VAS hợp tác",
+      "source_service_id": "59",
+      "source_testcase": "CT_61",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "59",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-12-11T16:40:00+07:00",
+      "has_relative_time": true,
+      "temporal_fill_policy": {
+        "recommended_mode": "explicit_fixture_rewrite",
+        "reason": "Source testcase expected_api uses a fixed fixture date; raw relative wording would resolve differently at the synthetic session date.",
+        "do_not_send_raw_relative_query_as_if_session_date_matches_fixture": true,
+        "session_datetime": "2026-12-11T16:40:00+07:00",
+        "source_expected_prd_id": "20260907",
+        "action": "Use an explicit-date equivalent query matching the source testcase fixture, or re-run KiRa with a session-date-consistent expected_api and regenerate gold."
+      },
+      "fill_execution_query": "Doanh thu tiêu dùng di động trừ VAS hợp tác của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
+      "fill_execution_mode": "explicit_fixture_rewrite",
+      "runner_contract": {
+        "send_field": "fill_execution_query",
+        "do_not_send_field": "kira_fill_query",
+        "reason": "Raw relative wording would resolve against the synthetic session date, not the fixed KiRa source fixture."
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_032",
+      "session": 18,
+      "session_goal": "Quay lên Thanh Sơn để đối chiếu",
+      "user_turn_id": "D18:5",
+      "assistant_turn_id": "D18:6",
+      "surface_text": "Lấy thêm 5G thực lũy kế của Thanh Sơn.",
+      "kira_fill_query": "TB Di động 5G thực Lũy kế của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày hôm trước là bao nhiêu?",
+      "source_indicator": "TB Di động 5G thực Lũy kế",
+      "source_service_id": "413",
+      "source_testcase": "CT_61",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "413",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1000444100_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-12-11T16:40:00+07:00",
+      "has_relative_time": true,
+      "temporal_fill_policy": {
+        "recommended_mode": "explicit_fixture_rewrite",
+        "reason": "Source testcase expected_api uses a fixed fixture date; raw relative wording would resolve differently at the synthetic session date.",
+        "do_not_send_raw_relative_query_as_if_session_date_matches_fixture": true,
+        "session_datetime": "2026-12-11T16:40:00+07:00",
+        "source_expected_prd_id": "20260907",
+        "action": "Use an explicit-date equivalent query matching the source testcase fixture, or re-run KiRa with a session-date-consistent expected_api and regenerate gold."
+      },
+      "fill_execution_query": "TB Di động 5G thực Lũy kế của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
+      "fill_execution_mode": "explicit_fixture_rewrite",
+      "runner_contract": {
+        "send_field": "fill_execution_query",
+        "do_not_send_field": "kira_fill_query",
+        "reason": "Raw relative wording would resolve against the synthetic session date, not the fixed KiRa source fixture."
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_033",
+      "session": 19,
+      "session_goal": "Tổng kết cùng kỳ năm",
+      "user_turn_id": "D19:3",
+      "assistant_turn_id": "D19:4",
+      "surface_text": "Xem tăng trưởng doanh thu trừ VAS của Thượng Long lũy kế tháng 8 so cùng kỳ năm.",
+      "kira_fill_query": "Lũy kế đến tháng 08/2026 so với cùng kỳ năm, Xã Thượng Long trong tỉnh Phú Thọ tăng trưởng Doanh thu tiêu dùng di động trừ VAS hợp tác bao nhiêu?",
+      "source_indicator": "Doanh thu tiêu dùng di động trừ VAS hợp tác",
+      "source_service_id": "59",
+      "source_testcase": "CT_80",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "59",
+        "prd_id": "20260831",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-12-16T09:55:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-12-16T09:55:00+07:00"
+      },
+      "fill_execution_query": "Lũy kế đến tháng 08/2026 so với cùng kỳ năm, Xã Thượng Long trong tỉnh Phú Thọ tăng trưởng Doanh thu tiêu dùng di động trừ VAS hợp tác bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_034",
+      "session": 19,
+      "session_goal": "Tổng kết cùng kỳ năm",
+      "user_turn_id": "D19:5",
+      "assistant_turn_id": "D19:6",
+      "surface_text": "Lấy tăng trưởng 5G thực lũy kế cùng mốc.",
+      "kira_fill_query": "Lũy kế đến tháng 08/2026 so với cùng kỳ năm, Xã Thượng Long trong tỉnh Phú Thọ tăng trưởng TB Di động 5G thực Lũy kế bao nhiêu?",
+      "source_indicator": "TB Di động 5G thực Lũy kế",
+      "source_service_id": "413",
+      "source_testcase": "CT_80",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "413",
+        "prd_id": "20260831",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-12-16T09:55:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-12-16T09:55:00+07:00"
+      },
+      "fill_execution_query": "Lũy kế đến tháng 08/2026 so với cùng kỳ năm, Xã Thượng Long trong tỉnh Phú Thọ tăng trưởng TB Di động 5G thực Lũy kế bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_035",
+      "session": 20,
+      "session_goal": "Slide xếp hạng",
+      "user_turn_id": "D20:3",
+      "assistant_turn_id": "D20:4",
+      "surface_text": "Cho top 3 tỉnh về 5G thực lũy kế tháng 8.",
+      "kira_fill_query": "Top 3 tỉnh xếp hạng đầu về TB Di động 5G thực Lũy kế tháng 08/2026.",
+      "source_indicator": "TB Di động 5G thực Lũy kế",
+      "source_service_id": "413",
+      "source_testcase": "CT_67",
+      "expected_intent": "xep_hang_chi_tieu",
+      "expected_api": {
+        "service_id": "413",
+        "prd_id": "20260831",
+        "province_code": "",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "month",
+        "limit": "3",
+        "order_by": "thuc_hien",
+        "order_type": "DESC",
+        "condition": []
+      },
+      "session_datetime": "2026-12-21T15:10:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-12-21T15:10:00+07:00"
+      },
+      "fill_execution_query": "Top 3 tỉnh xếp hạng đầu về TB Di động 5G thực Lũy kế tháng 08/2026.",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_036",
+      "session": 21,
+      "session_goal": "Đối chiếu lại chỉ tiêu cũ",
+      "user_turn_id": "D21:3",
+      "assistant_turn_id": "D21:4",
+      "surface_text": "Đối chiếu lại doanh thu tiêu dùng di động của Thượng Long năm 2026 giúp mình.",
+      "kira_fill_query": "Năm 2026, Doanh thu tiêu dùng di động của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "source_indicator": "Doanh thu tiêu dùng di động",
+      "source_service_id": "33",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "33",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-12-26T11:30:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-12-26T11:30:00+07:00"
+      },
+      "fixture_expected_api": {
+        "service_id": "33",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ]
+      },
+      "fill_execution_contract": {
+        "class": "ct28_hidden_fixture_date",
+        "source_fixture_as_of_date": "2026-09-08",
+        "source_fixture_prd_id": "20260907",
+        "warning": "The natural query 'Năm 2026' does not determine the source fixture cutoff.",
+        "allowed_uses": [
+          "Use expected_api semantic fields to evaluate LTM/rewrite/parameter grounding.",
+          "Use fixture_expected_api only when deliberately replaying the original KiRa CT_28 fixture."
+        ],
+        "do_not_claim": "Do not claim that prd_id=20260907 was inferred from the conversation or memory."
+      },
+      "fill_execution_query": "Năm 2026, Doanh thu tiêu dùng di động của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_037",
+      "session": 21,
+      "session_goal": "Đối chiếu lại chỉ tiêu cũ",
+      "user_turn_id": "D21:5",
+      "assistant_turn_id": "D21:6",
+      "surface_text": "Lấy thêm 4G thực lũy kế của Thượng Long.",
+      "kira_fill_query": "Năm 2026, Thuê bao Di động 4G thực Lũy kế của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "source_indicator": "Thuê bao Di động 4G thực Lũy kế",
+      "source_service_id": "36",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "36",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-12-26T11:30:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-12-26T11:30:00+07:00"
+      },
+      "fixture_expected_api": {
+        "service_id": "36",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ]
+      },
+      "fill_execution_contract": {
+        "class": "ct28_hidden_fixture_date",
+        "source_fixture_as_of_date": "2026-09-08",
+        "source_fixture_prd_id": "20260907",
+        "warning": "The natural query 'Năm 2026' does not determine the source fixture cutoff.",
+        "allowed_uses": [
+          "Use expected_api semantic fields to evaluate LTM/rewrite/parameter grounding.",
+          "Use fixture_expected_api only when deliberately replaying the original KiRa CT_28 fixture."
+        ],
+        "do_not_claim": "Do not claim that prd_id=20260907 was inferred from the conversation or memory."
+      },
+      "fill_execution_query": "Năm 2026, Thuê bao Di động 4G thực Lũy kế của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_038",
+      "session": 22,
+      "session_goal": "Chốt kỳ",
+      "user_turn_id": "D22:3",
+      "assistant_turn_id": "D22:4",
+      "surface_text": "Lấy doanh thu trừ VAS của Thượng Long năm 2026.",
+      "kira_fill_query": "Năm 2026, Doanh thu tiêu dùng di động trừ VAS hợp tác của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "source_indicator": "Doanh thu tiêu dùng di động trừ VAS hợp tác",
+      "source_service_id": "59",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "59",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-12-30T16:05:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-12-30T16:05:00+07:00"
+      },
+      "fixture_expected_api": {
+        "service_id": "59",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ]
+      },
+      "fill_execution_contract": {
+        "class": "ct28_hidden_fixture_date",
+        "source_fixture_as_of_date": "2026-09-08",
+        "source_fixture_prd_id": "20260907",
+        "warning": "The natural query 'Năm 2026' does not determine the source fixture cutoff.",
+        "allowed_uses": [
+          "Use expected_api semantic fields to evaluate LTM/rewrite/parameter grounding.",
+          "Use fixture_expected_api only when deliberately replaying the original KiRa CT_28 fixture."
+        ],
+        "do_not_claim": "Do not claim that prd_id=20260907 was inferred from the conversation or memory."
+      },
+      "fill_execution_query": "Năm 2026, Doanh thu tiêu dùng di động trừ VAS hợp tác của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    },
+    {
+      "fill_id": "CONV01V2_FILL_039",
+      "session": 22,
+      "session_goal": "Chốt kỳ",
+      "user_turn_id": "D22:5",
+      "assistant_turn_id": "D22:6",
+      "surface_text": "Và 5G thực lũy kế của Thượng Long.",
+      "kira_fill_query": "Năm 2026, TB Di động 5G thực Lũy kế của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "source_indicator": "TB Di động 5G thực Lũy kế",
+      "source_service_id": "413",
+      "source_testcase": "CT_28",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "413",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "session_datetime": "2026-12-30T16:05:00+07:00",
+      "has_relative_time": false,
+      "temporal_fill_policy": {
+        "recommended_mode": "normal",
+        "session_datetime": "2026-12-30T16:05:00+07:00"
+      },
+      "fixture_expected_api": {
+        "service_id": "413",
+        "prd_id": "20260907",
+        "province_code": "PTO",
+        "cluster_code": "1001344100_DVTM",
+        "precinct_code": "PTO062",
+        "dept_level": "4",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "semantic_time_scope": {
+        "type": "year",
+        "year": 2026,
+        "cutoff": "unspecified_by_user"
+      },
+      "api_scoring_contract": {
+        "mode": "semantic_fields_only",
+        "compare_fields": [
+          "service_id",
+          "province_code",
+          "cluster_code",
+          "precinct_code",
+          "dept_level",
+          "ck_type",
+          "limit",
+          "condition"
+        ],
+        "ignore_fixture_only_fields": [
+          "prd_id"
+        ]
+      },
+      "fill_execution_contract": {
+        "class": "ct28_hidden_fixture_date",
+        "source_fixture_as_of_date": "2026-09-08",
+        "source_fixture_prd_id": "20260907",
+        "warning": "The natural query 'Năm 2026' does not determine the source fixture cutoff.",
+        "allowed_uses": [
+          "Use expected_api semantic fields to evaluate LTM/rewrite/parameter grounding.",
+          "Use fixture_expected_api only when deliberately replaying the original KiRa CT_28 fixture."
+        ],
+        "do_not_claim": "Do not claim that prd_id=20260907 was inferred from the conversation or memory."
+      },
+      "fill_execution_query": "Năm 2026, TB Di động 5G thực Lũy kế của Xã Thượng Long - Tỉnh Phú Thọ là bao nhiêu?",
+      "fill_execution_mode": "normal",
+      "runner_contract": {
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
+      }
+    }
+  ],
+  "note": "Business fill mappings unchanged from v2.",
+  "temporal_fill_policy": {
+    "rule": "Do not fill relative-time conversation turns with a KiRa response generated under a mismatched fixed testcase date.",
+    "safe_options": [
+      "Use an explicit-date equivalent query matching the source testcase fixture and keep the existing expected_api.",
+      "Or ground KiRa to the synthetic session date, then regenerate expected_api/gold for that turn."
+    ],
+    "relative_fill_count": 11,
+    "relative_fill_ids": [
+      "CONV01V2_FILL_003",
+      "CONV01V2_FILL_004",
+      "CONV01V2_FILL_016",
+      "CONV01V2_FILL_017",
+      "CONV01V2_FILL_018",
+      "CONV01V2_FILL_019",
+      "CONV01V2_FILL_020",
+      "CONV01V2_FILL_021",
+      "CONV01V2_FILL_022",
+      "CONV01V2_FILL_031",
+      "CONV01V2_FILL_032"
+    ]
+  },
+  "ct28_contract": {
+    "ct28_fill_count": 14,
+    "fill_ids": [
+      "CONV01V2_FILL_012",
+      "CONV01V2_FILL_013",
+      "CONV01V2_FILL_023",
+      "CONV01V2_FILL_024",
+      "CONV01V2_FILL_025",
+      "CONV01V2_FILL_026",
+      "CONV01V2_FILL_027",
+      "CONV01V2_FILL_028",
+      "CONV01V2_FILL_029",
+      "CONV01V2_FILL_030",
+      "CONV01V2_FILL_036",
+      "CONV01V2_FILL_037",
+      "CONV01V2_FILL_038",
+      "CONV01V2_FILL_039"
+    ],
+    "rule": "CT_28 year queries carry an unspecified cutoff semantically. The source fixture cutoff lives only in fixture_expected_api."
+  },
+  "fill_id_policy": {
+    "stable_across_revisions": true,
+    "rename_after_real_responses_exist": false,
+    "note": "CONV01V2_FILL_### is a stable identifier, not a version claim."
+  },
+  "execution_contract": {
+    "normal": "Send `kira_fill_query`.",
+    "explicit_fixture_rewrite": "Send `fill_execution_query`.",
+    "runner_must_not_infer_rewrite_itself": true,
+    "fixture_date_replay": "Send `fill_execution_query`. This mode deliberately replays a source testcase date that is fixture-only and not inferred from the natural conversation turn."
+  },
+  "hidden_fixture_date_contract": {
+    "fill_ids": [
+      "CONV01V2_FILL_009",
+      "CONV01V2_FILL_010"
+    ],
+    "rule": "These natural surface turns do not provide the 06/09/2026 date. Treat the date as fixture-only metadata, not an LTM inference target."
+  }
+}

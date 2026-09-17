@@ -1,7 +1,7 @@
 {
   "manifest_schema_version": 1,
-  "contract_id": "kira-week5-benchmark-v1",
-  "frozen_on": "2026-09-11",
+  "contract_id": "kira-week5-benchmark-v2",
+  "frozen_on": "2026-09-16",
   "kind": "source_control_baseline_not_a_benchmark_result",
   "source": {
     "commit": "75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00",
@@ -114,7 +114,7 @@
     "exact_provider_and_model_deployment_for_rewrite",
     "embedding_provider_model_and_verified_dimension",
     "effective_provider_sdk_timeouts_and_retries",
-    "approved_corpus_split_and_review_hashes",
+    "approved_corpus_scope_and_review_hashes",
     "resolved_non_secret_config_and_rendered_prompt_hashes",
     "isolated_database_and_resource_ownership",
     "workload_seed_concurrency_warmup_and_sample_counts",

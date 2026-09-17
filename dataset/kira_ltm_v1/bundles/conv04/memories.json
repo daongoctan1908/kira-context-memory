@@ -1,0 +1,390 @@
+{
+  "conversation_id": "conv_04_FREEZE_v4_FINAL",
+  "do_not_ingest": true,
+  "artifact_semantics": "Gold memory EVENTS, not a closed-world list of final Mem0 rows.",
+  "formation_negative_event_ids": [
+    "M13",
+    "M15"
+  ],
+  "active_memory_event_ids_at_end": [
+    "M02",
+    "M03",
+    "M04",
+    "M05",
+    "M06",
+    "M07",
+    "M08",
+    "M09",
+    "M10",
+    "M11",
+    "M12",
+    "M14"
+  ],
+  "expected_active_memory_row_source_event_ids": [
+    "M02",
+    "M03",
+    "M04",
+    "M05",
+    "M06",
+    "M07",
+    "M08",
+    "M09",
+    "M10",
+    "M11",
+    "M12"
+  ],
+  "expected_active_memory_row_count": 11,
+  "expected_active_memory_row_count_semantics": {
+    "value": 11,
+    "role": "reference_only",
+    "hard_exact_gate": false,
+    "reason": "Open-world semantic formation allows valid extra memories and equivalent merges."
+  },
+  "event_vs_row_contract": {
+    "memory_event": "Annotation of add/update/reinforce/do_not_persist behavior.",
+    "active_memory_row": "Distinct durable semantic memory expected in the final active state.",
+    "reinforce_existing_event": "May confirm an existing row without creating a separate row."
+  },
+  "formation_precision_contract": {
+    "world_assumption": "open_world_semantic",
+    "gold_events_exhaustive_for_required_events": false,
+    "extra_valid_memory_policy": "Semantically valid unannotated memories are not automatically false positives.",
+    "precision_penalty_rule": "Penalize contradicted, malformed, or improperly persisted ephemeral memories."
+  },
+  "negative_event_contract": {
+    "scope": "do_not_persist applies only to the ephemeral claim represented by the negative gold event, not to every semantic claim in the same source turn.",
+    "same_turn_valid_reinforcement_policy": "A source turn may also reinforce an existing durable memory; valid reinforcement must not cause the negative event to fail.",
+    "known_allowed_reinforcements": {
+      "M13": [
+        "M11"
+      ],
+      "M15": [
+        "M09"
+      ]
+    }
+  },
+  "chronology_contract": {
+    "authoritative_order": "source_turn_session_time",
+    "do_not_use": [
+      "memory_id_numeric_order",
+      "memory_gold_array_order"
+    ],
+    "rule": "Temporal order comes from source turn/session timestamps; Mxx identifiers are not chronological."
+  },
+  "memory_gold": [
+    {
+      "memory_id": "M01",
+      "key": "semantic.5g_main",
+      "canonical_fact": "Ban đầu, “5G chính” = Thuê bao Register 5G lũy kế.",
+      "source_turn_ids": [
+        "D1:1"
+      ],
+      "primary_source_turn_ids": [
+        "D1:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": false,
+      "supersedes_memory_id": null,
+      "memory_family": "semantic_alias_5g",
+      "memory_type": "user_convention",
+      "inactive_reason": "superseded_by_M11",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M02",
+      "key": "semantic.5g_base",
+      "canonical_fact": "“Nền 5G” = TB Di động 5G thực Lũy kế.",
+      "source_turn_ids": [
+        "D1:3"
+      ],
+      "primary_source_turn_ids": [
+        "D1:3"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "semantic_role_5g",
+      "memory_type": "user_convention",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M03",
+      "key": "semantic.5g_inflow",
+      "canonical_fact": "“Dòng vào 5G” = Thuê bao 5G phát triển mới.",
+      "source_turn_ids": [
+        "D2:1"
+      ],
+      "primary_source_turn_ids": [
+        "D2:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "semantic_role_5g",
+      "memory_type": "user_convention",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M04",
+      "key": "semantic.5g_delta",
+      "canonical_fact": "“Biến động 5G” = TB Di động 5G thực Lũy kế Tăng Giảm.",
+      "source_turn_ids": [
+        "D2:3"
+      ],
+      "primary_source_turn_ids": [
+        "D2:3"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "semantic_role_5g",
+      "memory_type": "user_convention",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M05",
+      "key": "semantic.ftth_base",
+      "canonical_fact": "“Nền FTTH” = Thuê bao FTTH phát triển thực LK.",
+      "source_turn_ids": [
+        "D4:1"
+      ],
+      "primary_source_turn_ids": [
+        "D4:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "semantic_role_ftth",
+      "memory_type": "user_convention",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M06",
+      "key": "semantic.ftth_inflow",
+      "canonical_fact": "“Dòng vào FTTH” = Thuê bao FTTH phát triển mới.",
+      "source_turn_ids": [
+        "D4:3"
+      ],
+      "primary_source_turn_ids": [
+        "D4:3"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "semantic_role_ftth",
+      "memory_type": "user_convention",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M07",
+      "key": "semantic.ftth_outflow",
+      "canonical_fact": "“Dòng ra FTTH” = Thuê bao FTTH rời mạng.",
+      "source_turn_ids": [
+        "D4:5"
+      ],
+      "primary_source_turn_ids": [
+        "D4:5"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "semantic_role_ftth",
+      "memory_type": "user_convention",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M08",
+      "key": "ranking.ftth_inflow.good",
+      "canonical_fact": "Với “dòng vào FTTH”, “top tốt” = các tỉnh có giá trị cao nhất.",
+      "source_turn_ids": [
+        "D5:1"
+      ],
+      "primary_source_turn_ids": [
+        "D5:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "ranking_polarity_ftth",
+      "memory_type": "preference",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M09",
+      "key": "ranking.ftth_outflow.good",
+      "canonical_fact": "Với “dòng ra FTTH”, “top tốt” = các tỉnh có giá trị thấp nhất.",
+      "source_turn_ids": [
+        "D6:1"
+      ],
+      "primary_source_turn_ids": [
+        "D6:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "ranking_polarity_ftth",
+      "memory_type": "preference",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M10",
+      "key": "ranking.ftth_outflow.alert",
+      "canonical_fact": "Với “dòng ra FTTH”, “top cảnh báo” = các tỉnh có giá trị cao nhất.",
+      "source_turn_ids": [
+        "D6:3"
+      ],
+      "primary_source_turn_ids": [
+        "D6:3"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "ranking_polarity_ftth",
+      "memory_type": "preference",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M11",
+      "key": "semantic.5g_main",
+      "canonical_fact": "Hiện tại, “5G chính” = TB Di động 5G thực Lũy kế.",
+      "source_turn_ids": [
+        "D9:1"
+      ],
+      "primary_source_turn_ids": [
+        "D9:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "update",
+      "active_at_end": true,
+      "supersedes_memory_id": "M01",
+      "memory_family": "semantic_alias_5g",
+      "memory_type": "preference_update",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M12",
+      "key": "semantic.5g_register_role",
+      "canonical_fact": "Hiện tại, Thuê bao Register 5G lũy kế chỉ dùng làm chỉ số đối chiếu.",
+      "source_turn_ids": [
+        "D9:3"
+      ],
+      "primary_source_turn_ids": [
+        "D9:3"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "semantic_role_5g",
+      "memory_type": "role_update",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M13",
+      "key": "temporary.meeting_5g_main_register",
+      "canonical_fact": "Riêng cuộc họp hôm đó, Register 5G tạm thay cho “5G chính”.",
+      "source_turn_ids": [
+        "D12:1"
+      ],
+      "primary_source_turn_ids": [
+        "D12:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": false,
+      "expected_operation": "do_not_persist",
+      "active_at_end": false,
+      "supersedes_memory_id": null,
+      "memory_family": "temporary_override",
+      "memory_type": "ephemeral",
+      "diagnostic_retrieval_scope": "transcript_oracle_only",
+      "history_versioning_expectation": "not_guaranteed",
+      "inactive_reason": "ephemeral_task_context",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M14",
+      "key": "semantic.5g_main",
+      "canonical_fact": "Sau cuộc họp, “5G chính” vẫn = TB Di động 5G thực Lũy kế.",
+      "source_turn_ids": [
+        "D13:1"
+      ],
+      "primary_source_turn_ids": [
+        "D13:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "reinforce_existing",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "semantic_alias_5g",
+      "memory_type": "reinforcement",
+      "should_create_new_memory": false,
+      "reinforces_memory_id": "M11",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M15",
+      "key": "temporary.ftth_outflow_good_high",
+      "canonical_fact": "Riêng lần đối chiếu đó, “top tốt” của dòng ra FTTH tạm lấy phía cao nhất.",
+      "source_turn_ids": [
+        "D16:1"
+      ],
+      "primary_source_turn_ids": [
+        "D16:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": false,
+      "expected_operation": "do_not_persist",
+      "active_at_end": false,
+      "supersedes_memory_id": null,
+      "memory_family": "temporary_override",
+      "memory_type": "ephemeral",
+      "diagnostic_retrieval_scope": "transcript_oracle_only",
+      "history_versioning_expectation": "not_guaranteed",
+      "inactive_reason": "ephemeral_task_context",
+      "qa_reference_status": "used_by_qa"
+    }
+  ],
+  "qa_reference_summary": {
+    "used_memory_ids": [
+      "M01",
+      "M02",
+      "M03",
+      "M04",
+      "M05",
+      "M06",
+      "M07",
+      "M08",
+      "M09",
+      "M10",
+      "M11",
+      "M12",
+      "M13",
+      "M14",
+      "M15"
+    ],
+    "formation_only_memory_ids": []
+  }
+}

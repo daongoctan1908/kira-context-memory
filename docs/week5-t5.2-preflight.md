@@ -170,6 +170,8 @@ Validation cuối:
 
 ## Phần tiếp theo
 
-T5.3 tạo corpus synthetic có gold draft, T5.4 xử lý validator/split và T5.5 bổ sung scoring/review.
+T5.3–T5.4 hiện có corpus nguồn `dataset/kira_ltm_v1` cùng manifest/checksum, full-corpus scope,
+schema, typed loader và validator. Corpus vẫn cần KiRa materialization, reviewer revision, semantic near-duplicate
+review và chuyển sang bốn suite trước khi T5.3/T5.4 hoàn tất. T5.5 bổ sung scoring/review.
 T5.2 không tạo corpus hoặc semantic score. PostgreSQL live test có opt-in bằng `POSTGRES_TEST_URL`
 trỏ DB disposable; test mặc định skip rõ nếu chưa cấu hình.

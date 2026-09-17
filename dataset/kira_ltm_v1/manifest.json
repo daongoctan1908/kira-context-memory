@@ -1,0 +1,186 @@
+{
+  "$schema": "schemas/manifest.schema.json",
+  "schema_version": 1,
+  "dataset_id": "kira_ltm_v1",
+  "dataset_version": "1.0.0-draft.2",
+  "status": "contract_frozen",
+  "canonical_format": "json",
+  "evaluation_scope": "full_corpus",
+  "id_namespace": "{bundle_id}:{local_id}",
+  "timestamp_policy": {
+    "source": "session_datetime",
+    "turn_offset_unit": "microseconds",
+    "turn_offset_start": 0
+  },
+  "data_policy": {
+    "classification": "internal_test_synthetic_derived",
+    "external_provider_allowed": false,
+    "public_git_status": "review_required"
+  },
+  "bundles": [
+    {
+      "bundle_id": "conv01",
+      "source_conversation_id": "conv_01_FREEZE_v10_FINAL",
+      "revision": 10,
+      "contract_status": "frozen",
+      "materialization_status": "pending",
+      "path": "bundles/conv01",
+      "review": {
+        "status": "draft",
+        "reviewer": null,
+        "revision": null
+      },
+      "counts": {
+        "sessions": 22,
+        "turns": 174,
+        "fills": 39,
+        "memory_events": 17,
+        "qa": 55,
+        "hard_gate": 36,
+        "diagnostic_history": 19,
+        "pending_answers": 19
+      },
+      "files": {
+        "conversation": {
+          "name": "conversation.json",
+          "sha256": "2be4a3021b5bf3767ff7560d29e3466af72d4333ccfc5c94846c73fe24733f3d"
+        },
+        "fills": {
+          "name": "fills.json",
+          "sha256": "d5acd438e951b08cf2e7aefa53936709750744bfdc231c8e815654290b485e00"
+        },
+        "memories": {
+          "name": "memories.json",
+          "sha256": "e2e3a9999c37d304b8214dfc4aba27ccfe3017ae94d2f5d01c57b52b5a160336"
+        },
+        "qa": {
+          "name": "qa.json",
+          "sha256": "c75a7c09f4bade78098ca109fb560ada3214cd6ec1a901b18df40b61e1b956c4"
+        }
+      }
+    },
+    {
+      "bundle_id": "conv02",
+      "source_conversation_id": "conv_02_FREEZE_v4_FINAL",
+      "revision": 4,
+      "contract_status": "frozen",
+      "materialization_status": "pending",
+      "path": "bundles/conv02",
+      "review": {
+        "status": "draft",
+        "reviewer": null,
+        "revision": null
+      },
+      "counts": {
+        "sessions": 20,
+        "turns": 116,
+        "fills": 36,
+        "memory_events": 15,
+        "qa": 50,
+        "hard_gate": 35,
+        "diagnostic_history": 15,
+        "pending_answers": 12
+      },
+      "files": {
+        "conversation": {
+          "name": "conversation.json",
+          "sha256": "f01cbbcdd6a22b756f615d9215c9d8324c77db81cc31c6ff424bf3538226843c"
+        },
+        "fills": {
+          "name": "fills.json",
+          "sha256": "05c6be883271dfb3f56edcfaf5e98a971c4fad0fecd291c096ced5d5d0c54a6a"
+        },
+        "memories": {
+          "name": "memories.json",
+          "sha256": "fd2598571bb3e62d8775f26bdcb8078274bb7bda6ff2d5e69ab84eedf2cd2618"
+        },
+        "qa": {
+          "name": "qa.json",
+          "sha256": "5b198e01b0365b7c6442c13cdf33c9392426bc524561cb68244b5b63a9a358bb"
+        }
+      }
+    },
+    {
+      "bundle_id": "conv03",
+      "source_conversation_id": "conv_03_FREEZE_v5_FINAL",
+      "revision": 5,
+      "contract_status": "frozen",
+      "materialization_status": "pending",
+      "path": "bundles/conv03",
+      "review": {
+        "status": "draft",
+        "reviewer": null,
+        "revision": null
+      },
+      "counts": {
+        "sessions": 22,
+        "turns": 114,
+        "fills": 33,
+        "memory_events": 15,
+        "qa": 52,
+        "hard_gate": 32,
+        "diagnostic_history": 20,
+        "pending_answers": 12
+      },
+      "files": {
+        "conversation": {
+          "name": "conversation.json",
+          "sha256": "a299b67be07b1146ba8bf400c2eaf716208e55e61d619c5b6db08f64e8913a3f"
+        },
+        "fills": {
+          "name": "fills.json",
+          "sha256": "856c85a10888f2975867d48c866a81750e09d14cc603650c0b7ac3485eb7d0d4"
+        },
+        "memories": {
+          "name": "memories.json",
+          "sha256": "1aa1f3b2cb7797cb2d91f2f398ebe3ae7dc418f6a586fc9d0212adb5cdf7cb6e"
+        },
+        "qa": {
+          "name": "qa.json",
+          "sha256": "e1163bb9dcea5f44308dc5d09d1982aaed52282e84c1d693609d4c3e53da8e35"
+        }
+      }
+    },
+    {
+      "bundle_id": "conv04",
+      "source_conversation_id": "conv_04_FREEZE_v4_FINAL",
+      "revision": 4,
+      "contract_status": "frozen",
+      "materialization_status": "pending",
+      "path": "bundles/conv04",
+      "review": {
+        "status": "draft",
+        "reviewer": null,
+        "revision": null
+      },
+      "counts": {
+        "sessions": 22,
+        "turns": 102,
+        "fills": 32,
+        "memory_events": 15,
+        "qa": 52,
+        "hard_gate": 36,
+        "diagnostic_history": 16,
+        "pending_answers": 11
+      },
+      "files": {
+        "conversation": {
+          "name": "conversation.json",
+          "sha256": "e1f9c4a6ec2158500bf28a82b9ca4400844f9d90c9ccc318986010eb70877058"
+        },
+        "fills": {
+          "name": "fills.json",
+          "sha256": "cc0f829817911ea2823b6c1a14c55da6e1d2b7ca22f4a7fd881f1312d0237417"
+        },
+        "memories": {
+          "name": "memories.json",
+          "sha256": "94dd08ff15d6ee59f29597bc399458a91220d8425a61229871d0fccbe76474dd"
+        },
+        "qa": {
+          "name": "qa.json",
+          "sha256": "1560d3487aad41f545880054518c8387904f06f9548c95963fbe2c5dbcab00db"
+        }
+      }
+    }
+  ]
+}

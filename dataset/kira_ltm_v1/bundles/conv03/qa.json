@@ -1,0 +1,1779 @@
+{
+  "conversation_id": "conv_03_FREEZE_v5_FINAL",
+  "do_not_ingest": true,
+  "summary": {
+    "sessions": 22,
+    "turns": 114,
+    "kira_fill_slots": 33,
+    "zero_fill_sessions": 6,
+    "assistant_bridge_count": 24,
+    "assistant_bridge_unique": 24,
+    "gold_memory_events": 15,
+    "active_memory_events_at_end": 9,
+    "expected_active_memory_rows_reference": 6,
+    "qa_total": 52,
+    "qa_category_distribution": {
+      "single_hop": 14,
+      "multi_hop": 10,
+      "temporal_reasoning": 6,
+      "state_update": 7,
+      "temporal_business_action": 5,
+      "false_premise": 5,
+      "abstention": 5
+    },
+    "hard_gate_qa": 32,
+    "diagnostic_history_qa": 20,
+    "scenario_groups": 39,
+    "scenario_group_size_range": [
+      1,
+      5
+    ],
+    "business_action_qa": 12,
+    "formation_only_memory_ids": [
+      "M08",
+      "M12",
+      "M13",
+      "M14"
+    ],
+    "status": "FROZEN_CONTRACT_PENDING_KIRA_FILL",
+    "conversation_id": "conv_03_FREEZE_v5_FINAL"
+  },
+  "baseline_scope": {
+    "hard_gate_definition": "Evaluable from the final current-state condition without requiring superseded or ephemeral history. This may use final active semantic memories and/or global safety, precedence, no-invention, clarification, or no-hit behavior. Hard-gate status does not imply that an LTM retrieval hit is strictly required.",
+    "diagnostic_history_definition": "Requires historical occurrence/order information and/or past, superseded, or ephemeral context not guaranteed by the final active semantic-memory snapshot."
+  },
+  "score_reporting_contract": {
+    "headline_scope": {
+      "baseline_headline": "hard_gate_only",
+      "hard_gate_micro": "Micro accuracy over hard_gate=true QA only.",
+      "hard_gate_macro_scenario": "Macro scenario accuracy over hard_gate=true QA only.",
+      "diagnostic_history": "Report separately."
+    },
+    "required_metrics": [
+      {
+        "name": "micro_accuracy",
+        "definition": "Correct QA / evaluated QA within selected tier."
+      },
+      {
+        "name": "macro_scenario_accuracy",
+        "definition": "Average scenario-group accuracy with equal scenario weight."
+      }
+    ]
+  },
+  "retrieval_scoring_global_contract": {
+    "abstention_no_hit_rule": "QA with no relevant memory and `no_hit_fpr_eligible=true` belongs to the no-hit FPR bucket.",
+    "nonexclusive_support_only_rule": {
+      "when": {
+        "strict_required_memory_ids_empty": true,
+        "no_hit_fpr_eligible": false
+      },
+      "recall_at_k_denominator": "exclude",
+      "no_hit_fpr_bucket": "exclude",
+      "supporting_memory_precision": "supporting memories remain precision-relevant and are not false positives",
+      "optional_reporting": "supporting-hit rate may be reported separately"
+    }
+  },
+  "evaluation_scope": {
+    "mode": "full_corpus",
+    "scenario_group_role": "reporting_slice",
+    "memory_family_role": "audit_dimension"
+  },
+  "qa": [
+    {
+      "question_id": "Q_SINGLE_HOP_001",
+      "category": "single_hop",
+      "question": "Bộ lõi hiện tại gồm những chỉ tiêu nào và theo thứ tự nào?",
+      "required_memory_ids": [
+        "M09"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D8:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Doanh thu dịch vụ, Doanh thu IOT, rồi FTTH phát triển thực lũy kế.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "core_bundle_current",
+      "memory_families": [
+        "metric_bundle"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Doanh thu dịch vụ, Doanh thu IOT, rồi FTTH phát triển thực lũy kế."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_002",
+      "category": "single_hop",
+      "question": "Nếu mình nói nhóm cuối mà không ghi số lượng thì lấy mấy tỉnh?",
+      "required_memory_ids": [
+        "M03"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D2:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "3 tỉnh đứng cuối.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "bottom_default",
+      "memory_families": [
+        "ranking_convention"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "3 tỉnh đứng cuối."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_003",
+      "category": "single_hop",
+      "question": "Phần so sánh nên trả lời theo kiểu nào?",
+      "required_memory_ids": [
+        "M04"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D3:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Nêu bên nào cao hơn và số của hai bên; không giải thích dài nếu không được hỏi.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "comparison_style",
+      "memory_families": [
+        "response_style"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Nêu bên nào cao hơn và số của hai bên; không giải thích dài nếu không được hỏi."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_004",
+      "category": "single_hop",
+      "question": "Cặp cụm mặc định hiện là hai cụm nào?",
+      "required_memory_ids": [
+        "M05"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D4:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Cụm Núi Thành (Đà Nẵng) và Cụm Vũng Tàu (Hồ Chí Minh).",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "cluster_pair_current",
+      "memory_families": [
+        "comparator_convention"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Cụm Núi Thành (Đà Nẵng) và Cụm Vũng Tàu (Hồ Chí Minh)."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_005",
+      "category": "single_hop",
+      "question": "Bảng xã chi tiết nghĩa là bảng nào?",
+      "required_memory_ids": [
+        "M06"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D5:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Top 10 xã trong Cụm Núi Thành, Đà Nẵng.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "commune_detail_current",
+      "memory_families": [
+        "ranking_convention"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Top 10 xã trong Cụm Núi Thành, Đà Nẵng."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_006",
+      "category": "single_hop",
+      "question": "So Doanh thu dịch vụ giữa hai tỉnh ngày 06/09/2026.",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [
+        "M10"
+      ],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D11:1"
+      ],
+      "answer_type": "clarification",
+      "expected_action": "ask_clarification",
+      "gold_answer": "Bạn muốn so hai tỉnh nào?",
+      "notes": "Generic missing-entity/no-invention behavior is sufficient to ask for the two provinces. M10 is relevant cancellation context but not strictly necessary for safe clarification.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "province_pair_missing_clarification",
+      "memory_families": [
+        "comparator_convention"
+      ],
+      "ltm_attribution": "non_exclusive",
+      "gold_rewrite": null,
+      "final_answer": "Bạn muốn so hai tỉnh nào?",
+      "no_hit_fpr_eligible": false,
+      "retrieval_scoring_contract": {
+        "strict_required_memory_ids": [],
+        "supporting_policy_overlap_memory_ids": [
+          "M10"
+        ],
+        "exclude_supporting_from_recall_at_k": true,
+        "precision_relevant_memory_ids": [
+          "M10"
+        ],
+        "supporting_retrieval_is_false_positive": false,
+        "no_hit_fpr_eligible": false,
+        "note": "Generic missing-entity/no-invention policy can produce the correct clarification without LTM. M10 is supporting evidence only."
+      }
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_007",
+      "category": "single_hop",
+      "question": "So Doanh thu IOT ở cặp cụm ngày 06/09/2026.",
+      "required_memory_ids": [
+        "M05"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D4:1"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "cluster_pair_action",
+      "memory_families": [
+        "comparator_convention"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Doanh thu dịch vụ IOT",
+      "source_service_id": "14330",
+      "source_testcase": "CT_66",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "14330",
+        "prd_id": "20260906",
+        "province_code": "DNG,HCM",
+        "cluster_code": "1000447100_VT_DVTM,1000502100_VT_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "day",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "So sánh Doanh thu dịch vụ IOT của Cụm Núi Thành (Đà Nẵng) và Cụm Vũng Tàu (Hồ Chí Minh) ngày 06/09/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_008",
+      "category": "single_hop",
+      "question": "Lấy bảng xã chi tiết cho Doanh thu dịch vụ tháng 8.",
+      "required_memory_ids": [
+        "M06"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D5:1"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "commune_detail_action",
+      "memory_families": [
+        "ranking_convention"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Doanh thu dịch vụ (VTT+VTS+VDS)",
+      "source_service_id": "34",
+      "source_testcase": "CT_70",
+      "expected_intent": "xep_hang_chi_tieu",
+      "expected_api": {
+        "service_id": "34",
+        "prd_id": "20260831",
+        "province_code": "DNG",
+        "cluster_code": "1000447100_VT_DVTM",
+        "precinct_code": "",
+        "dept_level": "4",
+        "ck_type": "month",
+        "limit": "10",
+        "order_by": "thuc_hien",
+        "order_type": "DESC",
+        "condition": []
+      },
+      "gold_rewrite": "Top 10 xã xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) trong Cụm Núi Thành, tỉnh Đà Nẵng tháng 08/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_009",
+      "category": "single_hop",
+      "question": "Lấy nhóm cuối về FTTH phát triển thực lũy kế tháng 8.",
+      "required_memory_ids": [
+        "M03"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D2:1"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "bottom_default_action",
+      "memory_families": [
+        "ranking_convention"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Thuê bao FTTH phát triển thực LK",
+      "source_service_id": "38",
+      "source_testcase": "CT_68",
+      "expected_intent": "xep_hang_chi_tieu",
+      "expected_api": {
+        "service_id": "38",
+        "prd_id": "20260831",
+        "province_code": "",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "month",
+        "limit": "3",
+        "order_by": "thuc_hien",
+        "order_type": "ASC",
+        "condition": []
+      },
+      "gold_rewrite": "Top 3 tỉnh đứng cuối về Thuê bao FTTH phát triển thực LK tháng 08/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_010",
+      "category": "single_hop",
+      "question": "Chỉ tiêu thứ ba của bộ lõi hiện tại là gì?",
+      "required_memory_ids": [
+        "M09"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D8:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "FTTH phát triển thực lũy kế.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "core_bundle_current",
+      "memory_families": [
+        "metric_bundle"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "FTTH phát triển thực lũy kế."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_011",
+      "category": "single_hop",
+      "question": "Hiện bộ lõi có truyền hình không?",
+      "required_memory_ids": [
+        "M09"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D8:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Không. Bộ lõi hiện là Doanh thu dịch vụ, IOT và FTTH.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "core_bundle_current",
+      "memory_families": [
+        "metric_bundle"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. Bộ lõi hiện là Doanh thu dịch vụ, IOT và FTTH."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_012",
+      "category": "single_hop",
+      "question": "Cặp Đông Thành–Minh Sơn có phải cặp so sánh mặc định hiện tại không?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M07"
+      ],
+      "evidence_turn_ids": [
+        "D6:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Không. Đó chỉ là cặp tạm cho workshop hôm đó.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "temporary_workshop_pair",
+      "memory_families": [
+        "temporary_task"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. Đó chỉ là cặp tạm cho workshop hôm đó.",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_013",
+      "category": "single_hop",
+      "question": "Tăng trưởng chỉ tiêu đầu của bộ lõi ở Hà Nội lũy kế đến tháng 8.",
+      "required_memory_ids": [
+        "M09"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D8:1"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "core_bundle_growth_action",
+      "memory_families": [
+        "metric_bundle"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Doanh thu dịch vụ (VTT+VTS+VDS)",
+      "source_service_id": "34",
+      "source_testcase": "CT_76",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "34",
+        "prd_id": "20260831",
+        "province_code": "HNI",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Tăng trưởng Doanh thu dịch vụ (VTT+VTS+VDS) của tỉnh Hà Nội lũy kế đến tháng 08/2026 là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_014",
+      "category": "single_hop",
+      "question": "Nếu mình nói cặp cụm thì có cần hỏi lại địa bàn không?",
+      "required_memory_ids": [
+        "M05"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D4:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Không. 'Cặp cụm' đã được quy ước là Núi Thành và Vũng Tàu.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "cluster_pair_current",
+      "memory_families": [
+        "comparator_convention"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. 'Cặp cụm' đã được quy ước là Núi Thành và Vũng Tàu."
+    },
+    {
+      "question_id": "Q_MULTI_HOP_001",
+      "category": "multi_hop",
+      "question": "So chỉ tiêu thứ hai của bộ lõi ở cặp cụm ngày 06/09/2026.",
+      "required_memory_ids": [
+        "M09",
+        "M05"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D8:1",
+        "D4:1"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "core_bundle_x_cluster_pair",
+      "memory_families": [
+        "comparator_convention",
+        "metric_bundle"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Doanh thu dịch vụ IOT",
+      "source_service_id": "14330",
+      "source_testcase": "CT_66",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "14330",
+        "prd_id": "20260906",
+        "province_code": "DNG,HCM",
+        "cluster_code": "1000447100_VT_DVTM,1000502100_VT_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "day",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "So sánh Doanh thu dịch vụ IOT của Cụm Núi Thành (Đà Nẵng) và Cụm Vũng Tàu (Hồ Chí Minh) ngày 06/09/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_MULTI_HOP_002",
+      "category": "multi_hop",
+      "question": "Nhóm cuối mặc định lấy bao nhiêu tỉnh và chỉ tiêu thứ ba của bộ lõi hiện tại là gì?",
+      "required_memory_ids": [
+        "M03",
+        "M09"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D2:1",
+        "D8:1"
+      ],
+      "answer_type": "memory_reasoning",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Nhóm cuối mặc định lấy 3 tỉnh; chỉ tiêu thứ ba của bộ lõi hiện tại là FTTH phát triển thực lũy kế.",
+      "notes": "Business execution for the same underlying facts is covered separately by Q_TEMPORAL_BUSINESS_ACTION_004.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "bottom_default_x_core_bundle_position",
+      "memory_families": [
+        "metric_bundle",
+        "ranking_convention"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Nhóm cuối mặc định lấy 3 tỉnh; chỉ tiêu thứ ba của bộ lõi hiện tại là FTTH phát triển thực lũy kế."
+    },
+    {
+      "question_id": "Q_MULTI_HOP_003",
+      "category": "multi_hop",
+      "question": "Lấy bảng xã chi tiết cho chỉ tiêu đầu của bộ lõi tháng 8.",
+      "required_memory_ids": [
+        "M06",
+        "M09"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D5:1",
+        "D8:1"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "core_bundle_x_commune_detail",
+      "memory_families": [
+        "metric_bundle",
+        "ranking_convention"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Doanh thu dịch vụ (VTT+VTS+VDS)",
+      "source_service_id": "34",
+      "source_testcase": "CT_70",
+      "expected_intent": "xep_hang_chi_tieu",
+      "expected_api": {
+        "service_id": "34",
+        "prd_id": "20260831",
+        "province_code": "DNG",
+        "cluster_code": "1000447100_VT_DVTM",
+        "precinct_code": "",
+        "dept_level": "4",
+        "ck_type": "month",
+        "limit": "10",
+        "order_by": "thuc_hien",
+        "order_type": "DESC",
+        "condition": []
+      },
+      "gold_rewrite": "Top 10 xã xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) trong Cụm Núi Thành, tỉnh Đà Nẵng tháng 08/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_MULTI_HOP_004",
+      "category": "multi_hop",
+      "question": "Hiện phần so tỉnh và phần so cụm khác nhau thế nào về địa bàn mặc định?",
+      "required_memory_ids": [
+        "M10",
+        "M05"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D11:1",
+        "D4:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "So tỉnh hiện không có cặp mặc định và phải hỏi lại nếu thiếu địa bàn; còn cặp cụm mặc định là Núi Thành–Vũng Tàu.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "province_vs_cluster_defaults",
+      "memory_families": [
+        "comparator_convention"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "So tỉnh hiện không có cặp mặc định và phải hỏi lại nếu thiếu địa bàn; còn cặp cụm mặc định là Núi Thành–Vũng Tàu."
+    },
+    {
+      "question_id": "Q_MULTI_HOP_005",
+      "category": "multi_hop",
+      "question": "Ở giai đoạn bộ lõi đã thêm FTTH nhưng cặp tỉnh chuẩn vẫn còn hiệu lực, chỉ tiêu thứ ba là gì và cặp tỉnh chuẩn là cặp nào?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M01",
+        "M09"
+      ],
+      "evidence_turn_ids": [
+        "D1:1",
+        "D8:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Chỉ tiêu thứ ba là FTTH phát triển thực lũy kế; cặp tỉnh chuẩn là Phú Thọ–Đà Nẵng.",
+      "notes": "Historical cross-family reasoning with clearer temporal wording.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "historical_bundle_x_province_pair",
+      "memory_families": [
+        "comparator_convention",
+        "metric_bundle"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Chỉ tiêu thứ ba là FTTH phát triển thực lũy kế; cặp tỉnh chuẩn là Phú Thọ–Đà Nẵng."
+    },
+    {
+      "question_id": "Q_MULTI_HOP_006",
+      "category": "multi_hop",
+      "question": "Ở giai đoạn bộ lõi ban đầu, chỉ tiêu thứ hai là gì và cặp cụm mặc định là cặp nào?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M02",
+        "M05"
+      ],
+      "evidence_turn_ids": [
+        "D1:3",
+        "D4:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Chỉ tiêu thứ hai là Doanh thu IOT; cặp cụm mặc định là Núi Thành–Vũng Tàu.",
+      "notes": "Cross-family historical reasoning; no longer duplicates province-pair evolution QA.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "historical_initial_bundle_x_cluster_pair",
+      "memory_families": [
+        "comparator_convention",
+        "metric_bundle"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Chỉ tiêu thứ hai là Doanh thu IOT; cặp cụm mặc định là Núi Thành–Vũng Tàu."
+    },
+    {
+      "question_id": "Q_MULTI_HOP_007",
+      "category": "multi_hop",
+      "question": "Trong buổi review, ở cặp cụm, lấy chỉ tiêu thuê bao thay thế ngày 06/09/2026.",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M11",
+        "M05"
+      ],
+      "evidence_turn_ids": [
+        "D14:1",
+        "D4:1"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "M11 resolves the temporary replacement KPI as television; M05 resolves the durable cluster pair as Núi Thành–Vũng Tàu.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "temporary_override_x_cluster_pair_action",
+      "memory_families": [
+        "comparator_convention",
+        "temporary_task"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": "So sánh Thuê bao truyền hình phát triển thực LK của Cụm Núi Thành (Đà Nẵng) và Cụm Vũng Tàu (Hồ Chí Minh) ngày 06/09/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true,
+      "source_indicator": "Thuê bao truyền hình phát triển thực LK",
+      "source_service_id": "777",
+      "source_testcase": "CT_66",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "777",
+        "prd_id": "20260906",
+        "province_code": "DNG,HCM",
+        "cluster_code": "1000447100_VT_DVTM,1000502100_VT_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      }
+    },
+    {
+      "question_id": "Q_MULTI_HOP_008",
+      "category": "multi_hop",
+      "question": "Cặp xã workshop và cặp cụm hiện tại có cùng vai trò không?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M07",
+        "M05"
+      ],
+      "evidence_turn_ids": [
+        "D6:1",
+        "D4:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Không. Đông Thành–Minh Sơn chỉ là cặp tạm cho workshop; Núi Thành–Vũng Tàu là cặp cụm mặc định hiện tại.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "temporary_vs_durable_comparator",
+      "memory_families": [
+        "comparator_convention",
+        "temporary_task"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. Đông Thành–Minh Sơn chỉ là cặp tạm cho workshop; Núi Thành–Vũng Tàu là cặp cụm mặc định hiện tại.",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_MULTI_HOP_009",
+      "category": "multi_hop",
+      "question": "Chỉ tiêu đầu của bộ lõi là gì và khi so sánh thì mình muốn câu trả lời theo kiểu nào?",
+      "required_memory_ids": [
+        "M09",
+        "M04"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D8:1",
+        "D3:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Chỉ tiêu đầu là Doanh thu dịch vụ; phần trả lời nên nêu bên nào cao hơn và số của hai bên, không giải thích dài.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "bundle_x_response_style",
+      "memory_families": [
+        "metric_bundle",
+        "response_style"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Chỉ tiêu đầu là Doanh thu dịch vụ; phần trả lời nên nêu bên nào cao hơn và số của hai bên, không giải thích dài."
+    },
+    {
+      "question_id": "Q_MULTI_HOP_010",
+      "category": "multi_hop",
+      "question": "Khi lấy nhóm cuối, mặc định lấy bao nhiêu tỉnh và phần so sánh nên trình bày ngắn thế nào?",
+      "required_memory_ids": [
+        "M03",
+        "M04"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D2:1",
+        "D3:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Lấy 3 tỉnh đứng cuối; khi so sánh thì nêu bên nào cao hơn và số của hai bên, không giải thích dài.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "ranking_x_response_style",
+      "memory_families": [
+        "ranking_convention",
+        "response_style"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Lấy 3 tỉnh đứng cuối; khi so sánh thì nêu bên nào cao hơn và số của hai bên, không giải thích dài."
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_001",
+      "category": "temporal_reasoning",
+      "question": "Quy ước nhóm cuối được chốt trước hay sau cặp cụm mặc định?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M03",
+        "M05"
+      ],
+      "evidence_turn_ids": [
+        "D2:1",
+        "D4:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Trước.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "ranking_vs_cluster_timeline",
+      "memory_families": [
+        "comparator_convention",
+        "ranking_convention"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Trước."
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_002",
+      "category": "temporal_reasoning",
+      "question": "Bảng xã chi tiết được chốt trước hay sau cặp xã workshop?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M06",
+        "M07"
+      ],
+      "evidence_turn_ids": [
+        "D5:1",
+        "D6:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Trước.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "commune_rule_vs_workshop_timeline",
+      "memory_families": [
+        "ranking_convention",
+        "temporary_task"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Trước.",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_003",
+      "category": "temporal_reasoning",
+      "question": "Bộ lõi được mở rộng thêm FTTH trước hay sau khi bỏ cặp tỉnh mặc định?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M09",
+        "M10"
+      ],
+      "evidence_turn_ids": [
+        "D8:1",
+        "D11:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Trước.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "bundle_update_vs_pair_cancel",
+      "memory_families": [
+        "comparator_convention",
+        "metric_bundle"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Trước."
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_004",
+      "category": "temporal_reasoning",
+      "question": "Cặp xã workshop xuất hiện trước hay sau khi bộ lõi được mở rộng thêm FTTH?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M07",
+        "M09"
+      ],
+      "evidence_turn_ids": [
+        "D6:1",
+        "D8:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Trước.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "workshop_vs_bundle_update",
+      "memory_families": [
+        "metric_bundle",
+        "temporary_task"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Trước.",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_005",
+      "category": "temporal_reasoning",
+      "question": "Ngoại lệ truyền hình xảy ra trước hay sau khi bỏ cặp tỉnh mặc định?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M10",
+        "M11"
+      ],
+      "evidence_turn_ids": [
+        "D11:1",
+        "D14:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Sau.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "tv_exception_vs_pair_cancel",
+      "memory_families": [
+        "comparator_convention",
+        "temporary_task"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Sau.",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_006",
+      "category": "temporal_reasoning",
+      "question": "Việc dùng lại Phú Thọ–Đà Nẵng cho một slide xảy ra trước hay sau khi bộ lõi được mở rộng thêm FTTH?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M09",
+        "M15"
+      ],
+      "evidence_turn_ids": [
+        "D8:1",
+        "D12:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Sau.",
+      "notes": "Requires chronology between two independent events; neither event semantically implies the other's timestamp.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "slide_exception_vs_bundle_update",
+      "memory_families": [
+        "metric_bundle",
+        "temporary_task"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Sau.",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_001",
+      "category": "state_update",
+      "question": "Cặp tỉnh mặc định ban đầu và hiện tại khác nhau thế nào?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M01",
+        "M10"
+      ],
+      "evidence_turn_ids": [
+        "D1:1",
+        "D11:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Ban đầu là Phú Thọ–Đà Nẵng; hiện tại không còn cặp tỉnh mặc định và phải hỏi lại nếu thiếu địa bàn.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "province_pair_evolution",
+      "memory_families": [
+        "comparator_convention"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Ban đầu là Phú Thọ–Đà Nẵng; hiện tại không còn cặp tỉnh mặc định và phải hỏi lại nếu thiếu địa bàn."
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_002",
+      "category": "state_update",
+      "question": "Bộ lõi ban đầu và hiện tại khác nhau thế nào?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M02",
+        "M09"
+      ],
+      "evidence_turn_ids": [
+        "D1:3",
+        "D8:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Ban đầu có 2 chỉ tiêu: Doanh thu dịch vụ, IOT; hiện tại có thêm FTTH ở vị trí thứ ba.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "core_bundle_evolution",
+      "memory_families": [
+        "metric_bundle"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Ban đầu có 2 chỉ tiêu: Doanh thu dịch vụ, IOT; hiện tại có thêm FTTH ở vị trí thứ ba."
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_003",
+      "category": "state_update",
+      "question": "Khi bộ lõi được thêm FTTH, hai vị trí đầu có thay đổi không?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M02",
+        "M09"
+      ],
+      "evidence_turn_ids": [
+        "D1:3",
+        "D8:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Không. Hai vị trí đầu vẫn là Doanh thu dịch vụ rồi IOT; FTTH được thêm ở vị trí thứ ba.",
+      "notes": "Requires both the initial and updated bundle states.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "core_bundle_update_preserves_order",
+      "memory_families": [
+        "metric_bundle"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. Hai vị trí đầu vẫn là Doanh thu dịch vụ rồi IOT; FTTH được thêm ở vị trí thứ ba."
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_004",
+      "category": "state_update",
+      "question": "Hiện nếu mình nói “cặp tỉnh chuẩn” thì còn được tự hiểu là Phú Thọ–Đà Nẵng nữa không?",
+      "required_memory_ids": [
+        "M10"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D11:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Không. Quy ước đó đã bị hủy; nếu cần so tỉnh phải nêu rõ hai tỉnh.",
+      "notes": "The query directly tests whether the old alias/default remains valid after cancellation; M10 is strictly required.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "province_pair_cancelled",
+      "memory_families": [
+        "comparator_convention"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. Quy ước đó đã bị hủy; nếu cần so tỉnh phải nêu rõ hai tỉnh."
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_005",
+      "category": "state_update",
+      "question": "Việc dùng lại Phú Thọ–Đà Nẵng cho một slide sau khi hủy default có khôi phục cặp tỉnh mặc định không?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M15",
+        "M10"
+      ],
+      "evidence_turn_ids": [
+        "D12:1",
+        "D11:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Không. Đó chỉ là cặp explicit cho một slide; cặp tỉnh mặc định vẫn bị hủy.",
+      "notes": "Temporary explicit reuse must not reverse the prior cancellation.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "slide_exception_after_pair_cancel",
+      "memory_families": [
+        "comparator_convention",
+        "temporary_task"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. Đó chỉ là cặp explicit cho một slide; cặp tỉnh mặc định vẫn bị hủy.",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_006",
+      "category": "state_update",
+      "question": "Ngoại lệ dùng truyền hình có trở thành thay đổi lâu dài của bộ lõi không?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M11"
+      ],
+      "evidence_turn_ids": [
+        "D14:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Không. Truyền hình chỉ là thay thế tạm ở vị trí FTTH trong buổi review và không được persist.",
+      "notes": "M11 alone explicitly encodes both the temporary substitution and the do-not-persist condition.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "temporary_tv_exception",
+      "memory_families": [
+        "temporary_task"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. Truyền hình chỉ là thay thế tạm ở vị trí FTTH trong buổi review và không được persist.",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_007",
+      "category": "state_update",
+      "question": "Sau khi cặp tỉnh mặc định bị hủy, cặp cụm có còn giữ quy ước riêng không?",
+      "required_memory_ids": [
+        "M05"
+      ],
+      "supporting_memory_ids": [
+        "M10"
+      ],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D4:1",
+        "D11:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Có. So tỉnh không còn cặp mặc định, nhưng cặp cụm vẫn là Núi Thành–Vũng Tàu.",
+      "notes": "Tests that cancellation of one comparator convention does not erase an independent comparator convention.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "province_cancel_cluster_unchanged",
+      "memory_families": [
+        "comparator_convention"
+      ],
+      "ltm_attribution": "partial_non_exclusive",
+      "gold_rewrite": null,
+      "final_answer": "Có. So tỉnh không còn cặp mặc định, nhưng cặp cụm vẫn là Núi Thành–Vũng Tàu.",
+      "retrieval_scoring_contract": {
+        "strict_required_memory_ids": [
+          "M05"
+        ],
+        "supporting_memory_ids": [
+          "M10"
+        ],
+        "exclude_supporting_from_recall_at_k": true,
+        "precision_relevant_memory_ids": [
+          "M05",
+          "M10"
+        ],
+        "supporting_retrieval_is_false_positive": false,
+        "note": "The question itself states that the province-pair default was cancelled, so M10 is supporting context only. M05 is strictly needed to know that the cluster-pair convention still exists and what it is."
+      }
+    },
+    {
+      "question_id": "Q_TEMPORAL_BUSINESS_ACTION_001",
+      "category": "temporal_business_action",
+      "question": "Ở giai đoạn còn cặp tỉnh chuẩn và bộ lõi ban đầu, so chỉ tiêu đầu của bộ lõi ngày 06/09/2026.",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M01",
+        "M02"
+      ],
+      "evidence_turn_ids": [
+        "D1:1",
+        "D1:3"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "historical_pair_x_initial_bundle",
+      "memory_families": [
+        "comparator_convention",
+        "metric_bundle"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Doanh thu dịch vụ (VTT+VTS+VDS)",
+      "source_service_id": "34",
+      "source_testcase": "CT_64",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "34",
+        "prd_id": "20260906",
+        "province_code": "DNG,PTO",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "day",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "So sánh Doanh thu dịch vụ (VTT+VTS+VDS) của tỉnh Phú Thọ và tỉnh Đà Nẵng ngày 06/09/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_TEMPORAL_BUSINESS_ACTION_002",
+      "category": "temporal_business_action",
+      "question": "Ở giai đoạn còn cặp tỉnh chuẩn và bộ lõi ban đầu, so chỉ tiêu thứ hai của bộ lõi ngày 06/09/2026.",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M01",
+        "M02"
+      ],
+      "evidence_turn_ids": [
+        "D1:1",
+        "D1:3"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "historical_pair_x_initial_bundle",
+      "memory_families": [
+        "comparator_convention",
+        "metric_bundle"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Doanh thu dịch vụ IOT",
+      "source_service_id": "14330",
+      "source_testcase": "CT_64",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "14330",
+        "prd_id": "20260906",
+        "province_code": "DNG,PTO",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "day",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "So sánh Doanh thu dịch vụ IOT của tỉnh Phú Thọ và tỉnh Đà Nẵng ngày 06/09/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_TEMPORAL_BUSINESS_ACTION_003",
+      "category": "temporal_business_action",
+      "question": "Theo quy ước hiện tại, so chỉ tiêu thứ ba của bộ lõi ở cặp cụm ngày 06/09/2026.",
+      "required_memory_ids": [
+        "M09",
+        "M05"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D8:1",
+        "D4:1"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "current_bundle_x_cluster_pair",
+      "memory_families": [
+        "comparator_convention",
+        "metric_bundle"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Thuê bao FTTH phát triển thực LK",
+      "source_service_id": "38",
+      "source_testcase": "CT_66",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "38",
+        "prd_id": "20260906",
+        "province_code": "DNG,HCM",
+        "cluster_code": "1000447100_VT_DVTM,1000502100_VT_DVTM",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "So sánh Thuê bao FTTH phát triển thực LK của Cụm Núi Thành (Đà Nẵng) và Cụm Vũng Tàu (Hồ Chí Minh) ngày 06/09/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_TEMPORAL_BUSINESS_ACTION_004",
+      "category": "temporal_business_action",
+      "question": "Theo quy ước hiện tại, lấy nhóm cuối cho chỉ tiêu thứ ba của bộ lõi tháng 8.",
+      "required_memory_ids": [
+        "M03",
+        "M09"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D2:1",
+        "D8:1"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "current_bundle_x_bottom",
+      "memory_families": [
+        "metric_bundle",
+        "ranking_convention"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Thuê bao FTTH phát triển thực LK",
+      "source_service_id": "38",
+      "source_testcase": "CT_68",
+      "expected_intent": "xep_hang_chi_tieu",
+      "expected_api": {
+        "service_id": "38",
+        "prd_id": "20260831",
+        "province_code": "",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "month",
+        "limit": "3",
+        "order_by": "thuc_hien",
+        "order_type": "ASC",
+        "condition": []
+      },
+      "gold_rewrite": "Top 3 tỉnh đứng cuối về Thuê bao FTTH phát triển thực LK tháng 08/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_TEMPORAL_BUSINESS_ACTION_005",
+      "category": "temporal_business_action",
+      "question": "Trong workshop, so chỉ tiêu đầu của bộ lõi ban đầu ở cặp xã tạm ngày 06/09/2026.",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M07",
+        "M02"
+      ],
+      "evidence_turn_ids": [
+        "D6:1",
+        "D1:3"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "historical_workshop_pair_action",
+      "memory_families": [
+        "metric_bundle",
+        "temporary_task"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Doanh thu dịch vụ (VTT+VTS+VDS)",
+      "source_service_id": "34",
+      "source_testcase": "CT_65",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "34",
+        "prd_id": "20260906",
+        "province_code": "PTO,THA",
+        "cluster_code": "1001244100_DVTM,1002056100_DVTM",
+        "precinct_code": "PTO021,THA132",
+        "dept_level": "4",
+        "ck_type": "day",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "So sánh Doanh thu dịch vụ (VTT+VTS+VDS) của Xã Đông Thành (Phú Thọ) và Xã Minh Sơn (Thanh Hóa) ngày 06/09/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_FALSE_PREMISE_001",
+      "category": "false_premise",
+      "question": "Hiện cặp tỉnh mặc định vẫn là Phú Thọ với Đà Nẵng đúng không?",
+      "required_memory_ids": [
+        "M10"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D11:1"
+      ],
+      "answer_type": "adversarial",
+      "expected_action": "reject_false_premise",
+      "gold_answer": "Không. Hiện không còn cặp tỉnh mặc định; thiếu tên hai tỉnh thì phải hỏi lại.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "province_pair_cancelled",
+      "memory_families": [
+        "comparator_convention"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. Hiện không còn cặp tỉnh mặc định; thiếu tên hai tỉnh thì phải hỏi lại."
+    },
+    {
+      "question_id": "Q_FALSE_PREMISE_002",
+      "category": "false_premise",
+      "question": "Bộ lõi hiện vẫn chỉ có Doanh thu dịch vụ và IOT đúng không?",
+      "required_memory_ids": [
+        "M09"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D8:1"
+      ],
+      "answer_type": "adversarial",
+      "expected_action": "reject_false_premise",
+      "gold_answer": "Không. Bộ lõi hiện còn có FTTH ở vị trí thứ ba.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "core_bundle_current",
+      "memory_families": [
+        "metric_bundle"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. Bộ lõi hiện còn có FTTH ở vị trí thứ ba."
+    },
+    {
+      "question_id": "Q_FALSE_PREMISE_003",
+      "category": "false_premise",
+      "question": "Cặp Đông Thành–Minh Sơn đã trở thành cặp so sánh mặc định đúng không?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M07"
+      ],
+      "evidence_turn_ids": [
+        "D6:1"
+      ],
+      "answer_type": "adversarial",
+      "expected_action": "reject_false_premise",
+      "gold_answer": "Không. Đó chỉ là cặp tạm cho workshop.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "temporary_workshop_pair",
+      "memory_families": [
+        "temporary_task"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. Đó chỉ là cặp tạm cho workshop.",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_FALSE_PREMISE_004",
+      "category": "false_premise",
+      "question": "Bảng xã chi tiết mặc định là top 5 xã đúng không?",
+      "required_memory_ids": [
+        "M06"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D5:1"
+      ],
+      "answer_type": "adversarial",
+      "expected_action": "reject_false_premise",
+      "gold_answer": "Không. Bảng xã chi tiết mặc định là top 10 xã trong Cụm Núi Thành.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "commune_detail_current",
+      "memory_families": [
+        "ranking_convention"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. Bảng xã chi tiết mặc định là top 10 xã trong Cụm Núi Thành."
+    },
+    {
+      "question_id": "Q_FALSE_PREMISE_005",
+      "category": "false_premise",
+      "question": "Cặp cụm mặc định là Phú Thọ với Đà Nẵng đúng không?",
+      "required_memory_ids": [
+        "M05"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D4:1"
+      ],
+      "answer_type": "adversarial",
+      "expected_action": "reject_false_premise",
+      "gold_answer": "Không. Cặp cụm mặc định là Núi Thành với Vũng Tàu.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "cluster_pair_current",
+      "memory_families": [
+        "comparator_convention"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. Cặp cụm mặc định là Núi Thành với Vũng Tàu."
+    },
+    {
+      "question_id": "Q_ABSTENTION_001",
+      "category": "abstention",
+      "question": "Mình muốn dùng ngưỡng chênh lệch bao nhiêu phần trăm để đánh dấu bất thường?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [],
+      "answer_type": "unanswerable",
+      "expected_action": "abstain",
+      "gold_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "unanswerable_user_profile",
+      "memory_families": [],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "no_hit_fpr_eligible": true
+    },
+    {
+      "question_id": "Q_ABSTENTION_002",
+      "category": "abstention",
+      "question": "Mình thường muốn xuất bảng so sánh ra Excel hay PDF?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [],
+      "answer_type": "unanswerable",
+      "expected_action": "abstain",
+      "gold_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "unanswerable_user_profile",
+      "memory_families": [],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "no_hit_fpr_eligible": true
+    },
+    {
+      "question_id": "Q_ABSTENTION_003",
+      "category": "abstention",
+      "question": "Mình thích màu nào để tô tỉnh đứng cuối?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [],
+      "answer_type": "unanswerable",
+      "expected_action": "abstain",
+      "gold_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "unanswerable_user_profile",
+      "memory_families": [],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "no_hit_fpr_eligible": true
+    },
+    {
+      "question_id": "Q_ABSTENTION_004",
+      "category": "abstention",
+      "question": "Mình muốn gửi bản phân tích vùng cho địa chỉ email nào?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [],
+      "answer_type": "unanswerable",
+      "expected_action": "abstain",
+      "gold_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "unanswerable_user_profile",
+      "memory_families": [],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "no_hit_fpr_eligible": true
+    },
+    {
+      "question_id": "Q_ABSTENTION_005",
+      "category": "abstention",
+      "question": "Mình có muốn hiển thị thêm mã đơn vị ở bảng xã chi tiết không?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [],
+      "answer_type": "unanswerable",
+      "expected_action": "abstain",
+      "gold_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "unanswerable_user_profile",
+      "memory_families": [],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "no_hit_fpr_eligible": true
+    }
+  ],
+  "evaluation_modes": {
+    "retrieval_ltm_only": {
+      "context": [
+        "current_query",
+        "ltm"
+      ],
+      "recent_seed": [],
+      "purpose": "Measure LTM retrieval without help from recent conversation context."
+    },
+    "end_to_end_recent_only": {
+      "context": [
+        "current_query",
+        "recent_messages"
+      ],
+      "recent_seed_policy": "explicit_run_configuration_only",
+      "purpose": "Baseline for what an explicitly seeded recent context can solve."
+    },
+    "end_to_end_recent_plus_ltm": {
+      "context": [
+        "current_query",
+        "recent_messages",
+        "ltm"
+      ],
+      "recent_seed_policy": "must_exactly_match_end_to_end_recent_only",
+      "purpose": "Full-system memory condition with the same recent seed as the recent-only baseline."
+    },
+    "ltm_uplift_definition": "Compare recent+LTM against recent-only using the exact same recent seed."
+  },
+  "recent_context_caveat": {
+    "late_recap_sessions": [
+      19,
+      20,
+      21
+    ],
+    "note": "D19–D21 become recent context only when the run explicitly seeds them. Prior synthetic sessions are never treated as recent by default across session boundaries."
+  },
+  "qa_execution_context_contract": {
+    "evaluation_anchor": "after_session_22",
+    "cross_session_default": "Each QA recall case starts in a fresh evaluation session unless the case/run configuration explicitly defines a recent seed.",
+    "retrieval_ltm_only_recent_messages": [],
+    "recent_only_rule": "Recent messages must be explicitly seeded by the case/run configuration; prior synthetic sessions must not be concatenated implicitly.",
+    "recent_plus_ltm_rule": "Use exactly the same explicit recent seed as recent_only, then add LTM. The only intended difference between these two E2E modes is the presence of LTM.",
+    "session_boundary_is_authoritative": true,
+    "runner_must_log_exact_recent_dia_ids": true
+  },
+  "clarification_scoring_contract": {
+    "applies_to_expected_action": "ask_clarification",
+    "must_not_execute_kira": true,
+    "gold_rewrite_must_be_null": true,
+    "semantic_requirement": "Ask the user to provide the two missing province names without inventing or resurrecting a default pair.",
+    "acceptable_paraphrase_policy": "semantic_match",
+    "forbidden_behavior": [
+      "execute a comparison without both province names",
+      "silently reuse the cancelled Phú Thọ–Đà Nẵng default"
+    ]
+  }
+}

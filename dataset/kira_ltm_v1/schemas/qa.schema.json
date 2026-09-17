@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kira.local/schemas/qa-v1.json",
+  "title": "KiRa QA and scoring gold",
+  "type": "object",
+  "required": ["conversation_id", "do_not_ingest", "summary", "baseline_scope", "evaluation_scope", "qa"],
+  "properties": {
+    "conversation_id": { "type": "string", "minLength": 1 },
+    "do_not_ingest": { "const": true },
+    "summary": { "type": "object" },
+    "baseline_scope": { "type": "object" },
+    "evaluation_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "scenario_group_role", "memory_family_role"],
+      "properties": {
+        "mode": { "const": "full_corpus" },
+        "scenario_group_role": { "const": "reporting_slice" },
+        "memory_family_role": { "const": "audit_dimension" }
+      }
+    },
+    "qa": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "question_id",
+          "category",
+          "question",
+          "required_memory_ids",
+          "evidence_turn_ids",
+          "expected_action",
+          "evaluation_tier",
+          "hard_gate",
+          "scenario_group"
+        ],
+        "properties": {
+          "question_id": { "type": "string", "minLength": 1 },
+          "category": { "type": "string", "minLength": 1 },
+          "question": { "type": "string", "minLength": 1 },
+          "required_memory_ids": { "$ref": "#/$defs/ids" },
+          "supporting_memory_ids": { "$ref": "#/$defs/ids" },
+          "history_memory_ids": { "$ref": "#/$defs/ids" },
+          "evidence_turn_ids": { "$ref": "#/$defs/ids" },
+          "expected_action": { "type": "string", "minLength": 1 },
+          "evaluation_tier": { "enum": ["hard_gate", "diagnostic_history"] },
+          "hard_gate": { "type": "boolean" },
+          "scenario_group": { "type": "string", "minLength": 1 },
+          "final_answer": { "type": ["string", "null"] }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

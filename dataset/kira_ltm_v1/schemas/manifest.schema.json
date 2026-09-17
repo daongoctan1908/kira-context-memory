@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kira.local/schemas/dataset-manifest-v1.json",
+  "title": "KiRa LTM dataset manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "dataset_version",
+    "status",
+    "canonical_format",
+    "evaluation_scope",
+    "id_namespace",
+    "timestamp_policy",
+    "data_policy",
+    "bundles"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema_version": { "const": 1 },
+    "dataset_id": { "const": "kira_ltm_v1" },
+    "dataset_version": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["draft", "contract_frozen", "materialized", "reviewed", "benchmark_ready"] },
+    "canonical_format": { "const": "json" },
+    "evaluation_scope": { "const": "full_corpus" },
+    "id_namespace": { "const": "{bundle_id}:{local_id}" },
+    "timestamp_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "turn_offset_unit", "turn_offset_start"],
+      "properties": {
+        "source": { "const": "session_datetime" },
+        "turn_offset_unit": { "const": "microseconds" },
+        "turn_offset_start": { "const": 0 }
+      }
+    },
+    "data_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classification", "external_provider_allowed", "public_git_status"],
+      "properties": {
+        "classification": { "const": "internal_test_synthetic_derived" },
+        "external_provider_allowed": { "const": false },
+        "public_git_status": { "const": "review_required" }
+      }
+    },
+    "bundles": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/bundle" }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "sha256"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+\\.json$" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "bundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bundle_id",
+        "source_conversation_id",
+        "revision",
+        "contract_status",
+        "materialization_status",
+        "path",
+        "review",
+        "counts",
+        "files"
+      ],
+      "properties": {
+        "bundle_id": { "$ref": "#/$defs/identifier" },
+        "source_conversation_id": { "$ref": "#/$defs/identifier" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "contract_status": { "enum": ["draft", "frozen"] },
+        "materialization_status": { "enum": ["pending", "materialized"] },
+        "path": { "type": "string", "pattern": "^bundles/[A-Za-z0-9_.-]+$" },
+        "review": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "reviewer", "revision"],
+          "properties": {
+            "status": { "enum": ["draft", "reviewed"] },
+            "reviewer": { "type": ["string", "null"] },
+            "revision": { "type": ["string", "null"] }
+          }
+        },
+        "counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sessions", "turns", "fills", "memory_events", "qa", "hard_gate", "diagnostic_history", "pending_answers"],
+          "properties": {
+            "sessions": { "type": "integer", "minimum": 1 },
+            "turns": { "type": "integer", "minimum": 1 },
+            "fills": { "type": "integer", "minimum": 0 },
+            "memory_events": { "type": "integer", "minimum": 0 },
+            "qa": { "type": "integer", "minimum": 0 },
+            "hard_gate": { "type": "integer", "minimum": 0 },
+            "diagnostic_history": { "type": "integer", "minimum": 0 },
+            "pending_answers": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "files": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["conversation", "fills", "memories", "qa"],
+          "properties": {
+            "conversation": { "$ref": "#/$defs/file" },
+            "fills": { "$ref": "#/$defs/file" },
+            "memories": { "$ref": "#/$defs/file" },
+            "qa": { "$ref": "#/$defs/file" }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,1766 @@
+{
+  "conversation_id": "conv_04_FREEZE_v4_FINAL",
+  "do_not_ingest": true,
+  "summary": {
+    "sessions": 22,
+    "turns": 102,
+    "kira_fill_slots": 32,
+    "zero_fill_sessions": 6,
+    "assistant_bridge_count": 19,
+    "assistant_bridge_unique": 19,
+    "gold_memory_events": 15,
+    "active_memory_events_at_end": 12,
+    "expected_active_memory_rows_reference": 11,
+    "qa_total": 52,
+    "qa_category_distribution": {
+      "single_hop": 14,
+      "multi_hop": 10,
+      "temporal_reasoning": 6,
+      "state_update": 7,
+      "temporal_business_action": 5,
+      "false_premise": 5,
+      "abstention": 5
+    },
+    "hard_gate_qa": 36,
+    "diagnostic_history_qa": 16,
+    "scenario_groups": 43,
+    "scenario_group_size_range": [
+      1,
+      5
+    ],
+    "business_action_qa": 11,
+    "formation_only_memory_ids": [],
+    "status": "FROZEN_CONTRACT_PENDING_KIRA_FILL",
+    "conversation_id": "conv_04_FREEZE_v4_FINAL"
+  },
+  "baseline_scope": {
+    "hard_gate_definition": "Evaluable from the final current-state condition without requiring superseded or ephemeral history. This may use final active semantic memories and/or global no-invention, clarification, precedence, or no-hit behavior. Hard-gate status does not imply that an LTM retrieval hit is strictly required.",
+    "diagnostic_history_definition": "Requires historical occurrence/order information and/or superseded or ephemeral context not guaranteed by the final active snapshot."
+  },
+  "score_reporting_contract": {
+    "headline_scope": {
+      "baseline_headline": "hard_gate_only",
+      "hard_gate_micro": "Micro accuracy over hard_gate=true QA only.",
+      "hard_gate_macro_scenario": "Macro scenario accuracy over hard_gate=true QA only.",
+      "diagnostic_history": "Report separately."
+    },
+    "required_metrics": [
+      {
+        "name": "micro_accuracy",
+        "definition": "Correct QA / evaluated QA within selected tier."
+      },
+      {
+        "name": "macro_scenario_accuracy",
+        "definition": "Average scenario-group accuracy with equal scenario weight."
+      }
+    ]
+  },
+  "retrieval_scoring_global_contract": {
+    "abstention_no_hit_rule": "QA with no relevant memory and `no_hit_fpr_eligible=true` belongs to the no-hit FPR bucket.",
+    "nonexclusive_support_only_rule": {
+      "when": {
+        "strict_required_memory_ids_empty": true,
+        "no_hit_fpr_eligible": false
+      },
+      "recall_at_k_denominator": "exclude",
+      "no_hit_fpr_bucket": "exclude",
+      "supporting_memory_precision": "supporting memories remain precision-relevant and are not false positives",
+      "optional_reporting": "supporting-hit rate may be reported separately"
+    }
+  },
+  "precedence_contract": {
+    "order": [
+      "explicit_current_query_instruction",
+      "temporary_current_session_override",
+      "durable_ltm_default"
+    ],
+    "rule": "A more specific current instruction overrides a remembered durable default without rewriting the durable memory unless the user explicitly makes the change persistent.",
+    "covered_case": "Q_SINGLE_HOP_014"
+  },
+  "clarification_scoring_contract": {
+    "applies_to_expected_action": "ask_clarification",
+    "must_not_execute_kira": true,
+    "gold_rewrite_must_be_null": true,
+    "acceptable_paraphrase_policy": "semantic_match",
+    "semantic_requirement": "Ask for the missing KPI family/context rather than guessing between lexical-near-duplicate subscriber metrics."
+  },
+  "qa_execution_context_contract": {
+    "evaluation_anchor": "after_session_22",
+    "cross_session_default": "Each QA recall case starts in a fresh evaluation session unless the case/run configuration explicitly defines a recent seed.",
+    "retrieval_ltm_only_recent_messages": [],
+    "recent_only_rule": "Recent messages must be explicitly seeded by the run; prior synthetic sessions must not be concatenated implicitly.",
+    "recent_plus_ltm_rule": "Use exactly the same explicit recent seed as recent_only, then add LTM.",
+    "session_boundary_is_authoritative": true,
+    "runner_must_log_exact_recent_dia_ids": true
+  },
+  "evaluation_modes": {
+    "retrieval_ltm_only": {
+      "context": [
+        "current_query",
+        "ltm"
+      ],
+      "recent_seed": [],
+      "purpose": "Measure LTM retrieval without recent-context help."
+    },
+    "end_to_end_recent_only": {
+      "context": [
+        "current_query",
+        "recent_messages"
+      ],
+      "recent_seed_policy": "explicit_run_configuration_only"
+    },
+    "end_to_end_recent_plus_ltm": {
+      "context": [
+        "current_query",
+        "recent_messages",
+        "ltm"
+      ],
+      "recent_seed_policy": "must_exactly_match_end_to_end_recent_only"
+    },
+    "ltm_uplift_definition": "Compare recent+LTM against recent-only using the exact same recent seed."
+  },
+  "evaluation_scope": {
+    "mode": "full_corpus",
+    "scenario_group_role": "reporting_slice",
+    "memory_family_role": "audit_dimension"
+  },
+  "qa": [
+    {
+      "question_id": "Q_SINGLE_HOP_001",
+      "category": "single_hop",
+      "question": "5G chính hiện tại là KPI nào?",
+      "required_memory_ids": [
+        "M11"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D9:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "TB Di động 5G thực Lũy kế.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "current_5g_main",
+      "memory_families": [
+        "semantic_alias_5g"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "TB Di động 5G thực Lũy kế."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_002",
+      "category": "single_hop",
+      "question": "Nền 5G là KPI nào?",
+      "required_memory_ids": [
+        "M02"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D1:3"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "TB Di động 5G thực Lũy kế.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "5g_base_role",
+      "memory_families": [
+        "semantic_role_5g"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "TB Di động 5G thực Lũy kế."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_003",
+      "category": "single_hop",
+      "question": "Dòng vào 5G là KPI nào?",
+      "required_memory_ids": [
+        "M03"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D2:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Thuê bao 5G phát triển mới.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "5g_inflow_role",
+      "memory_families": [
+        "semantic_role_5g"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Thuê bao 5G phát triển mới."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_004",
+      "category": "single_hop",
+      "question": "Biến động 5G là KPI nào?",
+      "required_memory_ids": [
+        "M04"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D2:3"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "TB Di động 5G thực Lũy kế Tăng Giảm.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "5g_delta_role",
+      "memory_families": [
+        "semantic_role_5g"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "TB Di động 5G thực Lũy kế Tăng Giảm."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_005",
+      "category": "single_hop",
+      "question": "Register 5G hiện dùng để làm gì?",
+      "required_memory_ids": [
+        "M12"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D9:3"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Dùng làm chỉ số đối chiếu.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "register_comparison_role",
+      "memory_families": [
+        "semantic_role_5g"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Dùng làm chỉ số đối chiếu."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_006",
+      "category": "single_hop",
+      "question": "Nền FTTH là KPI nào?",
+      "required_memory_ids": [
+        "M05"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D4:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Thuê bao FTTH phát triển thực LK.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "ftth_base_role",
+      "memory_families": [
+        "semantic_role_ftth"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Thuê bao FTTH phát triển thực LK."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_007",
+      "category": "single_hop",
+      "question": "Dòng vào FTTH là KPI nào?",
+      "required_memory_ids": [
+        "M06"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D4:3"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Thuê bao FTTH phát triển mới.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "ftth_inflow_role",
+      "memory_families": [
+        "semantic_role_ftth"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Thuê bao FTTH phát triển mới."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_008",
+      "category": "single_hop",
+      "question": "Dòng ra FTTH là KPI nào?",
+      "required_memory_ids": [
+        "M07"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D4:5"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Thuê bao FTTH rời mạng.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "ftth_outflow_role",
+      "memory_families": [
+        "semantic_role_ftth"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Thuê bao FTTH rời mạng."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_009",
+      "category": "single_hop",
+      "question": "Top tốt của dòng vào FTTH lấy phía cao hay thấp?",
+      "required_memory_ids": [
+        "M08"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D5:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Phía cao: các tỉnh có giá trị cao nhất.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "ftth_inflow_good_polarity",
+      "memory_families": [
+        "ranking_polarity_ftth"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Phía cao: các tỉnh có giá trị cao nhất."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_010",
+      "category": "single_hop",
+      "question": "Top tốt của dòng ra FTTH lấy phía cao hay thấp?",
+      "required_memory_ids": [
+        "M09"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D6:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Phía thấp: các tỉnh có giá trị thấp nhất.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "ftth_outflow_good_polarity",
+      "memory_families": [
+        "ranking_polarity_ftth"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Phía thấp: các tỉnh có giá trị thấp nhất."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_011",
+      "category": "single_hop",
+      "question": "Lấy dòng vào toàn quốc tháng 8.",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [
+        "M03",
+        "M06"
+      ],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D2:1",
+        "D4:3"
+      ],
+      "answer_type": "clarification",
+      "expected_action": "ask_clarification",
+      "gold_answer": "Bạn muốn lấy dòng vào 5G hay dòng vào FTTH?",
+      "notes": "Bare 'dòng vào' is deliberately ambiguous across 5G and FTTH.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "ambiguous_inflow_family",
+      "memory_families": [
+        "semantic_role_5g",
+        "semantic_role_ftth"
+      ],
+      "ltm_attribution": "non_exclusive",
+      "gold_rewrite": null,
+      "final_answer": "Bạn muốn lấy dòng vào 5G hay dòng vào FTTH?",
+      "no_hit_fpr_eligible": false,
+      "retrieval_scoring_contract": {
+        "strict_required_memory_ids": [],
+        "supporting_memory_ids": [
+          "M03",
+          "M06"
+        ],
+        "exclude_supporting_from_recall_at_k": true,
+        "precision_relevant_memory_ids": [
+          "M03",
+          "M06"
+        ],
+        "supporting_retrieval_is_false_positive": false
+      }
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_012",
+      "category": "single_hop",
+      "question": "So 5G chính của Phú Thọ với Đà Nẵng ngày 06/09/2026.",
+      "required_memory_ids": [
+        "M11"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D9:1"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "current_5g_main_action",
+      "memory_families": [
+        "semantic_alias_5g"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "TB Di động 5G thực Lũy kế",
+      "source_service_id": "413",
+      "source_testcase": "CT_64",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "413",
+        "prd_id": "20260906",
+        "province_code": "DNG,PTO",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "So sánh TB Di động 5G thực Lũy kế của tỉnh Phú Thọ và tỉnh Đà Nẵng ngày 06/09/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_013",
+      "category": "single_hop",
+      "question": "Xem tăng trưởng biến động 5G ở Hà Nội lũy kế đến tháng 8.",
+      "required_memory_ids": [
+        "M04"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D2:3"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "5g_delta_growth_action",
+      "memory_families": [
+        "semantic_role_5g"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "TB Di động 5G thực Lũy kế Tăng Giảm",
+      "source_service_id": "2810",
+      "source_testcase": "CT_76",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "2810",
+        "prd_id": "20260831",
+        "province_code": "HNI",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Tăng trưởng TB Di động 5G thực Lũy kế Tăng Giảm của tỉnh Hà Nội lũy kế đến tháng 08/2026 là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_014",
+      "category": "single_hop",
+      "question": "Riêng lần này, lấy 3 tỉnh top tốt của dòng ra FTTH theo phía cao nhất tháng 8.",
+      "required_memory_ids": [
+        "M07"
+      ],
+      "supporting_memory_ids": [
+        "M09"
+      ],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D4:5",
+        "D6:1"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "M07 is strictly required to resolve the semantic role 'dòng ra FTTH' to the churn KPI. M09 is relevant durable polarity context but is overridden by the explicit current-query direction.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "explicit_override_outflow_good",
+      "memory_families": [
+        "ranking_polarity_ftth",
+        "semantic_role_ftth"
+      ],
+      "ltm_attribution": "partial_override",
+      "source_indicator": "Thuê bao FTTH rời mạng",
+      "source_service_id": "1484",
+      "source_testcase": "CT_67",
+      "expected_intent": "xep_hang_chi_tieu",
+      "expected_api": {
+        "service_id": "1484",
+        "prd_id": "20260831",
+        "province_code": "",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "month",
+        "limit": "3",
+        "order_by": "thuc_hien",
+        "order_type": "DESC",
+        "condition": []
+      },
+      "gold_rewrite": "Top 3 tỉnh xếp hạng đầu về Thuê bao FTTH rời mạng tháng 08/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "retrieval_scoring_contract": {
+        "strict_required_memory_ids": [
+          "M07"
+        ],
+        "supporting_memory_ids": [
+          "M09"
+        ],
+        "exclude_supporting_from_recall_at_k": true,
+        "precision_relevant_memory_ids": [
+          "M07",
+          "M09"
+        ],
+        "supporting_retrieval_is_false_positive": false,
+        "memory_application": "Apply M07. Do not apply M09's low-direction default because the current query explicitly requests the high side."
+      }
+    },
+    {
+      "question_id": "Q_MULTI_HOP_001",
+      "category": "multi_hop",
+      "question": "5G chính hiện tại là KPI nào và Register 5G hiện giữ vai trò gì?",
+      "required_memory_ids": [
+        "M11",
+        "M12"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D9:1",
+        "D9:3"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "5G chính là TB Di động 5G thực Lũy kế; Register 5G dùng làm chỉ số đối chiếu.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "current_main_x_register_role",
+      "memory_families": [
+        "semantic_alias_5g",
+        "semantic_role_5g"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "5G chính là TB Di động 5G thực Lũy kế; Register 5G dùng làm chỉ số đối chiếu."
+    },
+    {
+      "question_id": "Q_MULTI_HOP_002",
+      "category": "multi_hop",
+      "question": "5G chính hiện tại và nền 5G có trỏ vào cùng một KPI không?",
+      "required_memory_ids": [
+        "M11",
+        "M02"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D9:1",
+        "D1:3"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Có. Cả hai hiện đều trỏ tới TB Di động 5G thực Lũy kế.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "current_main_x_base_5g",
+      "memory_families": [
+        "semantic_alias_5g",
+        "semantic_role_5g"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Có. Cả hai hiện đều trỏ tới TB Di động 5G thực Lũy kế."
+    },
+    {
+      "question_id": "Q_MULTI_HOP_003",
+      "category": "multi_hop",
+      "question": "Top tốt của dòng vào FTTH và top tốt của dòng ra FTTH khác nhau thế nào?",
+      "required_memory_ids": [
+        "M08",
+        "M09"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D5:1",
+        "D6:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Dòng vào FTTH lấy phía cao nhất; dòng ra FTTH lấy phía thấp nhất.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "good_polarity_cross_ftth_roles",
+      "memory_families": [
+        "ranking_polarity_ftth"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Dòng vào FTTH lấy phía cao nhất; dòng ra FTTH lấy phía thấp nhất."
+    },
+    {
+      "question_id": "Q_MULTI_HOP_004",
+      "category": "multi_hop",
+      "question": "Với dòng ra FTTH, top tốt và top cảnh báo đi theo hai phía nào?",
+      "required_memory_ids": [
+        "M09",
+        "M10"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D6:1",
+        "D6:3"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Top tốt lấy phía thấp nhất; top cảnh báo lấy phía cao nhất.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "outflow_good_vs_alert",
+      "memory_families": [
+        "ranking_polarity_ftth"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Top tốt lấy phía thấp nhất; top cảnh báo lấy phía cao nhất."
+    },
+    {
+      "question_id": "Q_MULTI_HOP_005",
+      "category": "multi_hop",
+      "question": "Dòng vào 5G và biến động 5G tương ứng với hai KPI nào?",
+      "required_memory_ids": [
+        "M03",
+        "M04"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D2:1",
+        "D2:3"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Dòng vào 5G là Thuê bao 5G phát triển mới; biến động 5G là TB Di động 5G thực Lũy kế Tăng Giảm.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "5g_inflow_x_delta",
+      "memory_families": [
+        "semantic_role_5g"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Dòng vào 5G là Thuê bao 5G phát triển mới; biến động 5G là TB Di động 5G thực Lũy kế Tăng Giảm."
+    },
+    {
+      "question_id": "Q_MULTI_HOP_006",
+      "category": "multi_hop",
+      "question": "Lấy 3 tỉnh top tốt cho dòng vào FTTH tháng 8.",
+      "required_memory_ids": [
+        "M06",
+        "M08"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D4:3",
+        "D5:1"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "ftth_inflow_good_action",
+      "memory_families": [
+        "ranking_polarity_ftth",
+        "semantic_role_ftth"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Thuê bao FTTH phát triển mới",
+      "source_service_id": "122",
+      "source_testcase": "CT_67",
+      "expected_intent": "xep_hang_chi_tieu",
+      "expected_api": {
+        "service_id": "122",
+        "prd_id": "20260831",
+        "province_code": "",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "month",
+        "limit": "3",
+        "order_by": "thuc_hien",
+        "order_type": "DESC",
+        "condition": []
+      },
+      "gold_rewrite": "Top 3 tỉnh xếp hạng đầu về Thuê bao FTTH phát triển mới tháng 08/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_MULTI_HOP_007",
+      "category": "multi_hop",
+      "question": "Lấy 3 tỉnh top tốt cho dòng ra FTTH tháng 8.",
+      "required_memory_ids": [
+        "M07",
+        "M09"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D4:5",
+        "D6:1"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "ftth_outflow_good_action",
+      "memory_families": [
+        "ranking_polarity_ftth",
+        "semantic_role_ftth"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Thuê bao FTTH rời mạng",
+      "source_service_id": "1484",
+      "source_testcase": "CT_68",
+      "expected_intent": "xep_hang_chi_tieu",
+      "expected_api": {
+        "service_id": "1484",
+        "prd_id": "20260831",
+        "province_code": "",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "month",
+        "limit": "3",
+        "order_by": "thuc_hien",
+        "order_type": "ASC",
+        "condition": []
+      },
+      "gold_rewrite": "Top 3 tỉnh đứng cuối về Thuê bao FTTH rời mạng tháng 08/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_MULTI_HOP_008",
+      "category": "multi_hop",
+      "question": "Lấy 3 tỉnh top cảnh báo cho dòng ra FTTH tháng 8.",
+      "required_memory_ids": [
+        "M07",
+        "M10"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D4:5",
+        "D6:3"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "ftth_outflow_alert_action",
+      "memory_families": [
+        "ranking_polarity_ftth",
+        "semantic_role_ftth"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Thuê bao FTTH rời mạng",
+      "source_service_id": "1484",
+      "source_testcase": "CT_67",
+      "expected_intent": "xep_hang_chi_tieu",
+      "expected_api": {
+        "service_id": "1484",
+        "prd_id": "20260831",
+        "province_code": "",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "month",
+        "limit": "3",
+        "order_by": "thuc_hien",
+        "order_type": "DESC",
+        "condition": []
+      },
+      "gold_rewrite": "Top 3 tỉnh xếp hạng đầu về Thuê bao FTTH rời mạng tháng 08/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_MULTI_HOP_009",
+      "category": "multi_hop",
+      "question": "Trong cuộc họp tạm thời 5G chính là KPI nào, còn bình thường Register 5G hiện dùng để làm gì?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M13",
+        "M12"
+      ],
+      "evidence_turn_ids": [
+        "D12:1",
+        "D9:3"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Trong cuộc họp, Register 5G tạm thay 5G chính; bình thường Register 5G dùng làm chỉ số đối chiếu.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "meeting_override_x_register_role",
+      "memory_families": [
+        "semantic_role_5g",
+        "temporary_override"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Trong cuộc họp, Register 5G tạm thay 5G chính; bình thường Register 5G dùng làm chỉ số đối chiếu.",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_MULTI_HOP_010",
+      "category": "multi_hop",
+      "question": "Ngay trước khi đổi chuẩn 5G chính, 5G chính là KPI nào và top tốt của dòng vào FTTH đi theo phía nào?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M01",
+        "M08"
+      ],
+      "evidence_turn_ids": [
+        "D1:1",
+        "D5:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Khi đó 5G chính là Thuê bao Register 5G lũy kế; top tốt của dòng vào FTTH lấy phía cao nhất.",
+      "notes": "Historical cross-family reasoning; no longer duplicates the 5G-main evolution state-update QA.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "historical_5g_main_x_ftth_inflow_good",
+      "memory_families": [
+        "ranking_polarity_ftth",
+        "semantic_alias_5g"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Khi đó 5G chính là Thuê bao Register 5G lũy kế; top tốt của dòng vào FTTH lấy phía cao nhất."
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_001",
+      "category": "temporal_reasoning",
+      "question": "Vai trò dòng vào 5G được chốt trước hay sau khi định nghĩa nền FTTH?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M03",
+        "M05"
+      ],
+      "evidence_turn_ids": [
+        "D2:1",
+        "D4:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Trước.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "5g_inflow_vs_ftth_base_timeline",
+      "memory_families": [
+        "semantic_role_5g",
+        "semantic_role_ftth"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Trước."
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_002",
+      "category": "temporal_reasoning",
+      "question": "Quy ước top tốt cho dòng vào FTTH được chốt trước hay sau khi đổi 5G chính sang thực lũy kế?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M08",
+        "M11"
+      ],
+      "evidence_turn_ids": [
+        "D5:1",
+        "D9:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Trước.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "ftth_polarity_vs_5g_update",
+      "memory_families": [
+        "ranking_polarity_ftth",
+        "semantic_alias_5g"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Trước."
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_003",
+      "category": "temporal_reasoning",
+      "question": "Đổi 5G chính sang thực lũy kế xảy ra trước hay sau ngoại lệ dùng Register trong cuộc họp?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M11",
+        "M13"
+      ],
+      "evidence_turn_ids": [
+        "D9:1",
+        "D12:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Trước.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "5g_update_vs_meeting_override",
+      "memory_families": [
+        "semantic_alias_5g",
+        "temporary_override"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Trước.",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_004",
+      "category": "temporal_reasoning",
+      "question": "Ngoại lệ xếp hạng một lần xảy ra trước hay sau ngoại lệ 5G trong cuộc họp?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M13",
+        "M15"
+      ],
+      "evidence_turn_ids": [
+        "D12:1",
+        "D16:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Sau.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "meeting_override_vs_ranking_override",
+      "memory_families": [
+        "temporary_override"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Sau.",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_005",
+      "category": "temporal_reasoning",
+      "question": "Register được chuyển sang vai trò đối chiếu trước hay sau cuộc họp dùng Register thay 5G chính?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M12",
+        "M13"
+      ],
+      "evidence_turn_ids": [
+        "D9:3",
+        "D12:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Trước.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "register_role_vs_meeting_override",
+      "memory_families": [
+        "semantic_role_5g",
+        "temporary_override"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Trước.",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_006",
+      "category": "temporal_reasoning",
+      "question": "Xác nhận 5G chính sau cuộc họp xảy ra trước hay sau ngoại lệ top tốt dòng ra lấy phía cao?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M14",
+        "M15"
+      ],
+      "evidence_turn_ids": [
+        "D13:1",
+        "D16:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Trước.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "post_meeting_reinforcement_vs_ranking_override",
+      "memory_families": [
+        "semantic_alias_5g",
+        "temporary_override"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Trước.",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_001",
+      "category": "state_update",
+      "question": "5G chính ban đầu và hiện tại khác nhau thế nào?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M01",
+        "M11"
+      ],
+      "evidence_turn_ids": [
+        "D1:1",
+        "D9:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Ban đầu là Register 5G lũy kế; hiện tại là TB Di động 5G thực Lũy kế.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "5g_main_evolution",
+      "memory_families": [
+        "semantic_alias_5g"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Ban đầu là Register 5G lũy kế; hiện tại là TB Di động 5G thực Lũy kế."
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_002",
+      "category": "state_update",
+      "question": "Vai trò của Register 5G thay đổi thế nào từ đầu tới hiện tại?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M01",
+        "M12"
+      ],
+      "evidence_turn_ids": [
+        "D1:1",
+        "D9:3"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Ban đầu Register 5G là 5G chính; hiện tại nó chỉ dùng làm chỉ số đối chiếu.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "register_role_evolution",
+      "memory_families": [
+        "semantic_alias_5g",
+        "semantic_role_5g"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Ban đầu Register 5G là 5G chính; hiện tại nó chỉ dùng làm chỉ số đối chiếu."
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_003",
+      "category": "state_update",
+      "question": "Trong cuộc họp KPI nào tạm thay 5G chính, còn durable 5G chính hiện tại là KPI nào?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M13",
+        "M11"
+      ],
+      "evidence_turn_ids": [
+        "D12:1",
+        "D9:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Trong cuộc họp Register 5G tạm thay 5G chính; durable 5G chính hiện tại vẫn là TB Di động 5G thực Lũy kế.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "meeting_override_vs_durable_main",
+      "memory_families": [
+        "semantic_alias_5g",
+        "temporary_override"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Trong cuộc họp Register 5G tạm thay 5G chính; durable 5G chính hiện tại vẫn là TB Di động 5G thực Lũy kế.",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_004",
+      "category": "state_update",
+      "question": "Sau khi 5G chính đổi sang thực lũy kế, dòng vào 5G hiện vẫn là KPI nào?",
+      "required_memory_ids": [
+        "M03"
+      ],
+      "supporting_memory_ids": [
+        "M11"
+      ],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D2:1",
+        "D9:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Dòng vào 5G vẫn là Thuê bao 5G phát triển mới.",
+      "notes": "The query states that 5G chính changed; M03 is strictly required for the independent current 'dòng vào 5G' role. M11 is supporting update context, not a strict retrieval dependency.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "5g_main_update_does_not_change_inflow_role",
+      "memory_families": [
+        "semantic_alias_5g",
+        "semantic_role_5g"
+      ],
+      "ltm_attribution": "partial_non_exclusive",
+      "gold_rewrite": null,
+      "final_answer": "Dòng vào 5G vẫn là Thuê bao 5G phát triển mới.",
+      "retrieval_scoring_contract": {
+        "strict_required_memory_ids": [
+          "M03"
+        ],
+        "supporting_memory_ids": [
+          "M11"
+        ],
+        "exclude_supporting_from_recall_at_k": true,
+        "precision_relevant_memory_ids": [
+          "M03",
+          "M11"
+        ],
+        "supporting_retrieval_is_false_positive": false
+      }
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_005",
+      "category": "state_update",
+      "question": "Ngoại lệ xếp hạng một lần đã thay đổi quy tắc nào của dòng ra FTTH, và quy ước top cảnh báo có đổi theo không?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M15",
+        "M10"
+      ],
+      "evidence_turn_ids": [
+        "D16:1",
+        "D6:3"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Nó chỉ tạm đổi top tốt sang phía cao; top cảnh báo vẫn lấy phía cao nhất và không bị thay đổi.",
+      "notes": "M15 is needed to identify which one-shot ranking rule changed and how; M10 is independently needed to verify that the durable top-cảnh-báo rule remains high-side.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "temporary_good_override_does_not_change_alert_rule",
+      "memory_families": [
+        "ranking_polarity_ftth",
+        "temporary_override"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Nó chỉ tạm đổi top tốt sang phía cao; top cảnh báo vẫn lấy phía cao nhất và không bị thay đổi.",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_006",
+      "category": "state_update",
+      "question": "Lần đối chiếu lấy top tốt dòng ra theo phía cao có làm đổi quy ước lâu dài không?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M15",
+        "M09"
+      ],
+      "evidence_turn_ids": [
+        "D16:1",
+        "D6:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Không. Đó chỉ là ngoại lệ một lần; quy ước lâu dài vẫn lấy phía thấp nhất.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "ranking_override_vs_durable_polarity",
+      "memory_families": [
+        "ranking_polarity_ftth",
+        "temporary_override"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. Đó chỉ là ngoại lệ một lần; quy ước lâu dài vẫn lấy phía thấp nhất.",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_007",
+      "category": "state_update",
+      "question": "Sau khi đổi 5G chính, nền 5G là KPI nào và có trùng với 5G chính mới không?",
+      "required_memory_ids": [
+        "M02",
+        "M11"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D1:3",
+        "D9:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Nền 5G là TB Di động 5G thực Lũy kế và hiện trùng với KPI của 5G chính mới.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "base_5g_after_main_update",
+      "memory_families": [
+        "semantic_alias_5g",
+        "semantic_role_5g"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Nền 5G là TB Di động 5G thực Lũy kế và hiện trùng với KPI của 5G chính mới."
+    },
+    {
+      "question_id": "Q_TEMPORAL_BUSINESS_ACTION_001",
+      "category": "temporal_business_action",
+      "question": "Trước khi đổi chuẩn 5G chính, lấy top 3 tỉnh cho 5G chính tháng 8.",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M01"
+      ],
+      "evidence_turn_ids": [
+        "D1:1"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "historical_5g_main_register",
+      "memory_families": [
+        "semantic_alias_5g"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Thuê bao Register 5G lũy kế",
+      "source_service_id": "2813",
+      "source_testcase": "CT_67",
+      "expected_intent": "xep_hang_chi_tieu",
+      "expected_api": {
+        "service_id": "2813",
+        "prd_id": "20260831",
+        "province_code": "",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "month",
+        "limit": "3",
+        "order_by": "thuc_hien",
+        "order_type": "DESC",
+        "condition": []
+      },
+      "gold_rewrite": "Top 3 tỉnh xếp hạng đầu về Thuê bao Register 5G lũy kế tháng 08/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_TEMPORAL_BUSINESS_ACTION_002",
+      "category": "temporal_business_action",
+      "question": "Trong cuộc họp có ngoại lệ về 5G chính, lấy 5G chính toàn quốc tháng 8.",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M13"
+      ],
+      "evidence_turn_ids": [
+        "D12:1"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "meeting_5g_main_register",
+      "memory_families": [
+        "temporary_override"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Thuê bao Register 5G lũy kế",
+      "source_service_id": "2813",
+      "source_testcase": "CT_2",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "2813",
+        "prd_id": "20260831",
+        "province_code": "",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "1",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Thuê bao Register 5G lũy kế của Toàn quốc tháng 08/2026 là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_TEMPORAL_BUSINESS_ACTION_003",
+      "category": "temporal_business_action",
+      "question": "Theo chuẩn hiện tại, xem tăng trưởng 5G chính ở Hà Nội lũy kế đến tháng 8.",
+      "required_memory_ids": [
+        "M11"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D9:1"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "current_5g_main_growth",
+      "memory_families": [
+        "semantic_alias_5g"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "TB Di động 5G thực Lũy kế",
+      "source_service_id": "413",
+      "source_testcase": "CT_76",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "413",
+        "prd_id": "20260831",
+        "province_code": "HNI",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "year",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Tăng trưởng TB Di động 5G thực Lũy kế của tỉnh Hà Nội lũy kế đến tháng 08/2026 là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_TEMPORAL_BUSINESS_ACTION_004",
+      "category": "temporal_business_action",
+      "question": "Sau khi đổi vai trò, lấy top 3 tỉnh cho chỉ số đối chiếu tháng 8.",
+      "required_memory_ids": [
+        "M12"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D9:3"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "The query intentionally omits 'Register'; M12 is strictly needed to resolve 'chỉ số đối chiếu' to Thuê bao Register 5G lũy kế.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "current_register_comparison_action",
+      "memory_families": [
+        "semantic_role_5g"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Thuê bao Register 5G lũy kế",
+      "source_service_id": "2813",
+      "source_testcase": "CT_67",
+      "expected_intent": "xep_hang_chi_tieu",
+      "expected_api": {
+        "service_id": "2813",
+        "prd_id": "20260831",
+        "province_code": "",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "month",
+        "limit": "3",
+        "order_by": "thuc_hien",
+        "order_type": "DESC",
+        "condition": []
+      },
+      "gold_rewrite": "Top 3 tỉnh xếp hạng đầu về Thuê bao Register 5G lũy kế tháng 08/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_TEMPORAL_BUSINESS_ACTION_005",
+      "category": "temporal_business_action",
+      "question": "Trước khi đổi chuẩn 5G chính, lấy 5G chính toàn quốc tháng 8.",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M01"
+      ],
+      "evidence_turn_ids": [
+        "D1:1"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "historical_5g_main_register",
+      "memory_families": [
+        "semantic_alias_5g"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Thuê bao Register 5G lũy kế",
+      "source_service_id": "2813",
+      "source_testcase": "CT_2",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "2813",
+        "prd_id": "20260831",
+        "province_code": "",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "1",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Thuê bao Register 5G lũy kế của Toàn quốc tháng 08/2026 là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_FALSE_PREMISE_001",
+      "category": "false_premise",
+      "question": "5G chính hiện vẫn là Register 5G đúng không?",
+      "required_memory_ids": [
+        "M11"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D9:1"
+      ],
+      "answer_type": "adversarial",
+      "expected_action": "reject_false_premise",
+      "gold_answer": "Không. 5G chính hiện là TB Di động 5G thực Lũy kế.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "current_5g_main",
+      "memory_families": [
+        "semantic_alias_5g"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. 5G chính hiện là TB Di động 5G thực Lũy kế."
+    },
+    {
+      "question_id": "Q_FALSE_PREMISE_002",
+      "category": "false_premise",
+      "question": "Nền 5G là Thuê bao 5G phát triển mới đúng không?",
+      "required_memory_ids": [
+        "M02"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D1:3"
+      ],
+      "answer_type": "adversarial",
+      "expected_action": "reject_false_premise",
+      "gold_answer": "Không. Nền 5G là TB Di động 5G thực Lũy kế.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "5g_base_role",
+      "memory_families": [
+        "semantic_role_5g"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. Nền 5G là TB Di động 5G thực Lũy kế."
+    },
+    {
+      "question_id": "Q_FALSE_PREMISE_003",
+      "category": "false_premise",
+      "question": "Sau khi đổi chuẩn thì Register 5G không còn vai trò gì nữa đúng không?",
+      "required_memory_ids": [
+        "M12"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D9:3"
+      ],
+      "answer_type": "adversarial",
+      "expected_action": "reject_false_premise",
+      "gold_answer": "Không. Register 5G hiện vẫn dùng làm chỉ số đối chiếu.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "register_comparison_role",
+      "memory_families": [
+        "semantic_role_5g"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. Register 5G hiện vẫn dùng làm chỉ số đối chiếu."
+    },
+    {
+      "question_id": "Q_FALSE_PREMISE_004",
+      "category": "false_premise",
+      "question": "Top tốt của dòng ra FTTH là lấy các tỉnh có giá trị cao nhất đúng không?",
+      "required_memory_ids": [
+        "M09"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D6:1"
+      ],
+      "answer_type": "adversarial",
+      "expected_action": "reject_false_premise",
+      "gold_answer": "Không. Top tốt của dòng ra FTTH lấy các tỉnh có giá trị thấp nhất.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "ftth_outflow_good_polarity",
+      "memory_families": [
+        "ranking_polarity_ftth"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. Top tốt của dòng ra FTTH lấy các tỉnh có giá trị thấp nhất."
+    },
+    {
+      "question_id": "Q_FALSE_PREMISE_005",
+      "category": "false_premise",
+      "question": "Top cảnh báo của dòng ra FTTH là lấy phía thấp nhất đúng không?",
+      "required_memory_ids": [
+        "M10"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D6:3"
+      ],
+      "answer_type": "adversarial",
+      "expected_action": "reject_false_premise",
+      "gold_answer": "Không. Top cảnh báo của dòng ra FTTH lấy phía cao nhất.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "ftth_outflow_alert_polarity",
+      "memory_families": [
+        "ranking_polarity_ftth"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. Top cảnh báo của dòng ra FTTH lấy phía cao nhất."
+    },
+    {
+      "question_id": "Q_ABSTENTION_001",
+      "category": "abstention",
+      "question": "Ngưỡng phần trăm nào thì mình coi biến động 5G là bất thường?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [],
+      "answer_type": "unanswerable",
+      "expected_action": "abstain",
+      "gold_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "unanswerable_user_profile",
+      "memory_families": [],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "no_hit_fpr_eligible": true
+    },
+    {
+      "question_id": "Q_ABSTENTION_002",
+      "category": "abstention",
+      "question": "Mình muốn tô màu gì cho top cảnh báo dòng ra FTTH?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [],
+      "answer_type": "unanswerable",
+      "expected_action": "abstain",
+      "gold_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "unanswerable_user_profile",
+      "memory_families": [],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "no_hit_fpr_eligible": true
+    },
+    {
+      "question_id": "Q_ABSTENTION_003",
+      "category": "abstention",
+      "question": "Mình thường muốn xuất bảng sức khỏe thuê bao ra Excel hay PDF?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [],
+      "answer_type": "unanswerable",
+      "expected_action": "abstain",
+      "gold_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "unanswerable_user_profile",
+      "memory_families": [],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "no_hit_fpr_eligible": true
+    },
+    {
+      "question_id": "Q_ABSTENTION_004",
+      "category": "abstention",
+      "question": "Mình muốn gửi báo cáo sức khỏe thuê bao cho địa chỉ email nào?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [],
+      "answer_type": "unanswerable",
+      "expected_action": "abstain",
+      "gold_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "unanswerable_user_profile",
+      "memory_families": [],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "no_hit_fpr_eligible": true
+    },
+    {
+      "question_id": "Q_ABSTENTION_005",
+      "category": "abstention",
+      "question": "Nếu thiếu dữ liệu 5G thì mình có muốn tự động dùng 4G thay thế không?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [],
+      "answer_type": "unanswerable",
+      "expected_action": "abstain",
+      "gold_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "unanswerable_user_profile",
+      "memory_families": [],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "no_hit_fpr_eligible": true
+    }
+  ]
+}

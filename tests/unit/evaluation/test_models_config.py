@@ -29,13 +29,14 @@ def test_typed_case_round_trip(kind):
         {
             "case_id": "case-1",
             "family_id": "confirmation",
-            "split": "dev",
+            "evaluation_scope": "full_corpus",
             "provenance": "synthetic",
             "inputs": {"kind": kind, **inputs},
             "gold": {"semantic_expectation": "Giữ attribution của assistant."},
         }
     )
     assert case.suite == kind
+    assert case.evaluation_scope == "full_corpus"
     assert EvalCase.model_validate_json(case.model_dump_json()) == case
     assert case.review.status == "draft"
     with pytest.raises(ValidationError):

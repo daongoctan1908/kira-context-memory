@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kira.local/schemas/memories-v1.json",
+  "title": "KiRa memory lifecycle gold",
+  "type": "object",
+  "required": [
+    "conversation_id",
+    "do_not_ingest",
+    "formation_negative_event_ids",
+    "active_memory_event_ids_at_end",
+    "expected_active_memory_row_source_event_ids",
+    "expected_active_memory_row_count",
+    "memory_gold"
+  ],
+  "properties": {
+    "conversation_id": { "type": "string", "minLength": 1 },
+    "do_not_ingest": { "const": true },
+    "formation_negative_event_ids": { "$ref": "#/$defs/ids" },
+    "active_memory_event_ids_at_end": { "$ref": "#/$defs/ids" },
+    "expected_active_memory_row_source_event_ids": { "$ref": "#/$defs/ids" },
+    "expected_active_memory_row_count": { "type": "integer", "minimum": 0 },
+    "memory_gold": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "memory_id",
+          "key",
+          "canonical_fact",
+          "source_turn_ids",
+          "should_store",
+          "expected_operation",
+          "active_at_end",
+          "memory_family"
+        ],
+        "properties": {
+          "memory_id": { "type": "string", "minLength": 1 },
+          "key": { "type": "string", "minLength": 1 },
+          "canonical_fact": { "type": "string", "minLength": 1 },
+          "source_turn_ids": { "$ref": "#/$defs/ids" },
+          "primary_source_turn_ids": { "$ref": "#/$defs/ids" },
+          "supporting_turn_ids": { "$ref": "#/$defs/ids" },
+          "should_store": { "type": "boolean" },
+          "expected_operation": { "enum": ["add", "update", "reinforce_existing", "do_not_persist"] },
+          "active_at_end": { "type": "boolean" },
+          "supersedes_memory_id": { "type": ["string", "null"] },
+          "memory_family": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

@@ -1,0 +1,1173 @@
+{
+  "conversation_id": "conv_01_FREEZE_v10_FINAL",
+  "persona": {
+    "role": "Nhân viên vận hành kinh doanh tại Phú Thọ",
+    "job_story": "Theo dõi Thanh Sơn thường xuyên; sau một giai đoạn drill-down và theo dõi song song, được chuyển trọng tâm chính sang Thượng Long."
+  },
+  "metadata": {
+    "language": "vi",
+    "design_goal": "Natural long-term KiRa usage; job narrative first, benchmark annotations second.",
+    "source_basis": "Hai bộ testcase KiRa do người dùng cung cấp.",
+    "business_responses": "blank_until_filled_from_original_kira",
+    "sessions": 22,
+    "turns": 174,
+    "kira_fill_slots": 39,
+    "session_turn_counts": [
+      10,
+      8,
+      6,
+      10,
+      8,
+      6,
+      10,
+      6,
+      6,
+      8,
+      10,
+      10,
+      8,
+      6,
+      8,
+      10,
+      6,
+      8,
+      8,
+      6,
+      8,
+      8
+    ],
+    "version": "v10_FINAL",
+    "assistant_bridge_count": 48,
+    "assistant_bridge_unique": 48,
+    "review_status": "FROZEN",
+    "fill_id_policy": {
+      "stable_across_revisions": true,
+      "note": "Legacy CONV01V2_FILL_### identifiers are intentionally retained so previously collected KiRa responses remain join-compatible."
+    }
+  },
+  "conversation": {
+    "session_1_date_time": "2026-09-10T08:35:00+07:00",
+    "session_1_goal": "Rà báo cáo tháng 8 của Thanh Sơn",
+    "session_1": [
+      {
+        "role": "user",
+        "dia_id": "D1:1",
+        "text": "Sáng nay mình rà lại báo cáo tháng 8 của Thanh Sơn trước nhé."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D1:2",
+        "text": "Ừ, mình lấy phần này trước.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D1:3",
+        "text": "Cho mình doanh thu tiêu dùng di động Thanh Sơn tháng 8.",
+        "fill_id": "CONV01V2_FILL_001"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D1:4",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_001",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D1:5",
+        "text": "Lấy luôn thuê bao 4G thực lũy kế của Thanh Sơn tháng 8 giúp mình.",
+        "fill_id": "CONV01V2_FILL_002"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D1:6",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_002",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D1:7",
+        "text": "Từ giờ nếu mình nói ngắn “bên mình” thì cứ hiểu là Thanh Sơn, Phú Thọ nhé; khi nào đổi mình sẽ nói."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D1:8",
+        "text": "Được, mình bám đúng phạm vi vừa nêu.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D1:9",
+        "text": "Mình thường thích câu trả lời gọn; hôm nay lại cần gửi bản tóm tắt trước trưa nên càng ngắn càng tốt."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D1:10",
+        "text": "OK, anh cứ hỏi tiếp.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_2_date_time": "2026-09-15T14:10:00+07:00",
+    "session_2_goal": "Rà mobile cuối ngày",
+    "session_2": [
+      {
+        "role": "user",
+        "dia_id": "D2:1",
+        "text": "Chiều nay mình chỉ rà phần mobile của Thanh Sơn để đối chiếu với file tuần trước."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D2:2",
+        "text": "Rõ rồi, mình giữ câu trả lời ngắn.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D2:3",
+        "text": "Xem doanh thu tiêu dùng di động trừ VAS hợp tác của Thanh Sơn lũy kế đến hôm trước.",
+        "fill_id": "CONV01V2_FILL_003"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D2:4",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_003",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D2:5",
+        "text": "Còn 4G thực lũy kế của Thanh Sơn đến hôm trước thì sao?",
+        "fill_id": "CONV01V2_FILL_004"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D2:6",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_004",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D2:7",
+        "text": "Doanh thu tiêu dùng di động với 4G là hai số mình mở khá thường xuyên khi rà báo cáo."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D2:8",
+        "text": "Được, mình theo đúng mốc đó.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_3_date_time": "2026-09-21T10:20:00+07:00",
+    "session_3_goal": "Bổ sung FTTH",
+    "session_3": [
+      {
+        "role": "user",
+        "dia_id": "D3:1",
+        "text": "Hôm nay mình bổ sung phần cố định vào báo cáo."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D3:2",
+        "text": "Ừ, mình hiểu cách anh đang rà số.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D3:3",
+        "text": "Cho mình FTTH phát triển thực lũy kế của Thanh Sơn tháng 8.",
+        "fill_id": "CONV01V2_FILL_005"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D3:4",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_005",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D3:5",
+        "text": "Phần này chỉ để bổ sung cạnh mobile thôi, mình chưa cần đi sâu."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D3:6",
+        "text": "OK, phần này mình không mở rộng thêm.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_4_date_time": "2026-09-28T16:05:00+07:00",
+    "session_4_goal": "SME, IOT và truyền hình",
+    "session_4": [
+      {
+        "role": "user",
+        "dia_id": "D4:1",
+        "text": "Phòng kinh doanh hỏi thêm mấy chỉ tiêu phụ của Thanh Sơn, mình gom một lượt luôn."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D4:2",
+        "text": "Được, mình đi lần lượt.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D4:3",
+        "text": "Lấy doanh thu SME Thanh Sơn tháng 8.",
+        "fill_id": "CONV01V2_FILL_006"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D4:4",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_006",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D4:5",
+        "text": "Tiện lấy thêm doanh thu IOT cùng tháng.",
+        "fill_id": "CONV01V2_FILL_007"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D4:6",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_007",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D4:7",
+        "text": "Và thuê bao truyền hình phát triển thực lũy kế của Thanh Sơn tháng 8.",
+        "fill_id": "CONV01V2_FILL_008"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D4:8",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_008",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D4:9",
+        "text": "Ba số này tháng này mới cần đưa vào phụ lục, không phải nhóm mình mở hằng ngày."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D4:10",
+        "text": "Rõ, mình giữ đúng tên chỉ tiêu.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_5_date_time": "2026-10-05T09:40:00+07:00",
+    "session_5_goal": "Đặt Thanh Sơn vào bối cảnh tỉnh",
+    "session_5": [
+      {
+        "role": "user",
+        "dia_id": "D5:1",
+        "text": "Mình cần đặt số Thanh Sơn vào bối cảnh chung trước buổi họp."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D5:2",
+        "text": "Ừ, mình nắm ngữ cảnh rồi.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D5:3",
+        "text": "So doanh thu tiêu dùng di động Phú Thọ với Đà Nẵng giúp mình.",
+        "fill_id": "CONV01V2_FILL_009"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D5:4",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_009",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D5:5",
+        "text": "So luôn thuê bao 4G thực lũy kế của hai tỉnh đó.",
+        "fill_id": "CONV01V2_FILL_010"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D5:6",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_010",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D5:7",
+        "text": "Phần so sánh tỉnh chỉ để tham chiếu; công việc thường ngày của mình vẫn ở Phú Thọ."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D5:8",
+        "text": "Được, mình để phần nhận xét cho anh tự chốt.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_6_date_time": "2026-10-10T17:25:00+07:00",
+    "session_6_goal": "Bảng xếp hạng nhanh",
+    "session_6": [
+      {
+        "role": "user",
+        "dia_id": "D6:1",
+        "text": "Sếp hỏi vị trí tương đối nên mình cần một bảng rất ngắn."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D6:2",
+        "text": "OK, mình chỉ lấy đúng số cần thiết.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D6:3",
+        "text": "Cho top 3 tỉnh về doanh thu tiêu dùng di động tháng 8.",
+        "fill_id": "CONV01V2_FILL_011"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D6:4",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_011",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D6:5",
+        "text": "Sau này nếu mình chỉ nói “top” mà không ghi số, cứ lấy 3 dòng đầu là đủ."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D6:6",
+        "text": "Ừ, mình giữ cùng cách trình bày với phần trước.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_7_date_time": "2026-10-15T08:50:00+07:00",
+    "session_7_goal": "Bắt đầu soi Thượng Long",
+    "session_7": [
+      {
+        "role": "user",
+        "dia_id": "D7:1",
+        "text": "Mấy tuần tới mình phải soi Thượng Long kỹ hơn vì có đợt rà soát ở xã này."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D7:2",
+        "text": "Ừ, mình nắm rồi. Mình xem lần lượt nhé.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D7:3",
+        "text": "Xem doanh thu tiêu dùng di động của Thượng Long năm 2026.",
+        "fill_id": "CONV01V2_FILL_012"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D7:4",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_012",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D7:5",
+        "text": "Lấy thêm FTTH phát triển thực lũy kế của Thượng Long năm 2026.",
+        "fill_id": "CONV01V2_FILL_013"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D7:6",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_013",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D7:7",
+        "text": "Hiện tại Thượng Long mới là chỗ mình đi sâu thêm thôi, phần phụ trách chính vẫn là Thanh Sơn."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D7:8",
+        "text": "Được, mình coi đây là phần bổ sung.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D7:9",
+        "text": "Mình muốn có bộ số nền trước khi đi vào chi tiết."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D7:10",
+        "text": "OK, mình giữ đúng cấp địa bàn.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_8_date_time": "2026-10-20T13:30:00+07:00",
+    "session_8_goal": "Bổ sung 5G",
+    "session_8": [
+      {
+        "role": "user",
+        "dia_id": "D8:1",
+        "text": "Đợt này mọi người hỏi 5G nhiều hơn nên mình bắt đầu theo dõi thêm."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D8:2",
+        "text": "Ừ, mình lấy phần 5G trước.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D8:3",
+        "text": "Cho mình 5G thực lũy kế của Thanh Sơn tháng 8.",
+        "fill_id": "CONV01V2_FILL_014"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D8:4",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_014",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D8:5",
+        "text": "4G vẫn là số quen thuộc của mình; 5G lúc này mới là phần bổ sung."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D8:6",
+        "text": "Được, mình không kéo thêm chỉ tiêu khác.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_9_date_time": "2026-10-26T11:05:00+07:00",
+    "session_9_goal": "Theo dõi bản doanh thu trừ VAS",
+    "session_9": [
+      {
+        "role": "user",
+        "dia_id": "D9:1",
+        "text": "Mình muốn đặt bản doanh thu trừ VAS cạnh chỉ tiêu doanh thu tiêu dùng đang dùng."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D9:2",
+        "text": "Rõ, mình bám đúng câu hỏi hiện tại.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D9:3",
+        "text": "Lấy doanh thu tiêu dùng di động trừ VAS hợp tác của Thanh Sơn tháng 8.",
+        "fill_id": "CONV01V2_FILL_015"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D9:4",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_015",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D9:5",
+        "text": "Chưa bỏ chỉ tiêu cũ nhé, mình chỉ muốn có thêm một góc nhìn để đối chiếu."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D9:6",
+        "text": "OK, mình giữ phần này tách khỏi mấy mục kia.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_10_date_time": "2026-11-01T15:45:00+07:00",
+    "session_10_goal": "Hỗ trợ Chí Tiên",
+    "session_10": [
+      {
+        "role": "user",
+        "dia_id": "D10:1",
+        "text": "Chiều nay mình hỗ trợ bên Chí Tiên làm một đoạn báo cáo, xong việc này là thôi."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D10:2",
+        "text": "Được, mình lấy hai số này trước.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D10:3",
+        "text": "Lấy doanh thu SME của Chí Tiên lũy kế đến hôm trước.",
+        "fill_id": "CONV01V2_FILL_016"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D10:4",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_016",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D10:5",
+        "text": "Lấy thêm FTTH phát triển thực lũy kế của Chí Tiên cùng mốc.",
+        "fill_id": "CONV01V2_FILL_017"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D10:6",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_017",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D10:7",
+        "text": "Xong hai số này mình quay lại mạch Thanh Sơn như bình thường."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D10:8",
+        "text": "Được, anh cứ tiếp tục với số tiếp theo.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_11_date_time": "2026-11-06T08:15:00+07:00",
+    "session_11_goal": "Chốt báo cáo tháng",
+    "session_11": [
+      {
+        "role": "user",
+        "dia_id": "D11:1",
+        "text": "Mình chốt lại bộ số Thanh Sơn để khóa báo cáo tháng trước."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D11:2",
+        "text": "Rõ rồi, mình giữ cùng mốc thời gian.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D11:3",
+        "text": "Cho mình doanh thu tiêu dùng di động của Thanh Sơn lũy kế đến hôm trước.",
+        "fill_id": "CONV01V2_FILL_018"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D11:4",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_018",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D11:5",
+        "text": "Lấy thêm bản trừ VAS để đặt cạnh.",
+        "fill_id": "CONV01V2_FILL_019"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D11:6",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_019",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D11:7",
+        "text": "Và 4G thực lũy kế của Thanh Sơn.",
+        "fill_id": "CONV01V2_FILL_020"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D11:8",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_020",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D11:9",
+        "text": "Mình chỉ cần đủ số để khóa bản tổng hợp."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D11:10",
+        "text": "OK, mình nắm cách anh muốn dùng số này.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_12_date_time": "2026-11-11T16:20:00+07:00",
+    "session_12_goal": "Xem tăng trưởng ngắn hạn",
+    "session_12": [
+      {
+        "role": "user",
+        "dia_id": "D12:1",
+        "text": "Trước họp mình muốn xem nhịp tăng trưởng ngắn hạn của Thanh Sơn."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D12:2",
+        "text": "Được, phần này mình xử lý riêng.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D12:3",
+        "text": "Xem tăng trưởng doanh thu trừ VAS của Thanh Sơn so cùng kỳ tháng.",
+        "fill_id": "CONV01V2_FILL_021"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D12:4",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_021",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D12:5",
+        "text": "Còn tăng trưởng 4G thực lũy kế của Thanh Sơn theo cùng kỳ tháng?",
+        "fill_id": "CONV01V2_FILL_022"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D12:6",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_022",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D12:7",
+        "text": "Trong mấy báo cáo ngắn, nếu mình chỉ nói “so cùng kỳ” thì thường mình đang nói cùng kỳ tháng."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D12:8",
+        "text": "Ừ, mình nắm cách anh đang dùng mốc so sánh.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D12:9",
+        "text": "Cùng kỳ năm mình sẽ ghi rõ khi cần."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D12:10",
+        "text": "Được, khi cần mốc năm anh cứ ghi rõ.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_13_date_time": "2026-11-16T09:25:00+07:00",
+    "session_13_goal": "Theo dõi thêm Thượng Long",
+    "session_13": [
+      {
+        "role": "user",
+        "dia_id": "D13:1",
+        "text": "Từ tuần này mình được giao theo dõi Thượng Long sát hơn, song song với Thanh Sơn."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D13:2",
+        "text": "OK, mình theo đúng nhịp báo cáo này.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D13:3",
+        "text": "Cho mình bản doanh thu trừ VAS của Thượng Long năm 2026.",
+        "fill_id": "CONV01V2_FILL_023"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D13:4",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_023",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D13:5",
+        "text": "Lấy thêm 5G thực lũy kế của Thượng Long năm 2026.",
+        "fill_id": "CONV01V2_FILL_024"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D13:6",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_024",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D13:7",
+        "text": "Mình vẫn chốt báo cáo chính ở Thanh Sơn, nhưng Thượng Long sẽ xuất hiện thường xuyên hơn từ giờ."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D13:8",
+        "text": "Được, mình coi đây là lần rà nhanh.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_14_date_time": "2026-11-21T14:50:00+07:00",
+    "session_14_goal": "Đi sâu FTTH Thượng Long",
+    "session_14": [
+      {
+        "role": "user",
+        "dia_id": "D14:1",
+        "text": "Hôm nay mình đi sâu phần cố định ở Thượng Long."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D14:2",
+        "text": "Được, mình xem phần cố định.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D14:3",
+        "text": "Cho mình FTTH rời mạng của Thượng Long năm 2026.",
+        "fill_id": "CONV01V2_FILL_025"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D14:4",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_025",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D14:5",
+        "text": "Xong phần này mình quay lại mobile."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D14:6",
+        "text": "Được, xong phần này anh cứ chuyển tiếp.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_15_date_time": "2026-11-26T10:40:00+07:00",
+    "session_15_goal": "Đặt 4G và 5G cạnh nhau",
+    "session_15": [
+      {
+        "role": "user",
+        "dia_id": "D15:1",
+        "text": "Mình đang so cách nhìn 4G với 5G ở Thượng Long."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D15:2",
+        "text": "OK, mình không gộp hai chỉ tiêu với nhau.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D15:3",
+        "text": "Lấy 4G thực lũy kế của Thượng Long năm 2026.",
+        "fill_id": "CONV01V2_FILL_026"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D15:4",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_026",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D15:5",
+        "text": "Lấy luôn 5G thực lũy kế cùng phạm vi.",
+        "fill_id": "CONV01V2_FILL_027"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D15:6",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_027",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D15:7",
+        "text": "Từ tháng này mình sẽ nhìn 5G thường xuyên hơn trong báo cáo, nhưng 4G vẫn giữ để đối chiếu."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D15:8",
+        "text": "Được, mình giữ phần này ngắn gọn.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_16_date_time": "2026-12-01T08:05:00+07:00",
+    "session_16_goal": "Chuyển trọng tâm sang Thượng Long",
+    "session_16": [
+      {
+        "role": "user",
+        "dia_id": "D16:1",
+        "text": "Từ tuần này phân công của mình đổi rồi: phần theo dõi chính chuyển xuống Thượng Long."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D16:2",
+        "text": "Ừ, mình bám theo cách anh đang theo dõi.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D16:3",
+        "text": "Cho mình doanh thu trừ VAS của Thượng Long năm 2026.",
+        "fill_id": "CONV01V2_FILL_028"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D16:4",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_028",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D16:5",
+        "text": "Lấy luôn 5G thực lũy kế của Thượng Long.",
+        "fill_id": "CONV01V2_FILL_029"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D16:6",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_029",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D16:7",
+        "text": "Thanh Sơn vẫn cần xem khi tổng hợp cụm, nhưng nếu mình nói ngắn “bên mình” thì giờ hiểu là Thượng Long nhé."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D16:8",
+        "text": "Rõ, mình chỉ lấy đúng phạm vi cần xem.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D16:9",
+        "text": "Mình muốn lấy bộ số đầu tiên ngay sau khi đổi phân công."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D16:10",
+        "text": "OK, mình nắm rồi.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_17_date_time": "2026-12-06T13:15:00+07:00",
+    "session_17_goal": "Một ngày làm việc bình thường",
+    "session_17": [
+      {
+        "role": "user",
+        "dia_id": "D17:1",
+        "text": "Hôm nay mình chỉ rà nhanh số của Thượng Long thôi."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D17:2",
+        "text": "Được, phần này không cần giải thích dài.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D17:3",
+        "text": "Cho mình doanh thu tiêu dùng di động của Thượng Long năm 2026.",
+        "fill_id": "CONV01V2_FILL_030"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D17:4",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_030",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D17:5",
+        "text": "Không có báo cáo đặc biệt, mình chốt số rồi chuyển việc khác."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D17:6",
+        "text": "OK, mình lấy gọn phần này.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_18_date_time": "2026-12-11T16:40:00+07:00",
+    "session_18_goal": "Quay lên Thanh Sơn để đối chiếu",
+    "session_18": [
+      {
+        "role": "user",
+        "dia_id": "D18:1",
+        "text": "Mình quay lên Thanh Sơn một lượt để so với số xã."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D18:2",
+        "text": "Rõ rồi, mình theo đúng cách gọi đó.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D18:3",
+        "text": "Lấy doanh thu trừ VAS của Thanh Sơn lũy kế đến hôm trước.",
+        "fill_id": "CONV01V2_FILL_031"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D18:4",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_031",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D18:5",
+        "text": "Lấy thêm 5G thực lũy kế của Thanh Sơn.",
+        "fill_id": "CONV01V2_FILL_032"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D18:6",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_032",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D18:7",
+        "text": "Đây chỉ là phần tham chiếu; công việc chính của mình vẫn ở Thượng Long."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D18:8",
+        "text": "Ừ, mình nắm rồi.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_19_date_time": "2026-12-16T09:55:00+07:00",
+    "session_19_goal": "Tổng kết cùng kỳ năm",
+    "session_19": [
+      {
+        "role": "user",
+        "dia_id": "D19:1",
+        "text": "Đợt tổng kết mình cần một trang cùng kỳ năm cho Thượng Long."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D19:2",
+        "text": "Được, mình coi phần này là bổ sung cho báo cáo.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D19:3",
+        "text": "Xem tăng trưởng doanh thu trừ VAS của Thượng Long lũy kế tháng 8 so cùng kỳ năm.",
+        "fill_id": "CONV01V2_FILL_033"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D19:4",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_033",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D19:5",
+        "text": "Lấy tăng trưởng 5G thực lũy kế cùng mốc.",
+        "fill_id": "CONV01V2_FILL_034"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D19:6",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_034",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D19:7",
+        "text": "Mốc này tách riêng với mấy báo cáo ngắn cùng kỳ tháng trước đây."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D19:8",
+        "text": "Được, mình tách phần tổng kết năm ra riêng.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_20_date_time": "2026-12-21T15:10:00+07:00",
+    "session_20_goal": "Slide xếp hạng",
+    "session_20": [
+      {
+        "role": "user",
+        "dia_id": "D20:1",
+        "text": "Buổi họp chiều cần một slide xếp hạng thật gọn."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D20:2",
+        "text": "Rõ, anh cứ hỏi tiếp.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D20:3",
+        "text": "Cho top 3 tỉnh về 5G thực lũy kế tháng 8.",
+        "fill_id": "CONV01V2_FILL_035"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D20:4",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_035",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D20:5",
+        "text": "Ba dòng là đủ cho slide."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D20:6",
+        "text": "Được, ba dòng là đủ.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_21_date_time": "2026-12-26T11:30:00+07:00",
+    "session_21_goal": "Đối chiếu lại chỉ tiêu cũ",
+    "session_21": [
+      {
+        "role": "user",
+        "dia_id": "D21:1",
+        "text": "Mình quay lại mấy chỉ tiêu cũ để khớp với file báo cáo tháng 8."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D21:2",
+        "text": "Được, mình đối chiếu theo file cũ trước.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D21:3",
+        "text": "Đối chiếu lại doanh thu tiêu dùng di động của Thượng Long năm 2026 giúp mình.",
+        "fill_id": "CONV01V2_FILL_036"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D21:4",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_036",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D21:5",
+        "text": "Lấy thêm 4G thực lũy kế của Thượng Long.",
+        "fill_id": "CONV01V2_FILL_037"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D21:6",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_037",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D21:7",
+        "text": "Dạo này mình xem 5G và bản trừ VAS nhiều hơn, nhưng lúc mình gọi rõ tên chỉ tiêu cũ thì cứ lấy đúng chỉ tiêu đó."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D21:8",
+        "text": "Ừ, mình lấy đúng phần anh cần để chốt báo cáo.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_22_date_time": "2026-12-30T16:05:00+07:00",
+    "session_22_goal": "Chốt kỳ",
+    "session_22": [
+      {
+        "role": "user",
+        "dia_id": "D22:1",
+        "text": "Mình chốt nốt báo cáo của Thượng Long trước khi nghỉ."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D22:2",
+        "text": "Rõ rồi, mình giữ câu trả lời gọn.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D22:3",
+        "text": "Lấy doanh thu trừ VAS của Thượng Long năm 2026.",
+        "fill_id": "CONV01V2_FILL_038"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D22:4",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_038",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D22:5",
+        "text": "Và 5G thực lũy kế của Thượng Long.",
+        "fill_id": "CONV01V2_FILL_039"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D22:6",
+        "text": "",
+        "fill_id": "CONV01V2_FILL_039",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D22:7",
+        "text": "Hiện phần mình làm thường xuyên nhất là Thượng Long; mobile vẫn là nhóm mình mở đầu mỗi lần rà số."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D22:8",
+        "text": "OK, mình nắm phần này.",
+        "source": "synthetic_bridge"
+      }
+    ]
+  }
+}

@@ -135,7 +135,7 @@ class EvalCase(EvalModel):
     schema_version: Literal[1] = 1
     case_id: Identifier
     family_id: Identifier
-    split: Literal["dev", "holdout"]
+    evaluation_scope: Literal["full_corpus"]
     provenance: Literal["synthetic"]
     tags: tuple[Identifier, ...] = ()
     inputs: CaseInput
@@ -221,7 +221,7 @@ class SuiteReadiness(EvalModel):
 
 class PreflightReport(EvalModel):
     schema_version: Literal[1] = 1
-    contract_id: Literal["kira-week5-benchmark-v1"] = "kira-week5-benchmark-v1"
+    contract_id: Literal["kira-week5-benchmark-v2"] = "kira-week5-benchmark-v2"
     scope: Literal["dependency_preflight_only"] = "dependency_preflight_only"
     run_id: UUID
     started_at: datetime

@@ -1,0 +1,440 @@
+{
+  "conversation_id": "conv_01_FREEZE_v10_FINAL",
+  "do_not_ingest": true,
+  "artifact_semantics": "17 gold memory EVENTS, not 17 required final Mem0 rows.",
+  "formation_scoring_note": "Score semantic behavior: add/update/reinforce/do_not_persist. A confirmation event may correctly reinforce/merge an existing memory instead of creating a duplicate row.",
+  "formation_negative_event_ids": [
+    "M08"
+  ],
+  "memory_gold": [
+    {
+      "memory_id": "M01",
+      "key": "scope.alias",
+      "canonical_fact": "'bên mình' = Thanh Sơn, Phú Thọ",
+      "source_turn_ids": [
+        "D1:7"
+      ],
+      "should_store": true,
+      "supersedes_memory_id": null,
+      "memory_type": "user_context",
+      "expected_operation": "add",
+      "active_at_end": false,
+      "inactive_reason": "superseded_by_M13",
+      "qa_reference_status": "used_by_qa",
+      "memory_family": "scope",
+      "primary_source_turn_ids": [
+        "D1:7"
+      ],
+      "supporting_turn_ids": [],
+      "durability_semantics": "durable_until_explicitly_updated",
+      "durability_note": "D1:7 now explicitly says 'Từ giờ' and 'khi nào đổi mình sẽ nói', so M01 may remain active until superseded by M13."
+    },
+    {
+      "memory_id": "M02",
+      "key": "response.style",
+      "canonical_fact": "Người dùng thường thích câu trả lời gọn",
+      "source_turn_ids": [
+        "D1:9"
+      ],
+      "should_store": true,
+      "supersedes_memory_id": null,
+      "memory_type": "preference",
+      "expected_operation": "add",
+      "active_at_end": true,
+      "qa_reference_status": "used_by_qa",
+      "memory_family": "response_style",
+      "primary_source_turn_ids": [
+        "D1:9"
+      ],
+      "supporting_turn_ids": [
+        "D2:2",
+        "D15:8",
+        "D17:2",
+        "D17:6",
+        "D22:2"
+      ],
+      "provenance_scoring": {
+        "semantic_fact_match": "A formed preference matching M02 is semantically correct even if extraction was reinforced by an assistant echo.",
+        "primary_provenance_metric": "Separately score whether D1:9, the user-origin primary source, was captured."
+      }
+    },
+    {
+      "memory_id": "M03",
+      "key": "kpi.frequent.initial",
+      "canonical_fact": "Khi rà báo cáo giai đoạn đầu, user thường mở Doanh thu tiêu dùng di động và Thuê bao Di động 4G thực Lũy kế.",
+      "source_turn_ids": [
+        "D2:7"
+      ],
+      "should_store": true,
+      "supersedes_memory_id": null,
+      "memory_type": "preference",
+      "expected_operation": "add",
+      "active_at_end": false,
+      "inactive_reason": "later KPI-priority updates make this an initial preference",
+      "qa_reference_status": "formation_only",
+      "memory_family": "kpi_usage",
+      "primary_source_turn_ids": [
+        "D2:7"
+      ],
+      "supporting_turn_ids": []
+    },
+    {
+      "memory_id": "M04",
+      "key": "ranking.short_limit",
+      "canonical_fact": "Khi user nói \"top\" mà không ghi số, mặc định lấy 3 dòng.",
+      "source_turn_ids": [
+        "D6:5"
+      ],
+      "should_store": true,
+      "supersedes_memory_id": null,
+      "memory_type": "preference",
+      "expected_operation": "add",
+      "active_at_end": true,
+      "qa_reference_status": "used_by_qa",
+      "memory_family": "ranking_preference",
+      "primary_source_turn_ids": [
+        "D6:5"
+      ],
+      "supporting_turn_ids": []
+    },
+    {
+      "memory_id": "M05",
+      "key": "scope.thuong_long_role",
+      "canonical_fact": "Thượng Long chỉ là nơi drill-down; phạm vi chính vẫn là Thanh Sơn",
+      "source_turn_ids": [
+        "D7:7"
+      ],
+      "should_store": true,
+      "supersedes_memory_id": null,
+      "memory_type": "state",
+      "expected_operation": "add",
+      "active_at_end": false,
+      "inactive_reason": "superseded_by_M10_then_M12",
+      "qa_reference_status": "used_by_qa",
+      "memory_family": "scope",
+      "primary_source_turn_ids": [
+        "D7:7"
+      ],
+      "supporting_turn_ids": []
+    },
+    {
+      "memory_id": "M06",
+      "key": "subscriber.5g_interest",
+      "canonical_fact": "5G là phần bổ sung; 4G vẫn là số quen thuộc",
+      "source_turn_ids": [
+        "D8:5"
+      ],
+      "should_store": true,
+      "supersedes_memory_id": null,
+      "memory_type": "preference",
+      "expected_operation": "add",
+      "active_at_end": false,
+      "inactive_reason": "superseded_by_M11",
+      "qa_reference_status": "used_by_qa",
+      "memory_family": "subscriber_preference",
+      "primary_source_turn_ids": [
+        "D8:5"
+      ],
+      "supporting_turn_ids": []
+    },
+    {
+      "memory_id": "M07",
+      "key": "revenue.vas_interest",
+      "canonical_fact": "Bản trừ VAS được thêm để đối chiếu, chưa bỏ KPI cũ",
+      "source_turn_ids": [
+        "D9:5"
+      ],
+      "should_store": true,
+      "supersedes_memory_id": null,
+      "memory_type": "preference",
+      "expected_operation": "add",
+      "active_at_end": false,
+      "inactive_reason": "superseded_by_M16",
+      "qa_reference_status": "used_by_qa",
+      "memory_family": "revenue_preference",
+      "primary_source_turn_ids": [
+        "D9:5"
+      ],
+      "supporting_turn_ids": []
+    },
+    {
+      "memory_id": "M08",
+      "key": "temporary.chi_tien",
+      "canonical_fact": "Chí Tiên chỉ là hỗ trợ tạm trong buổi",
+      "source_turn_ids": [
+        "D10:1"
+      ],
+      "should_store": false,
+      "supersedes_memory_id": null,
+      "memory_type": "ephemeral",
+      "expected_operation": "do_not_persist",
+      "active_at_end": false,
+      "inactive_reason": "ephemeral task context",
+      "qa_reference_status": "used_by_qa",
+      "memory_family": "temporary_task",
+      "primary_source_turn_ids": [
+        "D10:1"
+      ],
+      "supporting_turn_ids": [],
+      "diagnostic_retrieval_scope": "transcript_oracle_only",
+      "history_versioning_expectation": "not_guaranteed",
+      "diagnostic_note": "Because M08 should not persist, QA about this event is a transcript/formation-event diagnostic, not a guaranteed memory-history retrieval task."
+    },
+    {
+      "memory_id": "M09",
+      "key": "growth.short_report",
+      "canonical_fact": "Trong báo cáo ngắn, khi user chỉ nói \"so cùng kỳ\", mặc định hiểu là cùng kỳ tháng.",
+      "source_turn_ids": [
+        "D12:7"
+      ],
+      "should_store": true,
+      "supersedes_memory_id": null,
+      "memory_type": "preference",
+      "expected_operation": "add",
+      "active_at_end": true,
+      "qa_reference_status": "used_by_qa",
+      "memory_family": "growth_preference",
+      "primary_source_turn_ids": [
+        "D12:7"
+      ],
+      "supporting_turn_ids": [
+        "D12:9"
+      ]
+    },
+    {
+      "memory_id": "M10",
+      "key": "scope.thuong_long_role",
+      "canonical_fact": "Theo dõi Thượng Long sát hơn, song song Thanh Sơn",
+      "source_turn_ids": [
+        "D13:1"
+      ],
+      "should_store": true,
+      "supersedes_memory_id": "M05",
+      "memory_type": "state_update",
+      "expected_operation": "update",
+      "active_at_end": false,
+      "inactive_reason": "later primary-scope change",
+      "qa_reference_status": "used_by_qa",
+      "memory_family": "scope",
+      "primary_source_turn_ids": [
+        "D13:1"
+      ],
+      "supporting_turn_ids": []
+    },
+    {
+      "memory_id": "M11",
+      "key": "subscriber.5g_priority",
+      "canonical_fact": "5G được xem thường xuyên hơn nhưng 4G vẫn giữ đối chiếu",
+      "source_turn_ids": [
+        "D15:7"
+      ],
+      "should_store": true,
+      "supersedes_memory_id": "M06",
+      "memory_type": "preference_update",
+      "expected_operation": "update",
+      "active_at_end": true,
+      "qa_reference_status": "used_by_qa",
+      "memory_family": "subscriber_preference",
+      "primary_source_turn_ids": [
+        "D15:7"
+      ],
+      "supporting_turn_ids": []
+    },
+    {
+      "memory_id": "M12",
+      "key": "scope.primary",
+      "canonical_fact": "Thượng Long, Phú Thọ",
+      "source_turn_ids": [
+        "D16:1"
+      ],
+      "should_store": true,
+      "supersedes_memory_id": "M10",
+      "memory_type": "state_update",
+      "expected_operation": "update",
+      "active_at_end": true,
+      "qa_reference_status": "used_by_qa",
+      "memory_family": "scope",
+      "primary_source_turn_ids": [
+        "D16:1"
+      ],
+      "supporting_turn_ids": [],
+      "update_chain": [
+        "M05",
+        "M10",
+        "M12"
+      ],
+      "update_semantics": "Thượng Long role evolves from drill-down -> parallel monitoring -> primary scope."
+    },
+    {
+      "memory_id": "M13",
+      "key": "scope.alias",
+      "canonical_fact": "'bên mình' = Thượng Long",
+      "source_turn_ids": [
+        "D16:7"
+      ],
+      "should_store": true,
+      "supersedes_memory_id": "M01",
+      "memory_type": "state_update",
+      "expected_operation": "update",
+      "active_at_end": true,
+      "qa_reference_status": "used_by_qa",
+      "memory_family": "scope",
+      "primary_source_turn_ids": [
+        "D16:7"
+      ],
+      "supporting_turn_ids": []
+    },
+    {
+      "memory_id": "M14",
+      "key": "scope.thanh_son_role",
+      "canonical_fact": "Thanh Sơn vẫn dùng khi tổng hợp cụm",
+      "source_turn_ids": [
+        "D16:7"
+      ],
+      "should_store": true,
+      "supersedes_memory_id": null,
+      "memory_type": "context",
+      "expected_operation": "add",
+      "active_at_end": true,
+      "qa_reference_status": "used_by_qa",
+      "memory_family": "scope",
+      "primary_source_turn_ids": [
+        "D16:7"
+      ],
+      "supporting_turn_ids": []
+    },
+    {
+      "memory_id": "M15",
+      "key": "kpi.explicit_precedence",
+      "canonical_fact": "KPI được gọi rõ phải giữ nguyên dù KPI khác được xem nhiều hơn",
+      "source_turn_ids": [
+        "D21:7"
+      ],
+      "should_store": true,
+      "supersedes_memory_id": null,
+      "memory_type": "rule",
+      "expected_operation": "add",
+      "active_at_end": true,
+      "qa_reference_status": "used_by_qa",
+      "memory_family": "explicit_precedence",
+      "primary_source_turn_ids": [
+        "D21:7"
+      ],
+      "supporting_turn_ids": [],
+      "policy_overlap_with_global_rule": true,
+      "policy_overlap_note": "Current explicit query > Recent > LTM already protects explicit KPI even without retrieving M15."
+    },
+    {
+      "memory_id": "M16",
+      "key": "revenue.current_priority",
+      "canonical_fact": "Bản trừ VAS được xem nhiều hơn bản doanh thu tiêu dùng cũ",
+      "source_turn_ids": [
+        "D21:7"
+      ],
+      "should_store": true,
+      "supersedes_memory_id": "M07",
+      "memory_type": "preference_update",
+      "expected_operation": "update",
+      "active_at_end": true,
+      "qa_reference_status": "used_by_qa",
+      "memory_family": "revenue_preference",
+      "primary_source_turn_ids": [
+        "D21:7"
+      ],
+      "supporting_turn_ids": []
+    },
+    {
+      "memory_id": "M17",
+      "key": "scope.current_work",
+      "canonical_fact": "Thượng Long là phần làm thường xuyên nhất",
+      "source_turn_ids": [
+        "D22:7"
+      ],
+      "should_store": true,
+      "supersedes_memory_id": null,
+      "memory_type": "confirmation",
+      "expected_operation": "reinforce_existing",
+      "active_at_end": true,
+      "should_create_new_memory": false,
+      "reinforces_memory_id": "M12",
+      "qa_reference_status": "formation_only",
+      "memory_family": "scope",
+      "primary_source_turn_ids": [
+        "D22:7"
+      ],
+      "supporting_turn_ids": []
+    }
+  ],
+  "qa_reference_summary": {
+    "used_memory_ids": [
+      "M01",
+      "M02",
+      "M04",
+      "M05",
+      "M06",
+      "M07",
+      "M08",
+      "M09",
+      "M10",
+      "M11",
+      "M12",
+      "M13",
+      "M14",
+      "M15",
+      "M16"
+    ],
+    "formation_only_memory_ids": [
+      "M03",
+      "M17"
+    ],
+    "note": "Formation-only events are valid: they test extraction/update/reinforcement behavior even if no QA directly depends on them."
+  },
+  "formation_contract": {
+    "memory_event_count": 17,
+    "M08": "formation negative: temporary Chí Tiên task should not become durable LTM.",
+    "M03_M17": "formation-only events; absence from QA dependencies is intentional.",
+    "assistant_echoes": "Supporting assistant turns may reinforce a semantic memory; primary user-source provenance can be scored separately."
+  },
+  "active_memory_event_ids_at_end": [
+    "M02",
+    "M04",
+    "M09",
+    "M11",
+    "M12",
+    "M13",
+    "M14",
+    "M15",
+    "M16",
+    "M17"
+  ],
+  "expected_active_memory_row_source_event_ids": [
+    "M02",
+    "M04",
+    "M09",
+    "M11",
+    "M12",
+    "M13",
+    "M14",
+    "M15",
+    "M16"
+  ],
+  "expected_active_memory_row_count": 9,
+  "event_vs_row_contract": {
+    "memory_event": "Annotation of a formation/update/reinforcement/no-persist event.",
+    "active_memory_row": "Distinct durable semantic memory expected to exist in final active memory state.",
+    "reinforce_existing_event": "May be active as an event but does not create a separate final row."
+  },
+  "formation_precision_contract": {
+    "world_assumption": "open_world_semantic",
+    "gold_events_exhaustive_for_required_events": false,
+    "extra_valid_memory_policy": "A semantically valid extra memory is not automatically a false positive merely because it is absent from the 17 annotated gold events.",
+    "precision_penalty_rule": "Penalize extra memories only when they are contradicted, clearly ephemeral despite persistence policy, malformed, or otherwise semantically invalid.",
+    "example_unannotated_fact": "D22:7 mentions mobile remains the group opened first during review; absence from gold is not by itself a false-positive label."
+  },
+  "expected_active_memory_row_count_semantics": {
+    "value": 9,
+    "role": "reference_only",
+    "hard_exact_gate": false,
+    "reason": "Formation evaluation is open-world semantic: valid extra memories, merges, or equivalent row structures must not fail solely because the final distinct row count differs from this reference count."
+  }
+}

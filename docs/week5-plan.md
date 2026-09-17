@@ -4,13 +4,15 @@
 
 T5.1–T5.2 hoàn tất về implementation: plan/control contract, eval types và provider preflight.
 [T5.2 evidence](week5-t5.2-preflight.md): ba OpenAI probes và PostgreSQL/pgvector live pass.
-T5.3–T5.20 chưa triển khai; dataset và semantic benchmark chưa chạy.
+T5.3–T5.4 đang triển khai: corpus nguồn có bốn storyline, manifest/checksum, full-corpus scope, schema, typed
+loader và validator deterministic. Corpus chưa materialize KiRa, chưa có reviewer revision và chưa
+được chuyển thành bốn suite `EvalCase`; semantic benchmark chưa chạy.
 
 - Control: `75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00`, kết thúc Week 4.
 - Application `0.4.1`; `viettel-mem0==2.0.20+viettel.3`; memory schema version `2`.
 - Extraction policy `kira-memory-policy-v2`; rewrite prompt `2`.
 - [Control manifest](week5-baseline.json) khóa provenance và các default liên quan.
-- [Benchmark contract v1](week5-benchmark-contract.md) quy định profile, scoring và promotion.
+- [Benchmark contract v2](week5-benchmark-contract.md) quy định profile, scoring và promotion.
 - [Week 4 release evidence](week4-t4.23-release-evidence.md) là evidence kế thừa, không phải
   kết quả kiểm thử mới của Week 5.
 
@@ -43,10 +45,11 @@ name cụ thể trước preflight. Profile thiếu dependency ghi `NOT_RUN`/`DE
 là đã pass. KiRa thật là gate task-success riêng; mock KiRa chỉ chứng minh query/SSE contract.
 Không chuyển KiRa transcript, kết quả nội bộ hay dữ liệu người dùng thật sang provider bên ngoài.
 
-Corpus v1 dự kiến 160 case: formation 60 (36 positive, 24 negative), retrieval 40, rewrite 40,
-cross-session 20. Chia khoảng 70% dev / 30% holdout theo **scenario family**, không theo từng
-paraphrase. Seed/biến thể đã dùng ở Week 2–3 chỉ vào dev. Taxonomy là nhãn đánh giá, không phải
-schema lưu memory. User/mentor review gold labels trước khi chấm semantic pass chính thức.
+Corpus hiện có 209 QA trên bốn storyline, dùng như một bộ acceptance `full_corpus`: mọi official
+run chạy toàn bộ case đủ điều kiện. `scenario_group` và memory family chỉ là chiều báo cáo/audit,
+không chia dev/holdout. Vì người phát triển có thể đã xem toàn bộ corpus, kết quả không được trình
+bày như bằng chứng generalization trên unseen holdout. Taxonomy là nhãn đánh giá, không phải schema
+lưu memory. User/mentor review gold labels trước khi chấm semantic pass chính thức.
 
 ## Batch A — Hợp đồng, corpus và harness nền tảng
 
@@ -54,8 +57,8 @@ schema lưu memory. User/mentor review gold labels trước khi chấm semantic 
 | --- | --- | --- | --- |
 | T5.1 | Lưu plan; khóa control manifest; chốt scope tuning, profiles, metrics, candidate selection và safety gates | Week 4 | DONE |
 | T5.2 | Eval types + provider preflight: typed case/config/result; probe chat/JSON extraction, embedding batch/dimension và DB theo dependency từng suite; lỗi typed, output không lộ secret | T5.1 | DONE |
-| T5.3 | Synthetic dataset v1: đủ bốn suite, positive/negative và domain slices; gold IDs, evidence, constraints và allowed attribution; trạng thái draft/reviewed rõ | T5.2 | NOT_STARTED |
-| T5.4 | Validator + split: validate schema, unique IDs, gold references, normalized exact duplicates, family isolation, seed reproducibility và checksums; semantic near-duplicate do reviewer kiểm tra | T5.3 | NOT_STARTED |
+| T5.3 | Synthetic dataset v1: đủ bốn suite, positive/negative và domain slices; gold IDs, evidence, constraints và allowed attribution; trạng thái draft/reviewed rõ | T5.2 | IN_PROGRESS — 4 storyline/209 QA đã đóng gói; còn materialization, reviewer revision và chuyển sang 4 suite |
+| T5.4 | Validator + scope: validate schema, unique IDs, gold references, normalized exact duplicates, full-corpus scope, seed reproducibility và checksums; semantic near-duplicate do reviewer kiểm tra | T5.3 | IN_PROGRESS — manifest/checksum, full-corpus scope và validator deterministic đã có; còn semantic near-duplicate review |
 | T5.5 | Scorer/human review/report: deterministic checks + review semantic thủ công; CLI dự kiến `validate`, `preflight`, `run`, `review`, `compare`; kết quả có denominator, coverage và error breakdown | T5.4 | NOT_STARTED |
 
 Checkpoint A: harness chạy offline được với mocks; corpus có checksum và review status;
@@ -70,9 +73,9 @@ probe, dataset hay một lần gọi model có phí.
 | T5.7 | Persistent evaluator đi qua application/Mem0/pgvector boundary thật; đối chiếu raw facts với memories/receipt thực sự commit | T5.6 |
 | T5.8 | Multi-turn và dedup/retry cases: paraphrase, top-k miss, before/after commit; fresh event cho quality, cùng event cho replay; đo duplicate giữa các event độc lập | T5.7 |
 | T5.9 | Formation report: precision/recall/F1, unsupported facts, formula/attribution, negatives và duplicate rate; phân tích theo taxonomy/case family | T5.8 |
-| T5.10 | Chạy control trước; tối đa hai prompt/config candidate được chọn bằng dev; version/hash từng candidate; chưa promote khi chưa qua holdout | T5.9 |
+| T5.10 | Chạy control trước; tối đa hai prompt/config candidate trên cùng full corpus; version/hash từng candidate; chọn theo metric/guardrail đã khóa, không cherry-pick case | T5.9 |
 
-Checkpoint B: có baseline formation report và candidate có evidence trên dev; chấp nhận kết
+Checkpoint B: có baseline formation report và candidate có evidence trên full corpus; chấp nhận kết
 luận “giữ baseline”. Không tự động làm correction/forget hoặc sửa cross-event dedup.
 
 ## Batch C — Retrieval, rewrite và cross-session
@@ -81,7 +84,7 @@ luận “giữ baseline”. Không tự động làm correction/forget hoặc s
 | --- | --- | --- |
 | T5.11 | Gold-memory seeding **evaluation-only**, `infer=False`, mapping gold ID ↔ persisted ID; tách corpus gold và corpus formation thật | T5.5 |
 | T5.12 | Retrieval evaluator gọi pipeline native với user scope; Recall@1/3/5, MRR, Precision@K và no-hit FP; zero cross-user leakage | T5.11 |
-| T5.13 | Dev grid top-k `[1,3,5,10]`, threshold `[0,0.1,0.3,0.5,0.7]`; cùng embedding/corpus; không coi native hybrid score là cosine similarity | T5.12 |
+| T5.13 | Diagnostic grid top-k `[1,3,5,10]`, threshold `[0,0.1,0.3,0.5,0.7]` trên full corpus; cùng embedding/corpus; không coi native hybrid score là cosine similarity | T5.12 |
 | T5.14 | Context/rewrite evaluator: constraints + semantic equivalence, exact formulas, Current > Recent > LTM, standalone/topic-switch/ambiguity/injection | T5.5, T5.12 |
 | T5.15 | Cross-session + ablation Current-only / Recent-only / LTM-only / Recent+LTM bằng eval wiring; Session B đợi đúng job A complete có deadline; đo memory readiness riêng | T5.7, T5.14 |
 
@@ -90,13 +93,13 @@ retrieval query đang chấm không tự tạo thêm memories làm nhiễm corpu
 địa danh Việt Nam, paraphrase, no-hit, focus còn/hết hạn, conflict và user isolation. Expired focus
 hoặc explicit correction có lỗi phải hiện trong report, không được tuyên bố đã có automatic TTL/update.
 
-## Batch D — Performance, holdout, promotion và handoff
+## Batch D — Performance, repeated confirmation, promotion và handoff
 
 | Task | Nội dung / Definition of Done | Phụ thuộc |
 | --- | --- | --- |
 | T5.16 | Performance theo stage: formation, retrieval, rewrite, SSE timing và memory readiness; workload/concurrency/warm-up/timeout/retry giống nhau; p50/p95 kèm sample count | T5.10, T5.15 |
-| T5.17 | Freeze candidate trước khi mở holdout; ba run độc lập control/candidate cùng profile; kiểm tra primary metric, case-family gain, safety và latency gate | T5.16 |
-| T5.18 | Promote prompt/config đã đạt contract; nếu không đủ evidence giữ baseline và ghi lý do; không chọn lại candidate trên holdout | T5.17 |
+| T5.17 | Freeze candidate; ba paired run độc lập control/candidate trên toàn bộ corpus cùng profile; kiểm tra primary metric, case-family gain, safety và latency gate | T5.16 |
+| T5.18 | Promote prompt/config đã đạt contract; nếu không đủ evidence giữ baseline và ghi lý do; không đổi luật/case sau khi xem kết quả | T5.17 |
 | T5.19 | Week 1–4 regression, coverage ≥90%, scorer/validator tests, PostgreSQL/memory compatibility và T4.19–T4.22 smoke; build eval image offline riêng | T5.18 |
 | T5.20 | Acceptance bundle: manifest, corpus/review checksum, reports, limitations và quyết định; runbook save/load/internal registry cho Week 6 | T5.19 |
 

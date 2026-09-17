@@ -1,0 +1,840 @@
+{
+  "conversation_id": "conv_03_FREEZE_v5_FINAL",
+  "persona": {
+    "role": "Chuyên viên phân tích so sánh vùng",
+    "job_story": "Phân tích chênh lệch giữa tỉnh/cụm/xã, dùng các bộ chỉ tiêu và tập tham chiếu có quy ước riêng. Memory trọng tâm là comparator convention, metric bundle update, ranking convention, temporary exception và explicit cancellation của một default."
+  },
+  "metadata": {
+    "language": "vi",
+    "design_goal": "LoCoMo-like long-term usage with memory families distinct from Conv 1 and Conv 2.",
+    "source_basis": "Hai bộ testcase KiRa do người dùng cung cấp.",
+    "business_responses": "blank_until_filled_from_original_kira",
+    "version": "v5_FINAL",
+    "review_status": "FROZEN_CONTRACT_PENDING_KIRA_FILL",
+    "business_time_window_note": "Business queries deliberately replay fixed historical source-testcase windows (08/2026 and 06/09/2026). The business period is not inferred from synthetic session_datetime.",
+    "fill_id_policy": {
+      "stable_across_revisions": true,
+      "note": "CONV03_FILL_### identifiers should remain stable after real KiRa responses are collected."
+    },
+    "sessions": 22,
+    "turns": 114,
+    "kira_fill_slots": 33,
+    "session_turn_counts": [
+      8,
+      6,
+      2,
+      8,
+      6,
+      6,
+      2,
+      8,
+      8,
+      4,
+      2,
+      6,
+      4,
+      6,
+      2,
+      8,
+      4,
+      6,
+      2,
+      6,
+      4,
+      6
+    ],
+    "zero_fill_sessions": [
+      3,
+      7,
+      11,
+      15,
+      19,
+      21
+    ],
+    "assistant_bridge_count": 24,
+    "assistant_bridge_unique": 24
+  },
+  "conversation": {
+    "session_1_date_time": "2026-09-11T09:10:00+07:00",
+    "session_1_goal": "Dựng bộ so sánh vùng",
+    "session_1": [
+      {
+        "role": "user",
+        "dia_id": "D1:1",
+        "text": "Từ giờ nếu mình nói “cặp tỉnh chuẩn” thì hiểu là Phú Thọ với Đà Nẵng; khi nào bỏ quy ước này mình sẽ nói."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D1:2",
+        "text": "Được, mình theo cách gọi đó trong phần so sánh.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D1:3",
+        "text": "Mình gọi “bộ lõi” là hai chỉ tiêu theo thứ tự: Doanh thu dịch vụ (VTT+VTS+VDS), rồi Doanh thu IOT."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D1:4",
+        "text": "Rõ, mình dùng đúng bộ chỉ tiêu anh vừa chốt.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D1:5",
+        "text": "So chỉ tiêu đầu của bộ lõi ở cặp tỉnh chuẩn ngày 06/09/2026.",
+        "fill_id": "CONV03_FILL_001"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D1:6",
+        "text": "",
+        "fill_id": "CONV03_FILL_001",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D1:7",
+        "text": "So tiếp chỉ tiêu thứ hai của bộ lõi ở cặp tỉnh chuẩn ngày 06/09/2026.",
+        "fill_id": "CONV03_FILL_002"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D1:8",
+        "text": "",
+        "fill_id": "CONV03_FILL_002",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_2_date_time": "2026-09-17T14:05:00+07:00",
+    "session_2_goal": "Quy ước nhóm cuối",
+    "session_2": [
+      {
+        "role": "user",
+        "dia_id": "D2:1",
+        "text": "Nếu mình nói “nhóm cuối” mà không ghi số lượng thì lấy 3 tỉnh đứng cuối."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D2:2",
+        "text": "Ừ, mình hiểu “nhóm cuối” theo mức đó.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D2:3",
+        "text": "Lấy nhóm cuối về Doanh thu dịch vụ tháng 8.",
+        "fill_id": "CONV03_FILL_003"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D2:4",
+        "text": "",
+        "fill_id": "CONV03_FILL_003",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D2:5",
+        "text": "Lấy nhóm cuối về Doanh thu IOT tháng 8 luôn.",
+        "fill_id": "CONV03_FILL_004"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D2:6",
+        "text": "",
+        "fill_id": "CONV03_FILL_004",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_3_date_time": "2026-09-22T10:40:00+07:00",
+    "session_3_goal": "Cách trả lời so sánh",
+    "session_3": [
+      {
+        "role": "user",
+        "dia_id": "D3:1",
+        "text": "Phần so sánh mình chỉ cần gọn: nêu bên nào cao hơn và số của hai bên; đừng kéo dài phần giải thích nếu mình không hỏi."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D3:2",
+        "text": "Được, mình giữ phần so sánh ngắn.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_4_date_time": "2026-09-29T15:30:00+07:00",
+    "session_4_goal": "Chốt cặp cụm tham chiếu",
+    "session_4": [
+      {
+        "role": "user",
+        "dia_id": "D4:1",
+        "text": "Còn khi mình nói “cặp cụm” thì mặc định là Cụm Núi Thành (Đà Nẵng) với Cụm Vũng Tàu (Hồ Chí Minh), dùng làm cặp tham chiếu giữa hai vùng."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D4:2",
+        "text": "Rõ, mình dùng cặp cụm đó khi anh gọi ngắn.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D4:3",
+        "text": "So Doanh thu dịch vụ ở cặp cụm ngày 06/09/2026.",
+        "fill_id": "CONV03_FILL_005"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D4:4",
+        "text": "",
+        "fill_id": "CONV03_FILL_005",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D4:5",
+        "text": "So Doanh thu IOT ở cặp cụm ngày 06/09/2026.",
+        "fill_id": "CONV03_FILL_006"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D4:6",
+        "text": "",
+        "fill_id": "CONV03_FILL_006",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D4:7",
+        "text": "So thêm FTTH phát triển thực lũy kế ở cặp cụm ngày 06/09/2026.",
+        "fill_id": "CONV03_FILL_007"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D4:8",
+        "text": "",
+        "fill_id": "CONV03_FILL_007",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_5_date_time": "2026-10-04T08:55:00+07:00",
+    "session_5_goal": "Bảng xã chi tiết",
+    "session_5": [
+      {
+        "role": "user",
+        "dia_id": "D5:1",
+        "text": "Nếu mình nói “bảng xã chi tiết” thì hiểu là top 10 xã trong cụm Núi Thành, Đà Nẵng."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D5:2",
+        "text": "Được, mình theo đúng phạm vi của bảng chi tiết đó.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D5:3",
+        "text": "Lấy bảng xã chi tiết cho Doanh thu dịch vụ tháng 8.",
+        "fill_id": "CONV03_FILL_008"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D5:4",
+        "text": "",
+        "fill_id": "CONV03_FILL_008",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D5:5",
+        "text": "Lấy bảng xã chi tiết cho Doanh thu IOT tháng 8.",
+        "fill_id": "CONV03_FILL_009"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D5:6",
+        "text": "",
+        "fill_id": "CONV03_FILL_009",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_6_date_time": "2026-10-10T13:20:00+07:00",
+    "session_6_goal": "Cặp xã tạm cho workshop",
+    "session_6": [
+      {
+        "role": "user",
+        "dia_id": "D6:1",
+        "text": "Workshop hôm nay mới dùng Xã Đông Thành (Phú Thọ) với Xã Minh Sơn (Thanh Hóa) để minh họa. Xong buổi này thì đừng coi đó là cặp so sánh mặc định của mình."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D6:2",
+        "text": "Rõ, mình chỉ dùng cặp đó cho workshop hôm nay.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D6:3",
+        "text": "So Doanh thu dịch vụ giữa hai xã workshop ngày 06/09/2026.",
+        "fill_id": "CONV03_FILL_010"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D6:4",
+        "text": "",
+        "fill_id": "CONV03_FILL_010",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D6:5",
+        "text": "So FTTH phát triển thực lũy kế giữa hai xã workshop ngày 06/09/2026.",
+        "fill_id": "CONV03_FILL_011"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D6:6",
+        "text": "",
+        "fill_id": "CONV03_FILL_011",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_7_date_time": "2026-10-15T09:25:00+07:00",
+    "session_7_goal": "Xác nhận bộ lõi hiện tại",
+    "session_7": [
+      {
+        "role": "user",
+        "dia_id": "D7:1",
+        "text": "Bộ lõi hiện vẫn chỉ có Doanh thu dịch vụ và IOT, chưa thêm chỉ tiêu thuê bao nào."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D7:2",
+        "text": "Ừ, mình giữ bộ lõi theo trạng thái hiện tại.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_8_date_time": "2026-10-21T16:10:00+07:00",
+    "session_8_goal": "Mở rộng bộ lõi",
+    "session_8": [
+      {
+        "role": "user",
+        "dia_id": "D8:1",
+        "text": "Từ kỳ này thêm FTTH phát triển thực lũy kế vào vị trí thứ ba của bộ lõi. Hai chỉ tiêu đầu giữ nguyên thứ tự."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D8:2",
+        "text": "Được, mình dùng bộ lõi đã cập nhật.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D8:3",
+        "text": "Lấy chỉ tiêu đầu của bộ lõi toàn quốc tháng 8.",
+        "fill_id": "CONV03_FILL_012"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D8:4",
+        "text": "",
+        "fill_id": "CONV03_FILL_012",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D8:5",
+        "text": "Lấy chỉ tiêu thứ hai của bộ lõi toàn quốc tháng 8.",
+        "fill_id": "CONV03_FILL_013"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D8:6",
+        "text": "",
+        "fill_id": "CONV03_FILL_013",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D8:7",
+        "text": "Lấy chỉ tiêu thứ ba của bộ lõi toàn quốc tháng 8.",
+        "fill_id": "CONV03_FILL_014"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D8:8",
+        "text": "",
+        "fill_id": "CONV03_FILL_014",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_9_date_time": "2026-10-27T11:45:00+07:00",
+    "session_9_goal": "Dùng bộ lõi mới với cặp tỉnh chuẩn",
+    "session_9": [
+      {
+        "role": "user",
+        "dia_id": "D9:1",
+        "text": "Dùng bộ lõi mới để rà lại cặp tỉnh chuẩn nhé."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D9:2",
+        "text": "Được, mình rà theo bộ lõi mới.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D9:3",
+        "text": "So chỉ tiêu đầu của bộ lõi ở cặp tỉnh chuẩn ngày 06/09/2026.",
+        "fill_id": "CONV03_FILL_015"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D9:4",
+        "text": "",
+        "fill_id": "CONV03_FILL_015",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D9:5",
+        "text": "So chỉ tiêu thứ hai của bộ lõi ở cặp tỉnh chuẩn ngày 06/09/2026.",
+        "fill_id": "CONV03_FILL_016"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D9:6",
+        "text": "",
+        "fill_id": "CONV03_FILL_016",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D9:7",
+        "text": "So chỉ tiêu thứ ba của bộ lõi ở cặp tỉnh chuẩn ngày 06/09/2026.",
+        "fill_id": "CONV03_FILL_017"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D9:8",
+        "text": "",
+        "fill_id": "CONV03_FILL_017",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_10_date_time": "2026-11-02T14:35:00+07:00",
+    "session_10_goal": "Nhóm cuối cho chỉ tiêu thuê bao",
+    "session_10": [
+      {
+        "role": "user",
+        "dia_id": "D10:1",
+        "text": "Mình rà thêm phần cuối bảng cho chỉ tiêu thuê bao mới trong bộ lõi."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D10:2",
+        "text": "Ừ, mình lấy phần cuối bảng như anh đang rà.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D10:3",
+        "text": "Lấy nhóm cuối cho chỉ tiêu thứ ba của bộ lõi tháng 8.",
+        "fill_id": "CONV03_FILL_018"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D10:4",
+        "text": "",
+        "fill_id": "CONV03_FILL_018",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_11_date_time": "2026-11-07T09:00:00+07:00",
+    "session_11_goal": "Bỏ cặp tỉnh mặc định",
+    "session_11": [
+      {
+        "role": "user",
+        "dia_id": "D11:1",
+        "text": "Từ giờ bỏ cặp tỉnh chuẩn nhé. Nếu mình chỉ nói “so tỉnh” mà không nêu rõ hai tỉnh thì hỏi lại, đừng tự dùng Phú Thọ với Đà Nẵng nữa."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D11:2",
+        "text": "Rõ, thiếu hai tỉnh thì mình sẽ không tự chọn cặp.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_12_date_time": "2026-11-12T15:50:00+07:00",
+    "session_12_goal": "Dùng lại cặp tỉnh cho một slide",
+    "session_12": [
+      {
+        "role": "user",
+        "dia_id": "D12:1",
+        "text": "Riêng slide hôm nay mình ghi rõ Phú Thọ với Đà Nẵng; việc này không khôi phục cặp tỉnh mặc định."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D12:2",
+        "text": "Được, mình chỉ dùng hai tỉnh đó cho slide này.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D12:3",
+        "text": "So Doanh thu dịch vụ của Phú Thọ với Đà Nẵng ngày 06/09/2026.",
+        "fill_id": "CONV03_FILL_019"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D12:4",
+        "text": "",
+        "fill_id": "CONV03_FILL_019",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D12:5",
+        "text": "So FTTH phát triển thực lũy kế của Phú Thọ với Đà Nẵng ngày 06/09/2026.",
+        "fill_id": "CONV03_FILL_020"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D12:6",
+        "text": "",
+        "fill_id": "CONV03_FILL_020",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_13_date_time": "2026-11-18T10:15:00+07:00",
+    "session_13_goal": "Dùng cặp cụm hiện tại",
+    "session_13": [
+      {
+        "role": "user",
+        "dia_id": "D13:1",
+        "text": "Phần tỉnh thì không còn mặc định, còn cặp cụm vẫn dùng như trước."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D13:2",
+        "text": "Ừ, mình tách hai quy ước đó ra.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D13:3",
+        "text": "So Doanh thu IOT ở cặp cụm ngày 06/09/2026.",
+        "fill_id": "CONV03_FILL_021"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D13:4",
+        "text": "",
+        "fill_id": "CONV03_FILL_021",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_14_date_time": "2026-11-23T14:45:00+07:00",
+    "session_14_goal": "Ngoại lệ thuê bao cho một buổi review",
+    "session_14": [
+      {
+        "role": "user",
+        "dia_id": "D14:1",
+        "text": "Riêng buổi review này, ở vị trí FTTH của bộ lõi mình muốn xem truyền hình thay thế. Xong buổi thì quay lại bộ lõi đã chốt, không lưu thay đổi này."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D14:2",
+        "text": "Rõ, đây chỉ là thay thế tạm cho buổi review.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D14:3",
+        "text": "Ở cặp cụm, lấy chỉ tiêu đầu của bộ lõi ngày 06/09/2026.",
+        "fill_id": "CONV03_FILL_022"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D14:4",
+        "text": "",
+        "fill_id": "CONV03_FILL_022",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D14:5",
+        "text": "Ở cặp cụm, lấy chỉ tiêu thuê bao thay thế của buổi review ngày 06/09/2026.",
+        "fill_id": "CONV03_FILL_023"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D14:6",
+        "text": "",
+        "fill_id": "CONV03_FILL_023",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_15_date_time": "2026-11-27T09:35:00+07:00",
+    "session_15_goal": "Kết thúc ngoại lệ tạm",
+    "session_15": [
+      {
+        "role": "user",
+        "dia_id": "D15:1",
+        "text": "Buổi review xong rồi. Bộ lõi vẫn là Doanh thu dịch vụ, IOT và FTTH theo đúng thứ tự đã chốt."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D15:2",
+        "text": "Được, mình quay lại bộ lõi chính.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_16_date_time": "2026-12-02T16:20:00+07:00",
+    "session_16_goal": "Rà tăng trưởng bộ lõi",
+    "session_16": [
+      {
+        "role": "user",
+        "dia_id": "D16:1",
+        "text": "Hôm nay mình chỉ rà tăng trưởng của ba chỉ tiêu bộ lõi ở Hà Nội, lũy kế đến tháng 8."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D16:2",
+        "text": "Ừ, mình lấy đúng ba chỉ tiêu đó.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D16:3",
+        "text": "Xem tăng trưởng chỉ tiêu đầu của bộ lõi ở Hà Nội lũy kế đến tháng 8.",
+        "fill_id": "CONV03_FILL_024"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D16:4",
+        "text": "",
+        "fill_id": "CONV03_FILL_024",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D16:5",
+        "text": "Xem tăng trưởng chỉ tiêu thứ hai của bộ lõi ở Hà Nội lũy kế đến tháng 8.",
+        "fill_id": "CONV03_FILL_025"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D16:6",
+        "text": "",
+        "fill_id": "CONV03_FILL_025",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D16:7",
+        "text": "Xem tăng trưởng chỉ tiêu thứ ba của bộ lõi ở Hà Nội lũy kế đến tháng 8.",
+        "fill_id": "CONV03_FILL_026"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D16:8",
+        "text": "",
+        "fill_id": "CONV03_FILL_026",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_17_date_time": "2026-12-08T11:05:00+07:00",
+    "session_17_goal": "Nhóm cuối cho IOT",
+    "session_17": [
+      {
+        "role": "user",
+        "dia_id": "D17:1",
+        "text": "Mình kiểm lại nhóm cuối cho chỉ tiêu IOT trước khi ghép slide."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D17:2",
+        "text": "Được, mình lấy phần đó trước.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D17:3",
+        "text": "Lấy nhóm cuối về Doanh thu IOT tháng 8.",
+        "fill_id": "CONV03_FILL_027"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D17:4",
+        "text": "",
+        "fill_id": "CONV03_FILL_027",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_18_date_time": "2026-12-13T08:40:00+07:00",
+    "session_18_goal": "Rà bảng xã chi tiết",
+    "session_18": [
+      {
+        "role": "user",
+        "dia_id": "D18:1",
+        "text": "Bảng xã chi tiết vẫn dùng đúng quy ước đã chốt, mình rà hai chỉ tiêu thôi."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D18:2",
+        "text": "Ừ, mình dùng lại bảng chi tiết đó.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D18:3",
+        "text": "Lấy bảng xã chi tiết cho Doanh thu dịch vụ tháng 8.",
+        "fill_id": "CONV03_FILL_028"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D18:4",
+        "text": "",
+        "fill_id": "CONV03_FILL_028",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D18:5",
+        "text": "Lấy bảng xã chi tiết cho FTTH phát triển thực lũy kế tháng 8.",
+        "fill_id": "CONV03_FILL_029"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D18:6",
+        "text": "",
+        "fill_id": "CONV03_FILL_029",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_19_date_time": "2026-12-18T15:00:00+07:00",
+    "session_19_goal": "Nhắc lại việc không có cặp tỉnh mặc định",
+    "session_19": [
+      {
+        "role": "user",
+        "dia_id": "D19:1",
+        "text": "Nhắc lại để khỏi lẫn: hiện mình không có cặp tỉnh mặc định. Thiếu tên hai tỉnh thì cứ hỏi lại."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D19:2",
+        "text": "Rõ, mình không tự suy ra cặp tỉnh.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_20_date_time": "2026-12-23T10:30:00+07:00",
+    "session_20_goal": "Rà cặp cụm cuối kỳ",
+    "session_20": [
+      {
+        "role": "user",
+        "dia_id": "D20:1",
+        "text": "Cuối kỳ mình rà lại cặp cụm, vẫn giữ Núi Thành với Vũng Tàu."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D20:2",
+        "text": "Được, mình dùng cặp cụm đang giữ.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D20:3",
+        "text": "So Doanh thu dịch vụ ở cặp cụm ngày 06/09/2026.",
+        "fill_id": "CONV03_FILL_030"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D20:4",
+        "text": "",
+        "fill_id": "CONV03_FILL_030",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D20:5",
+        "text": "So FTTH phát triển thực lũy kế ở cặp cụm ngày 06/09/2026.",
+        "fill_id": "CONV03_FILL_031"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D20:6",
+        "text": "",
+        "fill_id": "CONV03_FILL_031",
+        "needs_kira_fill": true
+      }
+    ],
+    "session_21_date_time": "2026-12-28T09:15:00+07:00",
+    "session_21_goal": "Chốt các quy ước hiện tại",
+    "session_21": [
+      {
+        "role": "user",
+        "dia_id": "D21:1",
+        "text": "Chốt lại nhé: bộ lõi gồm Doanh thu dịch vụ, IOT, FTTH; “nhóm cuối” là 3 tỉnh đứng cuối; “cặp cụm” là Núi Thành với Vũng Tàu; “bảng xã chi tiết” là top 10 xã ở Núi Thành."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D21:2",
+        "text": "Được, mình nắm các quy ước hiện tại.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D21:3",
+        "text": "Riêng so sánh tỉnh thì không có cặp mặc định nữa, thiếu tên hai tỉnh là phải hỏi lại."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D21:4",
+        "text": "Rõ, phần so tỉnh mình sẽ chờ đủ địa bàn.",
+        "source": "synthetic_bridge"
+      }
+    ],
+    "session_22_date_time": "2026-12-30T14:10:00+07:00",
+    "session_22_goal": "Dùng bộ quy ước đã chốt",
+    "session_22": [
+      {
+        "role": "user",
+        "dia_id": "D22:1",
+        "text": "Mình lấy hai lát cắt cuối để đóng file phân tích."
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D22:2",
+        "text": "Ừ, mình lấy hai phần cuối.",
+        "source": "synthetic_bridge"
+      },
+      {
+        "role": "user",
+        "dia_id": "D22:3",
+        "text": "Lấy nhóm cuối về Doanh thu dịch vụ tháng 8.",
+        "fill_id": "CONV03_FILL_032"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D22:4",
+        "text": "",
+        "fill_id": "CONV03_FILL_032",
+        "needs_kira_fill": true
+      },
+      {
+        "role": "user",
+        "dia_id": "D22:5",
+        "text": "So Doanh thu IOT ở cặp cụm ngày 06/09/2026.",
+        "fill_id": "CONV03_FILL_033"
+      },
+      {
+        "role": "assistant",
+        "dia_id": "D22:6",
+        "text": "",
+        "fill_id": "CONV03_FILL_033",
+        "needs_kira_fill": true
+      }
+    ]
+  }
+}

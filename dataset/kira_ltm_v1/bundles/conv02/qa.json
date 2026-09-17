@@ -1,0 +1,1650 @@
+{
+  "conversation_id": "conv_02_FREEZE_v4_FINAL",
+  "do_not_ingest": true,
+  "summary": {
+    "sessions": 20,
+    "turns": 116,
+    "kira_fill_slots": 36,
+    "assistant_bridge_count": 22,
+    "assistant_bridge_unique": 22,
+    "gold_memory_events": 15,
+    "active_memory_events_at_end": 12,
+    "expected_active_memory_rows_reference": 9,
+    "qa_total": 50,
+    "qa_category_distribution": {
+      "single_hop": 14,
+      "false_premise": 5,
+      "multi_hop": 10,
+      "temporal_reasoning": 5,
+      "state_update": 6,
+      "temporal_business_action": 5,
+      "abstention": 5
+    },
+    "hard_gate_qa": 35,
+    "diagnostic_history_qa": 15,
+    "scenario_groups": 31,
+    "formation_only_memory_ids": [
+      "M12",
+      "M13",
+      "M14"
+    ],
+    "status": "FROZEN_CONTRACT_PENDING_KIRA_FILL",
+    "scenario_group_size_range": [
+      1,
+      5
+    ],
+    "relative_time_fill_slots": 0,
+    "partial_policy_overlap_qa_count": 1,
+    "conversation_id": "conv_02_FREEZE_v4_FINAL",
+    "diagnostic_required_memory_audit": "PASS",
+    "hard_gate_active_row_dependency_audit": "PASS",
+    "evidence_id_audit": "PASS",
+    "gold_final_consistency": "PASS",
+    "fill_pairing_audit": "PASS",
+    "bridge_policy_leak_audit": "PASS",
+    "memory_gold_audit": "PASS",
+    "fill_slots_audit": "PASS"
+  },
+  "baseline_scope": {
+    "hard_gate_definition": "Answerable from the final active semantic-memory snapshot.",
+    "diagnostic_history_definition": "Requires historical occurrence/order information and/or past, superseded, or ephemeral context not guaranteed by the final active semantic-memory snapshot.",
+    "hard_gate_qa_count": 35,
+    "diagnostic_history_qa_count": 15
+  },
+  "score_reporting_contract": {
+    "headline_scope": {
+      "baseline_headline": "hard_gate_only",
+      "hard_gate_micro": "Micro accuracy over hard_gate=true QA only.",
+      "hard_gate_macro_scenario": "Macro scenario accuracy over hard_gate=true QA only.",
+      "diagnostic_history": "Report separately."
+    },
+    "required_metrics": [
+      {
+        "name": "micro_accuracy",
+        "definition": "Correct QA / evaluated QA within the selected tier."
+      },
+      {
+        "name": "macro_scenario_accuracy",
+        "definition": "Average scenario-group accuracy with equal scenario weight."
+      }
+    ]
+  },
+  "evaluation_scope": {
+    "mode": "full_corpus",
+    "scenario_group_role": "reporting_slice",
+    "memory_family_role": "audit_dimension"
+  },
+  "qa": [
+    {
+      "question_id": "Q_SINGLE_HOP_001",
+      "category": "single_hop",
+      "question": "DTDV là viết tắt của chỉ tiêu nào?",
+      "required_memory_ids": [
+        "M02"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D1:3"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Doanh thu dịch vụ (VTT+VTS+VDS).",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "abbreviation_dtdv",
+      "memory_families": [
+        "abbreviation"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Doanh thu dịch vụ (VTT+VTS+VDS)."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_002",
+      "category": "single_hop",
+      "question": "Phần đầu báo cáo tháng của mình sắp theo thứ tự nào?",
+      "required_memory_ids": [
+        "M01"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D1:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Doanh thu dịch vụ trước, sau đó tới FTTH.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "report_section_order",
+      "memory_families": [
+        "report_structure"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Doanh thu dịch vụ trước, sau đó tới FTTH."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_003",
+      "category": "single_hop",
+      "question": "Nếu chỉ nói top tỉnh mà không ghi số lượng thì lấy mấy dòng?",
+      "required_memory_ids": [
+        "M03"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D2:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "3 dòng.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "province_ranking_default",
+      "memory_families": [
+        "ranking_preference"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "3 dòng."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_004",
+      "category": "single_hop",
+      "question": "Hiện tại bảng cụm ở phần chính mặc định mấy dòng?",
+      "required_memory_ids": [
+        "M10"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D13:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "3 dòng; top 5 chỉ khi ghi rõ.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "cluster_ranking_current",
+      "memory_families": [
+        "ranking_preference"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "3 dòng; top 5 chỉ khi ghi rõ."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_005",
+      "category": "single_hop",
+      "question": "Chỉ tiêu nào đã trở thành dòng thường xuyên trong phụ lục?",
+      "required_memory_ids": [
+        "M07"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D7:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Doanh thu IOT.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "iot_appendix",
+      "memory_families": [
+        "report_structure"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Doanh thu IOT."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_006",
+      "category": "single_hop",
+      "question": "Bản nhanh hiện tại có những phần nào?",
+      "required_memory_ids": [
+        "M11"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D16:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "DTDV, FTTH và IOT ở dòng cuối; chi tiết IOT vẫn ở phụ lục.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "quick_template_current",
+      "memory_families": [
+        "report_template"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "DTDV, FTTH và IOT ở dòng cuối; chi tiết IOT vẫn ở phụ lục."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_007",
+      "category": "single_hop",
+      "question": "Phần nhận xét tăng trưởng nên viết theo kiểu nào?",
+      "required_memory_ids": [
+        "M06"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D6:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Ngắn; nếu dữ liệu đủ thì nêu hướng tăng/giảm.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "growth_style",
+      "memory_families": [
+        "response_style"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Ngắn; nếu dữ liệu đủ thì nêu hướng tăng/giảm."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_008",
+      "category": "single_hop",
+      "question": "Cho mình DTDV toàn quốc tháng 8.",
+      "required_memory_ids": [
+        "M02"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D1:3"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "abbreviation_dtdv_action",
+      "memory_families": [
+        "abbreviation"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Doanh thu dịch vụ (VTT+VTS+VDS)",
+      "source_service_id": "34",
+      "source_testcase": "CT_2",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "34",
+        "prd_id": "20260831",
+        "province_code": "",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "1",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Doanh thu dịch vụ (VTT+VTS+VDS) của Toàn quốc tháng 08/2026 là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_009",
+      "category": "single_hop",
+      "question": "Top 3 tỉnh về DTDV tháng 8.",
+      "required_memory_ids": [
+        "M02"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D1:3"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "abbreviation_dtdv_action",
+      "memory_families": [
+        "abbreviation"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Doanh thu dịch vụ (VTT+VTS+VDS)",
+      "source_service_id": "34",
+      "source_testcase": "CT_67",
+      "expected_intent": "xep_hang_chi_tieu",
+      "expected_api": {
+        "service_id": "34",
+        "prd_id": "20260831",
+        "province_code": "",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "month",
+        "limit": "3",
+        "order_by": "thuc_hien",
+        "order_type": "DESC",
+        "condition": []
+      },
+      "gold_rewrite": "Top 3 tỉnh xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) tháng 08/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_010",
+      "category": "single_hop",
+      "question": "Lấy chỉ tiêu phụ lục mới thường kỳ toàn quốc tháng 8.",
+      "required_memory_ids": [
+        "M07"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D7:1"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "iot_appendix_action",
+      "memory_families": [
+        "report_structure"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Doanh thu dịch vụ IOT",
+      "source_service_id": "14330",
+      "source_testcase": "CT_2",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "14330",
+        "prd_id": "20260831",
+        "province_code": "",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "1",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Doanh thu dịch vụ IOT của Toàn quốc tháng 08/2026 là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_011",
+      "category": "single_hop",
+      "question": "Nếu mình nói tách nhóm doanh thu thì cần nhìn những nhóm nào?",
+      "required_memory_ids": [
+        "M05"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D5:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "VTT, VTS và VDS; thao tác tách nhóm không làm đổi nghĩa DTDV.",
+      "notes": "Deliberately does not require M02; this QA only tests the decomposition convention in M05.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "revenue_decomposition",
+      "memory_families": [
+        "analysis_workflow"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "VTT, VTS và VDS; thao tác tách nhóm không làm đổi nghĩa DTDV."
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_012",
+      "category": "single_hop",
+      "question": "Top 5 cụm Hà Nội về DTDV tháng 8.",
+      "required_memory_ids": [
+        "M02"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D1:3"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "explicit_top5_cluster",
+      "memory_families": [
+        "abbreviation"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Doanh thu dịch vụ (VTT+VTS+VDS)",
+      "source_service_id": "34",
+      "source_testcase": "CT_69",
+      "expected_intent": "xep_hang_chi_tieu",
+      "expected_api": {
+        "service_id": "34",
+        "prd_id": "20260831",
+        "province_code": "HNI",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "5",
+        "order_by": "thuc_hien",
+        "order_type": "DESC",
+        "condition": []
+      },
+      "gold_rewrite": "Top 5 cụm xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) tại tỉnh Hà Nội tháng 08/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_013",
+      "category": "single_hop",
+      "question": "So DTDV Phú Thọ với Đà Nẵng ngày 06/09/2026.",
+      "required_memory_ids": [
+        "M02"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D1:3"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "abbreviation_dtdv_compare",
+      "memory_families": [
+        "abbreviation"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Doanh thu dịch vụ (VTT+VTS+VDS)",
+      "source_service_id": "34",
+      "source_testcase": "CT_64",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "34",
+        "prd_id": "20260906",
+        "province_code": "DNG,PTO",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "day",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "So sánh Doanh thu dịch vụ (VTT+VTS+VDS) của tỉnh Phú Thọ và tỉnh Đà Nẵng ngày 06/09/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_SINGLE_HOP_014",
+      "category": "single_hop",
+      "question": "Truyền hình và Dcom có phải phần thường xuyên của mẫu hiện tại không?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M09"
+      ],
+      "evidence_turn_ids": [
+        "D9:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Không. Chúng chỉ phục vụ một buổi họp tạm thời.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "temporary_tv_dcom",
+      "memory_families": [
+        "temporary_task"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. Chúng chỉ phục vụ một buổi họp tạm thời.",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_FALSE_PREMISE_005",
+      "category": "false_premise",
+      "question": "IOT hiện chỉ nằm ở phụ lục thôi đúng không?",
+      "required_memory_ids": [
+        "M11"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D16:1"
+      ],
+      "answer_type": "adversarial",
+      "expected_action": "reject_false_premise",
+      "gold_answer": "Không. IOT vẫn có chi tiết ở phụ lục nhưng hiện còn được thêm ở dòng cuối của bản nhanh.",
+      "notes": "The question asserts a false current-state premise and should be scored as false-premise resistance.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "quick_template_current",
+      "memory_families": [
+        "report_template"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. IOT vẫn có chi tiết ở phụ lục nhưng hiện còn được thêm ở dòng cuối của bản nhanh."
+    },
+    {
+      "question_id": "Q_MULTI_HOP_001",
+      "category": "multi_hop",
+      "question": "Cho top tỉnh về DTDV tháng 8 theo số dòng mình thường để.",
+      "required_memory_ids": [
+        "M02",
+        "M03"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D1:3",
+        "D2:1"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "dtdv_x_province_default",
+      "memory_families": [
+        "abbreviation",
+        "ranking_preference"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Doanh thu dịch vụ (VTT+VTS+VDS)",
+      "source_service_id": "34",
+      "source_testcase": "CT_67",
+      "expected_intent": "xep_hang_chi_tieu",
+      "expected_api": {
+        "service_id": "34",
+        "prd_id": "20260831",
+        "province_code": "",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "month",
+        "limit": "3",
+        "order_by": "thuc_hien",
+        "order_type": "DESC",
+        "condition": []
+      },
+      "gold_rewrite": "Top 3 tỉnh xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) tháng 08/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_MULTI_HOP_002",
+      "category": "multi_hop",
+      "question": "Nếu dựng trang chính theo các quy ước hiện tại, phần đầu báo cáo sắp thế nào và bảng xếp hạng tỉnh mặc định mấy dòng?",
+      "required_memory_ids": [
+        "M01",
+        "M03"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D1:1",
+        "D2:1"
+      ],
+      "answer_type": "memory_reasoning",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Doanh thu dịch vụ trước, FTTH sau; bảng tỉnh mặc định 3 dòng.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "report_order_x_province_default",
+      "memory_families": [
+        "ranking_preference",
+        "report_structure"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Doanh thu dịch vụ trước, FTTH sau; bảng tỉnh mặc định 3 dòng."
+    },
+    {
+      "question_id": "Q_MULTI_HOP_003",
+      "category": "multi_hop",
+      "question": "So sánh chỉ tiêu đứng đầu bản nhanh giữa Phú Thọ và Đà Nẵng ngày 06/09/2026.",
+      "required_memory_ids": [
+        "M11",
+        "M02"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D16:1",
+        "D1:3"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "quick_template_order_action",
+      "memory_families": [
+        "abbreviation",
+        "report_template"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Doanh thu dịch vụ (VTT+VTS+VDS)",
+      "source_service_id": "34",
+      "source_testcase": "CT_64",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "34",
+        "prd_id": "20260906",
+        "province_code": "DNG,PTO",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "day",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "So sánh Doanh thu dịch vụ (VTT+VTS+VDS) của tỉnh Phú Thọ và tỉnh Đà Nẵng ngày 06/09/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_MULTI_HOP_004",
+      "category": "multi_hop",
+      "question": "Chỉ tiêu đứng đầu bản nhanh hiện tại có phải cũng là chỉ tiêu đứng trước FTTH ở phần đầu báo cáo tháng không?",
+      "required_memory_ids": [
+        "M11",
+        "M01",
+        "M02"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D16:1",
+        "D1:1",
+        "D1:3"
+      ],
+      "answer_type": "memory_reasoning",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Có. DTDV là Doanh thu dịch vụ (VTT+VTS+VDS), đứng đầu bản nhanh và cũng đứng trước FTTH ở phần đầu báo cáo tháng.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "quick_template_order",
+      "memory_families": [
+        "abbreviation",
+        "report_structure",
+        "report_template"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Có. DTDV là Doanh thu dịch vụ (VTT+VTS+VDS), đứng đầu bản nhanh và cũng đứng trước FTTH ở phần đầu báo cáo tháng."
+    },
+    {
+      "question_id": "Q_MULTI_HOP_005",
+      "category": "multi_hop",
+      "question": "Hiện tại bản nhanh khác bản ban đầu ở điểm nào?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M08",
+        "M11"
+      ],
+      "evidence_turn_ids": [
+        "D8:1",
+        "D16:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Ban đầu chỉ có DTDV và FTTH; hiện tại thêm IOT ở dòng cuối.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "quick_template_evolution",
+      "memory_families": [
+        "report_template"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Ban đầu chỉ có DTDV và FTTH; hiện tại thêm IOT ở dòng cuối."
+    },
+    {
+      "question_id": "Q_MULTI_HOP_006",
+      "category": "multi_hop",
+      "question": "Quy ước bảng cụm ở phần chính thay đổi thế nào từ đầu tới hiện tại?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M04",
+        "M10"
+      ],
+      "evidence_turn_ids": [
+        "D3:1",
+        "D13:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Ban đầu mặc định 5 dòng; hiện bảng cụm chính mặc định 3 dòng và top 5 chỉ khi ghi rõ.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "cluster_ranking_evolution",
+      "memory_families": [
+        "ranking_preference"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Ban đầu mặc định 5 dòng; hiện bảng cụm chính mặc định 3 dòng và top 5 chỉ khi ghi rõ."
+    },
+    {
+      "question_id": "Q_MULTI_HOP_007",
+      "category": "multi_hop",
+      "question": "Sau khi thêm IOT, hai dòng đầu của bản nhanh có còn khớp với thứ tự phần đầu báo cáo tháng đã dùng từ đầu không?",
+      "required_memory_ids": [
+        "M11",
+        "M01",
+        "M02"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D16:1",
+        "D1:1",
+        "D1:3"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Có. Bản nhanh vẫn là DTDV rồi FTTH; DTDV là Doanh thu dịch vụ, nên thứ tự này vẫn khớp với phần đầu báo cáo tháng: Doanh thu dịch vụ rồi FTTH.",
+      "notes": "M11 gives the current quick-template order, M01 gives the monthly-report order, and M02 resolves DTDV to Doanh thu dịch vụ.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "quick_template_order",
+      "memory_families": [
+        "abbreviation",
+        "report_structure",
+        "report_template"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Có. Bản nhanh vẫn là DTDV rồi FTTH; DTDV là Doanh thu dịch vụ, nên thứ tự này vẫn khớp với phần đầu báo cáo tháng: Doanh thu dịch vụ rồi FTTH."
+    },
+    {
+      "question_id": "Q_MULTI_HOP_008",
+      "category": "multi_hop",
+      "question": "DTDV và quy tắc 'tách nhóm doanh thu' liên hệ với nhau thế nào?",
+      "required_memory_ids": [
+        "M02",
+        "M05"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D1:3",
+        "D5:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "DTDV là Doanh thu dịch vụ (VTT+VTS+VDS); còn 'tách nhóm doanh thu' là xem riêng VTT, VTS và VDS mà không tự đổi định nghĩa DTDV.",
+      "notes": "M02 is required for the actual DTDV definition; M05 is required for the decomposition rule.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "abbreviation_x_decomposition",
+      "memory_families": [
+        "abbreviation",
+        "analysis_workflow"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "DTDV là Doanh thu dịch vụ (VTT+VTS+VDS); còn 'tách nhóm doanh thu' là xem riêng VTT, VTS và VDS mà không tự đổi định nghĩa DTDV."
+    },
+    {
+      "question_id": "Q_MULTI_HOP_009",
+      "category": "multi_hop",
+      "question": "Bảng tỉnh và bảng cụm chính hiện có cùng số dòng mặc định không?",
+      "required_memory_ids": [
+        "M03",
+        "M10"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D2:1",
+        "D13:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Có. Cả bảng tỉnh và bảng cụm chính đều mặc định 3 dòng; top 5 cụm chỉ khi ghi rõ.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "cluster_ranking_current",
+      "memory_families": [
+        "ranking_preference"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Có. Cả bảng tỉnh và bảng cụm chính đều mặc định 3 dòng; top 5 cụm chỉ khi ghi rõ."
+    },
+    {
+      "question_id": "Q_MULTI_HOP_010",
+      "category": "multi_hop",
+      "question": "Trong mẫu hiện tại, IOT có phải là một dòng thường xuyên ở phụ lục không, và nó nằm ở đâu trong bản nhanh?",
+      "required_memory_ids": [
+        "M07",
+        "M11"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D7:1",
+        "D16:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Có. IOT là dòng thường xuyên trong phụ lục và nằm ở dòng cuối của bản nhanh.",
+      "notes": "M07 is required for the 'thường xuyên trong phụ lục' status; M11 is required for the current quick-template position at the last line.",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "iot_roles_current",
+      "memory_families": [
+        "report_structure",
+        "report_template"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Có. IOT là dòng thường xuyên trong phụ lục và nằm ở dòng cuối của bản nhanh."
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_001",
+      "category": "temporal_reasoning",
+      "question": "IOT trở thành dòng phụ lục thường xuyên trước hay sau khi bản nhanh được định nghĩa?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M07",
+        "M08"
+      ],
+      "evidence_turn_ids": [
+        "D7:1",
+        "D8:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Trước.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "iot_vs_quick_timeline",
+      "memory_families": [
+        "report_structure",
+        "report_template"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Trước."
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_002",
+      "category": "temporal_reasoning",
+      "question": "Quy ước bảng cụm ở phần chính đổi từ 5 dòng xuống 3 dòng trước hay sau khi IOT vào phụ lục thường xuyên?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M07",
+        "M10"
+      ],
+      "evidence_turn_ids": [
+        "D7:1",
+        "D13:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Sau.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "cluster_update_timeline",
+      "memory_families": [
+        "ranking_preference",
+        "report_structure"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Sau."
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_003",
+      "category": "temporal_reasoning",
+      "question": "Yêu cầu tạm truyền hình và Dcom xảy ra trước hay sau khi IOT trở thành phụ lục thường xuyên?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M07",
+        "M09"
+      ],
+      "evidence_turn_ids": [
+        "D7:1",
+        "D9:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Sau.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "temporary_tv_dcom",
+      "memory_families": [
+        "report_structure",
+        "temporary_task"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Sau.",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_004",
+      "category": "temporal_reasoning",
+      "question": "Bản nhanh được thêm IOT trước hay sau khi bảng cụm chính rút xuống 3 dòng?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M10",
+        "M11"
+      ],
+      "evidence_turn_ids": [
+        "D13:1",
+        "D16:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Sau.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "quick_vs_cluster_update",
+      "memory_families": [
+        "ranking_preference",
+        "report_template"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Sau."
+    },
+    {
+      "question_id": "Q_TEMPORAL_REASONING_005",
+      "category": "temporal_reasoning",
+      "question": "Cách viết tắt DTDV được xác lập trước hay sau quy tắc tách nhóm doanh thu?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M02",
+        "M05"
+      ],
+      "evidence_turn_ids": [
+        "D1:3",
+        "D5:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Trước.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "abbreviation_timeline",
+      "memory_families": [
+        "abbreviation",
+        "analysis_workflow"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Trước."
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_001",
+      "category": "state_update",
+      "question": "Bảng cụm ở phần chính mặc định ban đầu và hiện tại khác nhau thế nào?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M04",
+        "M10"
+      ],
+      "evidence_turn_ids": [
+        "D3:1",
+        "D13:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Ban đầu mặc định 5 dòng; hiện tại bảng cụm chính mặc định 3 dòng, top 5 chỉ khi ghi rõ.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "cluster_ranking_evolution",
+      "memory_families": [
+        "ranking_preference"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Ban đầu mặc định 5 dòng; hiện tại bảng cụm chính mặc định 3 dòng, top 5 chỉ khi ghi rõ."
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_002",
+      "category": "state_update",
+      "question": "Bản nhanh ban đầu và hiện tại khác nhau thế nào?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M08",
+        "M11"
+      ],
+      "evidence_turn_ids": [
+        "D8:1",
+        "D16:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Ban đầu có DTDV rồi FTTH; hiện tại thêm IOT ở dòng cuối.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "quick_template_evolution",
+      "memory_families": [
+        "report_template"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Ban đầu có DTDV rồi FTTH; hiện tại thêm IOT ở dòng cuối."
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_003",
+      "category": "state_update",
+      "question": "Vai trò của IOT thay đổi thế nào trong conversation?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M07",
+        "M11"
+      ],
+      "evidence_turn_ids": [
+        "D7:1",
+        "D16:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "IOT từ dòng phụ lục thường xuyên trở thành cả dòng phụ lục và dòng cuối của bản nhanh.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "iot_role_evolution",
+      "memory_families": [
+        "report_structure",
+        "report_template"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "IOT từ dòng phụ lục thường xuyên trở thành cả dòng phụ lục và dòng cuối của bản nhanh."
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_004",
+      "category": "state_update",
+      "question": "Sau khi thêm IOT, hai dòng đầu của bản nhanh hiện là gì?",
+      "required_memory_ids": [
+        "M11"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D16:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "DTDV rồi FTTH.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "quick_template_current",
+      "memory_families": [
+        "report_template"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "DTDV rồi FTTH."
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_005",
+      "category": "state_update",
+      "question": "Hiện nếu mình nói DTDV thì hiểu là gì, còn khi cần VTT riêng thì mình sẽ gọi thế nào?",
+      "required_memory_ids": [
+        "M02",
+        "M15"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D1:3",
+        "D18:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "DTDV là Doanh thu dịch vụ (VTT+VTS+VDS); khi cần VTT riêng, mình sẽ gọi rõ doanh thu VTT.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "abbreviation_dtdv",
+      "memory_families": [
+        "abbreviation",
+        "explicit_precedence"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "DTDV là Doanh thu dịch vụ (VTT+VTS+VDS); khi cần VTT riêng, mình sẽ gọi rõ doanh thu VTT."
+    },
+    {
+      "question_id": "Q_STATE_UPDATE_006",
+      "category": "state_update",
+      "question": "Yêu cầu truyền hình và Dcom có trở thành một update của mẫu báo cáo không?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M09"
+      ],
+      "evidence_turn_ids": [
+        "D9:1"
+      ],
+      "answer_type": "memory_state",
+      "expected_action": "answer_from_memory",
+      "gold_answer": "Không. Đây là yêu cầu tạm cho một buổi họp và không nên persist thành mẫu báo cáo.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "temporary_tv_dcom",
+      "memory_families": [
+        "temporary_task"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. Đây là yêu cầu tạm cho một buổi họp và không nên persist thành mẫu báo cáo.",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_TEMPORAL_BUSINESS_ACTION_001",
+      "category": "temporal_business_action",
+      "question": "Theo quy ước bảng cụm ở phần chính ban đầu, lấy bảng cụm Hà Nội về DTDV tháng 8 với số dòng mặc định.",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M04",
+        "M02"
+      ],
+      "evidence_turn_ids": [
+        "D3:1",
+        "D1:3"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "historical_cluster_default_action",
+      "memory_families": [
+        "abbreviation",
+        "ranking_preference"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Doanh thu dịch vụ (VTT+VTS+VDS)",
+      "source_service_id": "34",
+      "source_testcase": "CT_69",
+      "expected_intent": "xep_hang_chi_tieu",
+      "expected_api": {
+        "service_id": "34",
+        "prd_id": "20260831",
+        "province_code": "HNI",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "5",
+        "order_by": "thuc_hien",
+        "order_type": "DESC",
+        "condition": []
+      },
+      "gold_rewrite": "Top 5 cụm xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) tại tỉnh Hà Nội tháng 08/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_TEMPORAL_BUSINESS_ACTION_002",
+      "category": "temporal_business_action",
+      "question": "Ở giai đoạn bản nhanh ban đầu, lấy chỉ tiêu cuối của bản nhanh toàn quốc tháng 8.",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M08"
+      ],
+      "evidence_turn_ids": [
+        "D8:1"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "historical_quick_template_action",
+      "memory_families": [
+        "report_template"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Thuê bao FTTH phát triển thực LK",
+      "source_service_id": "38",
+      "source_testcase": "CT_2",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "38",
+        "prd_id": "20260831",
+        "province_code": "",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "1",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Thuê bao FTTH phát triển thực LK của Toàn quốc tháng 08/2026 là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_TEMPORAL_BUSINESS_ACTION_003",
+      "category": "temporal_business_action",
+      "question": "Theo mẫu hiện tại, lấy chỉ tiêu cuối của bản nhanh toàn quốc tháng 8.",
+      "required_memory_ids": [
+        "M11"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D16:1"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "current_quick_template_action",
+      "memory_families": [
+        "report_template"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Doanh thu dịch vụ IOT",
+      "source_service_id": "14330",
+      "source_testcase": "CT_2",
+      "expected_intent": "tra_cuu_chi_tieu",
+      "expected_api": {
+        "service_id": "14330",
+        "prd_id": "20260831",
+        "province_code": "",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "1",
+        "ck_type": "month",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "Doanh thu dịch vụ IOT của Toàn quốc tháng 08/2026 là bao nhiêu?",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_TEMPORAL_BUSINESS_ACTION_004",
+      "category": "temporal_business_action",
+      "question": "Sau khi bảng cụm đổi quy ước, nếu mình ghi rõ top 5 thì lấy top 5 cụm Hà Nội về DTDV tháng 8.",
+      "required_memory_ids": [
+        "M02"
+      ],
+      "supporting_memory_ids": [
+        "M10"
+      ],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D13:1",
+        "D1:3"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "explicit_top5_after_update",
+      "memory_families": [
+        "abbreviation",
+        "ranking_preference"
+      ],
+      "ltm_attribution": "partial_non_exclusive",
+      "source_indicator": "Doanh thu dịch vụ (VTT+VTS+VDS)",
+      "source_service_id": "34",
+      "source_testcase": "CT_69",
+      "expected_intent": "xep_hang_chi_tieu",
+      "expected_api": {
+        "service_id": "34",
+        "prd_id": "20260831",
+        "province_code": "HNI",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "8",
+        "ck_type": "month",
+        "limit": "5",
+        "order_by": "thuc_hien",
+        "order_type": "DESC",
+        "condition": []
+      },
+      "gold_rewrite": "Top 5 cụm xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) tại tỉnh Hà Nội tháng 08/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "capability_tags": [
+        "partial_policy_overlap",
+        "explicit_limit_precedence"
+      ],
+      "retrieval_scoring_contract": {
+        "strict_required_memory_ids": [
+          "M02"
+        ],
+        "supporting_policy_overlap_memory_ids": [
+          "M10"
+        ],
+        "exclude_supporting_from_recall_at_k": true,
+        "precision_relevant_memory_ids": [
+          "M02",
+          "M10"
+        ],
+        "supporting_retrieval_is_false_positive": false,
+        "note": "The query explicitly requests top 5, so M10 is relevant context about the updated cluster rule but is not required to honor the explicit limit."
+      },
+      "ltm_uplift_reporting": {
+        "count_in_overall_correctness": true,
+        "strict_ltm_dependent_memory_ids": [
+          "M02"
+        ],
+        "non_exclusive_supporting_memory_ids": [
+          "M10"
+        ],
+        "count_as_ltm_benefit_for_memory_ids": [
+          "M02"
+        ],
+        "do_not_claim_ltm_benefit_for_memory_ids": [
+          "M10"
+        ],
+        "reason": "M02 is needed to resolve DTDV. M10 is relevant context about the updated cluster default, but the query explicitly says top 5 so M10 is not required to honor the limit."
+      }
+    },
+    {
+      "question_id": "Q_TEMPORAL_BUSINESS_ACTION_005",
+      "category": "temporal_business_action",
+      "question": "Sau khi IOT vào bản nhanh, so chỉ tiêu đầu tiên của bản nhanh giữa Phú Thọ và Đà Nẵng ngày 06/09/2026.",
+      "required_memory_ids": [
+        "M11",
+        "M02"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D16:1",
+        "D1:3"
+      ],
+      "answer_type": "business_action",
+      "expected_action": "execute",
+      "gold_answer": null,
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "quick_template_order_action",
+      "memory_families": [
+        "abbreviation",
+        "report_template"
+      ],
+      "ltm_attribution": "normal",
+      "source_indicator": "Doanh thu dịch vụ (VTT+VTS+VDS)",
+      "source_service_id": "34",
+      "source_testcase": "CT_64",
+      "expected_intent": "so_sanh_chi_tieu",
+      "expected_api": {
+        "service_id": "34",
+        "prd_id": "20260906",
+        "province_code": "DNG,PTO",
+        "cluster_code": "",
+        "precinct_code": "",
+        "dept_level": "3",
+        "ck_type": "day",
+        "limit": "",
+        "condition": []
+      },
+      "gold_rewrite": "So sánh Doanh thu dịch vụ (VTT+VTS+VDS) của tỉnh Phú Thọ và tỉnh Đà Nẵng ngày 06/09/2026.",
+      "final_answer": "TBD_AFTER_KIRA_FILL"
+    },
+    {
+      "question_id": "Q_FALSE_PREMISE_001",
+      "category": "false_premise",
+      "question": "Bảng cụm hiện vẫn mặc định top 5 đúng không?",
+      "required_memory_ids": [
+        "M10"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D13:1"
+      ],
+      "answer_type": "adversarial",
+      "expected_action": "reject_false_premise",
+      "gold_answer": "Không. Bảng cụm chính hiện mặc định 3 dòng; top 5 chỉ khi ghi rõ.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "cluster_ranking_current",
+      "memory_families": [
+        "ranking_preference"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. Bảng cụm chính hiện mặc định 3 dòng; top 5 chỉ khi ghi rõ."
+    },
+    {
+      "question_id": "Q_FALSE_PREMISE_002",
+      "category": "false_premise",
+      "question": "Bản nhanh hiện vẫn chỉ có DTDV và FTTH đúng không?",
+      "required_memory_ids": [
+        "M11"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D16:1"
+      ],
+      "answer_type": "adversarial",
+      "expected_action": "reject_false_premise",
+      "gold_answer": "Không. Hiện bản nhanh còn có IOT ở dòng cuối.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "quick_template_current",
+      "memory_families": [
+        "report_template"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. Hiện bản nhanh còn có IOT ở dòng cuối."
+    },
+    {
+      "question_id": "Q_FALSE_PREMISE_003",
+      "category": "false_premise",
+      "question": "Truyền hình và Dcom đã thành hai dòng thường xuyên của mẫu báo cáo đúng không?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [
+        "M09"
+      ],
+      "evidence_turn_ids": [
+        "D9:1"
+      ],
+      "answer_type": "adversarial",
+      "expected_action": "reject_false_premise",
+      "gold_answer": "Không. Chúng chỉ phục vụ một buổi họp tạm thời.",
+      "notes": "",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
+      "scenario_group": "temporary_tv_dcom",
+      "memory_families": [
+        "temporary_task"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. Chúng chỉ phục vụ một buổi họp tạm thời.",
+      "diagnostic_source_scope": "transcript_oracle_or_formation_event",
+      "memory_history_not_required": true
+    },
+    {
+      "question_id": "Q_FALSE_PREMISE_004",
+      "category": "false_premise",
+      "question": "DTDV nghĩa là doanh thu VTT riêng đúng không?",
+      "required_memory_ids": [
+        "M02"
+      ],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [
+        "D1:3"
+      ],
+      "answer_type": "adversarial",
+      "expected_action": "reject_false_premise",
+      "gold_answer": "Không. DTDV là Doanh thu dịch vụ (VTT+VTS+VDS).",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "abbreviation_dtdv",
+      "memory_families": [
+        "abbreviation"
+      ],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không. DTDV là Doanh thu dịch vụ (VTT+VTS+VDS)."
+    },
+    {
+      "question_id": "Q_ABSTENTION_001",
+      "category": "abstention",
+      "question": "Mình thường muốn biểu đồ cột hay biểu đồ đường trong báo cáo?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [],
+      "answer_type": "unanswerable",
+      "expected_action": "abstain",
+      "gold_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "unanswerable_user_profile",
+      "memory_families": [],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không có đủ thông tin trong lịch sử hội thoại."
+    },
+    {
+      "question_id": "Q_ABSTENTION_002",
+      "category": "abstention",
+      "question": "Mình muốn gửi báo cáo định kỳ cho địa chỉ email nào?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [],
+      "answer_type": "unanswerable",
+      "expected_action": "abstain",
+      "gold_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "unanswerable_user_profile",
+      "memory_families": [],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không có đủ thông tin trong lịch sử hội thoại."
+    },
+    {
+      "question_id": "Q_ABSTENTION_003",
+      "category": "abstention",
+      "question": "Mình thích dùng màu nào cho phần tăng trưởng âm?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [],
+      "answer_type": "unanswerable",
+      "expected_action": "abstain",
+      "gold_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "unanswerable_user_profile",
+      "memory_families": [],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không có đủ thông tin trong lịch sử hội thoại."
+    },
+    {
+      "question_id": "Q_ABSTENTION_004",
+      "category": "abstention",
+      "question": "Mình thường muốn hiển thị bao nhiêu chữ số thập phân?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [],
+      "answer_type": "unanswerable",
+      "expected_action": "abstain",
+      "gold_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "unanswerable_user_profile",
+      "memory_families": [],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không có đủ thông tin trong lịch sử hội thoại."
+    },
+    {
+      "question_id": "Q_ABSTENTION_005",
+      "category": "abstention",
+      "question": "Mình có muốn bảng phụ lục hiển thị thêm mã đơn vị không?",
+      "required_memory_ids": [],
+      "supporting_memory_ids": [],
+      "history_memory_ids": [],
+      "evidence_turn_ids": [],
+      "answer_type": "unanswerable",
+      "expected_action": "abstain",
+      "gold_answer": "Không có đủ thông tin trong lịch sử hội thoại.",
+      "notes": "",
+      "evaluation_tier": "hard_gate",
+      "hard_gate": true,
+      "scenario_group": "unanswerable_user_profile",
+      "memory_families": [],
+      "ltm_attribution": "normal",
+      "gold_rewrite": null,
+      "final_answer": "Không có đủ thông tin trong lịch sử hội thoại."
+    }
+  ]
+}

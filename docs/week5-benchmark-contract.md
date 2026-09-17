@@ -1,6 +1,8 @@
-# Week 5 — Benchmark contract v1
+# Week 5 — Benchmark contract v2
 
-Status: **frozen for T5.1**, 2026-09-11. Contract ID: `kira-week5-benchmark-v1`.
+Status: **revised for full-corpus evaluation**, 2026-09-16. Contract ID:
+`kira-week5-benchmark-v2`. V2 bỏ dev/holdout split: corpus hiện tại là một acceptance dataset
+chạy toàn bộ, không phải bằng chứng generalization trên unseen holdout. Control source không đổi.
 Đây là đặc tả cho implementation tiếp theo, chưa phải harness hoặc benchmark result.
 
 Liên quan: [Week 5 plan](week5-plan.md), [control manifest](week5-baseline.json),
@@ -54,26 +56,27 @@ Không cấu hình hoặc chưa lên lịch chạy: `NOT_RUN`. Đã thử nhưng
 `DEPENDENCY_ERROR`. Response không tuân contract: `PROTOCOL_ERROR`. Không auto-fallback provider
 khác trong cùng experiment hoặc biến provider error thành một case “không cần nhớ” đã pass.
 
-## 3. Corpus, review và split
+## 3. Corpus, review và phạm vi chạy
 
-Target v1: 160 case — formation 60 (36 positive/24 negative), retrieval 40, rewrite 40,
-cross-session 20. Đây là target thiết kế, chưa phải dataset đã tồn tại. T5.3/T5.4 ghi số lượng
-thực tế và lý do nếu cần đổi; thay đổi phải được review trước chạy chính thức.
+Dataset nguồn hiện có 209 QA trên bốn storyline. T5.3/T5.4 vẫn phải ghi số case thực sự chuyển
+được sang từng suite và lý do loại case; thay đổi phải được review trước chạy chính thức.
 
-Mỗi case cần stable ID, suite, scenario-family ID, split, tags, synthetic provenance, inputs,
+Mỗi case cần stable ID, suite, scenario-family ID, `evaluation_scope=full_corpus`, tags,
+synthetic provenance, inputs,
 gold IDs/constraints, evidence references, allowed attribution và review status. Formation gold
 là atomic reusable claims; retrieval gold xác định relevant memory IDs; rewrite gold là các
 slot/constraints cần giữ hoặc không được invent, không chỉ một câu exact-match.
 
-- Chia khoảng 70/30 dev/holdout theo family, giữ các paraphrase/episode liên quan cùng split.
-- Week 2/3 seeds và mọi biến thể nhận biết được chỉ vào dev.
-- Validator kiểm tra normalized exact duplicates, IDs, references và split; reviewer kiểm tra
+- Mọi official run chạy toàn bộ case đủ điều kiện trong cả bốn bundle; không có dev/holdout split.
+- `scenario_group` và memory family chỉ dùng để báo cáo/audit, không quyết định case có được chạy.
+- Validator kiểm tra normalized exact duplicates, IDs, references và full-corpus scope; reviewer kiểm tra
   semantic overlap. Không quảng cáo exact normalization là semantic leakage detector.
 - Gold có `draft`/`reviewed`, reviewer decision và revision/hash; user/mentor duyệt nội dung.
   Không tự nhận “reviewed” chỉ vì schema pass hoặc LLM vừa sinh corpus.
-- Người review có thể xem holdout gold để duyệt; vòng tuning không được dùng holdout outputs/errors.
-  Freeze gold + split + candidate trước T5.17. Sửa gold sau khi thấy kết quả cần revision mới và
-  rerun cả control/candidate; không cherry-pick case hoặc sửa label để candidate thắng.
+- Freeze gold + evaluation scope + candidate trước T5.17. Sửa gold sau khi thấy kết quả cần
+  revision mới và rerun cả control/candidate; không cherry-pick case hoặc sửa label để candidate
+  thắng. Vì toàn corpus có thể được xem trong lúc phát triển, report phải ghi rõ đây là
+  acceptance/regression evidence, không phải unseen-holdout generalization evidence.
 
 Coverage bắt buộc: sáu taxonomy, confirmation/ellipsis và dual-source attribution; formula,
 operator/unit/threshold; ordinary-query entity, greeting, transient KPI, assistant guess, fake
@@ -176,9 +179,10 @@ task-success riêng khi có KiRa thật và gold nghiệp vụ được duyệt.
 
 ## 6. Candidate selection và performance gate
 
-T5.10 chạy control trước, thử tối đa hai prompt/config candidate trên dev. T5.13 grid là dev-only;
-tổ hợp cuối được chọn và freeze thành một candidate trước holdout, không mở thêm “candidate thứ ba”
-bằng cách tune trên holdout. Nếu sửa sau khi xem holdout, cần corpus holdout mới/review kế hoạch.
+T5.10 chạy control trước, thử tối đa hai prompt/config candidate trên cùng full corpus. T5.13 grid
+là diagnostic trên corpus đó; tổ hợp cuối được chọn bằng metric/guardrail đã khóa trước, sau đó
+freeze thành một candidate cho ba paired repetitions. Không mở thêm candidate bằng cách cherry-pick
+case, đổi gold hoặc đổi luật sau khi xem kết quả.
 
 | Thành phần được tune | Primary metric | Guardrails |
 | --- | --- | --- |
@@ -187,16 +191,16 @@ bằng cách tune trên holdout. Nếu sửa sau khi xem holdout, cần corpus h
 | Rewrite | Semantic pass rate tăng | Không thêm constraint/safety regression |
 
 Chọn candidate trên paired, reviewed case set cùng profile; không promote từ mock. Candidate cuối
-phải cải thiện primary metric và ít nhất một holdout family; component không đổi vẫn phải không
+phải cải thiện primary metric và ít nhất một scenario family; component không đổi vẫn phải không
 regress. Không dùng weighted aggregate để che cross-user leak hoặc formula failure. Tie giữ control;
-không đủ evidence cũng giữ control. Nếu hai dev candidate cùng tốt, ưu tiên ít thay đổi hơn;
-nếu vẫn hòa thì ghi tiêu chí latency rồi freeze lựa chọn trước holdout.
+không đủ evidence cũng giữ control. Nếu hai candidate cùng tốt, ưu tiên ít thay đổi hơn;
+nếu vẫn hòa thì áp dụng tiêu chí latency đã ghi trước rồi freeze lựa chọn.
 
 T5.17 chạy ba independent repetitions cho control và candidate với fresh state, case order seed
 cố định theo từng paired repetition; không cherry-pick lần tốt nhất. Báo từng run + tổng hợp,
 per-family deltas và failure counts. Promotion yêu cầu cả ba run đáp ứng guardrails, primary gain
 ở kết quả tổng hợp, và cùng một family có gain lặp lại ít nhất hai run. Cả hai phía phải được
-review đầy đủ trên holdout; dependency/protocol gaps cần rerun paired hoặc giữ trạng thái chưa đủ
+review đầy đủ trên toàn bộ case đủ điều kiện; dependency/protocol gaps cần rerun paired hoặc giữ trạng thái chưa đủ
 evidence, không promote trên subset bị thiếu dữ liệu.
 
 Hard gates trên corpus được chạy: zero observed cross-user leak, secret memory, inferred
@@ -209,7 +213,7 @@ Gateway time-to-first-text/stream completion, queue wait và formation readiness
 SDK retry và worker retry khác nhau, phải ghi cả hai; không mặc định timeout cấu hình của probe
 là timeout của SDK runtime. Nêu rõ throughput, concurrency, rate-limit/errors và hardware/network.
 
-Trước T5.16 phải freeze workload và warm-up. Quy ước lấy mẫu của contract v1 để dùng latency gate: 100
+Trước T5.16 phải freeze workload và warm-up. Quy ước lấy mẫu của contract v2 để dùng latency gate: 100
 successful measured operations/stage/variant/repetition sau warm-up, tổng ba repetitions; timeout
 và lỗi vẫn được đếm/report riêng. p95 theo nearest-rank `ceil(0.95*n)`, p50 tương tự. Workload,
 concurrency và provider settings giữ giống nhau. Candidate p95 mỗi stage bị ảnh hưởng ≤1.10×
@@ -223,7 +227,7 @@ Mỗi run manifest tương lai phải chứa:
 
 - Run ID, contract version, UTC timestamps, profile, control/candidate/harness SHA và dirty flag
   (official run yêu cầu clean source), image digest/ID nếu dùng container.
-- Corpus version/hash, split/family hash, gold review revision/hash, prompt rendered-content hashes,
+- Corpus version/hash, evaluation-scope/family hash, gold review revision/hash, prompt rendered-content hashes,
   resolved non-secret config hash; model/provider/deployment identity và embedding dimension.
 - Seed, selected cases/suites, enabled capabilities, top-k/threshold, inference parameters,
   timeout/retry settings thực tế của runtime và probes riêng, concurrency/warm-up/sample counts.
@@ -257,7 +261,8 @@ Kiểm tra T5.1 tại local workspace ngày 2026-09-11:
 - Không chạy lại pytest/coverage, Docker smoke hoặc provider benchmark trong task docs-only này.
   Week 4 evidence vẫn là evidence kế thừa, không được gắn nhãn kết quả chạy mới.
 
-Freeze là versioned agreement, không có nghĩa tuyệt đối không thể sửa. Thay scope/scoring/split
+Freeze là versioned agreement, không có nghĩa tuyệt đối không thể sửa. Thay scope/scoring
 hoặc gate phải bump contract version, ghi rationale, được review trước experiment bị ảnh hưởng,
 và rerun control/candidate tương ứng. Không overwrite kết quả control hoặc đổi luật sau khi thấy
-holdout để hợp thức hóa promotion.
+kết quả để hợp thức hóa promotion. Nếu sau này cần đo generalization, phải thu một corpus độc lập;
+không tái gắn nhãn một phần corpus hiện tại thành holdout sau khi nó đã được xem.

@@ -1,0 +1,403 @@
+{
+  "conversation_id": "conv_02_FREEZE_v4_FINAL",
+  "do_not_ingest": true,
+  "artifact_semantics": "Gold memory EVENTS, not a closed-world list of final Mem0 rows.",
+  "formation_scoring_note": "Score semantic add/update/reinforce/do_not_persist behavior. A reinforcement may confirm one or multiple existing memories without creating duplicate rows. Equivalent merges are allowed; valid unannotated extra facts are not automatically false positives.",
+  "formation_negative_event_ids": [
+    "M09"
+  ],
+  "active_memory_event_ids_at_end": [
+    "M01",
+    "M02",
+    "M03",
+    "M05",
+    "M06",
+    "M07",
+    "M10",
+    "M11",
+    "M12",
+    "M13",
+    "M14",
+    "M15"
+  ],
+  "expected_active_memory_row_source_event_ids": [
+    "M01",
+    "M02",
+    "M03",
+    "M05",
+    "M06",
+    "M07",
+    "M10",
+    "M11",
+    "M15"
+  ],
+  "expected_active_memory_row_count": 9,
+  "expected_active_memory_row_count_semantics": {
+    "value": 9,
+    "role": "reference_only",
+    "hard_exact_gate": false,
+    "reason": "Open-world semantic formation allows valid extra memories and equivalent merges."
+  },
+  "formation_precision_contract": {
+    "world_assumption": "open_world_semantic",
+    "gold_events_exhaustive_for_required_events": false,
+    "extra_valid_memory_policy": "Semantically valid extra memories are not automatically false positives.",
+    "precision_penalty_rule": "Penalize contradicted, malformed, or improperly persisted ephemeral memories."
+  },
+  "memory_gold": [
+    {
+      "memory_id": "M01",
+      "key": "report.section_order",
+      "canonical_fact": "Phần đầu báo cáo tháng đặt Doanh thu dịch vụ trước, sau đó tới FTTH.",
+      "source_turn_ids": [
+        "D1:1"
+      ],
+      "primary_source_turn_ids": [
+        "D1:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "report_structure",
+      "memory_type": "preference",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M02",
+      "key": "abbreviation.dtdv",
+      "canonical_fact": "User dùng \"DTDV\" để chỉ Doanh thu dịch vụ (VTT+VTS+VDS).",
+      "source_turn_ids": [
+        "D1:3"
+      ],
+      "primary_source_turn_ids": [
+        "D1:3"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "abbreviation",
+      "memory_type": "user_convention",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M03",
+      "key": "ranking.province_default_limit",
+      "canonical_fact": "Khi user nói top tỉnh mà không ghi số lượng, mặc định lấy 3 dòng.",
+      "source_turn_ids": [
+        "D2:1"
+      ],
+      "primary_source_turn_ids": [
+        "D2:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "ranking_preference",
+      "memory_type": "preference",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M04",
+      "key": "ranking.cluster_default_limit",
+      "canonical_fact": "Ban đầu, bảng cụm ở phần chính mặc định 5 dòng khi user không ghi số lượng.",
+      "source_turn_ids": [
+        "D3:1"
+      ],
+      "primary_source_turn_ids": [
+        "D3:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": false,
+      "supersedes_memory_id": null,
+      "memory_family": "ranking_preference",
+      "memory_type": "preference",
+      "qa_reference_status": "used_by_qa",
+      "inactive_reason": "superseded_by_M10"
+    },
+    {
+      "memory_id": "M05",
+      "key": "analysis.decompose_revenue",
+      "canonical_fact": "Khi user nói \"tách nhóm doanh thu\", cần xem riêng VTT, VTS và VDS; thao tác này không tự thay đổi định nghĩa hiện hành của DTDV.",
+      "source_turn_ids": [
+        "D5:1"
+      ],
+      "primary_source_turn_ids": [
+        "D5:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "analysis_workflow",
+      "memory_type": "user_convention",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M06",
+      "key": "response.growth_style",
+      "canonical_fact": "Nhận xét tăng trưởng nên ngắn; nếu dữ liệu đủ thì nêu hướng tăng/giảm.",
+      "source_turn_ids": [
+        "D6:1"
+      ],
+      "primary_source_turn_ids": [
+        "D6:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "response_style",
+      "memory_type": "preference",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M07",
+      "key": "report.appendix_iot",
+      "canonical_fact": "Doanh thu IOT là một dòng thường xuyên trong phụ lục từ kỳ này.",
+      "source_turn_ids": [
+        "D7:1"
+      ],
+      "primary_source_turn_ids": [
+        "D7:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "report_structure",
+      "memory_type": "preference",
+      "qa_reference_status": "used_by_qa"
+    },
+    {
+      "memory_id": "M08",
+      "key": "report.quick_template",
+      "canonical_fact": "Ban đầu, 'bản nhanh' gồm DTDV rồi FTTH và chưa gồm phần phụ lục.",
+      "source_turn_ids": [
+        "D8:1"
+      ],
+      "primary_source_turn_ids": [
+        "D8:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": false,
+      "supersedes_memory_id": null,
+      "memory_family": "report_template",
+      "memory_type": "preference",
+      "qa_reference_status": "used_by_qa",
+      "inactive_reason": "superseded_by_M11"
+    },
+    {
+      "memory_id": "M09",
+      "key": "temporary.meeting_tv_dcom",
+      "canonical_fact": "Truyền hình và Dcom chỉ được thêm cho buổi họp ngày đó, không phải mẫu báo cáo thường xuyên.",
+      "source_turn_ids": [
+        "D9:1"
+      ],
+      "primary_source_turn_ids": [
+        "D9:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": false,
+      "expected_operation": "do_not_persist",
+      "active_at_end": false,
+      "supersedes_memory_id": null,
+      "memory_family": "temporary_task",
+      "memory_type": "ephemeral",
+      "diagnostic_retrieval_scope": "transcript_oracle_only",
+      "history_versioning_expectation": "not_guaranteed",
+      "qa_reference_status": "used_by_qa",
+      "inactive_reason": "ephemeral_task_context"
+    },
+    {
+      "memory_id": "M10",
+      "key": "ranking.cluster_default_limit",
+      "canonical_fact": "Hiện tại bảng cụm ở phần chính mặc định 3 dòng; top 5 chỉ khi user ghi rõ.",
+      "source_turn_ids": [
+        "D13:1"
+      ],
+      "primary_source_turn_ids": [
+        "D13:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "update",
+      "active_at_end": true,
+      "supersedes_memory_id": "M04",
+      "memory_family": "ranking_preference",
+      "memory_type": "preference_update",
+      "qa_reference_status": "used_by_qa",
+      "update_chain": [
+        "M04",
+        "M10"
+      ]
+    },
+    {
+      "memory_id": "M11",
+      "key": "report.quick_template",
+      "canonical_fact": "Hiện tại 'bản nhanh' gồm DTDV rồi FTTH và thêm IOT ở dòng cuối; việc thêm IOT không đổi hai dòng đầu; chi tiết IOT vẫn ở phụ lục.",
+      "source_turn_ids": [
+        "D16:1"
+      ],
+      "primary_source_turn_ids": [
+        "D16:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "update",
+      "active_at_end": true,
+      "supersedes_memory_id": "M08",
+      "memory_family": "report_template",
+      "memory_type": "preference_update",
+      "qa_reference_status": "used_by_qa",
+      "update_chain": [
+        "M08",
+        "M11"
+      ]
+    },
+    {
+      "memory_id": "M12",
+      "key": "abbreviation.dtdv",
+      "canonical_fact": "DTDV vẫn chỉ Doanh thu dịch vụ (VTT+VTS+VDS).",
+      "source_turn_ids": [
+        "D18:1"
+      ],
+      "primary_source_turn_ids": [
+        "D18:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "reinforce_existing",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "abbreviation",
+      "memory_type": "reinforcement",
+      "should_create_new_memory": false,
+      "reinforces_memory_id": "M02",
+      "qa_reference_status": "formation_only"
+    },
+    {
+      "memory_id": "M13",
+      "key": "report.section_order",
+      "canonical_fact": "Đầu trang hiện vẫn theo thứ tự DTDV rồi FTTH.",
+      "source_turn_ids": [
+        "D20:1"
+      ],
+      "primary_source_turn_ids": [
+        "D20:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "reinforce_existing",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "report_structure",
+      "memory_type": "reinforcement",
+      "should_create_new_memory": false,
+      "reinforces_memory_id": "M01",
+      "qa_reference_status": "formation_only",
+      "formation_note": "Direct reinforcement of report.section_order from D20:1."
+    },
+    {
+      "memory_id": "M14",
+      "key": "report.final_template",
+      "canonical_fact": "Mẫu hiện tại xác nhận bản nhanh có IOT ở cuối; bảng tỉnh mặc định 3 dòng; bảng cụm chính mặc định 3 dòng, top 5 chỉ khi user ghi rõ.",
+      "source_turn_ids": [
+        "D20:1"
+      ],
+      "primary_source_turn_ids": [
+        "D20:1"
+      ],
+      "supporting_turn_ids": [
+        "D20:3"
+      ],
+      "should_store": true,
+      "expected_operation": "reinforce_existing",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "report_template",
+      "memory_type": "summary_confirmation",
+      "should_create_new_memory": false,
+      "qa_reference_status": "formation_only",
+      "reinforces_memory_ids": [
+        "M03",
+        "M10",
+        "M11"
+      ],
+      "reinforcement_scope": "multi_memory_summary_confirmation_without_report_section_order",
+      "formation_note": "D20:1 is the primary summary confirmation for quick-template and 3-line defaults; D20:3 directly supports the explicit top-5 cluster exception. M01/report.section_order remains excluded because M13 separately tests that reinforcement."
+    },
+    {
+      "memory_id": "M15",
+      "key": "kpi.explicit_vtt",
+      "canonical_fact": "Khi cần doanh thu VTT riêng, user sẽ gọi rõ \"doanh thu VTT\"; DTDV không được dùng để chỉ VTT riêng.",
+      "source_turn_ids": [
+        "D18:1"
+      ],
+      "primary_source_turn_ids": [
+        "D18:1"
+      ],
+      "supporting_turn_ids": [],
+      "should_store": true,
+      "expected_operation": "add",
+      "active_at_end": true,
+      "supersedes_memory_id": null,
+      "memory_family": "explicit_precedence",
+      "memory_type": "user_convention",
+      "qa_reference_status": "used_by_qa",
+      "policy_overlap_with_global_rule": true,
+      "policy_overlap_note": "Global explicit-query precedence also protects an explicitly requested VTT KPI, but this memory captures the user's own naming convention."
+    }
+  ],
+  "qa_reference_summary": {
+    "used_memory_ids": [
+      "M01",
+      "M02",
+      "M03",
+      "M04",
+      "M05",
+      "M06",
+      "M07",
+      "M08",
+      "M09",
+      "M10",
+      "M11",
+      "M15"
+    ],
+    "formation_only_memory_ids": [
+      "M12",
+      "M13",
+      "M14"
+    ],
+    "note": "M12-M14 are reinforcement/summary-confirmation formation events; no QA requires them as distinct retrievable rows."
+  },
+  "event_vs_row_contract": {
+    "memory_event": "Annotation of an add/update/reinforcement/do-not-persist event.",
+    "active_memory_row": "Distinct durable semantic memory expected in the final active memory state.",
+    "reinforce_existing_event": "May confirm one or multiple existing memories without creating a separate final row."
+  },
+  "formation_contract": {
+    "memory_event_count": 15,
+    "negative_event_ids": [
+      "M09"
+    ],
+    "formation_only_memory_ids": [
+      "M12",
+      "M13",
+      "M14"
+    ],
+    "note": "M12 and M13 reinforce existing rows; M14 is a multi-memory summary confirmation. None should be required as a distinct retrievable final row."
+  }
+}
