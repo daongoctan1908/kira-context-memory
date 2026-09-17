@@ -14,6 +14,9 @@ PostgreSQL/pgvector live pass. T5.3–T5.4 đang triển khai: [dataset KiRa LTM
 có bốn storyline, manifest/checksum, full-corpus scope, schema, typed loader và validator. Corpus
 vẫn ở trạng thái `contract_frozen`: 140 KiRa fill và 54 answer chưa materialize, gold chưa được
 reviewer ký revision và chưa chuyển thành bốn suite `EvalCase`; chưa có semantic benchmark Week 5.
+Khi kết nối được KiRa Test, dùng CLI resume-safe trong
+[dataset materialization runbook](dataset/kira_ltm_v1/README.md#materialize-with-kira-test) để thu
+80 response duy nhất, ghép 140 assistant turn và 54 QA answer rồi validate trước khi commit.
 Để kiểm tra Gateway + Worker bằng OpenAI thật nhưng vẫn giữ dữ liệu/KiRa synthetic, dùng
 [Week 5 OpenAI runtime smoke](docs/week5-openai-runtime-smoke.md). Stack này thay ba provider mock
 bằng OpenAI và giữ database Week 5 tách biệt; kết quả smoke không được coi là benchmark chất lượng.

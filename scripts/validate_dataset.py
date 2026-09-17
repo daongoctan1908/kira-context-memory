@@ -245,8 +245,10 @@ def _validate_bundle(
         for turn in turns
         if turn.get("role") == "assistant" and turn.get("text") == ""
     }
-    if blank_assistant_ids != fill_assistant_ids:
+    if entry.materialization_status == "pending" and blank_assistant_ids != fill_assistant_ids:
         errors.append(f"{label} blank assistant turns do not match fill slots")
+    if entry.materialization_status == "materialized" and blank_assistant_ids:
+        errors.append(f"{label} is materialized but still has blank assistant turns")
     if metadata.get("kira_fill_slots") != len(fills):
         errors.append(f"{label} metadata.kira_fill_slots mismatch")
 
@@ -330,8 +332,6 @@ def _validate_bundle(
         if getattr(entry.counts, field) != actual:
             errors.append(f"{label} manifest count {field} mismatch")
     if entry.materialization_status == "materialized":
-        if blank_assistant_ids:
-            errors.append(f"{label} is materialized but still has blank assistant turns")
         if pending_answers:
             errors.append(f"{label} is materialized but still has pending answers")
     elif not blank_assistant_ids:

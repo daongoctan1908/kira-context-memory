@@ -76,3 +76,83 @@ pairing, lifecycle links, pending/materialized state and normalized exact duplic
 
 The manifest deliberately keeps gold review status as `draft` until a named reviewer approves a
 specific revision. A schema pass is not human review.
+
+## Materialize with KiRa Test
+
+The materializer calls each unique KiRa query once, checkpoints the response outside Git, and
+reuses that response for every matching conversation/QA target. The current source compiles to 80
+unique requests covering 140 blank assistant turns and 54 pending QA answers.
+
+Create an ignored `.env.kira.local` containing only the approved KiRa Test credentials:
+
+```env
+KIRA_BASE_URL=http://approved-kira-host:port
+KIRA_USERNAME=replace_me
+KIRA_DOMAIN=VBI
+KIRA_BASIC_AUTH=replace_me
+KIRA_SERVICE_ID=5
+KIRA_DEVICE=Browser
+KIRA_MESSAGE_TYPE=text
+```
+
+`KIRA_BASIC_AUTH` contains only the credential value after the literal `Basic ` prefix. Never put
+the prefix itself in this file, and never commit the file.
+
+Inspect the workload without network access or writes:
+
+```powershell
+uv run python -m scripts.materialize_dataset plan --root dataset/kira_ltm_v1
+```
+
+Use one request as the connectivity smoke. `INCOMPLETE` and exit code 1 are expected here because
+the command was deliberately capped:
+
+```powershell
+uv run python -m scripts.materialize_dataset collect `
+  --root dataset/kira_ltm_v1 `
+  --env-file .env.kira.local --env-file-only `
+  --checkpoint artifacts/week5/kira-materialization.json `
+  --max-requests 1
+```
+
+Resume the checkpoint and collect the remaining responses sequentially:
+
+```powershell
+uv run python -m scripts.materialize_dataset collect `
+  --root dataset/kira_ltm_v1 `
+  --env-file .env.kira.local --env-file-only `
+  --checkpoint artifacts/week5/kira-materialization.json `
+  --resume
+```
+
+The command never prints query/response content or credentials. A failed request records only its
+exception class; rerun the same command with `--resume` to retry failed and pending tasks while
+skipping completed ones. Do not commit the checkpoint: it contains synthetic queries plus internal
+KiRa responses and lives under the Git-ignored `artifacts/` directory.
+
+Preview a fully validated materialized copy before changing the canonical source:
+
+```powershell
+uv run python -m scripts.materialize_dataset apply `
+  --root dataset/kira_ltm_v1 `
+  --checkpoint artifacts/week5/kira-materialization.json `
+  --dataset-version 1.0.0-materialized.1 `
+  --output-root artifacts/week5/kira_ltm_v1_materialized
+```
+
+After reviewing that copy, apply the same validated checkpoint to the canonical dataset:
+
+```powershell
+uv run python -m scripts.materialize_dataset apply `
+  --root dataset/kira_ltm_v1 `
+  --checkpoint artifacts/week5/kira-materialization.json `
+  --dataset-version 1.0.0-materialized.1 `
+  --in-place
+
+uv run python -m scripts.validate_dataset dataset/kira_ltm_v1
+git diff -- dataset/kira_ltm_v1
+```
+
+`apply` refuses incomplete checkpoints or source files changed since collection began. It first
+builds and validates a staged copy, then updates only `conversation.json`, `qa.json`, their
+checksums, counts and materialization status. Gold review remains `draft` until human review.
