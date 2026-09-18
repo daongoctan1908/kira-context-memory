@@ -24,10 +24,10 @@ def test_internal_distribution_preserves_upstream_namespace() -> None:
     assert Memory.__module__ == "mem0.memory.main"
 
 
-def test_v3_add_only_duplicate_and_user_scope_behavior() -> None:
+def test_v3_add_only_duplicate_preserves_creation_conversation_and_user_scope() -> None:
     fact = "The user prefers revenue figures in billions of VND."
-    another_fact = "The user prefers monthly comparisons."
-    extracted = [fact, fact, another_fact, fact]
+    revised_fact = "The user prefers revenue figures in millions of VND."
+    extracted = [fact, fact, revised_fact, fact]
     stored: list[StoredVector] = []
 
     vector_store = MagicMock()
@@ -71,20 +71,60 @@ def test_v3_add_only_duplicate_and_user_scope_behavior() -> None:
         patch("mem0.memory.main.SQLiteManager", return_value=history),
     ):
         memory = Memory(MemoryConfig())
-        first = memory.add("first turn", user_id="user-a", infer=True)
-        duplicate = memory.add("repeat turn", user_id="user-a", infer=True)
-        distinct = memory.add("new turn", user_id="user-a", infer=True)
-        other_user = memory.add("other user turn", user_id="user-b", infer=True)
+        first = memory.add(
+            "conversation A creates the preference",
+            user_id="user-a",
+            metadata={"conversation_id": "conversation-a", "turn_id": "turn-a"},
+            infer=True,
+        )
+        duplicate = memory.add(
+            "conversation B repeats the same preference",
+            user_id="user-a",
+            metadata={"conversation_id": "conversation-b", "turn_id": "turn-b1"},
+            infer=True,
+        )
+        distinct = memory.add(
+            "conversation B states a revised preference",
+            user_id="user-a",
+            metadata={"conversation_id": "conversation-b", "turn_id": "turn-b2"},
+            infer=True,
+        )
+        other_user = memory.add(
+            "another user states the first preference",
+            user_id="user-b",
+            metadata={"conversation_id": "conversation-c", "turn_id": "turn-c"},
+            infer=True,
+        )
 
     assert [item["event"] for item in first["results"]] == ["ADD"]
     assert duplicate == {"results": []}
     assert [item["event"] for item in distinct["results"]] == ["ADD"]
     assert [item["event"] for item in other_user["results"]] == ["ADD"]
     assert [row.payload["user_id"] for row in stored] == ["user-a", "user-a", "user-b"]
+    assert [row.payload["conversation_id"] for row in stored] == [
+        "conversation-a",
+        "conversation-b",
+        "conversation-c",
+    ]
+    assert [row.payload["turn_id"] for row in stored] == ["turn-a", "turn-b2", "turn-c"]
+    assert [row.payload["data"] for row in stored] == [fact, revised_fact, fact]
+    assert first["results"][0]["id"] == stored[0].id
+    assert distinct["results"][0]["id"] == stored[1].id
+    assert other_user["results"][0]["id"] == stored[2].id
+    assert len({row.id for row in stored}) == 3
     assert stored[0].payload["hash"] == hashlib.md5(fact.encode()).hexdigest()
     assert vector_store.insert.call_count == 3
     vector_store.update.assert_not_called()
     vector_store.delete.assert_not_called()
+
+    # Existing-memory context is user-scoped, not conversation-scoped. Conversation B sees A's
+    # fact and native V3 drops the exact duplicate without changing A's ID or ownership metadata.
+    extraction_prompts = [
+        call.kwargs["messages"][1]["content"] for call in llm.generate_response.call_args_list
+    ]
+    assert fact in extraction_prompts[1]
+    assert fact in extraction_prompts[2]
+    assert fact not in extraction_prompts[3]
 
     search_filters = [call.kwargs["filters"] for call in vector_store.search.call_args_list]
     assert search_filters == [
