@@ -1,9 +1,13 @@
 """CLI and KiRa stream collection tests for dataset materialization."""
 
+from datetime import UTC, datetime
+
 import pytest
 
 from app.domain.models.kira import KiraEventKind, KiraStreamEvent
 from evaluation.dataset import default_dataset_root
+from evaluation.materialization import completed_task, replace_checkpoint_task
+from scripts import materialize_dataset
 from scripts.materialize_dataset import collect_kira_text, main
 
 
@@ -96,3 +100,48 @@ def test_apply_cli_rejects_missing_checkpoint_without_details(tmp_path, capsys):
     )
 
     assert "error_class=FileNotFoundError" in capsys.readouterr().err
+
+
+def test_preflight_persists_one_request_then_reuses_it(tmp_path, capsys, monkeypatch):
+    checkpoint_path = tmp_path / "checkpoint.json"
+    calls = 0
+
+    def fake_settings(*args, **kwargs):
+        del args, kwargs
+        return object()
+
+    async def fake_collect(checkpoint, **kwargs):
+        nonlocal calls
+        calls += 1
+        assert kwargs["max_requests"] == 1
+        assert kwargs["request_delay_seconds"] == 0
+        assert kwargs["continue_on_error"] is False
+        updated = replace_checkpoint_task(
+            checkpoint,
+            0,
+            completed_task(
+                checkpoint.tasks[0],
+                "KiRa preflight response",
+                now=datetime(2026, 9, 18, tzinfo=UTC),
+            ),
+            now=datetime(2026, 9, 18, tzinfo=UTC),
+        )
+        materialize_dataset.write_materialization_checkpoint(kwargs["checkpoint_path"], updated)
+        return updated, False
+
+    monkeypatch.setattr(materialize_dataset, "_load_settings", fake_settings)
+    monkeypatch.setattr(materialize_dataset, "collect_checkpoint", fake_collect)
+    command = [
+        "preflight",
+        "--root",
+        str(default_dataset_root()),
+        "--checkpoint",
+        str(checkpoint_path),
+        "--env-file-only",
+    ]
+
+    assert main(command) == 0
+    assert "completed=1/80 reused=false" in capsys.readouterr().out
+    assert main(command) == 0
+    assert "completed=1/80 reused=true" in capsys.readouterr().out
+    assert calls == 1

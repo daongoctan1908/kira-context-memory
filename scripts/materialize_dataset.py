@@ -122,6 +122,19 @@ def _base_parser() -> argparse.ArgumentParser:
     plan = commands.add_parser("plan", help="show targets without calling KiRa or writing files")
     plan.add_argument("--root", type=Path, default=default_dataset_root())
 
+    preflight = commands.add_parser(
+        "preflight",
+        help="materialize exactly one KiRa query into the official resume checkpoint",
+    )
+    preflight.add_argument("--root", type=Path, default=default_dataset_root())
+    preflight.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
+    preflight.add_argument("--env-file", type=Path, default=Path(".env"))
+    preflight.add_argument(
+        "--env-file-only",
+        action="store_true",
+        help="ignore inherited environment values and load configuration only from --env-file",
+    )
+
     collect = commands.add_parser("collect", help="call KiRa and checkpoint every unique response")
     collect.add_argument("--root", type=Path, default=default_dataset_root())
     collect.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
@@ -201,16 +214,23 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 0
 
-        settings = _load_settings(args.env_file, file_only=args.env_file_only)
         checkpoint_path = args.checkpoint.resolve()
         if checkpoint_path.exists():
-            if not args.resume:
+            if args.command == "collect" and not args.resume:
                 raise ValueError("checkpoint exists; pass --resume to continue it")
             checkpoint = load_materialization_checkpoint(checkpoint_path)
             verify_checkpoint_source(args.root, checkpoint)
         else:
             checkpoint = build_materialization_checkpoint(args.root)
             write_materialization_checkpoint(checkpoint_path, checkpoint)
+        if args.command == "preflight" and checkpoint.completed_count:
+            print(
+                f"PASS checkpoint={checkpoint_path} "
+                f"completed={checkpoint.completed_count}/{checkpoint.total_count} reused=true"
+            )
+            return 0
+
+        settings = _load_settings(args.env_file, file_only=args.env_file_only)
         loop_factory = asyncio.SelectorEventLoop if os.name == "nt" else None
         with asyncio.Runner(loop_factory=loop_factory) as runner:
             checkpoint, complete = runner.run(
@@ -218,11 +238,23 @@ def main(argv: list[str] | None = None) -> int:
                     checkpoint,
                     checkpoint_path=checkpoint_path,
                     settings=settings,
-                    request_delay_seconds=args.request_delay_seconds,
-                    max_requests=args.max_requests,
-                    continue_on_error=args.continue_on_error,
+                    request_delay_seconds=(
+                        0 if args.command == "preflight" else args.request_delay_seconds
+                    ),
+                    max_requests=1 if args.command == "preflight" else args.max_requests,
+                    continue_on_error=(
+                        False if args.command == "preflight" else args.continue_on_error
+                    ),
                 )
             )
+        if args.command == "preflight":
+            passed = checkpoint.completed_count == 1
+            status = "PASS" if passed else "FAIL"
+            print(
+                f"{status} checkpoint={checkpoint_path} "
+                f"completed={checkpoint.completed_count}/{checkpoint.total_count} reused=false"
+            )
+            return 0 if passed else 1
         status = "COMPLETE" if complete else "INCOMPLETE"
         print(
             f"{status} checkpoint={checkpoint_path} "

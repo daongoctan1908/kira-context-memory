@@ -75,6 +75,10 @@ docker compose --env-file .env.week5.internal.local -f compose.week5.benchmark.y
   -m scripts.materialize_dataset plan
 docker compose --env-file .env.week5.internal.local -f compose.week5.benchmark.yaml `
   --profile tools run --rm --entrypoint python eval-controller `
+  -m scripts.materialize_dataset preflight `
+  --checkpoint /materialization/kira-materialization.json
+docker compose --env-file .env.week5.internal.local -f compose.week5.benchmark.yaml `
+  --profile tools run --rm --entrypoint python eval-controller `
   -m scripts.materialize_dataset collect `
   --checkpoint /materialization/kira-materialization.json --resume
 docker compose --env-file .env.week5.internal.local -f compose.week5.benchmark.yaml `
@@ -84,7 +88,9 @@ docker compose --env-file .env.week5.internal.local -f compose.week5.benchmark.y
 ```
 
 Do not apply an incomplete checkpoint. Review/freeze the resulting gold revision before the official
-benchmark.
+benchmark. `preflight` makes exactly one real KiRa request and stores it in the same official
+checkpoint. Re-running preflight reuses that completed task; the following `collect --resume` skips
+it instead of spending a second request.
 
 ## 4. Sequential startup to limit peak RAM
 
