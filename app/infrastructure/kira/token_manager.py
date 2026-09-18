@@ -34,9 +34,7 @@ class KiraTokenManager:
         self._authenticate = authenticate
         self._expiry_skew_seconds = expiry_skew_seconds
         self._clock = clock
-        self._tracer = tracer or trace.NoOpTracerProvider().get_tracer(
-            "app.infrastructure.kira"
-        )
+        self._tracer = tracer or trace.NoOpTracerProvider().get_tracer("app.infrastructure.kira")
         self._lock = asyncio.Lock()
         self._token: str | None = None
         self._expires_at = 0.0

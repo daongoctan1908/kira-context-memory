@@ -42,7 +42,5 @@ class CorrelationMiddleware:
 
 def _is_chat_request(scope: Scope) -> bool:
     return (
-        scope["type"] == "http"
-        and scope.get("method") == "POST"
-        and scope.get("path") == "/chat"
+        scope["type"] == "http" and scope.get("method") == "POST" and scope.get("path") == "/chat"
     )

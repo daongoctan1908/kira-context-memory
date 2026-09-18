@@ -70,9 +70,7 @@ METRIC_SPECS: Mapping[str, MetricSpec] = {
     "memory_search_results": MetricSpec(
         "kira.memory.search.result_count", "histogram", boundaries=(0, 1, 2, 3, 5, 10)
     ),
-    "memory_job_schedule": MetricSpec(
-        "kira.memory.job.schedule.count", "counter", "{schedule}"
-    ),
+    "memory_job_schedule": MetricSpec("kira.memory.job.schedule.count", "counter", "{schedule}"),
     "rewrite_count": MetricSpec("kira.context.rewrite.count", "counter", "{rewrite}"),
     "rewrite_duration": MetricSpec(
         "kira.context.rewrite.duration",
@@ -81,9 +79,7 @@ METRIC_SPECS: Mapping[str, MetricSpec] = {
         (0.05, 0.1, 0.5, 1, 2, 4, 8, 10),
     ),
     "degraded_count": MetricSpec("kira.context.degraded.count", "counter", "{degradation}"),
-    "conversation_write": MetricSpec(
-        "kira.conversation.write.count", "counter", "{write}"
-    ),
+    "conversation_write": MetricSpec("kira.conversation.write.count", "counter", "{write}"),
     "request_duration": MetricSpec(
         "kira.chat.request.duration", "histogram", "s", _DURATION_BOUNDARIES
     ),
@@ -98,9 +94,7 @@ METRIC_SPECS: Mapping[str, MetricSpec] = {
         "kira.stream.first_content.duration", "histogram", "s", _DURATION_BOUNDARIES
     ),
     "queue_depth": MetricSpec("kira.memory.job.queue.depth", "observable_gauge", "{job}"),
-    "oldest_pending_age": MetricSpec(
-        "kira.memory.job.oldest_pending.age", "observable_gauge", "s"
-    ),
+    "oldest_pending_age": MetricSpec("kira.memory.job.oldest_pending.age", "observable_gauge", "s"),
     "job_claim_count": MetricSpec("kira.memory.job.claim.count", "counter", "{job}"),
     "job_process_count": MetricSpec("kira.memory.job.process.count", "counter", "{job}"),
     "job_process_duration": MetricSpec(
@@ -124,9 +118,7 @@ METRIC_SPECS: Mapping[str, MetricSpec] = {
         "kira.memory.job.queue.database.available", "observable_gauge", "1"
     ),
     "in_flight": MetricSpec("kira.memory.job.in_flight", "observable_gauge", "{job}"),
-    "database_backoff": MetricSpec(
-        "kira.memory.job.database_backoff", "observable_gauge", "s"
-    ),
+    "database_backoff": MetricSpec("kira.memory.job.database_backoff", "observable_gauge", "s"),
     "queue_wait": MetricSpec(
         "kira.memory.job.queue_wait.duration",
         "histogram",
@@ -262,24 +254,16 @@ class GatewayMetrics:
         self._recent_messages = _create_instrument(resolved, METRIC_SPECS["recent_messages"])
         self._recent_tokens = _create_instrument(resolved, METRIC_SPECS["recent_tokens"])
         self._search_count = _create_instrument(resolved, METRIC_SPECS["memory_search_count"])
-        self._search_duration = _create_instrument(
-            resolved, METRIC_SPECS["memory_search_duration"]
-        )
-        self._search_results = _create_instrument(
-            resolved, METRIC_SPECS["memory_search_results"]
-        )
-        self._schedule_count = _create_instrument(
-            resolved, METRIC_SPECS["memory_job_schedule"]
-        )
+        self._search_duration = _create_instrument(resolved, METRIC_SPECS["memory_search_duration"])
+        self._search_results = _create_instrument(resolved, METRIC_SPECS["memory_search_results"])
+        self._schedule_count = _create_instrument(resolved, METRIC_SPECS["memory_job_schedule"])
         self._rewrite_count = _create_instrument(resolved, METRIC_SPECS["rewrite_count"])
         self._rewrite_duration = _create_instrument(resolved, METRIC_SPECS["rewrite_duration"])
         self._degraded_count = _create_instrument(resolved, METRIC_SPECS["degraded_count"])
         self._write_count = _create_instrument(resolved, METRIC_SPECS["conversation_write"])
         self._request_duration = _create_instrument(resolved, METRIC_SPECS["request_duration"])
         self._stage_duration = _create_instrument(resolved, METRIC_SPECS["stage_duration"])
-        self._stream_duration = _create_instrument(
-            resolved, METRIC_SPECS["kira_stream_duration"]
-        )
+        self._stream_duration = _create_instrument(resolved, METRIC_SPECS["kira_stream_duration"])
         self._first_event = _create_instrument(resolved, METRIC_SPECS["kira_first_event"])
         self._first_content = _create_instrument(resolved, METRIC_SPECS["kira_first_content"])
 
@@ -411,9 +395,7 @@ class WorkerMetrics:
             self._meter, METRIC_SPECS["job_process_duration"]
         )
         self._attempts = _create_instrument(self._meter, METRIC_SPECS["job_attempt"])
-        self._lifecycle_events = _create_instrument(
-            self._meter, METRIC_SPECS["lifecycle_event"]
-        )
+        self._lifecycle_events = _create_instrument(self._meter, METRIC_SPECS["lifecycle_event"])
         self._cleanup = _create_instrument(self._meter, METRIC_SPECS["cleanup_count"])
         self._queue_wait = _create_instrument(self._meter, METRIC_SPECS["queue_wait"])
         self._stage_duration = _create_instrument(self._meter, METRIC_SPECS["stage_duration"])

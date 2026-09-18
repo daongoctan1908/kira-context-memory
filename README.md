@@ -176,7 +176,7 @@ memory search và queue availability mà không lộ dữ liệu synthetic; Post
 phục khi test kết thúc. Xem
 [Week 4 T4.22 observability/readiness](docs/week4-t4.22-observability-readiness-acceptance.md).
 T4.23 đồng bộ package, Gateway, Worker, OCI label và Compose image; bản vá formation idempotency
-dùng `0.4.1` với custom Mem0 `2.0.20+viettel.3` và memory schema version 2. Stack được dựng lại từ
+dùng `0.4.1` với custom Mem0 `2.0.20+viettel.4` và memory schema version 2. Stack được dựng lại từ
 synthetic từ đầu, chạy migration up/down/up và replay toàn bộ T4.19–T4.22. Release gate cũng khóa
 raw asyncpg `57P03` để Worker backoff rồi tự hồi phục thay vì dừng runner. Xem
 [Week 4 T4.23 release evidence](docs/week4-t4.23-release-evidence.md).
