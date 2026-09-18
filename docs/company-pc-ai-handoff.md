@@ -53,7 +53,8 @@ b256a0f  KiRa materialization preflight
 8f4a927  bind eval image vào đúng variant runtime
 619d5db  PC provider/preflight freeze
 a658a55  technical PC acceptance gate
-<commit chứa tài liệu này> T4.6 handoff evidence/bundle
+2e41695  full-corpus mock runner + fail-closed live profile
+b184601  T4.6 handoff evidence/bundle + tài liệu PC này
 ```
 
 Nếu remote chưa có commit mới nhất, dừng và yêu cầu chuyển/push đúng commit. Không tự tái tạo thay đổi
