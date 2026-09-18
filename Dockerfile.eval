@@ -15,52 +15,49 @@ COPY pyproject.toml uv.lock README.md ./
 COPY packages/viettel-mem0/pyproject.toml packages/viettel-mem0/README.md packages/viettel-mem0/LICENSE ./packages/viettel-mem0/
 COPY packages/viettel-mem0/mem0 ./packages/viettel-mem0/mem0
 COPY app ./app
-COPY alembic.ini ./
-COPY migrations ./migrations
 COPY worker ./worker
+COPY evaluation ./evaluation
+COPY dataset ./dataset
+COPY scripts/run_week5_benchmark.py scripts/validate_dataset.py scripts/materialize_dataset.py scripts/week5_mock_acceptance.py ./scripts/
 
-RUN uv sync --frozen --no-dev --no-editable
+RUN uv sync --frozen --no-dev --extra evaluation --no-editable
 
 FROM python:3.11-slim-bookworm AS runtime
 
 ARG APP_VERSION=0.4.1
-ARG SOURCE_REVISION=unknown
-ARG BENCHMARK_VARIANT=runtime
-ARG BENCHMARK_ROLE=runtime
+ARG SOURCE_REVISION
+ARG BENCHMARK_VARIANT=working_tree
 
-LABEL org.opencontainers.image.title="kira-context-memory" \
+LABEL org.opencontainers.image.title="kira-context-memory-eval" \
       org.opencontainers.image.version="${APP_VERSION}" \
       org.opencontainers.image.revision="${SOURCE_REVISION}" \
       io.kira.benchmark.contract="kira-week5-benchmark-v4" \
       io.kira.benchmark.variant="${BENCHMARK_VARIANT}" \
-      io.kira.benchmark.role="${BENCHMARK_ROLE}"
+      io.kira.benchmark.role="eval-controller"
 
 ENV APP_VERSION=${APP_VERSION} \
     BENCHMARK_SOURCE_REVISION=${SOURCE_REVISION} \
     BENCHMARK_VARIANT=${BENCHMARK_VARIANT} \
-    HEALTH_PORT=8000 \
-    MEM0_DIR=/tmp/kira-mem0 \
-    MEM0_TELEMETRY=False \
     PATH="/app/.venv/bin:${PATH}" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-RUN groupadd --system --gid 10001 kira \
+RUN test -n "${SOURCE_REVISION}" \
+    && groupadd --system --gid 10001 kira \
     && useradd --system --uid 10001 --gid kira --home-dir /app --shell /usr/sbin/nologin kira
 
 COPY --from=builder --chown=kira:kira /app/.venv /app/.venv
+COPY --chown=kira:kira pyproject.toml ./
+COPY --chown=kira:kira packages/viettel-mem0/pyproject.toml ./packages/viettel-mem0/
 COPY --chown=kira:kira app ./app
-COPY --chown=kira:kira alembic.ini ./
-COPY --chown=kira:kira migrations ./migrations
 COPY --chown=kira:kira worker ./worker
+COPY --chown=kira:kira evaluation ./evaluation
+COPY --chown=kira:kira dataset ./dataset
+COPY --chown=kira:kira scripts/run_week5_benchmark.py scripts/validate_dataset.py scripts/materialize_dataset.py scripts/week5_mock_acceptance.py ./scripts/
 
 USER kira
 
-EXPOSE 8000 8001
-
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD ["python", "-c", "import os, urllib.request; urllib.request.urlopen(f\"http://127.0.0.1:{os.environ.get('HEALTH_PORT', '8000')}/health\", timeout=2).read()"]
-
-CMD ["uvicorn", "app.presentation.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["python", "-m", "scripts.run_week5_benchmark"]
+CMD ["validate"]
