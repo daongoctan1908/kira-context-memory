@@ -6,6 +6,7 @@ import json
 import logging
 import sys
 from pathlib import Path
+from uuid import UUID, uuid4
 
 from pydantic import TypeAdapter
 
@@ -23,6 +24,14 @@ from evaluation.config import load_config
 from evaluation.dataset import default_dataset_root
 from evaluation.models import Outcome, Profile, RunProvenance, Suite
 from evaluation.preflight import run_preflight
+from evaluation.provenance import capture_local_provenance
+from evaluation.runner import (
+    MockBenchmarkExecutor,
+    benchmark_execution_complete,
+    create_or_resume_store,
+    execute_benchmark_cases,
+    prepare_benchmark_run,
+)
 from scripts.validate_dataset import validate_dataset
 
 _AUDIT_CANDIDATES = TypeAdapter(list[AuditCandidate])
@@ -78,6 +87,18 @@ def _add_offline_commands(commands: argparse._SubParsersAction) -> None:
     import_command.add_argument("--batch", type=Path, required=True)
     import_command.add_argument("--decisions", type=Path, required=True)
     import_command.add_argument("--output", type=Path, required=True)
+
+    run = commands.add_parser("run", help="Run the crash-safe benchmark case ledger")
+    run.add_argument("--profile", choices=list(Profile), default=Profile.MOCK)
+    run.add_argument("--suite", choices=list(Suite), action="append", required=True)
+    run.add_argument("--formation-mode", choices=("write_free", "persistent"), default="write_free")
+    run.add_argument("--env-file", type=Path)
+    run.add_argument("--env-file-only", action="store_true")
+    run.add_argument("--provenance-file", type=Path)
+    run.add_argument("--dataset-root", type=Path, default=default_dataset_root())
+    run.add_argument("--artifact-root", type=Path, required=True)
+    run.add_argument("--seed", type=int, default=742)
+    run.add_argument("--run-id", type=UUID)
 
 
 def _run_offline(args: argparse.Namespace) -> int:
@@ -157,6 +178,71 @@ def _run_offline(args: argparse.Namespace) -> int:
             )
         )
         return 0
+    if args.command == "run":
+        if args.env_file_only and args.env_file is None:
+            raise ValueError("file-only mode needs an explicit file")
+        profile = Profile(args.profile)
+        if profile is not Profile.MOCK:
+            print(
+                json.dumps(
+                    {
+                        "outcome": "NOT_RUN",
+                        "reason": "native_benchmark_executor_not_configured",
+                        "profile": profile.value,
+                    },
+                    sort_keys=True,
+                )
+            )
+            return 2
+        config = load_config(
+            profile=profile,
+            suites=tuple(Suite(value) for value in args.suite),
+            env_file=args.env_file,
+            environment={} if args.env_file_only else None,
+            formation_mode=args.formation_mode,
+        )
+        provenance = (
+            RunProvenance.model_validate_json(args.provenance_file.read_text(encoding="utf-8"))
+            if args.provenance_file
+            else capture_local_provenance()
+        )
+        run_id = args.run_id
+        manifest_path = args.artifact_root / "manifest.json"
+        if manifest_path.exists():
+            existing = ArtifactRunManifest.model_validate_json(
+                manifest_path.read_text(encoding="utf-8")
+            )
+            if run_id is not None and run_id != existing.identity.run_id:
+                raise ValueError("resume run ID differs from the existing artifact")
+            run_id = existing.identity.run_id
+        preparation, _ = prepare_benchmark_run(
+            run_id=run_id or uuid4(),
+            config=config,
+            provenance=provenance,
+            dataset_root=args.dataset_root,
+            seed=args.seed,
+        )
+        store = create_or_resume_store(args.artifact_root, preparation)
+        loop_factory = asyncio.SelectorEventLoop if sys.platform == "win32" else None
+        with asyncio.Runner(loop_factory=loop_factory) as runner:
+            runner.run(execute_benchmark_cases(preparation, store, MockBenchmarkExecutor()))
+        summary = store.latest_outcome_counts
+        completed = benchmark_execution_complete(preparation, store)
+        print(
+            json.dumps(
+                {
+                    "outcome": "PASS" if completed else "NOT_RUN",
+                    "profile": profile.value,
+                    "quality_claim": False,
+                    "run_id": str(preparation.identity.run_id),
+                    "terminal_cases": sum(summary.values()),
+                    "outcomes": {key.value: value for key, value in summary.items()},
+                    "artifact_root": str(args.artifact_root),
+                },
+                sort_keys=True,
+            )
+        )
+        return 0 if completed else 2
     raise ValueError("unsupported command")
 
 

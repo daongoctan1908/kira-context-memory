@@ -134,14 +134,26 @@ async def execute_benchmark_cases(
     if store.manifest.identity != preparation.identity:
         raise ValueError("artifact store belongs to another benchmark run")
     cases = {case.case_id: case for case in preparation.selected_cases}
+    latest = {attempt.case_id: attempt for attempt in store.latest_attempts}
     for case_id in store.resume_plan().run_case_ids:
         case = cases[case_id]
+        previous = latest.get(case_id)
+        if (
+            case.eligibility.status == "blocked"
+            and previous is not None
+            and previous.outcome is Outcome.NOT_RUN
+        ):
+            continue
         attempt_number = store.next_attempt_number(case_id)
         try:
             result = await executor.evaluate(case)
             outcome = Outcome(result.outcome)
             reason_codes = tuple(getattr(result, "reason_codes", ()))
-            output = result.model_dump(mode="json", exclude_none=False)
+            output = (
+                None
+                if outcome in {Outcome.NOT_RUN, Outcome.DEPENDENCY_ERROR, Outcome.PROTOCOL_ERROR}
+                else result.model_dump(mode="json", exclude_none=False)
+            )
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -170,6 +182,34 @@ async def execute_benchmark_cases(
                     reason_codes=reason_codes or ("benchmark_execution_failed",),
                 )
             )
+
+
+def benchmark_execution_complete(
+    preparation: BenchmarkRunPreparation,
+    store: ArtifactStore,
+) -> bool:
+    """Return true when each selected case has the expected execution-terminal artifact."""
+
+    if store.manifest.identity != preparation.identity:
+        raise ValueError("artifact store belongs to another benchmark run")
+    latest = {attempt.case_id: attempt for attempt in store.latest_attempts}
+    quality_terminal = {
+        Outcome.PASS,
+        Outcome.FAIL,
+        Outcome.REVIEW_REQUIRED,
+        Outcome.INSUFFICIENT_EVIDENCE,
+    }
+    return all(
+        (
+            latest.get(case.case_id) is not None
+            and (
+                latest[case.case_id].outcome is Outcome.NOT_RUN
+                if case.eligibility.status == "blocked"
+                else latest[case.case_id].outcome in quality_terminal
+            )
+        )
+        for case in preparation.selected_cases
+    )
 
 
 class MockBenchmarkExecutor:

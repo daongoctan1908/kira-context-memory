@@ -229,3 +229,64 @@ def test_offline_cli_errors_are_sanitized(tmp_path: Path, capsys):
     captured = capsys.readouterr()
     assert "sk-sensitive-provider-key" not in captured.out + captured.err
     assert json.loads(captured.out)["reason"] == "offline_command_error"
+
+
+def test_run_cli_executes_and_resumes_the_mock_case_ledger(tmp_path: Path, capsys):
+    provenance = tmp_path / "provenance.json"
+    provenance.write_text(
+        _identity().provenance.model_dump_json(exclude_computed_fields=True),
+        encoding="utf-8",
+    )
+    root = tmp_path / "mock-run"
+    arguments = [
+        "run",
+        "--profile",
+        "mock",
+        "--suite",
+        "formation",
+        "--suite",
+        "retrieval",
+        "--suite",
+        "rewrite",
+        "--suite",
+        "cross_session",
+        "--provenance-file",
+        str(provenance),
+        "--artifact-root",
+        str(root),
+    ]
+
+    assert main(arguments) == 0
+    first = json.loads(capsys.readouterr().out)
+    case_lines = (root / "cases.jsonl").read_text(encoding="utf-8").splitlines()
+    assert first["outcome"] == "PASS"
+    assert first["quality_claim"] is False
+    assert first["terminal_cases"] == len(case_lines) > 0
+
+    assert main(arguments) == 0
+    second = json.loads(capsys.readouterr().out)
+    assert second["run_id"] == first["run_id"]
+    assert (root / "cases.jsonl").read_text(encoding="utf-8").splitlines() == case_lines
+
+
+def test_run_cli_refuses_to_fake_a_live_native_executor(tmp_path: Path, capsys):
+    result = main(
+        [
+            "run",
+            "--profile",
+            "pc_openai_acceptance",
+            "--suite",
+            "rewrite",
+            "--artifact-root",
+            str(tmp_path / "pc-run"),
+        ]
+    )
+
+    assert result == 2
+    output = json.loads(capsys.readouterr().out)
+    assert output == {
+        "outcome": "NOT_RUN",
+        "profile": "pc_openai_acceptance",
+        "reason": "native_benchmark_executor_not_configured",
+    }
+    assert not (tmp_path / "pc-run").exists()
