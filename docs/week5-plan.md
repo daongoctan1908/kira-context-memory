@@ -12,7 +12,7 @@ loader và validator deterministic. Corpus chưa materialize KiRa, chưa có rev
 - Application `0.4.1`; `viettel-mem0==2.0.20+viettel.3`; memory schema version `2`.
 - Extraction policy `kira-memory-policy-v2`; rewrite prompt `2`.
 - [Control manifest](week5-baseline.json) khóa provenance và các default liên quan.
-- [Benchmark contract v3](week5-benchmark-contract.md) quy định profile, scoring, runtime
+- [Benchmark contract v4](week5-benchmark-contract.md) quy định profile, scoring, runtime
   provenance và late performance guardrail.
 - [Week 4 release evidence](week4-t4.23-release-evidence.md) là evidence kế thừa, không phải
   kết quả kiểm thử mới của Week 5.

@@ -111,7 +111,7 @@ def test_cli_mock_creates_safe_artifact_and_wont_overwrite(tmp_path, capsys):
     assert main(args) == 0
     report = json.loads(capsys.readouterr().out)
     assert report["simulated"] is True
-    assert report["contract_id"] == "kira-week5-benchmark-v3"
+    assert report["contract_id"] == "kira-week5-benchmark-v4"
     assert report["provenance"]["runtime"]["sha"]
     assert report["provenance"]["harness"]["sha"]
     assert report["provenance"]["prompt_sha256"]

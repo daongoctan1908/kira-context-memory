@@ -16,7 +16,7 @@ from pydantic import (
     model_validator,
 )
 
-BENCHMARK_CONTRACT_ID = "kira-week5-benchmark-v3"
+BENCHMARK_CONTRACT_ID = "kira-week5-benchmark-v4"
 HISTORICAL_CONTROL_SHA = "75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00"
 
 
@@ -375,7 +375,7 @@ class SuiteReadiness(EvalModel):
 
 class PreflightReport(EvalModel):
     schema_version: Literal[1] = 1
-    contract_id: Literal["kira-week5-benchmark-v3"] = BENCHMARK_CONTRACT_ID
+    contract_id: Literal["kira-week5-benchmark-v4"] = BENCHMARK_CONTRACT_ID
     scope: Literal["dependency_preflight_only"] = "dependency_preflight_only"
     run_id: UUID
     started_at: datetime

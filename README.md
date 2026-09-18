@@ -7,7 +7,7 @@ thuộc trực tiếp vào FastAPI, HTTPX, PostgreSQL SDK hoặc vLLM.
 ## Trạng thái
 
 **Week 5:** T5.1 đã lưu [plan và backlog](docs/week5-plan.md),
-[benchmark contract v3](docs/week5-benchmark-contract.md) và
+[benchmark contract v4](docs/week5-benchmark-contract.md) và
 [control manifest](docs/week5-baseline.json) tại baseline `75deb1d`.
 [T5.2](docs/week5-t5.2-preflight.md) đã có eval types và CLI preflight; ba OpenAI probes cùng
 PostgreSQL/pgvector live pass. T5.3–T5.4 đang triển khai: [dataset KiRa LTM v1](dataset/kira_ltm_v1/README.md)

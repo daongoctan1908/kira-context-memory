@@ -1,6 +1,6 @@
 # Week 5 T5.2 — Eval contracts và provider preflight
 
-Artifacts mới được đọc theo `kira-week5-benchmark-v3`. Contract v3 không thay kết quả preflight
+Artifacts mới được đọc theo `kira-week5-benchmark-v4`. Contract v4 không thay kết quả preflight
 lịch sử; nó bổ sung runtime/harness SHA độc lập, rendered prompt hashes và package versions cho
 các report tạo sau ngày 2026-09-18.
 

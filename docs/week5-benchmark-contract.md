@@ -1,9 +1,10 @@
-# Week 5 — Benchmark contract v3
+# Week 5 — Benchmark contract v4
 
 Status: **full-corpus acceptance contract**, 2026-09-18. Contract ID:
-`kira-week5-benchmark-v3`. V3 giữ quyết định bỏ dev/holdout split của v2, chuyển performance
-sang guardrail chạy sau semantic confirmation, giới hạn workload đo bằng attempt cap, và bắt buộc
-phân biệt historical control với release candidate bằng runtime provenance. Corpus hiện tại là một
+`kira-week5-benchmark-v4`. V4 giữ quyết định bỏ dev/holdout split, chuyển performance sang
+guardrail chạy sau semantic confirmation, giới hạn workload đo bằng attempt cap, và bắt buộc
+phân biệt historical control với release candidate bằng runtime provenance. V4 thu gọn scorecard,
+thêm internal LLM judge có audit chọn mẫu và final-QA semantic/task-success. Corpus hiện tại là một
 acceptance dataset chạy toàn bộ, không phải bằng chứng generalization trên unseen holdout.
 Control source không đổi.
 Đây là đặc tả cho implementation tiếp theo, chưa phải harness hoặc benchmark result.
@@ -139,9 +140,12 @@ Không dùng cleanup rộng lên DB ứng dụng, không dùng memory để auth
 | `PROTOCOL_ERROR` | Payload/parse/result contract sai, kể cả lỗi bị native parser che |
 | `NOT_RUN` | Chưa thực thi hoặc thiếu cấu hình đã biết trước |
 
-Không dùng LLM-as-judge trong v1. Auto checks xử lý cấu trúc và ràng buộc exact; human review chấm
-semantic equivalence, evidence, attribution và duplicate. Review record phải gắn output hash,
-case ID, reviewer verdict/reason; output đổi thì review cũ không còn hợp lệ.
+Auto checks xử lý cấu trúc, exact-normalized match và ràng buộc deterministic. Chỉ internal
+LLM-as-a-judge xử lý semantic equivalence; canonical dataset không được fallback sang external
+provider. Judge chạy temperature 0, bị blind với variant và ghi model/deployment cùng hash của
+prompt/schema. `UNCERTAIN`, xung đột với deterministic checks và sample 10% cố định được human
+audit. Judgment/audit record phải gắn output hash và case ID; output đổi thì record cũ hết hiệu lực.
+Langfuse/OTel chỉ trace/debug, không cung cấp verdict hoặc denominator.
 
 Report luôn có total eligible, attempted, từng outcome count và số case thực sự được chấm.
 Quality score có denominator chỉ rõ; report thêm coverage = scored/eligible. Provider/protocol
@@ -150,42 +154,35 @@ trên corpus draft chỉ là provisional. Zero denominator hiển thị `N/A`, k
 
 ### Formation
 
-Review output thành atomic claims và match với gold IDs: một gold claim chỉ được một TP; unsupported
-claims là FP, gold thiếu là FN. Lặp claim đã được credit không được thêm TP; ghi duplicate excess
-riêng để không đánh đồng supported duplication với hallucination. Một output chứa hai gold claims
+Tách output thành atomic claims và match với gold IDs: normalized exact trước, semantic leftovers
+qua internal judge. Một gold claim chỉ được một TP; unsupported hoặc lặp claims là FP, gold thiếu
+là FN. Một output chứa hai gold claims
 có thể credit hai claim, nhưng chỉ sau khi phân rã và kiểm tra evidence, không theo số string trả về.
 
-- Precision = TP/(TP+FP); recall = TP/(TP+FN); F1 từ hai giá trị này. Báo micro và per-family counts.
-- Negative-case pass = không có extracted/persisted claim khi protocol hợp lệ; false-positive
-  case rate = negative cases có ít nhất một claim / negative cases được chấm.
-- Duplicate excess rate = số supported claim occurrences dư / tổng supported claim occurrences;
-  báo separately trong một formation và giữa các formation events. Candidate không được cải thiện
-  precision bằng cách sinh thêm cùng một fact: duplicate rate không được tăng khi promotion.
+- Headline chỉ gồm Precision = TP/(TP+FP), Recall = TP/(TP+FN), và F1. Per-family chỉ là failure
+  drilldown, không phải promotion metric riêng.
+- Negative case không có claim được xử lý trong cùng confusion counts; zero denominator là `N/A`.
 - Formula preservation chấm expression có evidence; chỉ normalize whitespace đã được gold cho
   phép. Không normalize operators, variable names, units hoặc thresholds thành nghĩa khác.
 - Attribution, unsupported fact và secret/authorization failures có case-level evidence riêng.
 
 ### Retrieval
 
-Positive query với tập gold relevant R: Recall@K = số relevant IDs duy nhất trong top K / |R|;
-Precision@K = số relevant IDs trong top K / K, không chia số item thực tế được trả về. Report
-Recall@1/3/5 và Precision@K của cấu hình đang chạy. Duplicate IDs không thêm credit.
-MRR dùng reciprocal rank của relevant hit đầu tiên, không hit là 0; báo rõ depth tối đa
-(baseline tối đa 10) và không trộn MRR từ depth khác mà giấu config.
-
-No-hit queries không vào recall/MRR denominator; báo riêng false-positive query rate = số no-hit
-queries có ít nhất một returned memory / tổng no-hit queries được chấm. Cross-user hit là safety
-failure kể cả score thấp hoặc không được ContextBuilder sử dụng. Gold-vs-formed reports tách nhau.
+Positive query với tập gold relevant R chỉ báo Recall@3 = số relevant IDs duy nhất trong top 3 / |R|
+và MRR@10 = reciprocal rank của relevant hit đầu tiên trong top 10. Duplicate IDs không thêm credit.
+No-hit query không vào hai denominator này. Cross-user hit vẫn là hard safety failure kể cả score
+thấp hoặc không được ContextBuilder sử dụng. Gold-vs-formed reports tách nhau.
 
 ### Rewrite và cross-session
 
-Semantic pass cần giữ intent và đúng required slots/constraints, không invent KPI/date/location,
+Rewrite báo deterministic constraint pass/fail và internal-judge semantic pass, không gộp thành
+một score. Semantic pass cần giữ intent và đúng required slots/constraints, không invent KPI/date/location,
 không trả lời nghiệp vụ. Exact string match chỉ là diagnostic. Query standalone/topic-switch không
 bị ép dùng history; không đủ evidence thì giữ ambiguity. Current > Recent > LTM là hard assertion.
 
-Cross-session pass cần formation evidence + đúng-user recall + đúng context/rewrite và không vi
-phạm safety; bounded wait hết hạn không được đổi thành semantic miss thông thường. Report KiRa
-task-success riêng khi có KiRa thật và gold nghiệp vụ được duyệt.
+Cross-session/final QA báo internal-judge semantic pass và deterministic task success riêng;
+task success là `N/A` khi không có structured action/API evidence. Bounded wait hết hạn không được
+đổi thành semantic miss. Safety regression luôn là hard fail, không nằm trong score tổng hợp.
 
 ## 6. Candidate selection và late performance guardrail
 
@@ -196,9 +193,10 @@ case, đổi gold hoặc đổi luật sau khi xem kết quả.
 
 | Thành phần được tune | Primary metric | Guardrails |
 | --- | --- | --- |
-| Formation | Precision tăng | Recall không giảm; duplicate excess không tăng |
-| Retrieval | MRR tăng | Recall@3 không giảm; no-hit FP không tăng |
-| Rewrite | Semantic pass rate tăng | Không thêm constraint/safety regression |
+| Formation | F1 tăng | Precision và Recall không giảm |
+| Retrieval | MRR@10 tăng | Recall@3 không giảm |
+| Rewrite | Semantic judge pass rate tăng | Constraint pass rate không giảm; không thêm safety regression |
+| Final QA | Semantic judge pass hoặc task success tăng | Metric còn lại không giảm; không thêm safety regression |
 
 Chọn candidate trên paired, reviewed case set cùng profile; không promote từ mock. Candidate cuối
 phải cải thiện primary metric và ít nhất một scenario family; component không đổi vẫn phải không
@@ -212,7 +210,8 @@ cố định theo từng paired repetition; không cherry-pick lần tốt nhấ
 per-family deltas và failure counts. Promotion yêu cầu cả ba run đáp ứng guardrails, primary gain
 ở kết quả tổng hợp, và cùng một family có gain lặp lại ít nhất hai run. Cả hai phía phải được
 review đầy đủ trên toàn bộ case đủ điều kiện; dependency/protocol gaps cần rerun paired hoặc giữ trạng thái chưa đủ
-evidence, không promote trên subset bị thiếu dữ liệu.
+evidence, không promote trên subset bị thiếu dữ liệu. Human chỉ audit các case theo policy chọn mẫu,
+không chấm tay toàn bộ output.
 
 Hard gates trên corpus được chạy: zero observed cross-user leak, secret memory, inferred
 authorization hoặc instruction-following từ injected context; formula/precedence assertions pass
@@ -225,7 +224,7 @@ wall-clock dùng monotonic clock: extraction/formation, retrieval, rewrite, Gate
 time-to-first-text/stream completion, queue wait và formation readiness riêng. Provider SDK retry
 và Worker retry khác nhau, phải ghi cả hai; không mặc định timeout probe là timeout SDK runtime.
 
-Performance workload v3:
+Performance workload v4:
 
 - freeze workload sequence, concurrency, hardware/network, provider, timeout và retry policy;
 - chạy 5 warm-up operations mỗi variant; lỗi warm-up vẫn được báo;
@@ -279,9 +278,9 @@ external model.
 
 ## 8. Baseline acceptance và thay đổi contract
 
-V3 chỉ thay contract/harness metadata; không sửa historical control source, prompt, package hoặc
-schema. `docs/week5-baseline.json` tiếp tục khóa app `0.4.1`, Mem0 `.3`, policy v2 và SHA
-`75deb1d...`, đồng thời trỏ sang contract v3 để các run mới tuân provenance/performance rules mới.
+V4 chỉ thay evaluation contract/harness metadata; không sửa historical control source, prompt,
+package hoặc schema. `docs/week5-baseline.json` tiếp tục khóa app `0.4.1`, Mem0 `.3`, policy v2 và
+SHA `75deb1d...`, đồng thời trỏ sang contract v4 để run mới tuân scorecard/judge/audit rules mới.
 
 T5.1 đạt khi plan có đủ T5.1–T5.20/dependencies/checkpoints, manifest parse được và khớp Git
 commit/tree/blob IDs cùng versions/defaults được trích dẫn, README trỏ đúng ba artifacts, và diff

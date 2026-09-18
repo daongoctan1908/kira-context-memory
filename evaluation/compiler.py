@@ -103,7 +103,7 @@ class CompilationCoverage(EvalModel):
 
 class DatasetCompilation(EvalModel):
     schema_version: Literal[1] = 1
-    contract_id: Literal["kira-week5-benchmark-v3"] = BENCHMARK_CONTRACT_ID
+    contract_id: Literal["kira-week5-benchmark-v4"] = BENCHMARK_CONTRACT_ID
     dataset_id: Identifier
     dataset_version: Annotated[str, StringConstraints(min_length=1, max_length=64)]
     dataset_sha256: Sha256

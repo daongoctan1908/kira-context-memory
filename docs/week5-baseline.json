@@ -1,6 +1,6 @@
 {
   "manifest_schema_version": 1,
-  "contract_id": "kira-week5-benchmark-v3",
+  "contract_id": "kira-week5-benchmark-v4",
   "frozen_on": "2026-09-16",
   "kind": "source_control_baseline_not_a_benchmark_result",
   "variant": "historical_control",

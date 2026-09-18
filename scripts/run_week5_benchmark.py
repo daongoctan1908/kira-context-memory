@@ -1,4 +1,4 @@
-"""Week 5 CLI: contract-v3 preflight; evaluation commands follow in later tasks."""
+"""Week 5 CLI: contract-v4 preflight; evaluation commands follow in later tasks."""
 
 import argparse
 import asyncio
@@ -25,7 +25,7 @@ def main(argv: list[str] | None = None) -> int:
     preflight.add_argument(
         "--provenance-file",
         type=Path,
-        help="Strict contract-v3 runtime/harness provenance JSON; defaults to this checkout",
+        help="Strict contract-v4 runtime/harness provenance JSON; defaults to this checkout",
     )
     preflight.add_argument(
         "--env-file-only",

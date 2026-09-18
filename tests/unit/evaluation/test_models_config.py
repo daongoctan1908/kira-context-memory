@@ -91,9 +91,9 @@ def test_review_and_result_are_not_implicitly_passed():
         CaseResult(case_id="c1", run_id=uuid4(), outcome="good")
 
 
-def test_contract_v3_distinguishes_historical_control_and_candidate_scope():
+def test_contract_v4_distinguishes_historical_control_and_candidate_scope():
     control = provenance(BenchmarkVariant.HISTORICAL_CONTROL)
-    assert BENCHMARK_CONTRACT_ID == "kira-week5-benchmark-v3"
+    assert BENCHMARK_CONTRACT_ID == "kira-week5-benchmark-v4"
     assert control.attribution_scope == "historical_control"
     assert Outcome.INSUFFICIENT_EVIDENCE == "INSUFFICIENT_EVIDENCE"
     assert set(PerformanceReviewVerdict) == {
@@ -155,7 +155,7 @@ def test_candidate_and_historical_control_declarations_fail_closed():
         RunProvenance.model_validate(historical)
 
 
-def test_contract_v3_does_not_rewrite_the_historical_control_runtime():
+def test_contract_v4_does_not_rewrite_the_historical_control_runtime():
     root = Path(__file__).resolve().parents[3]
     manifest = json.loads((root / "docs/week5-baseline.json").read_text(encoding="utf-8"))
     assert manifest["contract_id"] == BENCHMARK_CONTRACT_ID
