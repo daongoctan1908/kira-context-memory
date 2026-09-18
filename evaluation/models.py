@@ -39,6 +39,7 @@ class EvalModel(BaseModel):
 class Profile(StrEnum):
     MOCK = "mock"
     EXTERNAL_SYNTHETIC = "external_synthetic"
+    PC_OPENAI_ACCEPTANCE = "pc_openai_acceptance"
     INTERNAL_TEST = "internal_test"
 
 

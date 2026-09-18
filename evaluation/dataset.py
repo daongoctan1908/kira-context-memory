@@ -82,7 +82,7 @@ class TimestampPolicy(EvalModel):
 
 class DatasetDataPolicy(EvalModel):
     classification: Literal["internal_test_synthetic_derived"]
-    external_provider_allowed: Literal[False]
+    external_provider_allowed: bool
     public_git_status: Literal["review_required"]
 
 

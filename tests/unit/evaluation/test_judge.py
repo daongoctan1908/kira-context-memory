@@ -135,7 +135,7 @@ async def test_formation_judge_requires_exact_one_to_one_decision_set():
 def test_judge_refuses_non_internal_profiles(profile):
     client = httpx.AsyncClient(transport=httpx.MockTransport(lambda _: _chat({})))
     try:
-        with pytest.raises(ValueError, match="internal_test"):
+        with pytest.raises(ValueError, match="approved acceptance"):
             InternalSemanticJudge(client, _config(profile=profile))
     finally:
         asyncio.run(client.aclose())
@@ -144,8 +144,22 @@ def test_judge_refuses_non_internal_profiles(profile):
 def test_judge_requires_explicit_provider():
     client = httpx.AsyncClient(transport=httpx.MockTransport(lambda _: _chat({})))
     try:
-        with pytest.raises(ValueError, match="explicit internal"):
+        with pytest.raises(ValueError, match="explicit endpoint"):
             InternalSemanticJudge(client, _config(judge=ProviderConfig()))
+    finally:
+        asyncio.run(client.aclose())
+
+
+def test_pc_acceptance_judge_records_external_provider_provenance():
+    client = httpx.AsyncClient(transport=httpx.MockTransport(lambda _: _chat({})))
+    try:
+        judge = InternalSemanticJudge(
+            client,
+            _config(profile=Profile.PC_OPENAI_ACCEPTANCE),
+        )
+        provenance = judge._provenance(prompt="prompt", response_model=type(_config()))
+        assert provenance.profile is Profile.PC_OPENAI_ACCEPTANCE
+        assert provenance.provider == "openai_external"
     finally:
         asyncio.run(client.aclose())
 

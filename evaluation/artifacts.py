@@ -72,7 +72,38 @@ class ArtifactRunManifest(EvalModel):
     schema_version: Literal[1] = 1
     created_at: datetime
     provenance: Literal["synthetic"] = "synthetic"
+    environment_role: Literal["mock", "laptop_synthetic", "pc_acceptance", "internal_official"]
+    official: bool
     identity: ArtifactRunIdentity
+
+    @model_validator(mode="before")
+    @classmethod
+    def derive_environment_claims(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        identity = value.get("identity")
+        if isinstance(identity, ArtifactRunIdentity):
+            profile = identity.profile
+        elif isinstance(identity, dict):
+            profile = Profile(identity.get("profile"))
+        else:
+            return value
+        roles = {
+            Profile.MOCK: "mock",
+            Profile.EXTERNAL_SYNTHETIC: "laptop_synthetic",
+            Profile.PC_OPENAI_ACCEPTANCE: "pc_acceptance",
+            Profile.INTERNAL_TEST: "internal_official",
+        }
+        expected_role = roles[profile]
+        expected_official = profile is Profile.INTERNAL_TEST
+        payload = dict(value)
+        payload.setdefault("environment_role", expected_role)
+        payload.setdefault("official", expected_official)
+        if payload["environment_role"] != expected_role:
+            raise ValueError("artifact environment role does not match its profile")
+        if payload["official"] is not expected_official:
+            raise ValueError("only internal_test artifacts may claim official evidence")
+        return payload
 
     @field_validator("created_at")
     @classmethod
@@ -538,6 +569,11 @@ class ArtifactStore:
         except BaseException:
             self._attempts = previous
             raise
+
+    def next_attempt_number(self, case_id: str) -> int:
+        if case_id not in self.manifest.identity.selected_case_ids:
+            raise ValueError("case is outside the selected run corpus")
+        return 1 + sum(attempt.case_id == case_id for attempt in self._attempts)
 
     def append_judgment(self, judgment: JudgmentArtifact) -> None:
         candidate = [*self._judgments, judgment]

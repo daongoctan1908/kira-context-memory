@@ -139,11 +139,11 @@ class RewriteEvaluator:
     ) -> None:
         if profile is Profile.EXTERNAL_SYNTHETIC:
             raise ValueError("canonical rewrite evaluation cannot use an external provider")
-        if profile is Profile.INTERNAL_TEST:
+        if profile in {Profile.PC_OPENAI_ACCEPTANCE, Profile.INTERNAL_TEST}:
             if backend != "native" or not isinstance(rewriter, VllmQueryRewriterAdapter):
-                raise ValueError("official internal rewrite evaluation requires the native adapter")
+                raise ValueError("acceptance rewrite evaluation requires the native adapter")
             if not isinstance(judge, InternalSemanticJudge):
-                raise ValueError("official rewrite evaluation requires the internal judge")
+                raise ValueError("acceptance rewrite evaluation requires the approved judge")
         self._rewriter = rewriter
         self._judge = judge
 

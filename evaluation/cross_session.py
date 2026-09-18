@@ -190,11 +190,11 @@ class CrossSessionEvaluator:
     ) -> None:
         if profile is Profile.EXTERNAL_SYNTHETIC:
             raise ValueError("canonical cross-session evaluation cannot use an external provider")
-        if profile is Profile.INTERNAL_TEST:
+        if profile in {Profile.PC_OPENAI_ACCEPTANCE, Profile.INTERNAL_TEST}:
             if backend != "native":
-                raise ValueError("official cross-session evaluation requires the native runtime")
+                raise ValueError("acceptance cross-session evaluation requires the native runtime")
             if not isinstance(judge, InternalSemanticJudge):
-                raise ValueError("official cross-session evaluation requires the internal judge")
+                raise ValueError("acceptance cross-session evaluation requires the approved judge")
         if readiness_timeout_seconds <= 0:
             raise ValueError("readiness timeout must be positive")
         self._runtime = runtime

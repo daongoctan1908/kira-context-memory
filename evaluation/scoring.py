@@ -39,9 +39,9 @@ class MatchSource(StrEnum):
 
 
 class JudgeProvenance(EvalModel):
-    """Identity of an approved internal judge; external profiles fail schema validation."""
+    """Identity of an approved, explicitly configured semantic judge."""
 
-    profile: Literal[Profile.INTERNAL_TEST] = Profile.INTERNAL_TEST
+    profile: Literal[Profile.PC_OPENAI_ACCEPTANCE, Profile.INTERNAL_TEST] = Profile.INTERNAL_TEST
     provider: Identifier
     model: NonEmpty
     deployment: NonEmpty | None = None

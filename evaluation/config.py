@@ -138,13 +138,17 @@ def load_config(
         *,
         allow_shared_external: bool = True,
     ) -> ProviderConfig:
-        # Internal runs never silently inherit OpenAI credentials or endpoints.
-        external = profile == Profile.EXTERNAL_SYNTHETIC
+        # PC acceptance and internal runs require a complete provider-specific declaration.
+        # Only the explicitly synthetic profile may inherit the shared OpenAI shortcut.
+        external = profile in {
+            Profile.EXTERNAL_SYNTHETIC,
+            Profile.PC_OPENAI_ACCEPTANCE,
+        }
         base = get(f"WEEK5_{kind}_BASE_URL")
         model = get(f"WEEK5_{kind}_MODEL")
         key = get(f"WEEK5_{kind}_API_KEY")
         # Shared credentials are used only with the shared endpoint, never a custom override.
-        if external and allow_shared_external and not base:
+        if profile is Profile.EXTERNAL_SYNTHETIC and allow_shared_external and not base:
             base = get("WEEK5_OPENAI_BASE_URL")
             model = model or get(shared_model)
             key = key or get("OPENAI_API_KEY")

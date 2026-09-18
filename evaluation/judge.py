@@ -106,20 +106,25 @@ def _parse_json(value: str | bytes) -> object:
 
 
 class InternalSemanticJudge:
-    """One-call, zero-retry OpenAI-compatible client for an explicitly internal judge."""
+    """One-call, zero-retry client for an approved OpenAI-compatible judge."""
 
     def __init__(self, client: httpx.AsyncClient, config: EvalConfig) -> None:
-        if config.profile is not Profile.INTERNAL_TEST:
-            raise ValueError("semantic judge requires the internal_test profile")
+        if config.profile not in {Profile.PC_OPENAI_ACCEPTANCE, Profile.INTERNAL_TEST}:
+            raise ValueError("semantic judge requires an approved acceptance profile")
         if not config.judge.configured:
-            raise ValueError("semantic judge requires an explicit internal endpoint and model")
+            raise ValueError("semantic judge requires an explicit endpoint and model")
         self._client = client
         self._config = config
 
     def _provenance(self, *, prompt: str, response_model: type[EvalModel]) -> JudgeProvenance:
         assert self._config.judge.model is not None
         return JudgeProvenance(
-            provider="internal_openai_compatible",
+            profile=self._config.profile,
+            provider=(
+                "openai_external"
+                if self._config.profile is Profile.PC_OPENAI_ACCEPTANCE
+                else "internal_openai_compatible"
+            ),
             model=self._config.judge.model,
             deployment=self._config.judge_deployment,
             prompt_sha256=_prompt_hash(prompt),

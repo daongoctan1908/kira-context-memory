@@ -275,6 +275,35 @@ def test_judge_never_inherits_shared_external_provider():
     assert config.judge.api_key is None
 
 
+def test_pc_acceptance_requires_explicit_provider_settings():
+    config = load_config(
+        profile=Profile.PC_OPENAI_ACCEPTANCE,
+        suites=(Suite.FORMATION, Suite.REWRITE),
+        environment={
+            "OPENAI_API_KEY": "sk-shared-must-not-leak",
+            "WEEK5_OPENAI_BASE_URL": "https://api.openai.com/v1",
+            "WEEK5_OPENAI_CHAT_MODEL": "shared-model",
+            "WEEK5_EXTRACTION_BASE_URL": "https://api.openai.com/v1",
+            "WEEK5_EXTRACTION_MODEL": "explicit-extraction",
+            "WEEK5_EXTRACTION_API_KEY": "sk-explicit-extraction",
+            "WEEK5_REWRITE_BASE_URL": "https://api.openai.com/v1",
+            "WEEK5_REWRITE_MODEL": "explicit-rewrite",
+            "WEEK5_REWRITE_API_KEY": "sk-explicit-rewrite",
+            "WEEK5_JUDGE_BASE_URL": "https://api.openai.com/v1",
+            "WEEK5_JUDGE_MODEL": "explicit-judge",
+            "WEEK5_JUDGE_API_KEY": "sk-explicit-judge",
+        },
+    )
+
+    assert config.extraction.configured
+    assert config.rewrite.configured
+    assert config.judge.configured
+    assert not config.embedding.configured
+    assert config.extraction.model == "explicit-extraction"
+    assert config.extraction.api_key.get_secret_value() == "sk-explicit-extraction"
+    assert "sk-shared-must-not-leak" not in repr(config)
+
+
 def test_explicit_internal_provider_and_config_knobs():
     config = load_config(
         profile=Profile.INTERNAL_TEST,
