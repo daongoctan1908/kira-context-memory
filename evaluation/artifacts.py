@@ -22,6 +22,7 @@ from evaluation.models import (
     BenchmarkVariant,
     EvalModel,
     Identifier,
+    NonEmpty,
     Outcome,
     Profile,
     RunProvenance,
@@ -78,6 +79,96 @@ class ArtifactRunManifest(EvalModel):
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("artifact creation timestamp must be timezone-aware")
         return value
+
+
+class FormedMemoryArtifact(EvalModel):
+    """One durable memory mapped back to the formation gold IDs that produced it."""
+
+    case_id: Identifier
+    family_id: Identifier
+    source_gold_ids: tuple[Identifier, ...] = ()
+    logical_user_id: Identifier
+    persisted_user_id: Identifier
+    memory_id: UUID
+    content: NonEmpty
+    formation_event_id: UUID
+    conversation_id: UUID
+    turn_id: Identifier
+    boundary_message_id: int = Field(ge=1, strict=True)
+    attributed_to: Literal["user", "assistant"] | None = None
+
+    @field_validator("source_gold_ids")
+    @classmethod
+    def source_gold_ids_are_unique(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if len(value) != len(set(value)):
+            raise ValueError("formed memory source gold IDs must be unique")
+        return value
+
+
+class FormedCorpusCaseArtifact(EvalModel):
+    case_id: Identifier
+    family_id: Identifier
+    logical_user_id: Identifier
+    persisted_user_id: Identifier
+    formation_event_id: UUID
+    source_gold_ids: tuple[Identifier, ...] = ()
+    memory_ids: tuple[UUID, ...] = ()
+
+    @model_validator(mode="after")
+    def case_ids_are_unique(self) -> "FormedCorpusCaseArtifact":
+        if len(self.source_gold_ids) != len(set(self.source_gold_ids)):
+            raise ValueError("formed case source gold IDs must be unique")
+        if len(self.memory_ids) != len(set(self.memory_ids)):
+            raise ValueError("formed case memory IDs must be unique")
+        return self
+
+
+class FormedCorpusArtifact(EvalModel):
+    schema_version: Literal[1] = 1
+    created_at: datetime
+    provenance: Literal["synthetic"] = "synthetic"
+    identity: ArtifactRunIdentity
+    cases: tuple[FormedCorpusCaseArtifact, ...]
+    memories: tuple[FormedMemoryArtifact, ...]
+
+    @field_validator("created_at")
+    @classmethod
+    def corpus_created_at_is_aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("formed corpus timestamp must be timezone-aware")
+        return value
+
+    @model_validator(mode="after")
+    def corpus_is_closed_and_owned(self) -> "FormedCorpusArtifact":
+        if Suite.FORMATION not in self.identity.suites:
+            raise ValueError("formed corpus identity must include the formation suite")
+        case_ids = [case.case_id for case in self.cases]
+        if len(case_ids) != len(set(case_ids)):
+            raise ValueError("formed corpus case IDs must be unique")
+        if not set(case_ids).issubset(self.identity.selected_case_ids):
+            raise ValueError("formed corpus contains a case outside the selected run")
+        memory_ids = [memory.memory_id for memory in self.memories]
+        if len(memory_ids) != len(set(memory_ids)):
+            raise ValueError("formed corpus memory IDs must be unique")
+        cases = {case.case_id: case for case in self.cases}
+        records_by_case: dict[str, set[UUID]] = {}
+        for memory in self.memories:
+            case = cases.get(memory.case_id)
+            if case is None:
+                raise ValueError("formed memory has no owning case")
+            if (
+                memory.family_id != case.family_id
+                or memory.logical_user_id != case.logical_user_id
+                or memory.persisted_user_id != case.persisted_user_id
+                or memory.formation_event_id != case.formation_event_id
+                or memory.source_gold_ids != case.source_gold_ids
+            ):
+                raise ValueError("formed memory provenance differs from its case")
+            records_by_case.setdefault(memory.case_id, set()).add(memory.memory_id)
+        for case in self.cases:
+            if set(case.memory_ids) != records_by_case.get(case.case_id, set()):
+                raise ValueError("formed case memory IDs do not match corpus records")
+        return self
 
 
 class CaseAttemptArtifact(EvalModel):
@@ -515,6 +606,23 @@ class ArtifactStore:
                     raise ValueError("persisted memory ownership cannot be removed")
         _replace(path, _canonical_json(ledger) + "\n")
         return path
+
+    def write_formed_corpus(self, corpus: FormedCorpusArtifact) -> Path:
+        """Persist the provenance-bound corpus consumed by formation-produced retrieval."""
+
+        if corpus.identity != self.manifest.identity:
+            raise ValueError("formed corpus belongs to another artifact run")
+        path = self.root / "formed-corpus.json"
+        _replace(path, _canonical_json(corpus) + "\n")
+        return path
+
+    def load_formed_corpus(self) -> FormedCorpusArtifact:
+        corpus = FormedCorpusArtifact.model_validate_json(
+            (self.root / "formed-corpus.json").read_text(encoding="utf-8")
+        )
+        if corpus.identity != self.manifest.identity:
+            raise ValueError("formed corpus belongs to another artifact run")
+        return corpus
 
     def load_isolation_ledger(self) -> IsolationLedger:
         path = self.root / "diagnostics" / "isolation-ledger.json"

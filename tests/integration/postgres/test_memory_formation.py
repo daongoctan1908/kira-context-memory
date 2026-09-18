@@ -26,6 +26,12 @@ from app.infrastructure.memory.postgres_admin import (
 )
 from app.infrastructure.postgres.conversation_store import PostgresConversationStoreAdapter
 from app.infrastructure.postgres.schema import conversations
+from evaluation.formation import (
+    FormationCaptureObserver,
+    PersistentFormationEvaluator,
+    PostgresFormationInspector,
+)
+from evaluation.models import FormationInput, Message, Outcome
 from scripts.check_live_memory_policy import score_case
 from tests.support.memory_policy_cases import CASES, MemoryPolicyCase
 
@@ -323,6 +329,102 @@ async def test_exact_boundary_formation_policy_cases_dedup_and_user_isolation() 
                     await connection.execute(
                         delete(conversations).where(conversations.c.user_id.in_(created_users))
                     )
+        finally:
+            await engine.dispose()
+            with psycopg.connect(psycopg_dsn) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(sql.Identifier(schema_name))
+                )
+
+
+async def test_persistent_evaluator_reads_back_real_pgvector_row_and_receipt() -> None:
+    database_url = _database_url()
+    psycopg_dsn = normalize_psycopg_dsn(database_url)
+    schema_name = f"memory_eval_{uuid4().hex}"
+    settings = _settings(database_url, schema_name)
+    engine = create_async_engine(database_url)
+    store = PostgresConversationStoreAdapter(engine)
+    case = next(item for item in SELECTED_CASES if item.name == "user_context_explicit_scope")
+    user_id = f"eval-persisted-{uuid4().hex}"
+    session_id = f"eval-session-{uuid4().hex}"
+    adapter: Mem0Adapter | None = None
+
+    try:
+        await asyncio.to_thread(
+            _initialize_memory_schema_sync,
+            psycopg_dsn,
+            schema_name,
+            settings.memory_collection_name,
+            settings.memory_embedding_model,
+            settings.memory_embedding_dims,
+        )
+        reference = await _persist_case(store, case, user_id, session_id)
+        observer = FormationCaptureObserver()
+        llm = DeterministicMemoryLlm()
+        with (
+            patch("mem0.memory.main.EmbedderFactory.create", return_value=DeterministicEmbedding()),
+            patch("mem0.memory.main.LlmFactory.create", return_value=llm),
+            patch(
+                "mem0.memory.main.extract_entities_batch",
+                side_effect=lambda texts: [[] for _ in texts],
+            ),
+            patch("mem0.memory.main.extract_entities", return_value=[]),
+        ):
+            adapter = Mem0Adapter(
+                create_mem0_client(settings),
+                search_timeout_seconds=settings.memory_search_timeout_seconds,
+                operation_timeout_seconds=settings.memory_operation_timeout_seconds,
+                observer=observer,
+            )
+            event_id = uuid4()
+            inspector = PostgresFormationInspector(
+                database_url,
+                schema_name=schema_name,
+                collection_name=settings.memory_collection_name,
+            )
+            initial = await inspector.inspect(event_id=event_id, user_id=user_id)
+            assert initial.memories == () and initial.receipt is None
+            evaluator = PersistentFormationEvaluator(
+                ProcessMemoryUseCase(store, adapter),
+                inspector,
+                observer,
+            )
+            inputs = FormationInput(
+                user_id="conv01:user",
+                messages=tuple(
+                    Message(
+                        message_id=f"conv01:source-{index}",
+                        session_id="conv01:session",
+                        role=source.role,
+                        content=source.content,
+                        timestamp=datetime(2026, 9, 7, index, tzinfo=UTC),
+                    )
+                    for index, source in enumerate(case.messages)
+                ),
+            )
+            result = await evaluator.evaluate(
+                case_id="conv01:formation:M01",
+                family_id="conv01:memory-family:user-context",
+                source_gold_ids=("conv01:M01",),
+                inputs=inputs,
+                reference=reference,
+                event_id=event_id,
+            )
+
+        assert result.outcome is Outcome.REVIEW_REQUIRED
+        assert result.extraction is not None
+        assert result.persistence is not None and result.persistence.receipt is not None
+        assert result.persistence.receipt.events == result.extraction.lifecycle_events
+        assert [item.content for item in result.persistence.memories] == [FACTS_BY_CASE[case.name]]
+        assert result.persistence.memories[0].user_id == user_id
+    finally:
+        if adapter is not None:
+            adapter.close()
+        try:
+            async with engine.begin() as connection:
+                await connection.execute(
+                    delete(conversations).where(conversations.c.user_id == user_id)
+                )
         finally:
             await engine.dispose()
             with psycopg.connect(psycopg_dsn) as connection, connection.cursor() as cursor:

@@ -2,8 +2,10 @@
 
 import json
 from collections.abc import Sequence
+from datetime import UTC, datetime
+from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 
 import pytest
@@ -16,11 +18,40 @@ from mem0.observability import (
     current_observation_usage,
 )
 
-from evaluation.formation import FormationExecutionStatus, WriteFreeFormationEvaluator
-from evaluation.models import FormationInput, Message, Outcome
+from app.application.use_cases.process_memory import ProcessMemoryUseCase
+from app.domain.models.conversation import (
+    CompletedTurnReference,
+    ConversationMessage,
+    ConversationRole,
+)
+from app.infrastructure.memory.mem0_adapter import Mem0Adapter
+from evaluation.artifacts import ArtifactRunIdentity, ArtifactStore
+from evaluation.formation import (
+    FormationCaptureObserver,
+    FormationExecutionStatus,
+    FormationPersistenceSnapshot,
+    FormationReceiptRecord,
+    PersistedFormationMemory,
+    PersistentFormationEvaluator,
+    PostgresFormationInspector,
+    WriteFreeFormationEvaluator,
+    build_formed_corpus,
+)
+from evaluation.models import (
+    BenchmarkVariant,
+    FormationInput,
+    GitSource,
+    Message,
+    Outcome,
+    Profile,
+    RunProvenance,
+    Suite,
+)
 
 _CONVERSATION_ID = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
 _EVENT_ID = UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+_MEMORY_ID = UUID("cccccccc-cccc-4ccc-8ccc-cccccccccccc")
+_NOW = datetime(2026, 9, 18, 9, 0, tzinfo=UTC)
 
 
 class ScriptedLlm:
@@ -223,3 +254,332 @@ async def test_observer_does_not_change_native_provider_calls_or_extraction_beha
     observed_payload = observed_store.insert_with_formation_receipt.call_args.kwargs["payloads"][0]
     for key in ("data", "hash", "user_id", "conversation_id", "turn_id", "attributed_to"):
         assert plain_payload[key] == observed_payload[key]
+
+
+class _BoundaryStore:
+    def __init__(
+        self,
+        reference: CompletedTurnReference,
+        messages: tuple[ConversationMessage, ...],
+    ) -> None:
+        self.reference = reference
+        self.messages = messages
+        self.calls = 0
+
+    async def read_through_boundary(
+        self,
+        user_id: str,
+        conversation_id: UUID,
+        boundary_message_id: int,
+        limit: int,
+    ) -> tuple[ConversationMessage, ...]:
+        self.calls += 1
+        assert (user_id, conversation_id, boundary_message_id) == (
+            self.reference.user_id,
+            self.reference.conversation_id,
+            self.reference.boundary_message_id,
+        )
+        assert limit == 10
+        return self.messages
+
+
+class _StateInspector:
+    def __init__(self, store: MagicMock, *, corrupt_content: bool = False) -> None:
+        self.store = store
+        self.corrupt_content = corrupt_content
+
+    async def inspect(self, *, event_id: UUID, user_id: str) -> FormationPersistenceSnapshot:
+        state = self.store.formation_state
+        raw_receipt = state["receipts"].get(str(event_id))
+        rows = [
+            (memory_id, payload)
+            for memory_id, payload in state["rows"].items()
+            if payload["formation_event_id"] == str(event_id)
+        ]
+        memories = tuple(
+            PersistedFormationMemory(
+                memory_id=memory_id,
+                content=("corrupted" if self.corrupt_content else payload["data"]),
+                user_id=payload["user_id"],
+                formation_event_id=payload["formation_event_id"],
+                conversation_id=payload["conversation_id"],
+                turn_id=payload["turn_id"],
+                boundary_message_id=payload["boundary_message_id"],
+                attributed_to=payload.get("attributed_to"),
+            )
+            for memory_id, payload in rows
+        )
+        receipt = None
+        if raw_receipt is not None:
+            receipt = PostgresFormationInspector._parse_receipt(
+                (event_id, user_id, raw_receipt, len(raw_receipt), _NOW),
+                expected_event_id=event_id,
+                expected_user_id=user_id,
+            )
+        return FormationPersistenceSnapshot(
+            event_id=event_id,
+            user_id=user_id,
+            memories=memories,
+            receipt=receipt,
+        )
+
+
+def _persistent_inputs() -> FormationInput:
+    return FormationInput(
+        user_id="conv01:user",
+        messages=(
+            Message(
+                message_id="conv01:u1",
+                session_id="conv01:session",
+                role="user",
+                content="Luôn ưu tiên Hà Nội",
+                timestamp=_NOW,
+            ),
+            Message(
+                message_id="conv01:a1",
+                session_id="conv01:session",
+                role="assistant",
+                content="Đã ghi nhận",
+                timestamp=_NOW,
+            ),
+        ),
+    )
+
+
+def _persistent_runtime(response: str):
+    memory, llm, store, _ = _native_memory([response])
+    state: dict[str, dict] = {"rows": {}, "receipts": {}}
+    store.formation_state = state
+
+    def get_receipt(event_id: str, user_id: str):
+        del user_id
+        return state["receipts"].get(event_id)
+
+    def commit(vectors, payloads, ids, *, event_id, user_id, result):
+        del vectors, user_id
+        if event_id in state["receipts"]:
+            return False, state["receipts"][event_id]
+        state["receipts"][event_id] = result
+        state["rows"].update(
+            {UUID(memory_id): payload for memory_id, payload in zip(ids, payloads, strict=True)}
+        )
+        return True, result
+
+    store.get_formation_result.side_effect = get_receipt
+    store.insert_with_formation_receipt.side_effect = commit
+    reference = CompletedTurnReference(
+        user_id="eval:run:user-1",
+        session_id="eval-session-1",
+        conversation_id=_CONVERSATION_ID,
+        turn_id="eval-turn-1",
+        boundary_message_id=2,
+    )
+    messages = (
+        ConversationMessage(
+            reference.session_id,
+            reference.turn_id,
+            ConversationRole.USER,
+            "Luôn ưu tiên Hà Nội",
+            _NOW,
+        ),
+        ConversationMessage(
+            reference.session_id,
+            reference.turn_id,
+            ConversationRole.ASSISTANT,
+            "Đã ghi nhận",
+            _NOW,
+        ),
+    )
+    observer = FormationCaptureObserver()
+    adapter = Mem0Adapter(
+        memory,
+        search_timeout_seconds=1,
+        operation_timeout_seconds=1,
+        observer=observer,
+    )
+    processor = ProcessMemoryUseCase(_BoundaryStore(reference, messages), adapter)
+    return processor, observer, _StateInspector(store), reference, llm, store
+
+
+def _formation_identity() -> ArtifactRunIdentity:
+    source = GitSource(sha="1" * 40, dirty=False)
+    return ArtifactRunIdentity(
+        run_id=UUID("dddddddd-dddd-4ddd-8ddd-dddddddddddd"),
+        profile=Profile.INTERNAL_TEST,
+        variant=BenchmarkVariant.WORKING_TREE,
+        provenance=RunProvenance(
+            variant=BenchmarkVariant.WORKING_TREE,
+            runtime=source,
+            harness=source,
+            prompt_sha256={"memory_extraction": "a" * 64, "rewrite_system": "b" * 64},
+            package_versions={
+                "kira-context-memory": "0.4.1",
+                "viettel-mem0": "2.0.20+viettel.4",
+            },
+        ),
+        dataset_id="kira-ltm-v1",
+        dataset_version="1.0.0-test",
+        dataset_sha256="c" * 64,
+        compilation_sha256="d" * 64,
+        config_sha256="e" * 64,
+        seed=742,
+        suites=(Suite.FORMATION,),
+        selected_case_ids=("conv01:formation:M01",),
+    )
+
+
+@pytest.mark.asyncio
+async def test_persistent_evaluator_reconciles_application_mem0_rows_and_receipt(
+    tmp_path: Path,
+):
+    response = json.dumps(
+        {"memory": [{"id": "0", "text": "Ưu tiên Hà Nội", "attributed_to": "user"}]}
+    )
+    processor, observer, inspector, reference, llm, store = _persistent_runtime(response)
+
+    result = await PersistentFormationEvaluator(processor, inspector, observer).evaluate(
+        case_id="conv01:formation:M01",
+        family_id="conv01:memory-family:preference",
+        source_gold_ids=("conv01:M01",),
+        inputs=_persistent_inputs(),
+        reference=reference,
+        event_id=_EVENT_ID,
+    )
+
+    assert result.outcome is Outcome.REVIEW_REQUIRED
+    assert result.extraction is not None
+    assert [fact.text for fact in result.extraction.facts] == ["Ưu tiên Hà Nội"]
+    assert result.persistence is not None and result.persistence.receipt is not None
+    assert result.persistence.receipt.events == result.extraction.lifecycle_events
+    assert len(result.persistence.memories) == 1
+    assert result.persistence.memories[0].content == "Ưu tiên Hà Nội"
+    assert result.persistence.memories[0].conversation_id == reference.conversation_id
+    assert llm.calls == 1
+    assert store.insert_with_formation_receipt.call_count == 1
+
+    identity = _formation_identity()
+    corpus = build_formed_corpus(identity=identity, results=(result,), created_at=_NOW)
+    artifact_store = ArtifactStore.create(tmp_path / "run", identity=identity, created_at=_NOW)
+    path = artifact_store.write_formed_corpus(corpus)
+    loaded = artifact_store.load_formed_corpus()
+
+    assert path.name == "formed-corpus.json"
+    assert loaded.identity.provenance == identity.provenance
+    assert loaded.cases[0].source_gold_ids == ("conv01:M01",)
+    assert loaded.memories[0].memory_id == result.persistence.memories[0].memory_id
+    assert loaded.memories[0].persisted_user_id == reference.user_id
+
+
+@pytest.mark.asyncio
+async def test_persistent_evaluator_commits_and_reconciles_valid_empty_receipt():
+    processor, observer, inspector, reference, llm, store = _persistent_runtime('{"memory":[]}')
+
+    result = await PersistentFormationEvaluator(processor, inspector, observer).evaluate(
+        case_id="conv01:formation:M01",
+        family_id="conv01:memory-family:negative",
+        source_gold_ids=(),
+        inputs=_persistent_inputs(),
+        reference=reference,
+        event_id=_EVENT_ID,
+    )
+
+    assert result.outcome is Outcome.REVIEW_REQUIRED
+    assert result.extraction is not None
+    assert result.extraction.status is FormationExecutionStatus.VALID_EMPTY
+    assert result.persistence is not None
+    assert result.persistence.memories == ()
+    assert result.persistence.receipt is not None
+    assert result.persistence.receipt.memory_count == 0
+    assert llm.calls == 1
+    assert store.insert_with_formation_receipt.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_persistent_evaluator_fails_closed_on_row_receipt_mismatch():
+    response = json.dumps(
+        {"memory": [{"id": "0", "text": "Ưu tiên Hà Nội", "attributed_to": "user"}]}
+    )
+    processor, observer, inspector, reference, _, _ = _persistent_runtime(response)
+    inspector.corrupt_content = True
+
+    result = await PersistentFormationEvaluator(processor, inspector, observer).evaluate(
+        case_id="conv01:formation:M01",
+        family_id="conv01:memory-family:preference",
+        source_gold_ids=("conv01:M01",),
+        inputs=_persistent_inputs(),
+        reference=reference,
+        event_id=_EVENT_ID,
+    )
+
+    assert result.outcome is Outcome.PROTOCOL_ERROR
+    assert result.reason_codes == ("formation_pgvector_receipt_mismatch",)
+
+
+@pytest.mark.asyncio
+async def test_persistent_evaluator_refuses_nonfresh_event_without_calling_processor():
+    processor = AsyncMock()
+    observer = FormationCaptureObserver()
+    reference = _persistent_runtime('{"memory":[]}')[3]
+    receipt = FormationReceiptRecord(
+        event_id=_EVENT_ID,
+        user_id=reference.user_id,
+        events=(),
+        memory_count=0,
+        committed_at=_NOW,
+    )
+    inspector = AsyncMock()
+    inspector.inspect.return_value = FormationPersistenceSnapshot(
+        event_id=_EVENT_ID,
+        user_id=reference.user_id,
+        receipt=receipt,
+    )
+
+    result = await PersistentFormationEvaluator(processor, inspector, observer).evaluate(
+        case_id="conv01:formation:M01",
+        family_id="conv01:memory-family:negative",
+        source_gold_ids=(),
+        inputs=_persistent_inputs(),
+        reference=reference,
+        event_id=_EVENT_ID,
+    )
+
+    assert result.outcome is Outcome.PROTOCOL_ERROR
+    assert result.reason_codes == ("formation_state_not_fresh",)
+    processor.execute.assert_not_awaited()
+
+
+def test_postgres_inspector_parses_only_exact_provenance_and_receipt_contract():
+    payload = {
+        "data": "Ưu tiên Hà Nội",
+        "user_id": "eval:run:user-1",
+        "formation_event_id": str(_EVENT_ID),
+        "conversation_id": str(_CONVERSATION_ID),
+        "turn_id": "eval-turn-1",
+        "boundary_message_id": 2,
+        "attributed_to": "user",
+    }
+    memory = PostgresFormationInspector._parse_memory(
+        (_MEMORY_ID, payload),
+        expected_event_id=_EVENT_ID,
+        expected_user_id="eval:run:user-1",
+    )
+    receipt = PostgresFormationInspector._parse_receipt(
+        (
+            _EVENT_ID,
+            "eval:run:user-1",
+            [{"id": str(_MEMORY_ID), "memory": "Ưu tiên Hà Nội", "event": "ADD"}],
+            1,
+            _NOW,
+        ),
+        expected_event_id=_EVENT_ID,
+        expected_user_id="eval:run:user-1",
+    )
+
+    assert memory.memory_id == _MEMORY_ID
+    assert receipt.events[0].memory_id == _MEMORY_ID
+    with pytest.raises(ValueError, match="owner"):
+        PostgresFormationInspector._parse_memory(
+            (_MEMORY_ID, payload),
+            expected_event_id=_EVENT_ID,
+            expected_user_id="another-user",
+        )
