@@ -25,7 +25,10 @@ def main(argv: list[str] | None = None) -> int:
             dataset_root=args.dataset_root,
         )
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(frozen.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        args.output.write_text(
+            frozen.model_dump_json(indent=2, exclude_computed_fields=True) + "\n",
+            encoding="utf-8",
+        )
         print(
             json.dumps(
                 {

@@ -750,3 +750,17 @@ class ArtifactStore:
             if attempt.case_id not in latest or attempt.attempt > latest[attempt.case_id].attempt:
                 latest[attempt.case_id] = attempt
         return Counter(attempt.outcome for attempt in latest.values())
+
+    @property
+    def latest_attempts(self) -> tuple[CaseAttemptArtifact, ...]:
+        """Return one deterministic latest terminal record per attempted case."""
+
+        latest: dict[str, CaseAttemptArtifact] = {}
+        for attempt in self._attempts:
+            if attempt.case_id not in latest or attempt.attempt > latest[attempt.case_id].attempt:
+                latest[attempt.case_id] = attempt
+        return tuple(
+            latest[case_id]
+            for case_id in self.manifest.identity.selected_case_ids
+            if case_id in latest
+        )
