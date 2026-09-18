@@ -26,6 +26,12 @@ from evaluation.audit import (
     HumanAuditDecision,
     select_audit_batch,
 )
+from evaluation.isolation import (
+    allocate_case_resources,
+    create_isolation_plan,
+    isolation_plan_sha256,
+    new_isolation_ledger,
+)
 from evaluation.models import (
     BenchmarkVariant,
     GitSource,
@@ -46,7 +52,11 @@ _RUN_ID = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
 _HASH = "a" * 64
 
 
-def _identity(*, config_sha256: str = "d" * 64) -> ArtifactRunIdentity:
+def _identity(
+    *,
+    config_sha256: str = "d" * 64,
+    isolation_sha256: str | None = None,
+) -> ArtifactRunIdentity:
     source = GitSource(sha="1" * 40, dirty=False)
     provenance = RunProvenance(
         variant=BenchmarkVariant.WORKING_TREE,
@@ -68,6 +78,7 @@ def _identity(*, config_sha256: str = "d" * 64) -> ArtifactRunIdentity:
         dataset_sha256="b" * 64,
         compilation_sha256="c" * 64,
         config_sha256=config_sha256,
+        isolation_sha256=isolation_sha256,
         seed=742,
         suites=(Suite.REWRITE,),
         selected_case_ids=("conv01:case-1", "conv01:case-2", "conv01:case-3"),
@@ -350,3 +361,33 @@ def test_invalid_summary_denominators_and_safety_are_rejected():
             pending_judgment=0,
             pending_audit=0,
         )
+
+
+def test_isolation_ledger_is_atomically_bound_to_artifact_run(tmp_path: Path):
+    plan = create_isolation_plan(
+        run_id=_RUN_ID,
+        owner_token=UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+        conversation_database_url="postgresql://eval:secret@localhost/eval",
+        memory_database_url="postgresql://eval:secret@localhost/eval",
+    )
+    plan_hash = isolation_plan_sha256(plan)
+    store = ArtifactStore.create(
+        tmp_path / "run",
+        identity=_identity(isolation_sha256=plan_hash),
+        created_at=_NOW,
+    )
+    ledger = new_isolation_ledger(plan)
+
+    path = store.write_isolation_ledger(ledger)
+
+    assert path.name == "isolation-ledger.json"
+    assert store.load_isolation_ledger() == ledger
+    expanded = ledger.model_copy(
+        update={"resources": (allocate_case_resources(plan, case_id="conv01:case-1", attempt=1),)}
+    )
+    store.write_isolation_ledger(expanded)
+    with pytest.raises(ValueError, match="cannot be removed"):
+        store.write_isolation_ledger(ledger)
+    wrong = ledger.model_copy(update={"plan_sha256": "0" * 64})
+    with pytest.raises(ValueError, match="another artifact run"):
+        store.write_isolation_ledger(wrong)

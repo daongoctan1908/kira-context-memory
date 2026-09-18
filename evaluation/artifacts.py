@@ -16,6 +16,7 @@ from uuid import UUID, uuid4
 from pydantic import Field, TypeAdapter, field_validator, model_validator
 
 from evaluation.audit import AuditBatch, HumanAuditDecision
+from evaluation.isolation import IsolationLedger
 from evaluation.models import (
     BENCHMARK_CONTRACT_ID,
     BenchmarkVariant,
@@ -46,6 +47,7 @@ class ArtifactRunIdentity(EvalModel):
     dataset_sha256: Sha256
     compilation_sha256: Sha256
     config_sha256: Sha256
+    isolation_sha256: Sha256 | None = None
     seed: int = Field(ge=0, le=2**63 - 1, strict=True)
     suites: tuple[Suite, ...] = Field(min_length=1)
     selected_case_ids: tuple[Identifier, ...] = Field(min_length=1)
@@ -489,6 +491,40 @@ class ArtifactStore:
         path = self.root / "diagnostics" / f"{case_key}.{diagnostic.attempt}.json"
         _write_new(path, _canonical_json(diagnostic) + "\n")
         return path
+
+    def write_isolation_ledger(self, ledger: IsolationLedger) -> Path:
+        """Persist ownership before DB writes so later cleanup never relies on a broad prefix."""
+
+        identity = self.manifest.identity
+        if identity.isolation_sha256 is None:
+            raise ValueError("artifact run has no isolation plan")
+        if ledger.run_id != identity.run_id or ledger.plan_sha256 != identity.isolation_sha256:
+            raise ValueError("isolation ledger belongs to another artifact run")
+        path = self.root / "diagnostics" / "isolation-ledger.json"
+        if path.exists():
+            existing = IsolationLedger.model_validate_json(path.read_text(encoding="utf-8"))
+            updated = {(item.case_id, item.attempt): item for item in ledger.resources}
+            for owned in existing.resources:
+                replacement = updated.get((owned.case_id, owned.attempt))
+                if replacement is None or (
+                    replacement.model_copy(update={"memory_ids": ()})
+                    != owned.model_copy(update={"memory_ids": ()})
+                ):
+                    raise ValueError("persisted resource ownership cannot be removed or reassigned")
+                if not set(owned.memory_ids).issubset(replacement.memory_ids):
+                    raise ValueError("persisted memory ownership cannot be removed")
+        _replace(path, _canonical_json(ledger) + "\n")
+        return path
+
+    def load_isolation_ledger(self) -> IsolationLedger:
+        path = self.root / "diagnostics" / "isolation-ledger.json"
+        ledger = IsolationLedger.model_validate_json(path.read_text(encoding="utf-8"))
+        identity = self.manifest.identity
+        if identity.isolation_sha256 is None:
+            raise ValueError("artifact run has no isolation plan")
+        if ledger.run_id != identity.run_id or ledger.plan_sha256 != identity.isolation_sha256:
+            raise ValueError("isolation ledger belongs to another artifact run")
+        return ledger
 
     def resume_plan(self) -> ResumePlan:
         latest: dict[str, CaseAttemptArtifact] = {}
