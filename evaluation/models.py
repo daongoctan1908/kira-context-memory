@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from pydantic import (
@@ -163,8 +163,17 @@ class RunProvenance(EvalModel):
 
 class Message(EvalModel):
     message_id: Identifier
+    session_id: Identifier | None = None
     role: Literal["user", "assistant"]
     content: NonEmpty
+    timestamp: datetime | None = None
+
+    @field_validator("timestamp")
+    @classmethod
+    def timestamp_is_timezone_aware(cls, value: datetime | None) -> datetime | None:
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
+            raise ValueError("message timestamp must be timezone-aware")
+        return value
 
 
 class GoldFact(EvalModel):
@@ -207,6 +216,7 @@ class CrossSessionInput(EvalModel):
     session_b: Identifier
     session_a_messages: tuple[Message, ...] = Field(min_length=1)
     session_b_query: NonEmpty
+    source_session_ids: tuple[Identifier, ...] = ()
 
     @model_validator(mode="after")
     def distinct_sessions(self) -> "CrossSessionInput":
@@ -224,9 +234,41 @@ CaseInput = Annotated[
 class GoldSpecification(EvalModel):
     facts: tuple[GoldFact, ...] = ()
     relevant_memory_ids: tuple[Identifier, ...] = ()
+    supporting_memory_ids: tuple[Identifier, ...] = ()
+    history_memory_ids: tuple[Identifier, ...] = ()
     required_exact: tuple[NonEmpty, ...] = ()
     forbidden: tuple[NonEmpty, ...] = ()
     semantic_expectation: NonEmpty
+    expected_answer: NonEmpty | None = None
+    expected_rewrite: NonEmpty | None = None
+    expected_action: Identifier | None = None
+    expected_api: dict[str, Any] | None = None
+    no_hit_fpr_eligible: bool | None = None
+    lifecycle_event: "FormationLifecycleGold | None" = None
+
+
+class FormationLifecycleGold(EvalModel):
+    event_id: Identifier
+    should_store: bool
+    expected_operation: Literal["add", "update", "reinforce_existing", "do_not_persist"]
+    active_at_end: bool
+    memory_family: Identifier
+    related_event_ids: tuple[Identifier, ...] = ()
+
+
+class CaseEligibility(EvalModel):
+    status: Literal["eligible", "blocked"] = "eligible"
+    blocked_reasons: tuple[Identifier, ...] = ()
+
+    @model_validator(mode="after")
+    def status_matches_reasons(self) -> "CaseEligibility":
+        if self.status == "eligible" and self.blocked_reasons:
+            raise ValueError("eligible case must not have blocked reasons")
+        if self.status == "blocked" and not self.blocked_reasons:
+            raise ValueError("blocked case requires at least one reason")
+        if len(set(self.blocked_reasons)) != len(self.blocked_reasons):
+            raise ValueError("blocked reasons must be unique")
+        return self
 
 
 class GoldReview(EvalModel):
@@ -248,6 +290,8 @@ class EvalCase(EvalModel):
     evaluation_scope: Literal["full_corpus"]
     provenance: Literal["synthetic"]
     tags: tuple[Identifier, ...] = ()
+    source_row_ids: tuple[Identifier, ...] = Field(min_length=1)
+    eligibility: CaseEligibility = Field(default_factory=CaseEligibility)
     inputs: CaseInput
     gold: GoldSpecification
     review: GoldReview = Field(default_factory=GoldReview)

@@ -69,6 +69,7 @@ def test_typed_case_round_trip(kind):
             "family_id": "confirmation",
             "evaluation_scope": "full_corpus",
             "provenance": "synthetic",
+            "source_row_ids": ["source-row-1"],
             "inputs": {"kind": kind, **inputs},
             "gold": {"semantic_expectation": "Giữ attribution của assistant."},
         }
