@@ -11,7 +11,12 @@ from evaluation.config import EvalConfig, ProviderConfig, load_config
 from evaluation.mock import mock_response
 from evaluation.models import Outcome, Probe, Profile, Reason, Suite
 from evaluation.preflight import run_preflight
-from evaluation.providers import api_url, embedding_observations, extraction_count
+from evaluation.providers import (
+    api_url,
+    embedding_observations,
+    extraction_count,
+    judge_observations,
+)
 
 
 def configured(suites=(Suite.FORMATION,), **overrides):
@@ -65,6 +70,65 @@ async def test_rewrite_only_does_not_require_extraction_embedding_or_db():
     assert report.checks[0].usage.total_tokens == 30
     assert "sk-synthetic-key" not in report.model_dump_json()
     assert "Một truy vấn độc lập" not in report.model_dump_json()
+
+
+async def test_pc_rewrite_preflight_requires_and_validates_explicit_judge_schema():
+    provider = ProviderConfig(
+        base_url="https://provider.test/v1",
+        model="explicit-model",
+        api_key=SecretStr("synthetic-secret-token"),
+        auth_required=True,
+    )
+    config = EvalConfig(
+        profile=Profile.PC_OPENAI_ACCEPTANCE,
+        suites=(Suite.REWRITE,),
+        rewrite=provider,
+        judge=provider,
+    )
+    calls = []
+
+    def handle(request):
+        body = json.loads(request.content)
+        calls.append(body)
+        schema = body.get("response_format", {}).get("json_schema", {})
+        if schema.get("name") == "week5_judge_preflight":
+            assert schema["strict"] is True
+            assert schema["schema"]["properties"]["verdict"]["enum"] == [
+                "PASS",
+                "FAIL",
+                "UNCERTAIN",
+            ]
+            return httpx.Response(
+                200,
+                json=chat_response('{"verdict":"PASS","reason_code":"synthetic_match"}'),
+            )
+        return httpx.Response(200, json=chat_response("Một truy vấn độc lập."))
+
+    report = await run_preflight(config, transport=httpx.MockTransport(handle))
+
+    assert len(calls) == 2
+    assert [item.probe for item in report.checks] == [
+        Probe.REWRITE_CHAT,
+        Probe.JUDGE_SEMANTIC,
+    ]
+    assert report.checks[1].judge_verdict == "PASS"
+    assert report.suites[0].outcome is Outcome.PASS
+    assert "synthetic-secret-token" not in report.model_dump_json()
+
+
+async def test_pc_semantic_suite_without_judge_is_not_ready():
+    provider = ProviderConfig(base_url="https://provider.test/v1", model="explicit-model")
+    config = EvalConfig(
+        profile=Profile.PC_OPENAI_ACCEPTANCE,
+        suites=(Suite.REWRITE,),
+        rewrite=provider,
+    )
+
+    report = await run_preflight(config, transport=httpx.MockTransport(mock_response))
+
+    assert report.checks[-1].probe is Probe.JUDGE_SEMANTIC
+    assert report.checks[-1].outcome is Outcome.NOT_RUN
+    assert report.suites[0].outcome is Outcome.NOT_RUN
 
 
 async def test_json_contract_and_shared_dependencies_run_once():
@@ -370,6 +434,23 @@ def test_endpoint_normalization_and_dual_source_envelope():
         )
         == 1
     )
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "not-json",
+        "{}",
+        '{"verdict":"MAYBE","reason_code":"x"}',
+        '{"verdict":"PASS","reason_code":"bad space"}',
+        '{"verdict":"PASS","reason_code":"x","raw":"secret"}',
+    ],
+)
+def test_judge_probe_rejects_noncontract_responses(content):
+    from evaluation.errors import ProtocolError
+
+    with pytest.raises(ProtocolError):
+        judge_observations(content)
 
 
 @pytest.mark.parametrize("usage", ["invalid", {"prompt_tokens": -1}, {"total_tokens": True}])

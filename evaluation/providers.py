@@ -21,6 +21,23 @@ EXTRACTION_INPUT = "Dữ liệu giả lập: Tôi muốn báo cáo được trì
 REWRITE_SYSTEM = "Rewrite the input as a standalone query in Vietnamese. Return only query text."
 REWRITE_INPUT = "Dữ liệu giả lập: So sánh doanh thu tháng 1 và tháng 2 tại khu vực A."
 EMBEDDING_INPUT = ["kira synthetic embedding probe one", "kira synthetic embedding probe two"]
+JUDGE_SYSTEM = (
+    "Classify whether the synthetic candidate satisfies the expectation. "
+    "Return only JSON matching the supplied schema."
+)
+JUDGE_INPUT = {
+    "candidate": "Hà Nội",
+    "expectation": "The answer identifies Hà Nội.",
+}
+JUDGE_RESPONSE_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["verdict", "reason_code"],
+    "properties": {
+        "verdict": {"type": "string", "enum": ["PASS", "FAIL", "UNCERTAIN"]},
+        "reason_code": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}$"},
+    },
+}
 
 
 def api_url(base_url: str, path: str) -> str:
@@ -110,6 +127,19 @@ def extraction_count(content: str) -> int:
         ):
             raise ProtocolError(Reason.INVALID_EXTRACTION)
     return len(memories)
+
+
+def judge_observations(content: str) -> dict:
+    payload = parse_json(content)
+    if (
+        not isinstance(payload, dict)
+        or set(payload) != {"verdict", "reason_code"}
+        or payload["verdict"] not in {"PASS", "FAIL", "UNCERTAIN"}
+        or not isinstance(payload["reason_code"], str)
+        or not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}", payload["reason_code"])
+    ):
+        raise ProtocolError(Reason.INVALID_JUDGE)
+    return {"judge_verdict": payload["verdict"]}
 
 
 def embedding_observations(body: object, expected_dimension: int | None) -> dict:
@@ -241,6 +271,39 @@ class ProviderProbes:
         }
         self._redact_returned_model(provider, details)
         return details
+
+    async def judge(self) -> dict:
+        provider = self.config.judge
+        body = {
+            "model": provider.model,
+            "stream": False,
+            "temperature": 0,
+            "max_tokens": self.config.judge_max_tokens,
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "week5_judge_preflight",
+                    "strict": True,
+                    "schema": JUDGE_RESPONSE_SCHEMA,
+                },
+            },
+            "messages": [
+                {"role": "system", "content": JUDGE_SYSTEM},
+                {
+                    "role": "user",
+                    "content": json.dumps(JUDGE_INPUT, ensure_ascii=False, separators=(",", ":")),
+                },
+            ],
+        }
+        response = await self.request(
+            "POST",
+            api_url(str(provider.base_url), "/chat/completions"),
+            provider=provider,
+            body=body,
+        )
+        content, details = chat_text(response)
+        self._redact_returned_model(provider, details)
+        return {"requested_model": provider.model, **details, **judge_observations(content)}
 
     @staticmethod
     def _redact_returned_model(provider: ProviderConfig, details: dict) -> None:

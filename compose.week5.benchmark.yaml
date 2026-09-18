@@ -224,6 +224,14 @@ services:
     pull_policy: never
     init: true
     env_file: *env-file
+    environment:
+      # The operator selects one running variant at a time. These non-secret selectors override
+      # the generic values in the env file; the password is interpolated without being placed on
+      # a command line.
+      WEEK5_GATEWAY_URL: http://${WEEK5_BENCHMARK_GATEWAY_HOST:-candidate-gateway}:8000
+      WEEK5_WORKER_URL: http://${WEEK5_BENCHMARK_WORKER_HOST:-candidate-worker}:8001
+      WEEK5_DATABASE_URL: postgresql://kira:${WEEK5_POSTGRES_PASSWORD}@${WEEK5_BENCHMARK_POSTGRES_HOST:-candidate-postgres}:5432/${WEEK5_BENCHMARK_DATABASE:-kira_candidate}
+      WEEK5_MEMORY_DATABASE_URL: postgresql://kira:${WEEK5_POSTGRES_PASSWORD}@${WEEK5_BENCHMARK_POSTGRES_HOST:-candidate-postgres}:5432/${WEEK5_BENCHMARK_DATABASE:-kira_candidate}
     volumes:
       - ${WEEK5_ARTIFACT_ROOT:-./artifacts/week5/benchmark}:/artifacts
       - ${WEEK5_MATERIALIZATION_ROOT:-./artifacts/week5}:/materialization

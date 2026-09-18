@@ -317,6 +317,7 @@ class CaseResult(EvalModel):
 class Probe(StrEnum):
     EXTRACTION_JSON = "extraction_json"
     REWRITE_CHAT = "rewrite_chat"
+    JUDGE_SEMANTIC = "judge_semantic"
     EMBEDDING_BATCH = "embedding_batch"
     PGVECTOR = "pgvector"
     MEMORY_SCHEMA = "memory_schema"
@@ -337,6 +338,7 @@ class Reason(StrEnum):
     INVALID_JSON = "invalid_json"
     INVALID_CHAT = "invalid_chat"
     INVALID_EXTRACTION = "invalid_extraction"
+    INVALID_JUDGE = "invalid_judge"
     INVALID_EMBEDDING = "invalid_embedding"
     DIMENSION_MISMATCH = "dimension_mismatch"
     RESPONSE_TOO_LARGE = "response_too_large"
@@ -365,6 +367,7 @@ class ProbeResult(EvalModel):
     embedding_dimension: int | None = Field(default=None, ge=1)
     embedding_count: int | None = Field(default=None, ge=0)
     extracted_fact_count: int | None = Field(default=None, ge=0)
+    judge_verdict: Literal["PASS", "FAIL", "UNCERTAIN"] | None = None
     usage: TokenUsage | None = None
 
 

@@ -115,6 +115,7 @@ def load_config(
             extraction=provider,
             rewrite=provider,
             embedding=provider,
+            judge=provider,
             database_url=SecretStr("postgresql://mock.invalid/eval"),
             memory_database_url=SecretStr("postgresql://mock.invalid/eval"),
             gateway_url="https://week5.invalid",

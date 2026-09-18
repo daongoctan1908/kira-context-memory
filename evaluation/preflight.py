@@ -29,17 +29,35 @@ from evaluation.providers import ProviderProbes
 DatabaseProbe = Callable[[EvalConfig, Probe, int | None], Awaitable[dict]]
 
 
-def required_probes(suite: Suite, formation_mode: str) -> tuple[Probe, ...]:
+def required_probes(
+    suite: Suite,
+    formation_mode: str,
+    profile: Profile,
+) -> tuple[Probe, ...]:
+    semantic = (
+        (Probe.JUDGE_SEMANTIC,)
+        if profile in {Profile.MOCK, Profile.PC_OPENAI_ACCEPTANCE, Profile.INTERNAL_TEST}
+        else ()
+    )
     formation = (Probe.EXTRACTION_JSON,)
     retrieval = (Probe.EMBEDDING_BATCH, Probe.PGVECTOR, Probe.MEMORY_SCHEMA)
     persistent = (*formation, *retrieval, Probe.CONVERSATION_DB)
     if suite == Suite.FORMATION:
-        return persistent if formation_mode == "persistent" else formation
+        probes = persistent if formation_mode == "persistent" else formation
+        return (*probes, *semantic)
     if suite == Suite.RETRIEVAL:
         return retrieval
     if suite == Suite.REWRITE:
-        return (Probe.REWRITE_CHAT,)
-    return (*persistent, Probe.REWRITE_CHAT, Probe.GATEWAY, Probe.WORKER, Probe.KIRA)
+        return (Probe.REWRITE_CHAT, *semantic)
+    kira_probe = (Probe.KIRA,) if profile is Profile.MOCK else ()
+    return (
+        *persistent,
+        Probe.REWRITE_CHAT,
+        *semantic,
+        Probe.GATEWAY,
+        Probe.WORKER,
+        *kira_probe,
+    )
 
 
 def readiness(results: tuple[ProbeResult, ...]) -> Outcome:
@@ -63,7 +81,10 @@ async def run_preflight(
         transport = transport or httpx.MockTransport(mock_response)
         database_probe = database_probe or mock_database
     database_probe = database_probe or probe_database
-    requirements = {suite: required_probes(suite, config.formation_mode) for suite in config.suites}
+    requirements = {
+        suite: required_probes(suite, config.formation_mode, config.profile)
+        for suite in config.suites
+    }
     needed = {probe for probes in requirements.values() for probe in probes}
     results: dict[Probe, ProbeResult] = {}
     async with httpx.AsyncClient(
@@ -86,6 +107,8 @@ async def run_preflight(
 
                     async def operation() -> dict:
                         return await providers.chat(extraction=False)
+                case Probe.JUDGE_SEMANTIC if config.judge.configured:
+                    operation = providers.judge
                 case Probe.EMBEDDING_BATCH if config.embedding.configured:
                     operation = providers.embeddings
                 case Probe.PGVECTOR | Probe.MEMORY_SCHEMA | Probe.CONVERSATION_DB:

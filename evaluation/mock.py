@@ -22,6 +22,10 @@ def mock_response(request: httpx.Request) -> httpx.Response:
     if request.url.path.endswith("/chat/completions"):
         body = json.loads(request.content)
         content = "Truy vấn giả lập."
+        if body.get("response_format", {}).get("json_schema", {}).get("name") == (
+            "week5_judge_preflight"
+        ):
+            content = json.dumps({"verdict": "PASS", "reason_code": "synthetic_match"})
         if "native Mem0 V3" in body["messages"][0]["content"]:
             content = json.dumps(
                 {
