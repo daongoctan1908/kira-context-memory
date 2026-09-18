@@ -35,6 +35,7 @@ from evaluation.scoring import (
     SemanticJudgment,
     output_sha256,
 )
+from evaluation.timing import TimingReport
 
 
 class ArtifactRunIdentity(EvalModel):
@@ -181,6 +182,7 @@ class CaseAttemptArtifact(EvalModel):
     output: Any | None = None
     output_sha256: Sha256 | None = None
     reason_codes: tuple[Identifier, ...] = ()
+    timing: TimingReport | None = None
 
     @field_validator("completed_at")
     @classmethod
