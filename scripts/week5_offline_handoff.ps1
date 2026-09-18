@@ -5,21 +5,38 @@ param(
     [string]$Action,
     [ValidateCount(1, 2)]
     [string[]]$CandidateRevision = @("HEAD"),
+    [ValidateSet("prompt", "config", "runtime_code", "dependencies", "schema", "lifecycle")]
+    [string[]]$CandidateChangeScope = @("runtime_code"),
+    [string]$CandidateSummary = "Declared Week 5 benchmark candidate.",
     [ValidatePattern('^candidate-[ab]$')]
     [string]$VariantId = "candidate-a",
     [string]$BundleDirectory = "artifacts/week5/offline-handoff",
     [string]$EnvFile = ".env.week5.internal.local",
+    [string]$PcPreflightPath = "artifacts/week5/pc-preflight/freeze.json",
+    [string]$PcAcceptancePath = "artifacts/week5/pc-openai/pc-acceptance.json",
     [string]$Registry = ""
 )
 
 $ErrorActionPreference = "Stop"
 $RepositoryRoot = Split-Path -Parent $PSScriptRoot
+
+function Resolve-InputPath {
+    param([string]$Path)
+    if ([System.IO.Path]::IsPathRooted($Path)) {
+        return [System.IO.Path]::GetFullPath($Path)
+    }
+    return [System.IO.Path]::GetFullPath((Join-Path $RepositoryRoot $Path))
+}
+
 $ControlRevision = "75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00"
 $ContractId = "kira-week5-benchmark-v4"
-$BundleRoot = [System.IO.Path]::GetFullPath((Join-Path $RepositoryRoot $BundleDirectory))
+$BundleRoot = Resolve-InputPath $BundleDirectory
 $ManifestPath = Join-Path $BundleRoot "image-manifest.json"
 $ComposeFile = Join-Path $RepositoryRoot "compose.week5.benchmark.yaml"
-$ResolvedEnvFile = [System.IO.Path]::GetFullPath((Join-Path $RepositoryRoot $EnvFile))
+$ResolvedEnvFile = Resolve-InputPath $EnvFile
+$ResolvedPcPreflightPath = Resolve-InputPath $PcPreflightPath
+$ResolvedPcAcceptancePath = Resolve-InputPath $PcAcceptancePath
+$DatasetManifestPath = Join-Path $RepositoryRoot "dataset/kira_ltm_v1/manifest.json"
 
 function Invoke-Checked {
     param([string]$Program, [string[]]$Arguments)
@@ -115,6 +132,43 @@ function Read-Manifest {
     return Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
 }
 
+function Get-Sha256 {
+    param([string]$Path)
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+function Copy-NewFile {
+    param([string]$Source, [string]$Destination)
+    if (-not (Test-Path -LiteralPath $Source -PathType Leaf)) {
+        throw "Required handoff evidence is missing"
+    }
+    if (Test-Path -LiteralPath $Destination) {
+        throw "Handoff output already exists"
+    }
+    Copy-Item -LiteralPath $Source -Destination $Destination
+}
+
+function Assert-ManifestImagesUnchanged {
+    param($Manifest)
+    foreach ($image in $Manifest.images) {
+        $inspect = (& docker image inspect $image.reference | ConvertFrom-Json)[0]
+        if ($LASTEXITCODE -ne 0 -or $inspect.Id -ne $image.image_id) {
+            throw "Image changed or is unavailable after manifest creation"
+        }
+    }
+}
+
+function Assert-BundleFileHashes {
+    param($BundleManifest)
+    foreach ($file in $BundleManifest.files) {
+        $path = Join-Path $BundleRoot $file.name
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or
+            (Get-Sha256 $path) -ne $file.sha256) {
+            throw "Offline bundle file checksum mismatch"
+        }
+    }
+}
+
 function Invoke-Compose {
     param([string[]]$Arguments)
     if (-not (Test-Path -LiteralPath $ResolvedEnvFile -PathType Leaf)) {
@@ -134,6 +188,12 @@ switch ($Action) {
         $dirty = & git -C $RepositoryRoot status --porcelain=v1
         if ($dirty) {
             throw "Build requires a clean checkout so image provenance is exact"
+        }
+        if (Test-Path -LiteralPath $ManifestPath) {
+            throw "Build manifest already exists; use a new bundle directory for a new image set"
+        }
+        if (-not $CandidateSummary.Trim()) {
+            throw "Candidate summary must not be blank"
         }
         $controlSha = Resolve-GitRevision $ControlRevision
         $harnessSha = Resolve-GitRevision "HEAD"
@@ -175,6 +235,20 @@ switch ($Action) {
 
         $postgresRef = "pgvector/pgvector:0.8.6-pg16-bookworm"
         $controlMetadata = Get-EvalMetadata $controlEvalTag $controlSha $harnessSha
+        $provenanceRoot = Join-Path $BundleRoot "provenance"
+        New-Item -ItemType Directory -Force -Path $provenanceRoot | Out-Null
+        $controlProvenance = [ordered]@{
+            variant = "historical_control"
+            runtime = [ordered]@{ sha = $controlSha; dirty = $false }
+            harness = [ordered]@{ sha = $harnessSha; dirty = $false }
+            prompt_sha256 = $controlMetadata.prompt_sha256
+            package_versions = $controlMetadata.package_versions
+        }
+        [System.IO.File]::WriteAllText(
+            (Join-Path $provenanceRoot "control.json"),
+            ($controlProvenance | ConvertTo-Json -Depth 6),
+            [System.Text.UTF8Encoding]::new($false)
+        )
         $images = @(
             Get-ImageRecord "control-runtime" $controlTag $controlSha $controlSha $harnessSha "historical_control"
             Get-ImageRecord "control-eval" $controlEvalTag $harnessSha $controlSha $harnessSha "historical_control"
@@ -186,6 +260,7 @@ switch ($Action) {
                 runtime_revision = $controlSha
                 runtime_role = "control-runtime"
                 eval_role = "control-eval"
+                provenance_file = "provenance/control.json"
                 metadata = $controlMetadata
             }
         )
@@ -207,6 +282,24 @@ switch ($Action) {
                 "--build-arg", "BENCHMARK_ROLE=$($candidate.variant_id)-eval",
                 "-t", $candidateEvalTag, $RepositoryRoot)
             $candidateMetadata = Get-EvalMetadata $candidateEvalTag $candidate.revision $harnessSha
+            $candidateProvenance = [ordered]@{
+                variant = "release_candidate"
+                runtime = [ordered]@{ sha = $candidate.revision; dirty = $false }
+                harness = [ordered]@{ sha = $harnessSha; dirty = $false }
+                prompt_sha256 = $candidateMetadata.prompt_sha256
+                package_versions = $candidateMetadata.package_versions
+                candidate = [ordered]@{
+                    candidate_id = $candidate.variant_id
+                    control_runtime_sha = $controlSha
+                    change_scopes = @($CandidateChangeScope)
+                    summary = $CandidateSummary
+                }
+            }
+            [System.IO.File]::WriteAllText(
+                (Join-Path $provenanceRoot "$($candidate.variant_id).json"),
+                ($candidateProvenance | ConvertTo-Json -Depth 6),
+                [System.Text.UTF8Encoding]::new($false)
+            )
             $images += Get-ImageRecord "$($candidate.variant_id)-runtime" $candidateTag $candidate.revision $candidate.revision $harnessSha "release_candidate"
             $images += Get-ImageRecord "$($candidate.variant_id)-eval" $candidateEvalTag $harnessSha $candidate.revision $harnessSha "release_candidate"
             $variants += [ordered]@{
@@ -215,6 +308,7 @@ switch ($Action) {
                 runtime_revision = $candidate.revision
                 runtime_role = "$($candidate.variant_id)-runtime"
                 eval_role = "$($candidate.variant_id)-eval"
+                provenance_file = "provenance/$($candidate.variant_id).json"
                 metadata = $candidateMetadata
             }
         }
@@ -243,28 +337,102 @@ switch ($Action) {
     }
     "Export" {
         $manifest = Read-Manifest
-        $archive = Join-Path $BundleRoot "kira-week5-images.tar"
-        if (Test-Path -LiteralPath $archive) {
-            throw "Image archive already exists"
+        $currentHarnessSha = Resolve-GitRevision "HEAD"
+        $dirty = & git -C $RepositoryRoot status --porcelain=v1
+        if ($dirty -or $currentHarnessSha -ne $manifest.harness_revision) {
+            throw "Export checkout differs from the exact accepted harness revision"
         }
+        $archive = Join-Path $BundleRoot "kira-week5-images.tar"
+        $bundleManifestPath = Join-Path $BundleRoot "bundle-manifest.json"
+        $evidencePath = Join-Path $BundleRoot "handoff-evidence.json"
+        $copiedPreflight = Join-Path $BundleRoot "pc-preflight.json"
+        $copiedAcceptance = Join-Path $BundleRoot "pc-acceptance.json"
+        $copiedDatasetManifest = Join-Path $BundleRoot "dataset-manifest.json"
+        foreach ($outputPath in @(
+            $archive, "$archive.sha256", $bundleManifestPath, $evidencePath,
+            $copiedPreflight, $copiedAcceptance, $copiedDatasetManifest
+        )) {
+            if (Test-Path -LiteralPath $outputPath) {
+                throw "Handoff export is create-only"
+            }
+        }
+        Copy-NewFile $ResolvedPcPreflightPath $copiedPreflight
+        Copy-NewFile $ResolvedPcAcceptancePath $copiedAcceptance
+        Copy-NewFile $DatasetManifestPath $copiedDatasetManifest
+
+        $evalImage = ($manifest.images | Where-Object { $_.role -eq "control-eval" }).reference
+        Invoke-Checked docker @(
+            "run", "--rm", "--network", "none",
+            "--mount", "type=bind,src=$BundleRoot,dst=/handoff",
+            "--entrypoint", "python", $evalImage,
+            "-m", "scripts.freeze_handoff",
+            "--dataset-root", "/app/dataset/kira_ltm_v1",
+            "--image-manifest", "/handoff/image-manifest.json",
+            "--pc-preflight", "/handoff/pc-preflight.json",
+            "--pc-acceptance", "/handoff/pc-acceptance.json",
+            "--output", "/handoff/handoff-evidence.json"
+        )
+        $evidence = Get-Content -LiteralPath $evidencePath -Raw | ConvertFrom-Json
+        if ($evidence.dataset_manifest_sha256 -ne (Get-Sha256 $copiedDatasetManifest)) {
+            throw "Host dataset manifest differs from the accepted eval image"
+        }
+        Assert-ManifestImagesUnchanged $manifest
         $references = @($manifest.images | ForEach-Object { $_.reference })
         $saveArguments = @("save", "--output", $archive) + $references
         Invoke-Checked docker $saveArguments
-        $checksum = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+        $checksum = Get-Sha256 $archive
         Set-Content -LiteralPath "$archive.sha256" -Value "$checksum  kira-week5-images.tar" -Encoding ascii
-        Copy-Item -LiteralPath $ComposeFile -Destination $BundleRoot
-        Copy-Item -LiteralPath (Join-Path $RepositoryRoot "evaluation/week5.internal.env.example") -Destination $BundleRoot
+        $copiedFiles = @(
+            @{ source = $ComposeFile; name = "compose.week5.benchmark.yaml" },
+            @{ source = (Join-Path $RepositoryRoot "evaluation/week5.internal.env.example"); name = "week5.internal.env.example" },
+            @{ source = (Join-Path $RepositoryRoot "docs/week5-offline-handoff.md"); name = "RUNBOOK.md" },
+            @{ source = (Join-Path $RepositoryRoot "docs/company-pc-ai-handoff.md"); name = "COMPANY-PC-AI-HANDOFF.md" }
+        )
+        foreach ($file in $copiedFiles) {
+            Copy-NewFile $file.source (Join-Path $BundleRoot $file.name)
+        }
+        $bundleFileNames = @(
+            "kira-week5-images.tar", "kira-week5-images.tar.sha256", "image-manifest.json",
+            "handoff-evidence.json", "pc-preflight.json", "pc-acceptance.json",
+            "dataset-manifest.json", "compose.week5.benchmark.yaml", "week5.internal.env.example",
+            "RUNBOOK.md", "COMPANY-PC-AI-HANDOFF.md"
+        )
+        $bundleFileNames += @($manifest.variants | ForEach-Object { $_.provenance_file })
+        $bundleFiles = $bundleFileNames | ForEach-Object {
+            [ordered]@{ name = $_; sha256 = Get-Sha256 (Join-Path $BundleRoot $_) }
+        }
+        $bundleManifest = [ordered]@{
+            schema_version = 1
+            contract_id = $ContractId
+            created_at = [DateTime]::UtcNow.ToString("o")
+            official = $false
+            image_count = @($manifest.images).Count
+            variant_count = @($manifest.variants).Count
+            files = @($bundleFiles)
+        }
+        [System.IO.File]::WriteAllText(
+            $bundleManifestPath,
+            ($bundleManifest | ConvertTo-Json -Depth 5),
+            [System.Text.UTF8Encoding]::new($false)
+        )
         Write-Output "PASS offline image archive exported"
     }
     "Import" {
         $archive = Join-Path $BundleRoot "kira-week5-images.tar"
         $checksumFile = "$archive.sha256"
+        $bundleManifestPath = Join-Path $BundleRoot "bundle-manifest.json"
         if (-not (Test-Path -LiteralPath $archive -PathType Leaf) -or
-            -not (Test-Path -LiteralPath $checksumFile -PathType Leaf)) {
-            throw "Offline image archive or checksum is missing"
+            -not (Test-Path -LiteralPath $checksumFile -PathType Leaf) -or
+            -not (Test-Path -LiteralPath $bundleManifestPath -PathType Leaf)) {
+            throw "Offline bundle is incomplete"
         }
+        $bundleManifest = Get-Content -LiteralPath $bundleManifestPath -Raw | ConvertFrom-Json
+        if ($bundleManifest.contract_id -ne $ContractId -or $bundleManifest.official -ne $false) {
+            throw "Offline bundle identity is invalid"
+        }
+        Assert-BundleFileHashes $bundleManifest
         $expected = ((Get-Content -LiteralPath $checksumFile -Raw).Split()[0]).ToLowerInvariant()
-        $actual = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+        $actual = Get-Sha256 $archive
         if ($actual -ne $expected) {
             throw "Offline image archive checksum mismatch"
         }
@@ -280,14 +448,21 @@ switch ($Action) {
     }
     "MockAcceptance" {
         $manifest = Read-Manifest
-        $evalImage = ($manifest.images | Where-Object { $_.role -eq "control-eval" }).reference
         $output = Join-Path $BundleRoot "mock-acceptance"
         New-Item -ItemType Directory -Force -Path $output | Out-Null
-        Invoke-Checked docker @("run", "--rm", "--network", "none",
-            "--mount", "type=bind,src=$output,dst=/artifacts",
-            "--entrypoint", "python", $evalImage,
-            "-m", "scripts.week5_mock_acceptance", "--output", "/artifacts")
-        Write-Output "PASS offline mock acceptance completed"
+        foreach ($variant in $manifest.variants) {
+            $evalImage = ($manifest.images | Where-Object { $_.role -eq $variant.eval_role }).reference
+            $variantOutput = Join-Path $output $variant.variant_id
+            if (Test-Path -LiteralPath $variantOutput) {
+                throw "Mock acceptance output already exists for a declared variant"
+            }
+            New-Item -ItemType Directory -Force -Path $variantOutput | Out-Null
+            Invoke-Checked docker @("run", "--rm", "--network", "none",
+                "--mount", "type=bind,src=$variantOutput,dst=/artifacts",
+                "--entrypoint", "python", $evalImage,
+                "-m", "scripts.week5_mock_acceptance", "--output", "/artifacts")
+        }
+        Write-Output "PASS offline mock acceptance completed for every declared eval image"
     }
     "Validate" {
         Invoke-Compose @("config", "--quiet")

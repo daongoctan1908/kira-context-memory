@@ -9,7 +9,7 @@ promote a candidate and does not replace the later internal-model benchmark.
   provider;
 - T4.1 materialization checkpoint is complete (`80/80`) and remains outside Git;
 - exact T4.3 image manifest exists;
-- `.env.week5.internal.local` contains explicit extraction, rewrite, embedding and judge endpoints,
+- `.env.week5.pc.local` contains explicit extraction, rewrite, embedding and judge endpoints,
   model/deployment names and credentials; shared `OPENAI_*` values are never inherited;
 - one control/candidate stack is already running and healthy.
 
@@ -20,7 +20,7 @@ as evidence for the PC profile.
 
 ## Run the sanitized provider preflight
 
-Select the running variant in `.env.week5.internal.local`. For control use:
+Select the running variant in `.env.week5.pc.local`. For control use:
 
 ```ini
 WEEK5_BENCHMARK_GATEWAY_HOST=control-gateway
@@ -32,12 +32,12 @@ WEEK5_BENCHMARK_DATABASE=kira_control
 For the candidate use the four `candidate-*` defaults from the template. Then run:
 
 ```powershell
-docker compose --env-file .env.week5.internal.local -f compose.week5.benchmark.yaml `
+docker compose --env-file .env.week5.pc.local -f compose.week5.benchmark.yaml `
   --profile tools run --rm eval-controller preflight `
   --profile pc_openai_acceptance `
   --suite formation --suite retrieval --suite rewrite --suite cross_session `
   --formation-mode persistent `
-  --provenance-file /materialization/<exact-variant-provenance>.json `
+  --provenance-file /materialization/offline-handoff/provenance/<variant>.json `
   --output /artifacts/pc-preflight/provider-preflight.json
 ```
 
@@ -48,7 +48,7 @@ are absent from the artifact.
 ## Bind provider evidence to real KiRa and the reviewed dataset
 
 ```powershell
-docker compose --env-file .env.week5.internal.local -f compose.week5.benchmark.yaml `
+docker compose --env-file .env.week5.pc.local -f compose.week5.benchmark.yaml `
   --profile tools run --rm --entrypoint python eval-controller `
   -m scripts.freeze_pc_preflight `
   --provider-preflight /artifacts/pc-preflight/provider-preflight.json `

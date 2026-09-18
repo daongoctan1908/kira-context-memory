@@ -102,6 +102,18 @@ def test_handoff_script_pins_control_and_verifies_offline_bundle():
     assert "Where-Object { $_.variant_id -eq $VariantId }" in script
     assert '"--build-context", "variant_source=$controlPath"' in script
     assert "Get-EvalMetadata" in script
+    assert "foreach ($variant in $manifest.variants)" in script
+    assert '"-m", "scripts.freeze_handoff"' in script
+    assert "Assert-ManifestImagesUnchanged" in script
+    assert "Assert-BundleFileHashes" in script
+    assert "PcAcceptancePath" in script
+    assert "dataset_manifest_sha256" in script
+    assert "bundle-manifest.json" in script
+    assert "CandidateChangeScope" in script
+    assert 'provenance_file = "provenance/control.json"' in script
+    assert 'variant = "historical_control"' in script
+    assert 'variant = "release_candidate"' in script
+    assert "Export checkout differs from the exact accepted harness revision" in script
 
 
 def test_image_metadata_binds_dataset_prompts_packages_and_exact_revisions(monkeypatch):
@@ -131,5 +143,22 @@ def test_internal_env_template_contains_placeholders_not_populated_credentials()
     assert "WEEK5_CONTROL_IMAGE=" in template
     assert "WEEK5_CANDIDATE_IMAGE=" in template
     assert "WEEK5_EVAL_IMAGE=" in template
+    assert "OPENAI_API_KEY=" not in template
+    assert "sk-" not in template
+
+
+def test_pc_env_template_requires_explicit_provider_and_kira_configuration():
+    template = (REPOSITORY_ROOT / "evaluation/week5.pc.env.example").read_text(encoding="utf-8")
+
+    for name in (
+        "WEEK5_EXTRACTION_BASE_URL",
+        "WEEK5_REWRITE_BASE_URL",
+        "WEEK5_EMBEDDING_BASE_URL",
+        "WEEK5_JUDGE_BASE_URL",
+        "KIRA_BASE_URL",
+        "KIRA_BASIC_AUTH",
+    ):
+        assert f"{name}=" in template
+    assert "WEEK5_OPENAI_BASE_URL=" not in template
     assert "OPENAI_API_KEY=" not in template
     assert "sk-" not in template
