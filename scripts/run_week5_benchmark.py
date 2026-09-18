@@ -1,4 +1,4 @@
-"""Week 5 CLI: T5.2 implements only preflight; evaluation commands follow in T5.5."""
+"""Week 5 CLI: contract-v3 preflight; evaluation commands follow in later tasks."""
 
 import argparse
 import asyncio
@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 from evaluation.config import load_config
-from evaluation.models import Outcome, Profile, Suite
+from evaluation.models import Outcome, Profile, RunProvenance, Suite
 from evaluation.preflight import run_preflight
 
 
@@ -22,6 +22,11 @@ def main(argv: list[str] | None = None) -> int:
         "--formation-mode", choices=("write_free", "persistent"), default="write_free"
     )
     preflight.add_argument("--env-file", type=Path)
+    preflight.add_argument(
+        "--provenance-file",
+        type=Path,
+        help="Strict contract-v3 runtime/harness provenance JSON; defaults to this checkout",
+    )
     preflight.add_argument(
         "--env-file-only",
         action="store_true",
@@ -38,6 +43,11 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("output exists")
         if args.env_file_only and args.env_file is None:
             raise ValueError("file-only mode needs an explicit file")
+        provenance = (
+            RunProvenance.model_validate_json(args.provenance_file.read_text(encoding="utf-8"))
+            if args.provenance_file
+            else None
+        )
         config = load_config(
             profile=Profile(args.profile),
             suites=tuple(Suite(s) for s in args.suite),
@@ -52,7 +62,7 @@ def main(argv: list[str] | None = None) -> int:
         # Psycopg async requires a selector loop on Windows; scope it to this CLI run.
         loop_factory = asyncio.SelectorEventLoop if sys.platform == "win32" else None
         with asyncio.Runner(loop_factory=loop_factory) as runner:
-            report = runner.run(run_preflight(config))
+            report = runner.run(run_preflight(config, provenance=provenance))
         source = (
             "file_only"
             if args.env_file_only

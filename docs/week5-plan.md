@@ -12,7 +12,8 @@ loader và validator deterministic. Corpus chưa materialize KiRa, chưa có rev
 - Application `0.4.1`; `viettel-mem0==2.0.20+viettel.3`; memory schema version `2`.
 - Extraction policy `kira-memory-policy-v2`; rewrite prompt `2`.
 - [Control manifest](week5-baseline.json) khóa provenance và các default liên quan.
-- [Benchmark contract v2](week5-benchmark-contract.md) quy định profile, scoring và promotion.
+- [Benchmark contract v3](week5-benchmark-contract.md) quy định profile, scoring, runtime
+  provenance và late performance guardrail.
 - [Week 4 release evidence](week4-t4.23-release-evidence.md) là evidence kế thừa, không phải
   kết quả kiểm thử mới của Week 5.
 
@@ -59,7 +60,7 @@ lưu memory. User/mentor review gold labels trước khi chấm semantic pass ch
 | T5.2 | Eval types + provider preflight: typed case/config/result; probe chat/JSON extraction, embedding batch/dimension và DB theo dependency từng suite; lỗi typed, output không lộ secret | T5.1 | DONE |
 | T5.3 | Synthetic dataset v1: đủ bốn suite, positive/negative và domain slices; gold IDs, evidence, constraints và allowed attribution; trạng thái draft/reviewed rõ | T5.2 | IN_PROGRESS — 4 storyline/209 QA đã đóng gói; còn materialization, reviewer revision và chuyển sang 4 suite |
 | T5.4 | Validator + scope: validate schema, unique IDs, gold references, normalized exact duplicates, full-corpus scope, seed reproducibility và checksums; semantic near-duplicate do reviewer kiểm tra | T5.3 | IN_PROGRESS — manifest/checksum, full-corpus scope và validator deterministic đã có; còn semantic near-duplicate review |
-| T5.5 | Scorer/human review/report: deterministic checks + review semantic thủ công; CLI dự kiến `validate`, `preflight`, `run`, `review`, `compare`; kết quả có denominator, coverage và error breakdown | T5.4 | NOT_STARTED |
+| T5.5 | Scorer/human review/report: deterministic checks + review semantic thủ công; CLI dự kiến `validate`, `preflight`, `run`, `review`, `compare`; kết quả có denominator, coverage, error breakdown, runtime/harness SHA, prompt/config hashes và package versions | T5.4 | NOT_STARTED |
 
 Checkpoint A: harness chạy offline được với mocks; corpus có checksum và review status;
 chỉ corpus đã review mới tạo semantic verdict. T5.1 **không** bao gồm code harness, provider
@@ -73,7 +74,7 @@ probe, dataset hay một lần gọi model có phí.
 | T5.7 | Persistent evaluator đi qua application/Mem0/pgvector boundary thật; đối chiếu raw facts với memories/receipt thực sự commit | T5.6 |
 | T5.8 | Multi-turn và dedup/retry cases: paraphrase, top-k miss, before/after commit; fresh event cho quality, cùng event cho replay; đo duplicate giữa các event độc lập | T5.7 |
 | T5.9 | Formation report: precision/recall/F1, unsupported facts, formula/attribution, negatives và duplicate rate; phân tích theo taxonomy/case family | T5.8 |
-| T5.10 | Chạy control trước; tối đa hai prompt/config candidate trên cùng full corpus; version/hash từng candidate; chọn theo metric/guardrail đã khóa, không cherry-pick case | T5.9 |
+| T5.10 | Chạy historical control trước; tối đa hai declared candidates trên cùng full corpus; ghi prompt/config hashes và mọi thay đổi runtime/dependency/schema/lifecycle; chọn theo metric/guardrail đã khóa, không cherry-pick case | T5.9 |
 
 Checkpoint B: có baseline formation report và candidate có evidence trên full corpus; chấp nhận kết
 luận “giữ baseline”. Không tự động làm correction/forget hoặc sửa cross-event dedup.
@@ -93,15 +94,15 @@ retrieval query đang chấm không tự tạo thêm memories làm nhiễm corpu
 địa danh Việt Nam, paraphrase, no-hit, focus còn/hết hạn, conflict và user isolation. Expired focus
 hoặc explicit correction có lỗi phải hiện trong report, không được tuyên bố đã có automatic TTL/update.
 
-## Batch D — Performance, repeated confirmation, promotion và handoff
+## Batch D — Repeated semantic confirmation, late performance và handoff
 
 | Task | Nội dung / Definition of Done | Phụ thuộc |
 | --- | --- | --- |
-| T5.16 | Performance theo stage: formation, retrieval, rewrite, SSE timing và memory readiness; workload/concurrency/warm-up/timeout/retry giống nhau; p50/p95 kèm sample count | T5.10, T5.15 |
-| T5.17 | Freeze candidate; ba paired run độc lập control/candidate trên toàn bộ corpus cùng profile; kiểm tra primary metric, case-family gain, safety và latency gate | T5.16 |
-| T5.18 | Promote prompt/config đã đạt contract; nếu không đủ evidence giữ baseline và ghi lý do; không đổi luật/case sau khi xem kết quả | T5.17 |
-| T5.19 | Week 1–4 regression, coverage ≥90%, scorer/validator tests, PostgreSQL/memory compatibility và T4.19–T4.22 smoke; build eval image offline riêng | T5.18 |
-| T5.20 | Acceptance bundle: manifest, corpus/review checksum, reports, limitations và quyết định; runbook save/load/internal registry cho Week 6 | T5.19 |
+| T5.16 | Timing instrumentation theo stage: formation, retrieval, rewrite, KiRa TTFT/completion, queue wait và memory readiness; tách SDK/Worker retries; mock kiểm tra counts và percentile | T5.10, T5.15 |
+| T5.17 | Freeze candidate; ba paired semantic run độc lập control/candidate trên toàn bộ corpus cùng profile; kiểm tra primary metric, case-family gain và safety; chưa dùng performance để cứu candidate semantic fail | T5.16 |
+| T5.18 | Late performance chỉ cho candidate đã vượt T5.17: 5 warm-up, mục tiêu 30 success, cap 40 attempts/variant; verdict `acceptable`, `reject_regression` hoặc `needs_more_samples` | T5.17 |
+| T5.19 | Promote candidate đủ evidence hoặc giữ control; chạy Week 1–4 regression, coverage ≥90%, scorer/validator tests, PostgreSQL/memory compatibility và T4.19–T4.22 smoke; build eval image offline riêng | T5.18 hoặc quyết định giữ control ở T5.17 |
+| T5.20 | Acceptance bundle: manifests có runtime/harness provenance, corpus/review checksum, reports, limitations và quyết định; runbook save/load/internal registry cho Week 6 | T5.19 |
 
 Checkpoint D: kết luận riêng local benchmark và internal acceptance. Eval image được build trên
 máy có Internet, kèm dependencies/corpus synthetic đã duyệt; runtime không tải model/pip, không
@@ -117,7 +118,7 @@ không dùng việc có dependency graph để trộn thay đổi của các tas
   custom Mem0, Docker/Compose, dependency versions và lock.
 - T5.2 đã thêm `evaluation/`, `scripts/run_week5_benchmark.py preflight` và tests riêng.
   Các lệnh validator/scorer cùng eval-image definition sẽ có ở task sau; chưa chạy benchmark.
-- Prompt/config runtime chỉ được thay có chủ đích tại T5.18 sau evidence. Candidate experiments
+- Prompt/config runtime chỉ được thay có chủ đích tại T5.19 sau evidence. Candidate experiments
   nằm trong evaluation trước đó; algorithm/lifecycle/schema change cần kế hoạch review riêng.
 - Mỗi write suite dùng disposable DB tách khỏi DB có live Worker, schema/collection/user theo run;
   cleanup chính xác theo manifest, không thao tác broad delete trên dữ liệu ứng dụng.

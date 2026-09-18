@@ -8,7 +8,7 @@ import pytest
 
 from evaluation.config import EvalConfig
 from evaluation.errors import PreflightError
-from evaluation.models import Probe, Reason
+from evaluation.models import HISTORICAL_CONTROL_SHA, Probe, Reason
 from evaluation.postgres import probe_database
 from scripts.run_week5_benchmark import main
 
@@ -111,10 +111,56 @@ def test_cli_mock_creates_safe_artifact_and_wont_overwrite(tmp_path, capsys):
     assert main(args) == 0
     report = json.loads(capsys.readouterr().out)
     assert report["simulated"] is True
+    assert report["contract_id"] == "kira-week5-benchmark-v3"
+    assert report["provenance"]["runtime"]["sha"]
+    assert report["provenance"]["harness"]["sha"]
+    assert report["provenance"]["prompt_sha256"]
+    assert report["provenance"]["package_versions"]["viettel-mem0"] == "2.0.20+viettel.4"
+    assert report["provenance"]["attribution_scope"] == "working_tree"
     assert json.loads(output.read_text(encoding="utf-8")) == report
     assert main(args) == 2
     assert json.loads(output.read_text(encoding="utf-8")) == report
     assert "configuration_error" in capsys.readouterr().out
+
+
+def test_cli_accepts_strict_historical_runtime_provenance(tmp_path, capsys):
+    provenance = tmp_path / "control-provenance.json"
+    provenance.write_text(
+        json.dumps(
+            {
+                "variant": "historical_control",
+                "runtime": {"sha": HISTORICAL_CONTROL_SHA, "dirty": False},
+                "harness": {"sha": "1" * 40, "dirty": False},
+                "prompt_sha256": {
+                    "memory_extraction": "a" * 64,
+                    "rewrite_system": "b" * 64,
+                },
+                "package_versions": {
+                    "kira-context-memory": "0.4.1",
+                    "viettel-mem0": "2.0.20+viettel.3",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert (
+        main(
+            [
+                "preflight",
+                "--profile",
+                "mock",
+                "--suite",
+                "formation",
+                "--provenance-file",
+                str(provenance),
+            ]
+        )
+        == 0
+    )
+    report = json.loads(capsys.readouterr().out)
+    assert report["provenance"]["runtime"]["sha"] == HISTORICAL_CONTROL_SHA
+    assert report["provenance"]["harness"]["sha"] == "1" * 40
+    assert report["provenance"]["attribution_scope"] == "historical_control"
 
 
 def test_cli_missing_config_and_bad_secret_are_safe(tmp_path, monkeypatch, capsys):

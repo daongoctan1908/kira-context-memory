@@ -1,13 +1,51 @@
 """Protect the eval data boundary and prevent secrets/ambient runtime config leaks."""
 
 import json
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
 from pydantic import SecretStr, ValidationError
 
 from evaluation.config import EvalConfig, ProviderConfig, load_config
-from evaluation.models import CaseResult, EvalCase, GoldReview, Outcome, Profile, Suite
+from evaluation.models import (
+    BENCHMARK_CONTRACT_ID,
+    HISTORICAL_CONTROL_SHA,
+    BenchmarkVariant,
+    CandidateChangeScope,
+    CandidateDeclaration,
+    CaseResult,
+    EvalCase,
+    GitSource,
+    GoldReview,
+    Outcome,
+    PerformanceReviewVerdict,
+    Profile,
+    RunProvenance,
+    Suite,
+)
+
+_HASH = "a" * 64
+
+
+def provenance(
+    variant: BenchmarkVariant,
+    *,
+    runtime_sha: str = HISTORICAL_CONTROL_SHA,
+    candidate: CandidateDeclaration | None = None,
+) -> RunProvenance:
+    source = GitSource(sha=runtime_sha, dirty=False)
+    return RunProvenance(
+        variant=variant,
+        runtime=source,
+        harness=source,
+        prompt_sha256={"memory_extraction": _HASH, "rewrite_system": "b" * 64},
+        package_versions={
+            "kira-context-memory": "0.4.1",
+            "viettel-mem0": "2.0.20+viettel.3",
+        },
+        candidate=candidate,
+    )
 
 
 @pytest.mark.parametrize("kind", list(Suite))
@@ -50,6 +88,79 @@ def test_review_and_result_are_not_implicitly_passed():
     assert CaseResult(case_id="c1", run_id=uuid4()).outcome == Outcome.NOT_RUN
     with pytest.raises(ValidationError):
         CaseResult(case_id="c1", run_id=uuid4(), outcome="good")
+
+
+def test_contract_v3_distinguishes_historical_control_and_candidate_scope():
+    control = provenance(BenchmarkVariant.HISTORICAL_CONTROL)
+    assert BENCHMARK_CONTRACT_ID == "kira-week5-benchmark-v3"
+    assert control.attribution_scope == "historical_control"
+    assert Outcome.INSUFFICIENT_EVIDENCE == "INSUFFICIENT_EVIDENCE"
+    assert set(PerformanceReviewVerdict) == {
+        PerformanceReviewVerdict.ACCEPTABLE,
+        PerformanceReviewVerdict.REJECT_REGRESSION,
+        PerformanceReviewVerdict.NEEDS_MORE_SAMPLES,
+    }
+
+    prompt_candidate = CandidateDeclaration(
+        candidate_id="prompt-v1",
+        change_scopes=(CandidateChangeScope.PROMPT,),
+        summary="Change only the rendered extraction prompt.",
+    )
+    prompt_only = provenance(
+        BenchmarkVariant.RELEASE_CANDIDATE,
+        runtime_sha="1" * 40,
+        candidate=prompt_candidate,
+    )
+    assert prompt_only.attribution_scope == "prompt_or_config_candidate"
+
+    mixed_candidate = prompt_candidate.model_copy(
+        update={
+            "candidate_id": "runtime-v1",
+            "change_scopes": (
+                CandidateChangeScope.PROMPT,
+                CandidateChangeScope.RUNTIME_CODE,
+            ),
+        }
+    )
+    mixed = provenance(
+        BenchmarkVariant.RELEASE_CANDIDATE,
+        runtime_sha="2" * 40,
+        candidate=mixed_candidate,
+    )
+    assert mixed.attribution_scope == "mixed_runtime_candidate"
+    assert mixed.model_dump(mode="json")["attribution_scope"] == "mixed_runtime_candidate"
+
+
+def test_candidate_and_historical_control_declarations_fail_closed():
+    with pytest.raises(ValidationError):
+        provenance(BenchmarkVariant.HISTORICAL_CONTROL, runtime_sha="1" * 40)
+    with pytest.raises(ValidationError):
+        provenance(BenchmarkVariant.RELEASE_CANDIDATE, runtime_sha="1" * 40)
+    with pytest.raises(ValidationError):
+        CandidateDeclaration(
+            candidate_id="duplicate-scopes",
+            change_scopes=(CandidateChangeScope.PROMPT, CandidateChangeScope.PROMPT),
+            summary="Invalid duplicate declaration.",
+        )
+    historical = provenance(BenchmarkVariant.HISTORICAL_CONTROL).model_dump(
+        exclude={"attribution_scope"}
+    )
+    historical["package_versions"]["viettel-mem0"] = "2.0.20+viettel.4"
+    with pytest.raises(ValidationError):
+        RunProvenance.model_validate(historical)
+    historical["package_versions"]["viettel-mem0"] = "2.0.20+viettel.3"
+    del historical["prompt_sha256"]["rewrite_system"]
+    with pytest.raises(ValidationError):
+        RunProvenance.model_validate(historical)
+
+
+def test_contract_v3_does_not_rewrite_the_historical_control_runtime():
+    root = Path(__file__).resolve().parents[3]
+    manifest = json.loads((root / "docs/week5-baseline.json").read_text(encoding="utf-8"))
+    assert manifest["contract_id"] == BENCHMARK_CONTRACT_ID
+    assert manifest["variant"] == BenchmarkVariant.HISTORICAL_CONTROL
+    assert manifest["source"]["commit"] == HISTORICAL_CONTROL_SHA
+    assert manifest["versions"]["viettel_mem0"] == "2.0.20+viettel.3"
 
 
 def test_cross_session_must_be_distinct_and_case_cannot_claim_real_provenance():

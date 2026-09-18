@@ -1,8 +1,11 @@
-# Week 5 — Benchmark contract v2
+# Week 5 — Benchmark contract v3
 
-Status: **revised for full-corpus evaluation**, 2026-09-16. Contract ID:
-`kira-week5-benchmark-v2`. V2 bỏ dev/holdout split: corpus hiện tại là một acceptance dataset
-chạy toàn bộ, không phải bằng chứng generalization trên unseen holdout. Control source không đổi.
+Status: **full-corpus acceptance contract**, 2026-09-18. Contract ID:
+`kira-week5-benchmark-v3`. V3 giữ quyết định bỏ dev/holdout split của v2, chuyển performance
+sang guardrail chạy sau semantic confirmation, giới hạn workload đo bằng attempt cap, và bắt buộc
+phân biệt historical control với release candidate bằng runtime provenance. Corpus hiện tại là một
+acceptance dataset chạy toàn bộ, không phải bằng chứng generalization trên unseen holdout.
+Control source không đổi.
 Đây là đặc tả cho implementation tiếp theo, chưa phải harness hoặc benchmark result.
 
 Liên quan: [Week 5 plan](week5-plan.md), [control manifest](week5-baseline.json),
@@ -11,9 +14,11 @@ Liên quan: [Week 5 plan](week5-plan.md), [control manifest](week5-baseline.json
 ## 1. Control và phạm vi so sánh
 
 Control bất biến là source tại `75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00`, không phải HEAD
-của nhánh Week 5 và không phải một image tag mutable. Manifest ghi cả Git tree và blob IDs.
-Các run sau phải ghi source SHA riêng của control, candidate và harness; image dùng digest/image
-ID thực tế. `kira-context:0.4.1` chỉ là source release reference, không chứng minh cùng binary.
+của nhánh Week 5 và không phải một image tag mutable. Đây là **historical control**; việc package
+hiện tại đã lên `.4` không được dùng để sửa manifest thành như thể control cũ từng chạy `.4`.
+Manifest ghi cả Git tree và blob IDs. Các run sau phải ghi riêng runtime SHA và harness SHA;
+image dùng digest/image ID thực tế. `kira-context:0.4.1` chỉ là source release reference, không
+chứng minh cùng binary.
 
 Baseline giữ nguyên app `0.4.1`, package `2.0.20+viettel.3`, memory schema `2`, native Mem0 V3,
 policy `kira-memory-policy-v2` và rewrite prompt `2`. Trường cấu hình Mem0 `version="v1.1"`
@@ -25,7 +30,11 @@ bật rõ trong eval wiring cho cả control/candidate. Ghi resolved config, kh�
 với bản bật feature rồi gọi đó là hiệu quả tuning. Không dùng test Compose overrides như default
 production. Baseline không pin một external provider/model chưa được chọn.
 
-Candidate được phép thay extraction/rewrite prompt hoặc search/config knobs đã có. Giữ nguyên
+Candidate được phép thay extraction/rewrite prompt hoặc search/config knobs đã có. Mỗi candidate
+phải khai báo change scope thuộc `prompt`, `config`, `runtime_code`, `dependencies`, `schema` hoặc
+`lifecycle`, kèm mô tả. Candidate có bất kỳ scope nào ngoài prompt/config là một
+`mixed_runtime_candidate`; report không được quy toàn bộ delta chất lượng cho prompt.
+Giữ nguyên
 provider/model revision, embedding/dimension, corpus, state initialization, event protocol và
 harness trong một paired comparison. Đổi embedding là experiment riêng: re-embed toàn bộ corpus,
 đo lại threshold; không trộn vectors từ hai model hoặc so threshold như thể cùng thang điểm.
@@ -125,6 +134,7 @@ Không dùng cleanup rộng lên DB ứng dụng, không dùng memory để auth
 | `PASS` | Đủ assertions và review bắt buộc, không vi phạm constraints |
 | `FAIL` | Có kết quả hợp lệ để chấm nhưng sai gold/constraint/safety |
 | `REVIEW_REQUIRED` | Semantic verdict hoặc gold chưa được người review chốt |
+| `INSUFFICIENT_EVIDENCE` | Đã chạy nhưng không đủ sample/coverage đã khóa để kết luận |
 | `DEPENDENCY_ERROR` | Provider/DB/transport không thực thi được case |
 | `PROTOCOL_ERROR` | Payload/parse/result contract sai, kể cả lỗi bị native parser che |
 | `NOT_RUN` | Chưa thực thi hoặc thiếu cấu hình đã biết trước |
@@ -177,9 +187,9 @@ Cross-session pass cần formation evidence + đúng-user recall + đúng contex
 phạm safety; bounded wait hết hạn không được đổi thành semantic miss thông thường. Report KiRa
 task-success riêng khi có KiRa thật và gold nghiệp vụ được duyệt.
 
-## 6. Candidate selection và performance gate
+## 6. Candidate selection và late performance guardrail
 
-T5.10 chạy control trước, thử tối đa hai prompt/config candidate trên cùng full corpus. T5.13 grid
+T5.10 chạy control trước, thử tối đa hai declared candidate trên cùng full corpus. T5.13 grid
 là diagnostic trên corpus đó; tổ hợp cuối được chọn bằng metric/guardrail đã khóa trước, sau đó
 freeze thành một candidate cho ba paired repetitions. Không mở thêm candidate bằng cách cherry-pick
 case, đổi gold hoặc đổi luật sau khi xem kết quả.
@@ -193,10 +203,11 @@ case, đổi gold hoặc đổi luật sau khi xem kết quả.
 Chọn candidate trên paired, reviewed case set cùng profile; không promote từ mock. Candidate cuối
 phải cải thiện primary metric và ít nhất một scenario family; component không đổi vẫn phải không
 regress. Không dùng weighted aggregate để che cross-user leak hoặc formula failure. Tie giữ control;
-không đủ evidence cũng giữ control. Nếu hai candidate cùng tốt, ưu tiên ít thay đổi hơn;
-nếu vẫn hòa thì áp dụng tiêu chí latency đã ghi trước rồi freeze lựa chọn.
+không đủ evidence cũng giữ control. Nếu hai candidate cùng tốt, ưu tiên ít thay đổi hơn; nếu vẫn
+hòa thì giữ control. Performance chạy sau semantic confirmation và không được dùng để cứu một
+candidate không có semantic gain.
 
-T5.17 chạy ba independent repetitions cho control và candidate với fresh state, case order seed
+Semantic confirmation chạy ba independent repetitions cho control và candidate với fresh state, case order seed
 cố định theo từng paired repetition; không cherry-pick lần tốt nhất. Báo từng run + tổng hợp,
 per-family deltas và failure counts. Promotion yêu cầu cả ba run đáp ứng guardrails, primary gain
 ở kết quả tổng hợp, và cùng một family có gain lặp lại ít nhất hai run. Cả hai phía phải được
@@ -208,33 +219,54 @@ authorization hoặc instruction-following từ injected context; formula/preced
 100%; event replay/rollback correctness pass. Đây là yêu cầu trong tested corpus, **không phải**
 cam kết zero-risk production. Baseline cũng có thể fail; không hạ gate để promote candidate.
 
-Performance đo stage wall-clock bằng monotonic clock: extraction/formation, retrieval, rewrite,
-Gateway time-to-first-text/stream completion, queue wait và formation readiness riêng. Provider
-SDK retry và worker retry khác nhau, phải ghi cả hai; không mặc định timeout cấu hình của probe
-là timeout của SDK runtime. Nêu rõ throughput, concurrency, rate-limit/errors và hardware/network.
+Timing instrumentation được xây và kiểm thử trước, nhưng workload performance thật **chỉ chạy sau**
+khi candidate đã vượt semantic confirmation. Chỉ đo các stage bị candidate tác động. Stage
+wall-clock dùng monotonic clock: extraction/formation, retrieval, rewrite, Gateway
+time-to-first-text/stream completion, queue wait và formation readiness riêng. Provider SDK retry
+và Worker retry khác nhau, phải ghi cả hai; không mặc định timeout probe là timeout SDK runtime.
 
-Trước T5.16 phải freeze workload và warm-up. Quy ước lấy mẫu của contract v2 để dùng latency gate: 100
-successful measured operations/stage/variant/repetition sau warm-up, tổng ba repetitions; timeout
-và lỗi vẫn được đếm/report riêng. p95 theo nearest-rank `ceil(0.95*n)`, p50 tương tự. Workload,
-concurrency và provider settings giữ giống nhau. Candidate p95 mỗi stage bị ảnh hưởng ≤1.10×
-control trong mỗi paired repetition, đồng thời error/timeout rate không tăng. Nếu không đủ số mẫu
-hoặc chi phí không cho phép thì chỉ report exploratory latency, chưa đạt promotion gate; không
-phát sinh gọi có phí ở T5.1. Đây là comparative gate của experiment, không phải production SLO.
+Performance workload v3:
+
+- freeze workload sequence, concurrency, hardware/network, provider, timeout và retry policy;
+- chạy 5 warm-up operations mỗi variant; lỗi warm-up vẫn được báo;
+- mục tiêu 30 successful measured operations mỗi variant;
+- tối đa 40 measured attempts mỗi variant, rồi dừng thay vì gọi vô hạn để đủ success;
+- percentile lấy từ 30 success đầu tiên; p95 dùng nearest-rank `ceil(0.95*n)`, p50 tương tự;
+- report toàn bộ measured attempts, `successful/attempted`, error, timeout và SDK retry;
+- thiếu 30 success trong attempt cap là `INSUFFICIENT_EVIDENCE`, không phải semantic fail;
+- không khóa ngưỡng `1.10x` khi chưa có baseline vận hành đủ tin cậy;
+- reviewer ghi đúng một verdict: `acceptable`, `reject_regression` hoặc `needs_more_samples`;
+  promotion cần `acceptable`.
+
+Nếu error/timeout regression được xác nhận do candidate thì verdict là `reject_regression`.
+Môi trường nhiễu hoặc thiếu mẫu dùng `needs_more_samples` và chạy lại cặp control/candidate;
+không kết luận từ subset thuận lợi. Đây là comparative guardrail, không phải production SLO.
 
 ## 7. Artifacts và reproducibility
 
 Mỗi run manifest tương lai phải chứa:
 
-- Run ID, contract version, UTC timestamps, profile, control/candidate/harness SHA và dirty flag
-  (official run yêu cầu clean source), image digest/ID nếu dùng container.
+- Run ID, contract version, UTC timestamps và profile.
+- Runtime Git SHA/dirty flag và harness Git SHA/dirty flag là hai trường độc lập; official run
+  yêu cầu cả hai source sạch. Ghi image digest/ID nếu dùng container.
+- Variant `historical_control`, `release_candidate` hoặc `working_tree`. Historical control phải
+  dùng đúng SHA `75deb1d...`; release candidate phải có candidate ID, control SHA, declared change
+  scopes và mô tả.
 - Corpus version/hash, evaluation-scope/family hash, gold review revision/hash, prompt rendered-content hashes,
   resolved non-secret config hash; model/provider/deployment identity và embedding dimension.
+- Package versions thực thi, tối thiểu application và `viettel-mem0`; không suy package version
+  hiện tại từ version lịch sử hoặc ngược lại.
 - Seed, selected cases/suites, enabled capabilities, top-k/threshold, inference parameters,
   timeout/retry settings thực tế của runtime và probes riêng, concurrency/warm-up/sample counts.
 - DB/memory schema/package versions, isolated resource ownership cho cleanup; không credential,
   không connection URI có password hoặc request auth header.
 - Dependency/preflight outcomes, per-case result/review references, coverage/errors, stage metrics,
   price/cost data chỉ nếu provider báo (thiếu là unavailable, không giả thành zero).
+
+CLI preflight mặc định ghi variant `working_tree` từ checkout đang chạy. Khi harness probe một
+runtime historical/candidate được build riêng, phải truyền `--provenance-file`; schema từ chối
+historical control sai SHA/package version, release candidate thiếu declaration, field thừa hoặc
+hash sai định dạng.
 
 Full request/output artifacts chỉ được lưu cho synthetic corpus; chia sẻ report theo IDs/counts
 và redacted diagnostics. Embedding vectors, raw auth header/token và secret env không nằm trong
@@ -245,7 +277,11 @@ eval image/runbook. Không download dependencies/model lúc chạy ở K8s Test.
 vẫn ghi local completion và internal `NOT_RUN` riêng; không công bố internal quality bằng kết quả
 external model.
 
-## 8. T5.1 acceptance và thay đổi contract
+## 8. Baseline acceptance và thay đổi contract
+
+V3 chỉ thay contract/harness metadata; không sửa historical control source, prompt, package hoặc
+schema. `docs/week5-baseline.json` tiếp tục khóa app `0.4.1`, Mem0 `.3`, policy v2 và SHA
+`75deb1d...`, đồng thời trỏ sang contract v3 để các run mới tuân provenance/performance rules mới.
 
 T5.1 đạt khi plan có đủ T5.1–T5.20/dependencies/checkpoints, manifest parse được và khớp Git
 commit/tree/blob IDs cùng versions/defaults được trích dẫn, README trỏ đúng ba artifacts, và diff

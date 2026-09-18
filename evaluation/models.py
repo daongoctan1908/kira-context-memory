@@ -11,8 +11,13 @@ from pydantic import (
     ConfigDict,
     Field,
     StringConstraints,
+    computed_field,
+    field_validator,
     model_validator,
 )
+
+BENCHMARK_CONTRACT_ID = "kira-week5-benchmark-v3"
+HISTORICAL_CONTROL_SHA = "75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00"
 
 
 def nonblank(value: str) -> str:
@@ -23,6 +28,8 @@ def nonblank(value: str) -> str:
 
 NonEmpty = Annotated[str, StringConstraints(min_length=1), AfterValidator(nonblank)]
 Identifier = Annotated[str, StringConstraints(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}$")]
+Sha256 = Annotated[str, StringConstraints(pattern=r"^[a-f0-9]{64}$")]
+GitSha = Annotated[str, StringConstraints(pattern=r"^[a-f0-9]{40,64}$")]
 
 
 class EvalModel(BaseModel):
@@ -46,9 +53,112 @@ class Outcome(StrEnum):
     PASS = "PASS"
     FAIL = "FAIL"
     REVIEW_REQUIRED = "REVIEW_REQUIRED"
+    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
     DEPENDENCY_ERROR = "DEPENDENCY_ERROR"
     PROTOCOL_ERROR = "PROTOCOL_ERROR"
     NOT_RUN = "NOT_RUN"
+
+
+class PerformanceReviewVerdict(StrEnum):
+    ACCEPTABLE = "acceptable"
+    REJECT_REGRESSION = "reject_regression"
+    NEEDS_MORE_SAMPLES = "needs_more_samples"
+
+
+class BenchmarkVariant(StrEnum):
+    WORKING_TREE = "working_tree"
+    HISTORICAL_CONTROL = "historical_control"
+    RELEASE_CANDIDATE = "release_candidate"
+
+
+class CandidateChangeScope(StrEnum):
+    PROMPT = "prompt"
+    CONFIG = "config"
+    RUNTIME_CODE = "runtime_code"
+    DEPENDENCIES = "dependencies"
+    SCHEMA = "schema"
+    LIFECYCLE = "lifecycle"
+
+
+class GitSource(EvalModel):
+    sha: GitSha
+    dirty: bool
+
+
+class CandidateDeclaration(EvalModel):
+    candidate_id: Identifier
+    control_runtime_sha: GitSha = HISTORICAL_CONTROL_SHA
+    change_scopes: tuple[CandidateChangeScope, ...] = Field(min_length=1)
+    summary: NonEmpty
+
+    @field_validator("change_scopes")
+    @classmethod
+    def change_scopes_are_unique(
+        cls, value: tuple[CandidateChangeScope, ...]
+    ) -> tuple[CandidateChangeScope, ...]:
+        if len(value) != len(set(value)):
+            raise ValueError("candidate change scopes must be unique")
+        return value
+
+
+class RunProvenance(EvalModel):
+    """Identity of executed runtime and harness; never infer one from the other."""
+
+    variant: BenchmarkVariant
+    runtime: GitSource
+    harness: GitSource
+    prompt_sha256: dict[Identifier, Sha256] = Field(min_length=1)
+    package_versions: dict[Identifier, NonEmpty] = Field(min_length=1)
+    candidate: CandidateDeclaration | None = None
+
+    @model_validator(mode="after")
+    def variant_has_consistent_declaration(self) -> "RunProvenance":
+        required_prompts = {"memory_extraction", "rewrite_system"}
+        required_packages = {"kira-context-memory", "viettel-mem0"}
+        if missing := required_prompts.difference(self.prompt_sha256):
+            raise ValueError(f"run provenance is missing prompt hashes: {sorted(missing)}")
+        if missing := required_packages.difference(self.package_versions):
+            raise ValueError(f"run provenance is missing package versions: {sorted(missing)}")
+        if self.variant is BenchmarkVariant.HISTORICAL_CONTROL:
+            if self.runtime.sha != HISTORICAL_CONTROL_SHA:
+                raise ValueError("historical control must use the frozen control runtime SHA")
+            if self.candidate is not None:
+                raise ValueError("historical control cannot contain a candidate declaration")
+            if self.package_versions["kira-context-memory"] != "0.4.1":
+                raise ValueError("historical control must retain application version 0.4.1")
+            if self.package_versions["viettel-mem0"] != "2.0.20+viettel.3":
+                raise ValueError("historical control must retain viettel-mem0 version .3")
+        elif self.variant is BenchmarkVariant.RELEASE_CANDIDATE:
+            if self.candidate is None:
+                raise ValueError("release candidate requires an explicit change declaration")
+        elif self.candidate is not None:
+            raise ValueError("working-tree evidence cannot claim a release candidate declaration")
+        return self
+
+    @computed_field
+    @property
+    def attribution_scope(
+        self,
+    ) -> Literal[
+        "working_tree",
+        "historical_control",
+        "prompt_or_config_candidate",
+        "mixed_runtime_candidate",
+    ]:
+        if self.variant is BenchmarkVariant.WORKING_TREE:
+            return "working_tree"
+        if self.variant is BenchmarkVariant.HISTORICAL_CONTROL:
+            return "historical_control"
+        assert self.candidate is not None
+        non_prompt_scopes = {
+            CandidateChangeScope.RUNTIME_CODE,
+            CandidateChangeScope.DEPENDENCIES,
+            CandidateChangeScope.SCHEMA,
+            CandidateChangeScope.LIFECYCLE,
+        }
+        if non_prompt_scopes.intersection(self.candidate.change_scopes):
+            return "mixed_runtime_candidate"
+        return "prompt_or_config_candidate"
 
 
 class Message(EvalModel):
@@ -221,7 +331,7 @@ class SuiteReadiness(EvalModel):
 
 class PreflightReport(EvalModel):
     schema_version: Literal[1] = 1
-    contract_id: Literal["kira-week5-benchmark-v2"] = "kira-week5-benchmark-v2"
+    contract_id: Literal["kira-week5-benchmark-v3"] = BENCHMARK_CONTRACT_ID
     scope: Literal["dependency_preflight_only"] = "dependency_preflight_only"
     run_id: UUID
     started_at: datetime
@@ -230,7 +340,8 @@ class PreflightReport(EvalModel):
     config_source: Literal["programmatic", "environment", "file_only", "file_then_environment"] = (
         "programmatic"
     )
-    config_sha256: str
+    config_sha256: Sha256
+    provenance: RunProvenance
     configuration: dict[str, object]
     checks: tuple[ProbeResult, ...]
     suites: tuple[SuiteReadiness, ...]

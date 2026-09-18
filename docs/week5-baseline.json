@@ -1,8 +1,9 @@
 {
   "manifest_schema_version": 1,
-  "contract_id": "kira-week5-benchmark-v2",
+  "contract_id": "kira-week5-benchmark-v3",
   "frozen_on": "2026-09-16",
   "kind": "source_control_baseline_not_a_benchmark_result",
+  "variant": "historical_control",
   "source": {
     "commit": "75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00",
     "tree": "20fb6f6f35f78d6de6eb55c83e388917cb338597",

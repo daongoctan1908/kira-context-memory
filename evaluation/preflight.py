@@ -18,10 +18,12 @@ from evaluation.models import (
     ProbeResult,
     Profile,
     Reason,
+    RunProvenance,
     Suite,
     SuiteReadiness,
 )
 from evaluation.postgres import probe_database
+from evaluation.provenance import capture_local_provenance
 from evaluation.providers import ProviderProbes
 
 DatabaseProbe = Callable[[EvalConfig, Probe, int | None], Awaitable[dict]]
@@ -52,8 +54,10 @@ async def run_preflight(
     *,
     transport: httpx.AsyncBaseTransport | None = None,
     database_probe: DatabaseProbe | None = None,
+    provenance: RunProvenance | None = None,
 ) -> PreflightReport:
     started_at = datetime.now(UTC)
+    provenance = provenance or capture_local_provenance()
     simulated = config.profile == Profile.MOCK
     if simulated:
         transport = transport or httpx.MockTransport(mock_response)
@@ -152,6 +156,7 @@ async def run_preflight(
         profile=config.profile,
         simulated=simulated,
         config_sha256=config.fingerprint(),
+        provenance=provenance,
         configuration=config.model_dump(mode="json"),
         checks=tuple(results.values()),
         suites=tuple(

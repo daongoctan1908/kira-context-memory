@@ -1,5 +1,9 @@
 # Week 5 T5.2 — Eval contracts và provider preflight
 
+Artifacts mới được đọc theo `kira-week5-benchmark-v3`. Contract v3 không thay kết quả preflight
+lịch sử; nó bổ sung runtime/harness SHA độc lập, rendered prompt hashes và package versions cho
+các report tạo sau ngày 2026-09-18.
+
 T5.2 đã triển khai typed case/config/result và preflight theo suite. Ba probe OpenAI thật đã
 pass với key trong `.env.week5.local`: extraction JSON, rewrite chat và embedding batch.
 Sau khi Docker Linux engine hoạt động ngày 2026-09-12, PostgreSQL/pgvector, application migration
@@ -12,7 +16,8 @@ retrieval, rewrite và cross-session sẽ được chấm bằng corpus/review t
 
 | Component | Trách nhiệm |
 | --- | --- |
-| `evaluation/models.py` | Case version 1 với discriminated inputs cho bốn suite; evidence/gold/attribution/review; result/outcome và preflight report |
+| `evaluation/models.py` | Case version 1 với discriminated inputs cho bốn suite; evidence/gold/attribution/review; result/outcome, candidate declaration, runtime provenance và preflight report |
+| `evaluation/provenance.py` | Capture Git identity/dirty state, rendered prompt hashes và package versions của checkout đang thực thi; runtime và harness vẫn là hai field riêng |
 | `evaluation/config.py` | Load file được chỉ định và process env; riêng provider extraction/rewrite/embedding; validation, secret exclusion và non-secret config hash |
 | `evaluation/providers.py` | Bounded HTTPX chat/JSON/embedding/health probes, fixed synthetic inputs, typed errors |
 | `evaluation/postgres.py` | Async PostgreSQL read-only: connection, pgvector, migration revision và memory metadata/collection/receipt tables |
@@ -20,6 +25,10 @@ retrieval, rewrite và cross-session sẽ được chấm bằng corpus/review t
 | `evaluation/mock.py` | HTTP/DB doubles offline; report ghi rõ simulated |
 | `scripts/run_week5_benchmark.py` | CLI `preflight`, safe JSON output và exit codes |
 | `evaluation/week5.env.example` | Template không chứa secret thật |
+
+CLI mặc định capture checkout hiện tại thành variant `working_tree`. Khi preflight một historical
+control hoặc release candidate được build riêng, truyền `--provenance-file <json>`; file phải đúng
+`RunProvenance`, candidate phải khai báo change scopes, và runtime/harness SHA không bị nhập làm một.
 
 Evaluation chạy từ source checkout; optional extra `evaluation` khai báo trực tiếp `python-dotenv`.
 Application wheel vẫn chỉ đóng gói `app` và `worker`. Eval image/packaging riêng thuộc T5.19.
