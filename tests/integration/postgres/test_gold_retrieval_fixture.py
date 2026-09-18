@@ -18,8 +18,8 @@ from app.infrastructure.memory.postgres_admin import (
 )
 from evaluation.compiler import compile_dataset
 from evaluation.isolation import create_isolation_plan
-from evaluation.models import RetrievalInput
-from evaluation.retrieval import GoldRetrievalFixtureManager
+from evaluation.models import Outcome, Profile, RetrievalInput
+from evaluation.retrieval import GoldRetrievalFixtureManager, RetrievalEvaluator
 
 pytestmark = pytest.mark.postgres_integration
 
@@ -94,7 +94,14 @@ async def test_gold_fixture_uses_native_pgvector_retrieval_and_exact_cleanup() -
         )
         case = source.model_copy(
             update={
-                "inputs": source.inputs.model_copy(update={"memories": source.inputs.memories[:2]})
+                "inputs": source.inputs.model_copy(update={"memories": source.inputs.memories[:2]}),
+                "gold": source.gold.model_copy(
+                    update={
+                        "relevant_memory_ids": tuple(
+                            memory.gold_id for memory in source.inputs.memories[:2]
+                        )
+                    }
+                ),
             }
         )
         with (
@@ -109,14 +116,18 @@ async def test_gold_fixture_uses_native_pgvector_retrieval_and_exact_cleanup() -
                 search_timeout_seconds=5,
                 operation_timeout_seconds=10,
             )
-            found = await adapter.search(
-                fixture.persisted_user_id(case.inputs.user_id),
-                case.inputs.current_query,
-                top_k=10,
-                threshold=0,
+            result = await RetrievalEvaluator(
+                adapter,
+                profile=Profile.INTERNAL_TEST,
+                backend="native",
+            ).evaluate_gold_fixture(
+                case,
+                fixture,
             )
-            assert {memory.memory_id for memory in found} == {
-                str(memory.memory_id) for memory in fixture.memories
+            assert result.outcome is Outcome.PASS
+            assert result.score is not None and result.score.recall_at_3 == 1
+            assert set(result.returned_memory_ids) == {
+                memory.memory_id for memory in fixture.memories
             }
 
             await manager.cleanup(fixture)

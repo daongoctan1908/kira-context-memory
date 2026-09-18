@@ -16,6 +16,7 @@ from evaluation.scoring import (
     score_constraints,
     score_formation,
     score_retrieval,
+    score_retrieval_groups,
     score_safety,
     score_task_success,
 )
@@ -132,6 +133,13 @@ def test_retrieval_uses_recall_at_3_and_mrr_at_10_only():
     no_hit = score_retrieval([], ["unexpected"])
     assert no_hit.recall_at_3 is None
     assert no_hit.reciprocal_rank is None
+
+    grouped = score_retrieval_groups(
+        ["m1", "m2"],
+        [("noise",), ("m1", "m2")],
+    )
+    assert grouped.recall_at_3 == 1
+    assert grouped.reciprocal_rank == pytest.approx(0.5)
 
 
 def test_rewrite_constraints_do_not_claim_semantic_equivalence():

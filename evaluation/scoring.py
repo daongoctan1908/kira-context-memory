@@ -254,16 +254,28 @@ def score_retrieval(
 ) -> RetrievalScore:
     """Score only Recall@3 and MRR@10; no-hit cases have an explicit N/A denominator."""
 
+    return score_retrieval_groups(
+        relevant_memory_ids,
+        tuple((memory_id,) for memory_id in returned_memory_ids),
+    )
+
+
+def score_retrieval_groups(
+    relevant_memory_ids: Sequence[str],
+    returned_gold_id_groups: Sequence[Sequence[str]],
+) -> RetrievalScore:
+    """Score ranked rows that may each represent more than one formation gold fact."""
+
     relevant = set(relevant_memory_ids)
     if not relevant:
         return RetrievalScore()
-    top_three_unique = set(returned_memory_ids[:3])
-    recall = len(relevant.intersection(top_three_unique)) / len(relevant)
+    top_three = {gold_id for group in returned_gold_id_groups[:3] for gold_id in group}
+    recall = len(relevant.intersection(top_three)) / len(relevant)
     first_rank = next(
         (
             rank
-            for rank, memory_id in enumerate(returned_memory_ids[:_MRR_DEPTH], 1)
-            if memory_id in relevant
+            for rank, gold_ids in enumerate(returned_gold_id_groups[:_MRR_DEPTH], 1)
+            if relevant.intersection(gold_ids)
         ),
         None,
     )
