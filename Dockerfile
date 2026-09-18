@@ -25,6 +25,7 @@ FROM python:3.11-slim-bookworm AS runtime
 
 ARG APP_VERSION=0.4.1
 ARG SOURCE_REVISION=unknown
+ARG HARNESS_REVISION=unknown
 ARG BENCHMARK_VARIANT=runtime
 ARG BENCHMARK_ROLE=runtime
 
@@ -34,10 +35,13 @@ LABEL org.opencontainers.image.title="kira-context-memory" \
       io.kira.benchmark.contract="kira-week5-benchmark-v4" \
       io.kira.benchmark.variant="${BENCHMARK_VARIANT}" \
       io.kira.benchmark.runtime-revision="${SOURCE_REVISION}" \
+      io.kira.benchmark.harness-revision="${HARNESS_REVISION}" \
       io.kira.benchmark.role="${BENCHMARK_ROLE}"
 
 ENV APP_VERSION=${APP_VERSION} \
     BENCHMARK_SOURCE_REVISION=${SOURCE_REVISION} \
+    BENCHMARK_RUNTIME_REVISION=${SOURCE_REVISION} \
+    BENCHMARK_HARNESS_REVISION=${HARNESS_REVISION} \
     BENCHMARK_VARIANT=${BENCHMARK_VARIANT} \
     HEALTH_PORT=8000 \
     MEM0_DIR=/tmp/kira-mem0 \

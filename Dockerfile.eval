@@ -11,22 +11,26 @@ ENV UV_COMPILE_BYTECODE=1 \
 WORKDIR /app
 
 COPY --from=uv /uv /uvx /bin/
-COPY pyproject.toml uv.lock README.md ./
-COPY packages/viettel-mem0/pyproject.toml packages/viettel-mem0/README.md packages/viettel-mem0/LICENSE ./packages/viettel-mem0/
-COPY packages/viettel-mem0/mem0 ./packages/viettel-mem0/mem0
-COPY app ./app
-COPY worker ./worker
+# ``variant_source`` is an explicit named build context supplied by the handoff script. Runtime
+# code and its lock therefore come from the exact control/candidate revision, while only the
+# evaluation harness and reviewed dataset come from the clean harness revision.
+COPY --from=variant_source pyproject.toml uv.lock README.md ./
+COPY --from=variant_source packages/viettel-mem0/pyproject.toml packages/viettel-mem0/README.md packages/viettel-mem0/LICENSE ./packages/viettel-mem0/
+COPY --from=variant_source packages/viettel-mem0/mem0 ./packages/viettel-mem0/mem0
+COPY --from=variant_source app ./app
+COPY --from=variant_source worker ./worker
 COPY evaluation ./evaluation
 COPY dataset ./dataset
-COPY scripts/run_week5_benchmark.py scripts/validate_dataset.py scripts/materialize_dataset.py scripts/review_dataset.py scripts/week5_mock_acceptance.py ./scripts/
+COPY scripts/run_week5_benchmark.py scripts/validate_dataset.py scripts/materialize_dataset.py scripts/review_dataset.py scripts/week5_mock_acceptance.py scripts/benchmark_image_metadata.py ./scripts/
 
-RUN uv sync --frozen --no-dev --extra evaluation --no-editable
+RUN uv sync --frozen --no-dev --no-editable
 
 FROM python:3.11-slim-bookworm AS runtime
 
 ARG APP_VERSION=0.4.1
 ARG SOURCE_REVISION
 ARG RUNTIME_REVISION
+ARG HARNESS_REVISION
 ARG BENCHMARK_VARIANT=working_tree
 ARG BENCHMARK_ROLE=eval-controller
 
@@ -36,11 +40,13 @@ LABEL org.opencontainers.image.title="kira-context-memory-eval" \
       io.kira.benchmark.contract="kira-week5-benchmark-v4" \
       io.kira.benchmark.variant="${BENCHMARK_VARIANT}" \
       io.kira.benchmark.runtime-revision="${RUNTIME_REVISION}" \
+      io.kira.benchmark.harness-revision="${HARNESS_REVISION}" \
       io.kira.benchmark.role="${BENCHMARK_ROLE}"
 
 ENV APP_VERSION=${APP_VERSION} \
     BENCHMARK_SOURCE_REVISION=${SOURCE_REVISION} \
     BENCHMARK_RUNTIME_REVISION=${RUNTIME_REVISION} \
+    BENCHMARK_HARNESS_REVISION=${HARNESS_REVISION} \
     BENCHMARK_VARIANT=${BENCHMARK_VARIANT} \
     PATH="/app/.venv/bin:${PATH}" \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -50,17 +56,18 @@ WORKDIR /app
 
 RUN test -n "${SOURCE_REVISION}" \
     && test -n "${RUNTIME_REVISION}" \
+    && test -n "${HARNESS_REVISION}" \
     && groupadd --system --gid 10001 kira \
     && useradd --system --uid 10001 --gid kira --home-dir /app --shell /usr/sbin/nologin kira
 
 COPY --from=builder --chown=kira:kira /app/.venv /app/.venv
-COPY --chown=kira:kira pyproject.toml ./
-COPY --chown=kira:kira packages/viettel-mem0/pyproject.toml ./packages/viettel-mem0/
-COPY --chown=kira:kira app ./app
-COPY --chown=kira:kira worker ./worker
-COPY --chown=kira:kira evaluation ./evaluation
-COPY --chown=kira:kira dataset ./dataset
-COPY --chown=kira:kira scripts/run_week5_benchmark.py scripts/validate_dataset.py scripts/materialize_dataset.py scripts/review_dataset.py scripts/week5_mock_acceptance.py ./scripts/
+COPY --from=builder --chown=kira:kira /app/pyproject.toml ./
+COPY --from=builder --chown=kira:kira /app/packages/viettel-mem0/pyproject.toml ./packages/viettel-mem0/
+COPY --from=builder --chown=kira:kira /app/app ./app
+COPY --from=builder --chown=kira:kira /app/worker ./worker
+COPY --from=builder --chown=kira:kira /app/evaluation ./evaluation
+COPY --from=builder --chown=kira:kira /app/dataset ./dataset
+COPY --from=builder --chown=kira:kira /app/scripts ./scripts
 
 USER kira
 

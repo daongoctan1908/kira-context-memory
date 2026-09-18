@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts.benchmark_image_metadata import image_metadata
 from scripts.week5_mock_acceptance import run_mock_acceptance
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -54,13 +55,18 @@ def test_eval_runtime_is_locked_and_does_not_install_or_download_at_startup():
     dockerfile = (REPOSITORY_ROOT / "Dockerfile.eval").read_text(encoding="utf-8")
     runtime = dockerfile.split("FROM python:3.11-slim-bookworm AS runtime", maxsplit=1)[1]
 
-    assert "uv sync --frozen --no-dev --extra evaluation --no-editable" in dockerfile
+    assert "uv sync --frozen --no-dev --no-editable" in dockerfile
     assert "ARG SOURCE_REVISION" in runtime
     assert "ARG RUNTIME_REVISION" in runtime
+    assert "ARG HARNESS_REVISION" in runtime
     assert "ARG BENCHMARK_ROLE=eval-controller" in runtime
     assert 'io.kira.benchmark.runtime-revision="${RUNTIME_REVISION}"' in runtime
+    assert 'io.kira.benchmark.harness-revision="${HARNESS_REVISION}"' in runtime
     assert 'io.kira.benchmark.role="${BENCHMARK_ROLE}"' in runtime
     assert 'test -n "${RUNTIME_REVISION}"' in runtime
+    assert 'test -n "${HARNESS_REVISION}"' in runtime
+    assert "COPY --from=variant_source app ./app" in dockerfile
+    assert "COPY --from=variant_source packages/viettel-mem0/mem0" in dockerfile
     assert "scripts/review_dataset.py" in dockerfile
     for forbidden in ("pip install", "uv sync", "curl ", "wget ", "model download"):
         assert forbidden not in runtime
@@ -94,6 +100,26 @@ def test_handoff_script_pins_control_and_verifies_offline_bundle():
     assert '"$($candidate.variant_id)-eval"' in script
     assert "runtime_revision = $ExpectedRuntimeRevision" in script
     assert "Where-Object { $_.variant_id -eq $VariantId }" in script
+    assert '"--build-context", "variant_source=$controlPath"' in script
+    assert "Get-EvalMetadata" in script
+
+
+def test_image_metadata_binds_dataset_prompts_packages_and_exact_revisions(monkeypatch):
+    monkeypatch.setenv("BENCHMARK_RUNTIME_REVISION", "1" * 40)
+    monkeypatch.setenv("BENCHMARK_HARNESS_REVISION", "2" * 40)
+
+    metadata = image_metadata(require_frozen=False)
+
+    assert metadata["contract_id"] == "kira-week5-benchmark-v4"
+    assert metadata["runtime_revision"] == "1" * 40
+    assert metadata["harness_revision"] == "2" * 40
+    assert metadata["dataset_id"] == "kira_ltm_v1"
+    assert len(metadata["dataset_sha256"]) == 64
+    assert set(metadata["prompt_sha256"]) == {"memory_extraction", "rewrite_system"}
+    assert set(metadata["package_versions"]) == {
+        "kira-context-memory",
+        "viettel-mem0",
+    }
 
 
 def test_internal_env_template_contains_placeholders_not_populated_credentials():

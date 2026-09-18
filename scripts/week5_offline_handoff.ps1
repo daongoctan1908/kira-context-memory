@@ -58,6 +58,7 @@ function Get-ImageRecord {
         [string]$Reference,
         [string]$ExpectedSourceRevision,
         [string]$ExpectedRuntimeRevision,
+        [string]$ExpectedHarnessRevision,
         [string]$ExpectedVariant
     )
     $inspect = (& docker image inspect $Reference | ConvertFrom-Json)[0]
@@ -70,6 +71,7 @@ function Get-ImageRecord {
             $labels.'io.kira.benchmark.contract' -ne $ContractId -or
             $labels.'io.kira.benchmark.variant' -ne $ExpectedVariant -or
             $labels.'io.kira.benchmark.runtime-revision' -ne $ExpectedRuntimeRevision -or
+            $labels.'io.kira.benchmark.harness-revision' -ne $ExpectedHarnessRevision -or
             $labels.'io.kira.benchmark.role' -ne $Role) {
             throw "Image provenance labels do not match: $Role"
         }
@@ -81,8 +83,29 @@ function Get-ImageRecord {
         repo_digests = @($inspect.RepoDigests)
         source_revision = $ExpectedSourceRevision
         runtime_revision = $ExpectedRuntimeRevision
+        harness_revision = $ExpectedHarnessRevision
         variant = $ExpectedVariant
     }
+}
+
+function Get-EvalMetadata {
+    param(
+        [string]$Reference,
+        [string]$ExpectedRuntimeRevision,
+        [string]$ExpectedHarnessRevision
+    )
+    $raw = & docker run --rm --network none --entrypoint python $Reference `
+        -m scripts.benchmark_image_metadata
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to inspect benchmark metadata from eval image"
+    }
+    $metadata = $raw | ConvertFrom-Json
+    if ($metadata.contract_id -ne $ContractId -or
+        $metadata.runtime_revision -ne $ExpectedRuntimeRevision -or
+        $metadata.harness_revision -ne $ExpectedHarnessRevision) {
+        throw "Eval image runtime/harness metadata does not match"
+    }
+    return $metadata
 }
 
 function Read-Manifest {
@@ -137,20 +160,24 @@ switch ($Action) {
 
         Invoke-Checked docker @("build", "--pull=false", "-f", $dockerfile,
             "--build-arg", "SOURCE_REVISION=$controlSha",
+            "--build-arg", "HARNESS_REVISION=$harnessSha",
             "--build-arg", "BENCHMARK_VARIANT=historical_control",
             "--build-arg", "BENCHMARK_ROLE=control-runtime",
             "-t", $controlTag, $controlPath)
         Invoke-Checked docker @("build", "--pull=false", "-f", $evalDockerfile,
+            "--build-context", "variant_source=$controlPath",
             "--build-arg", "SOURCE_REVISION=$harnessSha",
             "--build-arg", "RUNTIME_REVISION=$controlSha",
+            "--build-arg", "HARNESS_REVISION=$harnessSha",
             "--build-arg", "BENCHMARK_VARIANT=historical_control",
             "--build-arg", "BENCHMARK_ROLE=control-eval",
             "-t", $controlEvalTag, $RepositoryRoot)
 
         $postgresRef = "pgvector/pgvector:0.8.6-pg16-bookworm"
+        $controlMetadata = Get-EvalMetadata $controlEvalTag $controlSha $harnessSha
         $images = @(
-            Get-ImageRecord "control-runtime" $controlTag $controlSha $controlSha "historical_control"
-            Get-ImageRecord "control-eval" $controlEvalTag $harnessSha $controlSha "historical_control"
+            Get-ImageRecord "control-runtime" $controlTag $controlSha $controlSha $harnessSha "historical_control"
+            Get-ImageRecord "control-eval" $controlEvalTag $harnessSha $controlSha $harnessSha "historical_control"
         )
         $variants = @(
             [ordered]@{
@@ -159,6 +186,7 @@ switch ($Action) {
                 runtime_revision = $controlSha
                 runtime_role = "control-runtime"
                 eval_role = "control-eval"
+                metadata = $controlMetadata
             }
         )
         foreach ($candidate in $candidates) {
@@ -166,26 +194,31 @@ switch ($Action) {
             $candidateEvalTag = "kira-context-$($candidate.variant_id)-eval:$($harnessSha.Substring(0, 12))-$($candidate.revision.Substring(0, 12))"
             Invoke-Checked docker @("build", "--pull=false", "-f", $dockerfile,
                 "--build-arg", "SOURCE_REVISION=$($candidate.revision)",
+                "--build-arg", "HARNESS_REVISION=$harnessSha",
                 "--build-arg", "BENCHMARK_VARIANT=release_candidate",
                 "--build-arg", "BENCHMARK_ROLE=$($candidate.variant_id)-runtime",
                 "-t", $candidateTag, $candidate.path)
             Invoke-Checked docker @("build", "--pull=false", "-f", $evalDockerfile,
+                "--build-context", "variant_source=$($candidate.path)",
                 "--build-arg", "SOURCE_REVISION=$harnessSha",
                 "--build-arg", "RUNTIME_REVISION=$($candidate.revision)",
+                "--build-arg", "HARNESS_REVISION=$harnessSha",
                 "--build-arg", "BENCHMARK_VARIANT=release_candidate",
                 "--build-arg", "BENCHMARK_ROLE=$($candidate.variant_id)-eval",
                 "-t", $candidateEvalTag, $RepositoryRoot)
-            $images += Get-ImageRecord "$($candidate.variant_id)-runtime" $candidateTag $candidate.revision $candidate.revision "release_candidate"
-            $images += Get-ImageRecord "$($candidate.variant_id)-eval" $candidateEvalTag $harnessSha $candidate.revision "release_candidate"
+            $candidateMetadata = Get-EvalMetadata $candidateEvalTag $candidate.revision $harnessSha
+            $images += Get-ImageRecord "$($candidate.variant_id)-runtime" $candidateTag $candidate.revision $candidate.revision $harnessSha "release_candidate"
+            $images += Get-ImageRecord "$($candidate.variant_id)-eval" $candidateEvalTag $harnessSha $candidate.revision $harnessSha "release_candidate"
             $variants += [ordered]@{
                 variant_id = $candidate.variant_id
                 benchmark_variant = "release_candidate"
                 runtime_revision = $candidate.revision
                 runtime_role = "$($candidate.variant_id)-runtime"
                 eval_role = "$($candidate.variant_id)-eval"
+                metadata = $candidateMetadata
             }
         }
-        $images += Get-ImageRecord "postgres-dependency" $postgresRef "" "" "dependency"
+        $images += Get-ImageRecord "postgres-dependency" $postgresRef "" "" "" "dependency"
         $manifest = [ordered]@{
             schema_version = 2
             contract_id = $ContractId
