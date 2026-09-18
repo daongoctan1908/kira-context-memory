@@ -104,6 +104,17 @@ class DatasetManifest(EvalModel):
         ids = [bundle.bundle_id for bundle in self.bundles]
         if len(set(ids)) != len(ids):
             raise ValueError("bundle IDs must be globally unique")
+        if self.status in {"reviewed", "benchmark_ready"} and any(
+            bundle.review.status != "reviewed" for bundle in self.bundles
+        ):
+            raise ValueError("reviewed dataset status requires every bundle to be reviewed")
+        if self.status == "benchmark_ready" and any(
+            bundle.contract_status != "frozen" or bundle.materialization_status != "materialized"
+            for bundle in self.bundles
+        ):
+            raise ValueError("benchmark-ready dataset requires frozen materialized bundles")
+        if self.data_policy.external_provider_allowed and self.status != "benchmark_ready":
+            raise ValueError("external provider access requires a benchmark-ready dataset")
         return self
 
     def bundle(self, bundle_id: str) -> BundleManifest:

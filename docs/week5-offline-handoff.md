@@ -92,6 +92,32 @@ benchmark. `preflight` makes exactly one real KiRa request and stores it in the 
 checkpoint. Re-running preflight reuses that completed task; the following `collect --resume` skips
 it instead of spending a second request.
 
+Export a hash-bound review packet from the materialized copy. Review all KiRa answers, memory
+lifecycle events, rewrite constraints, task/API expectations, safety cases and semantic
+near-duplicates; then replace every placeholder in the decisions file. Freezing fails unless every
+bundle has the same reviewer/revision, every checklist item is true and the source files still have
+the exact packet hashes:
+
+```powershell
+docker compose --env-file .env.week5.internal.local -f compose.week5.benchmark.yaml `
+  --profile tools run --rm --entrypoint python eval-controller `
+  -m scripts.review_dataset export `
+  --packet /materialization/dataset-review-packet.json `
+  --decisions /materialization/dataset-review-decisions.json
+docker compose --env-file .env.week5.internal.local -f compose.week5.benchmark.yaml `
+  --profile tools run --rm --entrypoint python eval-controller `
+  -m scripts.review_dataset freeze `
+  --packet /materialization/dataset-review-packet.json `
+  --decisions /materialization/dataset-review-decisions.json `
+  --dataset-version 1.0.0 --allow-pc-openai --in-place
+docker compose --env-file .env.week5.internal.local -f compose.week5.benchmark.yaml `
+  --profile tools run --rm eval-controller
+```
+
+`--allow-pc-openai` is an explicit data-governance approval for this reviewed synthetic-derived
+corpus. It does not make the PC run official; only `internal_test` artifacts can claim official
+benchmark evidence.
+
 ## 4. Sequential startup to limit peak RAM
 
 Run one variant at a time. The script starts PostgreSQL, then migrations, memory schema init, Worker

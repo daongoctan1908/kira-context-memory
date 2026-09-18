@@ -34,9 +34,7 @@ async def test_mock_acceptance_builds_complete_offline_bundle(tmp_path: Path):
     assert summary["contract_id"] == "kira-week5-benchmark-v4"
     assert summary["network_required"] is False
     assert summary["quality_claim"] is False
-    assert summary["materialization_checkpoint"] == (
-        "artifacts/week5/kira-materialization.json"
-    )
+    assert summary["materialization_checkpoint"] == ("artifacts/week5/kira-materialization.json")
 
     serialized = "\n".join(path.read_text(encoding="utf-8") for path in output.iterdir())
     for forbidden in ("api_key", "password", "Authorization", "Bearer ", "sk-"):
@@ -59,14 +57,13 @@ def test_eval_runtime_is_locked_and_does_not_install_or_download_at_startup():
     assert "uv sync --frozen --no-dev --extra evaluation --no-editable" in dockerfile
     assert "ARG SOURCE_REVISION" in runtime
     assert 'io.kira.benchmark.role="eval-controller"' in runtime
+    assert "scripts/review_dataset.py" in dockerfile
     for forbidden in ("pip install", "uv sync", "curl ", "wget ", "model download"):
         assert forbidden not in runtime
 
 
 def test_internal_compose_uses_only_prebuilt_images_and_fixed_handoff_mounts():
-    compose = (REPOSITORY_ROOT / "compose.week5.benchmark.yaml").read_text(
-        encoding="utf-8"
-    )
+    compose = (REPOSITORY_ROOT / "compose.week5.benchmark.yaml").read_text(encoding="utf-8")
 
     assert "build:" not in compose
     assert compose.count("pull_policy: never") == 11
@@ -78,11 +75,9 @@ def test_internal_compose_uses_only_prebuilt_images_and_fixed_handoff_mounts():
 
 
 def test_handoff_script_pins_control_and_verifies_offline_bundle():
-    script = (REPOSITORY_ROOT / "scripts/week5_offline_handoff.ps1").read_text(
-        encoding="utf-8-sig"
-    )
+    script = (REPOSITORY_ROOT / "scripts/week5_offline_handoff.ps1").read_text(encoding="utf-8-sig")
 
-    assert '75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00' in script
+    assert "75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00" in script
     assert '"--pull=false"' in script
     assert '@("save", "--output", $archive)' in script
     assert '@("load", "--input", $archive)' in script

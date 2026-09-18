@@ -41,7 +41,7 @@
       "required": ["classification", "external_provider_allowed", "public_git_status"],
       "properties": {
         "classification": { "const": "internal_test_synthetic_derived" },
-        "external_provider_allowed": { "const": false },
+        "external_provider_allowed": { "type": "boolean" },
         "public_git_status": { "const": "review_required" }
       }
     },

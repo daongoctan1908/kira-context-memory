@@ -18,7 +18,7 @@ COPY app ./app
 COPY worker ./worker
 COPY evaluation ./evaluation
 COPY dataset ./dataset
-COPY scripts/run_week5_benchmark.py scripts/validate_dataset.py scripts/materialize_dataset.py scripts/week5_mock_acceptance.py ./scripts/
+COPY scripts/run_week5_benchmark.py scripts/validate_dataset.py scripts/materialize_dataset.py scripts/review_dataset.py scripts/week5_mock_acceptance.py ./scripts/
 
 RUN uv sync --frozen --no-dev --extra evaluation --no-editable
 
@@ -55,7 +55,7 @@ COPY --chown=kira:kira app ./app
 COPY --chown=kira:kira worker ./worker
 COPY --chown=kira:kira evaluation ./evaluation
 COPY --chown=kira:kira dataset ./dataset
-COPY --chown=kira:kira scripts/run_week5_benchmark.py scripts/validate_dataset.py scripts/materialize_dataset.py scripts/week5_mock_acceptance.py ./scripts/
+COPY --chown=kira:kira scripts/run_week5_benchmark.py scripts/validate_dataset.py scripts/materialize_dataset.py scripts/review_dataset.py scripts/week5_mock_acceptance.py ./scripts/
 
 USER kira
 
