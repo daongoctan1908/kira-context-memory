@@ -11,13 +11,18 @@ from uuid import uuid4
 import psycopg
 import pytest
 from psycopg import sql
-from sqlalchemy import delete
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.application.services.memory_policy import MEMORY_EXTRACTION_INSTRUCTIONS
 from app.application.use_cases.process_memory import ProcessMemoryUseCase
+from app.application.use_cases.process_memory_job import (
+    MemoryJobProcessOutcome,
+    ProcessMemoryJobUseCase,
+)
 from app.config.settings import Settings
 from app.domain.models.conversation import ConversationMessage, ConversationRole
+from app.domain.models.memory_job import MemoryJobStatus
 from app.infrastructure.memory.mem0_adapter import Mem0Adapter, create_mem0_client
 from app.infrastructure.memory.postgres_admin import (
     _initialize_memory_schema_sync,
@@ -25,7 +30,8 @@ from app.infrastructure.memory.postgres_admin import (
     normalize_psycopg_dsn,
 )
 from app.infrastructure.postgres.conversation_store import PostgresConversationStoreAdapter
-from app.infrastructure.postgres.schema import conversations
+from app.infrastructure.postgres.memory_job_queue import PostgresMemoryJobQueueAdapter
+from app.infrastructure.postgres.schema import conversations, memory_jobs
 from evaluation.formation import (
     FormationCaptureObserver,
     PersistentFormationEvaluator,
@@ -124,6 +130,27 @@ class DeterministicMemoryLlm:
         return json.dumps({"memory": memory}, ensure_ascii=False)
 
 
+class FailOnceMemoryLlm(DeterministicMemoryLlm):
+    def __init__(self) -> None:
+        super().__init__()
+        self.attempts = 0
+
+    def generate_response(
+        self,
+        messages: list[dict[str, str]],
+        response_format: object = None,
+        **kwargs: object,
+    ) -> str:
+        self.attempts += 1
+        if self.attempts == 1:
+            raise TimeoutError("synthetic provider timeout")
+        return super().generate_response(
+            messages,
+            response_format=response_format,
+            **kwargs,
+        )
+
+
 def _database_url() -> str:
     value = os.environ.get("POSTGRES_TEST_URL")
     if not value:
@@ -189,6 +216,39 @@ async def _persist_case(
         reference = result.reference
     assert reference is not None
     return reference
+
+
+async def _schedule_single_turn_case(
+    store: PostgresConversationStoreAdapter,
+    case: MemoryPolicyCase,
+    user_id: str,
+    session_id: str,
+):
+    if len(case.messages) != 2:
+        raise AssertionError("retry contract case must contain exactly one completed turn")
+    user_source, assistant_source = case.messages
+    turn_id = uuid4().hex
+    result = await store.append_turn(
+        user_id,
+        ConversationMessage(
+            session_id,
+            turn_id,
+            ConversationRole.USER,
+            user_source.content,
+            datetime(2026, 9, 7, tzinfo=UTC),
+        ),
+        ConversationMessage(
+            session_id,
+            turn_id,
+            ConversationRole.ASSISTANT,
+            assistant_source.content,
+            datetime(2026, 9, 7, tzinfo=UTC) + timedelta(milliseconds=1),
+        ),
+        schedule_memory=True,
+    )
+    assert result.inserted is True
+    assert result.memory_job_event_id is not None
+    return result
 
 
 async def test_exact_boundary_formation_policy_cases_dedup_and_user_isolation() -> None:
@@ -417,6 +477,237 @@ async def test_persistent_evaluator_reads_back_real_pgvector_row_and_receipt() -
         assert result.persistence.receipt.events == result.extraction.lifecycle_events
         assert [item.content for item in result.persistence.memories] == [FACTS_BY_CASE[case.name]]
         assert result.persistence.memories[0].user_id == user_id
+    finally:
+        if adapter is not None:
+            adapter.close()
+        try:
+            async with engine.begin() as connection:
+                await connection.execute(
+                    delete(conversations).where(conversations.c.user_id == user_id)
+                )
+        finally:
+            await engine.dispose()
+            with psycopg.connect(psycopg_dsn) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(sql.Identifier(schema_name))
+                )
+
+
+async def test_provider_failure_before_commit_retries_queue_without_partial_state() -> None:
+    database_url = _database_url()
+    psycopg_dsn = normalize_psycopg_dsn(database_url)
+    schema_name = f"memory_retry_{uuid4().hex}"
+    settings = _settings(database_url, schema_name)
+    engine = create_async_engine(database_url)
+    store = PostgresConversationStoreAdapter(engine)
+    queue = PostgresMemoryJobQueueAdapter(engine)
+    case = next(item for item in SELECTED_CASES if item.name == "user_context_explicit_scope")
+    user_id = f"eval-retry-{uuid4().hex}"
+    session_id = f"eval-retry-session-{uuid4().hex}"
+    adapter: Mem0Adapter | None = None
+
+    try:
+        await asyncio.to_thread(
+            _initialize_memory_schema_sync,
+            psycopg_dsn,
+            schema_name,
+            settings.memory_collection_name,
+            settings.memory_embedding_model,
+            settings.memory_embedding_dims,
+        )
+        scheduled = await _schedule_single_turn_case(store, case, user_id, session_id)
+        assert scheduled.memory_job_event_id is not None
+        llm = FailOnceMemoryLlm()
+        with (
+            patch("mem0.memory.main.EmbedderFactory.create", return_value=DeterministicEmbedding()),
+            patch("mem0.memory.main.LlmFactory.create", return_value=llm),
+            patch("mem0.memory.main.extract_entities_batch", return_value=[]),
+            patch("mem0.memory.main.extract_entities", return_value=[]),
+        ):
+            adapter = Mem0Adapter(
+                create_mem0_client(settings),
+                search_timeout_seconds=settings.memory_search_timeout_seconds,
+                operation_timeout_seconds=settings.memory_operation_timeout_seconds,
+            )
+            process_memory = ProcessMemoryUseCase(store, adapter)
+            process_job = ProcessMemoryJobUseCase(
+                process_memory,
+                queue,
+                max_attempts=2,
+                retry_delays_seconds=(1,),
+            )
+            first = (
+                await queue.claim_due(
+                    lease_owner=uuid4(),
+                    limit=1,
+                    lease_seconds=120,
+                    max_attempts=2,
+                )
+            )[0]
+            first_result = await process_job.execute(first)
+
+            assert first_result.outcome is MemoryJobProcessOutcome.RETRY
+            inspector = PostgresFormationInspector(
+                database_url,
+                schema_name=schema_name,
+                collection_name=settings.memory_collection_name,
+            )
+            failed_state = await inspector.inspect(
+                event_id=scheduled.memory_job_event_id,
+                user_id=user_id,
+            )
+            assert failed_state.memories == () and failed_state.receipt is None
+
+            async with engine.begin() as connection:
+                await connection.execute(
+                    update(memory_jobs)
+                    .where(memory_jobs.c.event_id == scheduled.memory_job_event_id)
+                    .values(next_attempt_at=datetime(2000, 1, 1, tzinfo=UTC))
+                )
+            second = (
+                await queue.claim_due(
+                    lease_owner=uuid4(),
+                    limit=1,
+                    lease_seconds=120,
+                    max_attempts=2,
+                )
+            )[0]
+            second_result = await process_job.execute(second)
+
+        assert second.reclaimed is False
+        assert second.attempt_count == 2
+        assert second_result.outcome is MemoryJobProcessOutcome.COMPLETED
+        committed = await inspector.inspect(
+            event_id=scheduled.memory_job_event_id,
+            user_id=user_id,
+        )
+        assert len(committed.memories) == 1
+        assert committed.receipt is not None and committed.receipt.memory_count == 1
+        assert llm.attempts == 2
+        assert len(llm.case_names) == 1
+    finally:
+        if adapter is not None:
+            adapter.close()
+        try:
+            async with engine.begin() as connection:
+                await connection.execute(
+                    delete(conversations).where(conversations.c.user_id == user_id)
+                )
+        finally:
+            await engine.dispose()
+            with psycopg.connect(psycopg_dsn) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(sql.Identifier(schema_name))
+                )
+
+
+async def test_after_commit_reclaim_replays_receipt_while_fresh_event_runs_independently() -> None:
+    database_url = _database_url()
+    psycopg_dsn = normalize_psycopg_dsn(database_url)
+    schema_name = f"memory_reclaim_{uuid4().hex}"
+    settings = _settings(database_url, schema_name)
+    engine = create_async_engine(database_url)
+    store = PostgresConversationStoreAdapter(engine)
+    queue = PostgresMemoryJobQueueAdapter(engine)
+    case = next(item for item in SELECTED_CASES if item.name == "user_context_explicit_scope")
+    user_id = f"eval-reclaim-{uuid4().hex}"
+    session_id = f"eval-reclaim-session-{uuid4().hex}"
+    adapter: Mem0Adapter | None = None
+
+    try:
+        await asyncio.to_thread(
+            _initialize_memory_schema_sync,
+            psycopg_dsn,
+            schema_name,
+            settings.memory_collection_name,
+            settings.memory_embedding_model,
+            settings.memory_embedding_dims,
+        )
+        scheduled = await _schedule_single_turn_case(store, case, user_id, session_id)
+        assert scheduled.memory_job_event_id is not None
+        llm = DeterministicMemoryLlm()
+        with (
+            patch("mem0.memory.main.EmbedderFactory.create", return_value=DeterministicEmbedding()),
+            patch("mem0.memory.main.LlmFactory.create", return_value=llm),
+            patch("mem0.memory.main.extract_entities_batch", return_value=[]),
+            patch("mem0.memory.main.extract_entities", return_value=[]),
+        ):
+            adapter = Mem0Adapter(
+                create_mem0_client(settings),
+                search_timeout_seconds=settings.memory_search_timeout_seconds,
+                operation_timeout_seconds=settings.memory_operation_timeout_seconds,
+            )
+            process_memory = ProcessMemoryUseCase(store, adapter)
+            first = (
+                await queue.claim_due(
+                    lease_owner=uuid4(),
+                    limit=1,
+                    lease_seconds=120,
+                    max_attempts=3,
+                )
+            )[0]
+
+            committed_before_crash = await process_memory.execute(
+                first.reference,
+                first.event_id,
+            )
+            assert len(committed_before_crash.events) == 1
+            assert len(llm.case_names) == 1
+
+            async with engine.begin() as connection:
+                await connection.execute(
+                    update(memory_jobs)
+                    .where(memory_jobs.c.event_id == first.event_id)
+                    .values(lease_expires_at=datetime(2000, 1, 1, tzinfo=UTC))
+                )
+            reclaimed = (
+                await queue.claim_due(
+                    lease_owner=uuid4(),
+                    limit=1,
+                    lease_seconds=120,
+                    max_attempts=3,
+                )
+            )[0]
+            replay_result = await ProcessMemoryJobUseCase(
+                process_memory,
+                queue,
+                max_attempts=3,
+                retry_delays_seconds=(1, 5),
+            ).execute(reclaimed)
+
+            assert replay_result.outcome is MemoryJobProcessOutcome.COMPLETED
+            assert reclaimed.reclaimed is True
+            assert reclaimed.attempt_count == 2
+            assert replay_result.lifecycle_event_count == 1
+            assert len(llm.case_names) == 1
+
+            fresh_event_id = uuid4()
+            fresh_result = await process_memory.execute(first.reference, fresh_event_id)
+            assert fresh_result.events == ()
+            assert len(llm.case_names) == 2
+
+        inspector = PostgresFormationInspector(
+            database_url,
+            schema_name=schema_name,
+            collection_name=settings.memory_collection_name,
+        )
+        original = await inspector.inspect(event_id=first.event_id, user_id=user_id)
+        fresh = await inspector.inspect(event_id=fresh_event_id, user_id=user_id)
+        assert len(original.memories) == 1
+        assert original.receipt is not None and original.receipt.memory_count == 1
+        assert fresh.memories == ()
+        assert fresh.receipt is not None and fresh.receipt.memory_count == 0
+        async with engine.connect() as connection:
+            job_row = (
+                await connection.execute(
+                    select(
+                        memory_jobs.c.status,
+                        memory_jobs.c.attempt_count,
+                        memory_jobs.c.lifecycle_event_count,
+                    ).where(memory_jobs.c.event_id == first.event_id)
+                )
+            ).one()
+        assert job_row == (MemoryJobStatus.COMPLETED.value, 2, 1)
     finally:
         if adapter is not None:
             adapter.close()
