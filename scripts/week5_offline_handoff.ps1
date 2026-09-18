@@ -3,7 +3,10 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidateSet("Build", "Export", "Import", "MockAcceptance", "Validate", "StartControl", "StartCandidate", "Stop", "Publish")]
     [string]$Action,
-    [string]$CandidateRevision = "HEAD",
+    [ValidateCount(1, 2)]
+    [string[]]$CandidateRevision = @("HEAD"),
+    [ValidatePattern('^candidate-[ab]$')]
+    [string]$VariantId = "candidate-a",
     [string]$BundleDirectory = "artifacts/week5/offline-handoff",
     [string]$EnvFile = ".env.week5.internal.local",
     [string]$Registry = ""
@@ -53,18 +56,20 @@ function Get-ImageRecord {
     param(
         [string]$Role,
         [string]$Reference,
-        [string]$ExpectedRevision,
+        [string]$ExpectedSourceRevision,
+        [string]$ExpectedRuntimeRevision,
         [string]$ExpectedVariant
     )
     $inspect = (& docker image inspect $Reference | ConvertFrom-Json)[0]
     if ($LASTEXITCODE -ne 0) {
         throw "Image is unavailable: $Role"
     }
-    if ($ExpectedRevision) {
+    if ($ExpectedSourceRevision) {
         $labels = $inspect.Config.Labels
-        if ($labels.'org.opencontainers.image.revision' -ne $ExpectedRevision -or
+        if ($labels.'org.opencontainers.image.revision' -ne $ExpectedSourceRevision -or
             $labels.'io.kira.benchmark.contract' -ne $ContractId -or
             $labels.'io.kira.benchmark.variant' -ne $ExpectedVariant -or
+            $labels.'io.kira.benchmark.runtime-revision' -ne $ExpectedRuntimeRevision -or
             $labels.'io.kira.benchmark.role' -ne $Role) {
             throw "Image provenance labels do not match: $Role"
         }
@@ -74,7 +79,8 @@ function Get-ImageRecord {
         reference = $Reference
         image_id = $inspect.Id
         repo_digests = @($inspect.RepoDigests)
-        source_revision = $ExpectedRevision
+        source_revision = $ExpectedSourceRevision
+        runtime_revision = $ExpectedRuntimeRevision
         variant = $ExpectedVariant
     }
 }
@@ -107,48 +113,89 @@ switch ($Action) {
             throw "Build requires a clean checkout so image provenance is exact"
         }
         $controlSha = Resolve-GitRevision $ControlRevision
-        $candidateSha = Resolve-GitRevision $CandidateRevision
+        $harnessSha = Resolve-GitRevision "HEAD"
         $controlPath = Join-Path $BundleRoot "worktrees/control"
-        $candidatePath = Join-Path $BundleRoot "worktrees/candidate"
         Ensure-Worktree $controlPath $controlSha
-        Ensure-Worktree $candidatePath $candidateSha
+
+        $candidates = @()
+        for ($index = 0; $index -lt $CandidateRevision.Count; $index++) {
+            $candidateId = "candidate-$([char]([int][char]'a' + $index))"
+            $candidateSha = Resolve-GitRevision $CandidateRevision[$index]
+            $candidatePath = Join-Path $BundleRoot "worktrees/$candidateId"
+            Ensure-Worktree $candidatePath $candidateSha
+            $candidates += [ordered]@{
+                variant_id = $candidateId
+                revision = $candidateSha
+                path = $candidatePath
+            }
+        }
 
         $controlTag = "kira-context-control:$($controlSha.Substring(0, 12))"
-        $candidateTag = "kira-context-candidate:$($candidateSha.Substring(0, 12))"
-        $evalTag = "kira-context-eval:$($candidateSha.Substring(0, 12))"
+        $controlEvalTag = "kira-context-control-eval:$($harnessSha.Substring(0, 12))-$($controlSha.Substring(0, 12))"
         $dockerfile = Join-Path $RepositoryRoot "Dockerfile"
-        $evalDockerfile = Join-Path $candidatePath "Dockerfile.eval"
+        $evalDockerfile = Join-Path $RepositoryRoot "Dockerfile.eval"
 
         Invoke-Checked docker @("build", "--pull=false", "-f", $dockerfile,
             "--build-arg", "SOURCE_REVISION=$controlSha",
             "--build-arg", "BENCHMARK_VARIANT=historical_control",
             "--build-arg", "BENCHMARK_ROLE=control-runtime",
             "-t", $controlTag, $controlPath)
-        Invoke-Checked docker @("build", "--pull=false", "-f", $dockerfile,
-            "--build-arg", "SOURCE_REVISION=$candidateSha",
-            "--build-arg", "BENCHMARK_VARIANT=release_candidate",
-            "--build-arg", "BENCHMARK_ROLE=candidate-runtime",
-            "-t", $candidateTag, $candidatePath)
         Invoke-Checked docker @("build", "--pull=false", "-f", $evalDockerfile,
-            "--build-arg", "SOURCE_REVISION=$candidateSha",
-            "--build-arg", "BENCHMARK_VARIANT=working_tree",
-            "-t", $evalTag, $candidatePath)
+            "--build-arg", "SOURCE_REVISION=$harnessSha",
+            "--build-arg", "RUNTIME_REVISION=$controlSha",
+            "--build-arg", "BENCHMARK_VARIANT=historical_control",
+            "--build-arg", "BENCHMARK_ROLE=control-eval",
+            "-t", $controlEvalTag, $RepositoryRoot)
 
         $postgresRef = "pgvector/pgvector:0.8.6-pg16-bookworm"
-        $null = Get-ImageRecord "postgres-dependency" $postgresRef "" "dependency"
         $images = @(
-            Get-ImageRecord "control-runtime" $controlTag $controlSha "historical_control"
-            Get-ImageRecord "candidate-runtime" $candidateTag $candidateSha "release_candidate"
-            Get-ImageRecord "eval-controller" $evalTag $candidateSha "working_tree"
-            Get-ImageRecord "postgres-dependency" $postgresRef "" "dependency"
+            Get-ImageRecord "control-runtime" $controlTag $controlSha $controlSha "historical_control"
+            Get-ImageRecord "control-eval" $controlEvalTag $harnessSha $controlSha "historical_control"
         )
+        $variants = @(
+            [ordered]@{
+                variant_id = "control"
+                benchmark_variant = "historical_control"
+                runtime_revision = $controlSha
+                runtime_role = "control-runtime"
+                eval_role = "control-eval"
+            }
+        )
+        foreach ($candidate in $candidates) {
+            $candidateTag = "kira-context-$($candidate.variant_id):$($candidate.revision.Substring(0, 12))"
+            $candidateEvalTag = "kira-context-$($candidate.variant_id)-eval:$($harnessSha.Substring(0, 12))-$($candidate.revision.Substring(0, 12))"
+            Invoke-Checked docker @("build", "--pull=false", "-f", $dockerfile,
+                "--build-arg", "SOURCE_REVISION=$($candidate.revision)",
+                "--build-arg", "BENCHMARK_VARIANT=release_candidate",
+                "--build-arg", "BENCHMARK_ROLE=$($candidate.variant_id)-runtime",
+                "-t", $candidateTag, $candidate.path)
+            Invoke-Checked docker @("build", "--pull=false", "-f", $evalDockerfile,
+                "--build-arg", "SOURCE_REVISION=$harnessSha",
+                "--build-arg", "RUNTIME_REVISION=$($candidate.revision)",
+                "--build-arg", "BENCHMARK_VARIANT=release_candidate",
+                "--build-arg", "BENCHMARK_ROLE=$($candidate.variant_id)-eval",
+                "-t", $candidateEvalTag, $RepositoryRoot)
+            $images += Get-ImageRecord "$($candidate.variant_id)-runtime" $candidateTag $candidate.revision $candidate.revision "release_candidate"
+            $images += Get-ImageRecord "$($candidate.variant_id)-eval" $candidateEvalTag $harnessSha $candidate.revision "release_candidate"
+            $variants += [ordered]@{
+                variant_id = $candidate.variant_id
+                benchmark_variant = "release_candidate"
+                runtime_revision = $candidate.revision
+                runtime_role = "$($candidate.variant_id)-runtime"
+                eval_role = "$($candidate.variant_id)-eval"
+            }
+        }
+        $images += Get-ImageRecord "postgres-dependency" $postgresRef "" "" "dependency"
         $manifest = [ordered]@{
-            schema_version = 1
+            schema_version = 2
             contract_id = $ContractId
             created_at = [DateTime]::UtcNow.ToString("o")
             control_revision = $controlSha
-            candidate_revision = $candidateSha
-            harness_revision = $candidateSha
+            harness_revision = $harnessSha
+            candidates = @($candidates | ForEach-Object {
+                [ordered]@{ variant_id = $_.variant_id; runtime_revision = $_.revision }
+            })
+            variants = $variants
             materialization_checkpoint = "artifacts/week5/kira-materialization.json"
             benchmark_artifact_root = "artifacts/week5/benchmark"
             images = $images
@@ -200,7 +247,7 @@ switch ($Action) {
     }
     "MockAcceptance" {
         $manifest = Read-Manifest
-        $evalImage = ($manifest.images | Where-Object { $_.role -eq "eval-controller" }).reference
+        $evalImage = ($manifest.images | Where-Object { $_.role -eq "control-eval" }).reference
         $output = Join-Path $BundleRoot "mock-acceptance"
         New-Item -ItemType Directory -Force -Path $output | Out-Null
         Invoke-Checked docker @("run", "--rm", "--network", "none",
@@ -214,6 +261,9 @@ switch ($Action) {
         Write-Output "PASS internal compose configuration is valid"
     }
     "StartControl" {
+        $manifest = Read-Manifest
+        $env:WEEK5_CONTROL_IMAGE = ($manifest.images | Where-Object { $_.role -eq "control-runtime" }).reference
+        $env:WEEK5_EVAL_IMAGE = ($manifest.images | Where-Object { $_.role -eq "control-eval" }).reference
         Invoke-Compose @("--profile", "control", "up", "-d", "control-postgres")
         Invoke-Compose @("--profile", "control", "run", "--rm", "control-migrate")
         Invoke-Compose @("--profile", "control", "run", "--rm", "control-memory-init")
@@ -221,11 +271,18 @@ switch ($Action) {
         Write-Output "PASS control stack started sequentially"
     }
     "StartCandidate" {
+        $manifest = Read-Manifest
+        $variant = @($manifest.variants | Where-Object { $_.variant_id -eq $VariantId })
+        if ($variant.Count -ne 1 -or $variant[0].benchmark_variant -ne "release_candidate") {
+            throw "Requested candidate is not declared in the image manifest"
+        }
+        $env:WEEK5_CANDIDATE_IMAGE = ($manifest.images | Where-Object { $_.role -eq "$VariantId-runtime" }).reference
+        $env:WEEK5_EVAL_IMAGE = ($manifest.images | Where-Object { $_.role -eq "$VariantId-eval" }).reference
         Invoke-Compose @("--profile", "candidate", "up", "-d", "candidate-postgres")
         Invoke-Compose @("--profile", "candidate", "run", "--rm", "candidate-migrate")
         Invoke-Compose @("--profile", "candidate", "run", "--rm", "candidate-memory-init")
         Invoke-Compose @("--profile", "candidate", "up", "-d", "candidate-worker", "candidate-gateway")
-        Write-Output "PASS candidate stack started sequentially"
+        Write-Output "PASS $VariantId stack started sequentially"
     }
     "Stop" {
         Invoke-Compose @("down", "--remove-orphans")
@@ -237,7 +294,9 @@ switch ($Action) {
         }
         $manifest = Read-Manifest
         foreach ($image in $manifest.images | Where-Object { $_.role -ne "postgres-dependency" }) {
-            $target = "$($Registry.TrimEnd('/'))/kira/$($image.role):$($image.source_revision.Substring(0, 12))"
+            $sourceSuffix = $image.source_revision.Substring(0, 12)
+            $runtimeSuffix = $image.runtime_revision.Substring(0, 12)
+            $target = "$($Registry.TrimEnd('/'))/kira/$($image.role):$sourceSuffix-$runtimeSuffix"
             Invoke-Checked docker @("tag", $image.reference, $target)
             Invoke-Checked docker @("push", $target)
         }

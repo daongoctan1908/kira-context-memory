@@ -10,7 +10,10 @@ not claim model quality from the mock acceptance.
 - Materialization checkpoint: `artifacts/week5/kira-materialization.json`.
 - Benchmark artifacts: `artifacts/week5/benchmark/`.
 - Handoff bundle: `artifacts/week5/offline-handoff/`.
-- Required images: control Gateway/Worker, candidate Gateway/Worker, eval controller and pgvector.
+- Exact benchmark image set: one runtime image and one eval image for the control, plus one runtime
+  image and one eval image for every declared candidate. One candidate therefore produces four
+  benchmark images; two candidates produce six. The pinned pgvector image is a separate runtime
+  dependency and is not counted as a benchmark variant image.
 
 The runtime and eval images contain their locked dependencies. `pull_policy: never` is used by the
 internal Compose file. No service runs `pip`, `uv sync`, model download or package installation at
@@ -28,11 +31,22 @@ docker pull pgvector/pgvector:0.8.6-pg16-bookworm
 ./scripts/week5_offline_handoff.ps1 -Action Export
 ```
 
-`Build` creates detached worktrees for the exact control/candidate SHAs, builds with `--pull=false`,
-checks OCI revision/contract/role labels and writes `image-manifest.json`. `MockAcceptance` runs with
-`--network none`; it validates/compiles the canonical corpus and runs all four dependency preflights
-with deterministic doubles. It is plumbing evidence only. `Export` writes one image tar plus SHA-256
-and copies the secret-free Compose/env templates into the bundle.
+To declare two candidates, pass both committed revisions in order. They become `candidate-a` and
+`candidate-b`:
+
+```powershell
+./scripts/week5_offline_handoff.ps1 -Action Build `
+  -CandidateRevision @("<candidate-a-sha>", "<candidate-b-sha>")
+```
+
+`Build` creates detached worktrees for the exact runtime SHAs. The eval code always comes from the
+clean harness revision that launches the build, but each eval image is bound to exactly one runtime
+revision by OCI labels. The script builds with `--pull=false`, checks source revision, runtime
+revision, contract, variant and role labels, then writes schema-v2 `image-manifest.json` with the
+declared variants. `MockAcceptance` runs the control eval image with `--network none`; it
+validates/compiles the canonical corpus and runs all four dependency preflights with deterministic
+doubles. It is plumbing evidence only. `Export` writes one image tar plus SHA-256 and copies the
+secret-free Compose/env templates into the bundle.
 
 An internal registry can replace the tar transfer:
 
@@ -52,10 +66,11 @@ Transfer the repository and `artifacts/week5/offline-handoff/`. Verify/load with
 Copy-Item evaluation/week5.internal.env.example .env.week5.internal.local
 ```
 
-Populate `.env.week5.internal.local` locally. Never commit or put it into the image tar. Replace its
-three image references with the exact references in `image-manifest.json`; fill the exact internal
-model/deployment names, embedding dimension, KiRa endpoint and credentials. Use the same provider
-revisions and retrieval config for control and candidate.
+Populate `.env.week5.internal.local` locally. Never commit or put it into the image tar. The three
+image values in this file are placeholders used only for Compose validation; `StartControl` and
+`StartCandidate` select the exact runtime/eval pair from `image-manifest.json` and override them for
+that invocation. Fill the exact internal model/deployment names, embedding dimension, KiRa endpoint
+and credentials. Use the same provider revisions and retrieval config for control and candidates.
 
 Validate Compose without printing resolved configuration:
 
@@ -127,10 +142,13 @@ and Gateway; it never starts control and candidate together:
 ./scripts/week5_offline_handoff.ps1 -Action StartControl
 # run control and preserve artifacts, then:
 ./scripts/week5_offline_handoff.ps1 -Action Stop
-./scripts/week5_offline_handoff.ps1 -Action StartCandidate
+./scripts/week5_offline_handoff.ps1 -Action StartCandidate -VariantId candidate-a
 # run candidate and preserve artifacts, then:
 ./scripts/week5_offline_handoff.ps1 -Action Stop
 ```
+
+If the manifest declares a second candidate, repeat with `-VariantId candidate-b`. The script rejects
+undeclared candidates and never silently reuses another candidate's eval/runtime image pair.
 
 `Stop` intentionally retains named database volumes. Use only the benchmark cleanup manifest or an
 explicitly approved Compose volume removal after evidence has been copied; never run broad deletes
@@ -139,7 +157,8 @@ against an application database.
 ## Acceptance checklist
 
 - The image tar SHA-256 and every loaded Docker image ID match `image-manifest.json`.
-- OCI `revision`, benchmark `contract`, `variant` and `role` labels match the manifest.
+- OCI source `revision`, `runtime-revision`, benchmark `contract`, `variant` and `role` labels match
+  the manifest.
 - Offline mock acceptance passes with Docker network disabled.
 - No populated env file, bearer/basic credential or database password is in Git/image archive.
 - Internal preflight passes before any paid/official run.

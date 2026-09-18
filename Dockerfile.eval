@@ -26,17 +26,21 @@ FROM python:3.11-slim-bookworm AS runtime
 
 ARG APP_VERSION=0.4.1
 ARG SOURCE_REVISION
+ARG RUNTIME_REVISION
 ARG BENCHMARK_VARIANT=working_tree
+ARG BENCHMARK_ROLE=eval-controller
 
 LABEL org.opencontainers.image.title="kira-context-memory-eval" \
       org.opencontainers.image.version="${APP_VERSION}" \
       org.opencontainers.image.revision="${SOURCE_REVISION}" \
       io.kira.benchmark.contract="kira-week5-benchmark-v4" \
       io.kira.benchmark.variant="${BENCHMARK_VARIANT}" \
-      io.kira.benchmark.role="eval-controller"
+      io.kira.benchmark.runtime-revision="${RUNTIME_REVISION}" \
+      io.kira.benchmark.role="${BENCHMARK_ROLE}"
 
 ENV APP_VERSION=${APP_VERSION} \
     BENCHMARK_SOURCE_REVISION=${SOURCE_REVISION} \
+    BENCHMARK_RUNTIME_REVISION=${RUNTIME_REVISION} \
     BENCHMARK_VARIANT=${BENCHMARK_VARIANT} \
     PATH="/app/.venv/bin:${PATH}" \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -45,6 +49,7 @@ ENV APP_VERSION=${APP_VERSION} \
 WORKDIR /app
 
 RUN test -n "${SOURCE_REVISION}" \
+    && test -n "${RUNTIME_REVISION}" \
     && groupadd --system --gid 10001 kira \
     && useradd --system --uid 10001 --gid kira --home-dir /app --shell /usr/sbin/nologin kira
 

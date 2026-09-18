@@ -56,7 +56,11 @@ def test_eval_runtime_is_locked_and_does_not_install_or_download_at_startup():
 
     assert "uv sync --frozen --no-dev --extra evaluation --no-editable" in dockerfile
     assert "ARG SOURCE_REVISION" in runtime
-    assert 'io.kira.benchmark.role="eval-controller"' in runtime
+    assert "ARG RUNTIME_REVISION" in runtime
+    assert "ARG BENCHMARK_ROLE=eval-controller" in runtime
+    assert 'io.kira.benchmark.runtime-revision="${RUNTIME_REVISION}"' in runtime
+    assert 'io.kira.benchmark.role="${BENCHMARK_ROLE}"' in runtime
+    assert 'test -n "${RUNTIME_REVISION}"' in runtime
     assert "scripts/review_dataset.py" in dockerfile
     for forbidden in ("pip install", "uv sync", "curl ", "wget ", "model download"):
         assert forbidden not in runtime
@@ -84,6 +88,12 @@ def test_handoff_script_pins_control_and_verifies_offline_bundle():
     assert '"--network", "none"' in script
     assert "Get-FileHash" in script
     assert "org.opencontainers.image.revision" in script
+    assert "[ValidateCount(1, 2)]" in script
+    assert "schema_version = 2" in script
+    assert 'Get-ImageRecord "control-eval"' in script
+    assert '"$($candidate.variant_id)-eval"' in script
+    assert "runtime_revision = $ExpectedRuntimeRevision" in script
+    assert "Where-Object { $_.variant_id -eq $VariantId }" in script
 
 
 def test_internal_env_template_contains_placeholders_not_populated_credentials():

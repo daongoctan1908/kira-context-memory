@@ -33,6 +33,7 @@ LABEL org.opencontainers.image.title="kira-context-memory" \
       org.opencontainers.image.revision="${SOURCE_REVISION}" \
       io.kira.benchmark.contract="kira-week5-benchmark-v4" \
       io.kira.benchmark.variant="${BENCHMARK_VARIANT}" \
+      io.kira.benchmark.runtime-revision="${SOURCE_REVISION}" \
       io.kira.benchmark.role="${BENCHMARK_ROLE}"
 
 ENV APP_VERSION=${APP_VERSION} \
