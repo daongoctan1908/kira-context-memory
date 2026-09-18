@@ -56,6 +56,10 @@ class EvalConfig(EvalModel):
     judge: ProviderConfig = Field(default_factory=ProviderConfig)
     judge_deployment: ModelId | None = None
     embedding_dimensions: int | None = Field(default=None, ge=1, le=65536, strict=True)
+    retrieval_depth: Literal[10] = 10
+    retrieval_recall_cutoff: Literal[3] = 3
+    retrieval_top_k: int = Field(default=10, ge=1, le=10, strict=True)
+    retrieval_threshold: float = Field(default=0.1, ge=0, le=1, allow_inf_nan=False)
     extraction_json_mode: Literal["json_object", "prompt_only"] = "json_object"
     connect_timeout_seconds: float = Field(default=2.0, gt=0, le=60, allow_inf_nan=False)
     read_timeout_seconds: float = Field(default=8.0, gt=0, le=120, allow_inf_nan=False)
@@ -157,6 +161,10 @@ def load_config(
             numeric[suffix.lower()] = float(value)
     if value := get("WEEK5_EMBEDDING_DIMENSIONS"):
         numeric["embedding_dimensions"] = int(value)
+    if value := get("WEEK5_RETRIEVAL_TOP_K"):
+        numeric["retrieval_top_k"] = int(value)
+    if value := get("WEEK5_RETRIEVAL_THRESHOLD"):
+        numeric["retrieval_threshold"] = float(value)
     if value := get("WEEK5_JUDGE_MAX_TOKENS"):
         numeric["judge_max_tokens"] = int(value)
     secrets = {

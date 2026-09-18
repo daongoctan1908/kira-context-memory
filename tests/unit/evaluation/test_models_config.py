@@ -223,6 +223,25 @@ def test_secret_exclusion_and_no_ambient_env(tmp_path):
     assert config.model_copy(update={"temperature": 1.0}).fingerprint() != config.fingerprint()
 
 
+def test_retrieval_contract_settings_load_and_are_fingerprinted():
+    config = load_config(
+        profile=Profile.INTERNAL_TEST,
+        suites=(Suite.RETRIEVAL,),
+        environment={
+            "WEEK5_RETRIEVAL_TOP_K": "7",
+            "WEEK5_RETRIEVAL_THRESHOLD": "0.25",
+        },
+    )
+
+    assert config.retrieval_depth == 10
+    assert config.retrieval_recall_cutoff == 3
+    assert config.retrieval_top_k == 7
+    assert config.retrieval_threshold == 0.25
+    assert (
+        config.model_copy(update={"retrieval_threshold": 0.3}).fingerprint() != config.fingerprint()
+    )
+
+
 def test_internal_profile_does_not_inherit_openai_and_missing_is_not_config_error():
     config = load_config(
         profile=Profile.INTERNAL_TEST,
