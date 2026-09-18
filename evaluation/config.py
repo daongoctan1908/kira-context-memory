@@ -53,6 +53,8 @@ class EvalConfig(EvalModel):
     extraction: ProviderConfig = Field(default_factory=ProviderConfig)
     rewrite: ProviderConfig = Field(default_factory=ProviderConfig)
     embedding: ProviderConfig = Field(default_factory=ProviderConfig)
+    judge: ProviderConfig = Field(default_factory=ProviderConfig)
+    judge_deployment: ModelId | None = None
     embedding_dimensions: int | None = Field(default=None, ge=1, le=65536, strict=True)
     extraction_json_mode: Literal["json_object", "prompt_only"] = "json_object"
     connect_timeout_seconds: float = Field(default=2.0, gt=0, le=60, allow_inf_nan=False)
@@ -61,6 +63,7 @@ class EvalConfig(EvalModel):
     max_response_bytes: int = Field(default=1_048_576, ge=1024, le=4_194_304, strict=True)
     extraction_max_tokens: int = Field(default=1000, ge=1, le=4096, strict=True)
     rewrite_max_tokens: int = Field(default=256, ge=1, le=4096, strict=True)
+    judge_max_tokens: int = Field(default=512, ge=1, le=4096, strict=True)
     temperature: float = Field(default=0.0, ge=0, le=2, allow_inf_nan=False)
     retries: Literal[0] = 0
     database_url: SecretStr | None = Field(default=None, exclude=True, repr=False)
@@ -125,14 +128,19 @@ def load_config(
         value = values.get(name)
         return value.strip() if value and value.strip() else None
 
-    def provider(kind: str, shared_model: str) -> ProviderConfig:
+    def provider(
+        kind: str,
+        shared_model: str,
+        *,
+        allow_shared_external: bool = True,
+    ) -> ProviderConfig:
         # Internal runs never silently inherit OpenAI credentials or endpoints.
         external = profile == Profile.EXTERNAL_SYNTHETIC
         base = get(f"WEEK5_{kind}_BASE_URL")
         model = get(f"WEEK5_{kind}_MODEL")
         key = get(f"WEEK5_{kind}_API_KEY")
         # Shared credentials are used only with the shared endpoint, never a custom override.
-        if external and not base:
+        if external and allow_shared_external and not base:
             base = get("WEEK5_OPENAI_BASE_URL")
             model = model or get(shared_model)
             key = key or get("OPENAI_API_KEY")
@@ -149,6 +157,8 @@ def load_config(
             numeric[suffix.lower()] = float(value)
     if value := get("WEEK5_EMBEDDING_DIMENSIONS"):
         numeric["embedding_dimensions"] = int(value)
+    if value := get("WEEK5_JUDGE_MAX_TOKENS"):
+        numeric["judge_max_tokens"] = int(value)
     secrets = {
         name: SecretStr(value) if (value := get(f"WEEK5_{name.upper()}")) else None
         for name in ("database_url", "memory_database_url")
@@ -160,6 +170,9 @@ def load_config(
         extraction=provider("EXTRACTION", "WEEK5_OPENAI_CHAT_MODEL"),
         rewrite=provider("REWRITE", "WEEK5_OPENAI_CHAT_MODEL"),
         embedding=provider("EMBEDDING", "WEEK5_OPENAI_EMBEDDING_MODEL"),
+        # Canonical judgments must never inherit a shared external provider implicitly.
+        judge=provider("JUDGE", "WEEK5_OPENAI_CHAT_MODEL", allow_shared_external=False),
+        judge_deployment=get("WEEK5_JUDGE_DEPLOYMENT"),
         extraction_json_mode=get("WEEK5_EXTRACTION_JSON_MODE") or "json_object",
         gateway_url=get("WEEK5_GATEWAY_URL"),
         worker_url=get("WEEK5_WORKER_URL"),

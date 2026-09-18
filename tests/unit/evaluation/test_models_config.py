@@ -236,6 +236,24 @@ def test_internal_profile_does_not_inherit_openai_and_missing_is_not_config_erro
     assert not config.extraction.configured
     assert config.extraction.api_key is None
     assert not config.embedding.configured
+    assert not config.judge.configured
+    assert config.judge.api_key is None
+
+
+def test_judge_never_inherits_shared_external_provider():
+    config = load_config(
+        profile=Profile.EXTERNAL_SYNTHETIC,
+        suites=(Suite.REWRITE,),
+        environment={
+            "OPENAI_API_KEY": "sk-synthetic-only",
+            "WEEK5_OPENAI_CHAT_MODEL": "external-model",
+            "WEEK5_OPENAI_BASE_URL": "https://api.openai.com/v1",
+        },
+    )
+    assert not config.judge.configured
+    assert config.judge.base_url is None
+    assert config.judge.model is None
+    assert config.judge.api_key is None
 
 
 def test_explicit_internal_provider_and_config_knobs():
@@ -250,12 +268,23 @@ def test_explicit_internal_provider_and_config_knobs():
             "WEEK5_READ_TIMEOUT_SECONDS": "12",
             "WEEK5_CONNECT_TIMEOUT_SECONDS": "3",
             "WEEK5_TOTAL_TIMEOUT_SECONDS": "20",
+            "WEEK5_JUDGE_BASE_URL": "http://judge.internal/v1",
+            "WEEK5_JUDGE_MODEL": "internal-judge",
+            "WEEK5_JUDGE_DEPLOYMENT": "judge-test",
+            "WEEK5_JUDGE_API_KEY": "internal-secret",
+            "WEEK5_JUDGE_MAX_TOKENS": "640",
         },
     )
     assert config.embedding.configured
     assert config.embedding_dimensions == 32
     assert config.read_timeout_seconds == 12
     assert config.extraction_json_mode == "prompt_only"
+    assert config.judge.configured
+    assert config.judge.model == "internal-judge"
+    assert config.judge_deployment == "judge-test"
+    assert config.judge_max_tokens == 640
+    for output in (repr(config), config.model_dump_json()):
+        assert "internal-secret" not in output
 
 
 def test_custom_endpoint_does_not_receive_shared_openai_key():
