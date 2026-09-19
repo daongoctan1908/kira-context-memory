@@ -10,6 +10,7 @@ from app.application.use_cases.process_memory_job import (
     ProcessMemoryJobUseCase,
 )
 from app.domain.errors.conversation import (
+    ConversationSourceUnavailableError,
     ConversationStoreConfigurationError,
     ConversationStoreConnectionError,
     ConversationStoreOperationError,
@@ -20,6 +21,7 @@ from app.domain.errors.memory import (
     LongTermMemoryConnectionError,
     LongTermMemoryOperationError,
     LongTermMemoryProtocolError,
+    LongTermMemorySourceUnavailableError,
     LongTermMemoryTimeoutError,
 )
 from app.domain.errors.memory_job import MemoryJobLeaseLostError
@@ -71,6 +73,21 @@ class FakeMemoryProcessor:
         if self.error is not None:
             raise self.error
         return self.result
+
+
+class BlockingDeletedSourceProcessor:
+    def __init__(self) -> None:
+        self.started = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def execute(
+        self,
+        reference: CompletedTurnReference,
+        formation_event_id: object,
+    ) -> MemoryProcessResult:
+        self.started.set()
+        await self.release.wait()
+        raise LongTermMemorySourceUnavailableError
 
 
 class FakeQueue:
@@ -177,6 +194,45 @@ async def test_success_completes_exact_job_with_native_lifecycle_event_count() -
     assert result.next_attempt_at is None
     assert processor.calls == [(job.reference, job.event_id)]
     assert queue.completed == [(job.event_id, job.lease_token, 4)]
+    assert queue.retried == []
+    assert queue.dead == []
+
+
+@pytest.mark.parametrize(
+    "error",
+    [ConversationSourceUnavailableError(), LongTermMemorySourceUnavailableError()],
+)
+async def test_deleted_source_is_terminally_skipped_without_retry(error: Exception) -> None:
+    job = make_job()
+    processor = FakeMemoryProcessor(error=error)
+    queue = FakeQueue()
+
+    result = await make_use_case(processor, queue).execute(job)
+
+    assert result.outcome is MemoryJobProcessOutcome.SKIPPED
+    assert result.lifecycle_event_count == 0
+    assert result.error_class is None
+    assert queue.completed == [(job.event_id, job.lease_token, 0)]
+    assert queue.retried == []
+    assert queue.dead == []
+
+
+async def test_provider_blocked_then_deleted_source_is_skipped_without_retry() -> None:
+    job = make_job()
+    processor = BlockingDeletedSourceProcessor()
+    queue = FakeQueue()
+
+    delivery = asyncio.create_task(make_use_case(processor, queue).execute(job))
+    await processor.started.wait()
+    assert queue.completed == []
+    assert queue.retried == []
+    assert queue.dead == []
+
+    processor.release.set()
+    result = await delivery
+
+    assert result.outcome is MemoryJobProcessOutcome.SKIPPED
+    assert queue.completed == [(job.event_id, job.lease_token, 0)]
     assert queue.retried == []
     assert queue.dead == []
 

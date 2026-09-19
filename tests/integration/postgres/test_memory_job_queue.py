@@ -181,6 +181,36 @@ async def test_claim_filters_future_and_exhausted_jobs(
     assert row.lease_expires_at == claimed[0].lease_expires_at
 
 
+async def test_claim_excludes_jobs_after_conversation_enters_deletion_pending(
+    engine: AsyncEngine,
+    session_id: str,
+) -> None:
+    event_id = await _schedule(engine, session_id, 1)
+    async with engine.begin() as connection:
+        await connection.execute(
+            update(conversations)
+            .where(
+                conversations.c.user_id == USER_ID,
+                conversations.c.session_id == session_id,
+            )
+            .values(status="deletion_pending")
+        )
+
+    claimed = await PostgresMemoryJobQueueAdapter(engine).claim_due(
+        lease_owner=uuid4(),
+        limit=10,
+        lease_seconds=120,
+        max_attempts=5,
+    )
+
+    assert claimed == ()
+    async with engine.connect() as connection:
+        status = await connection.scalar(
+            select(memory_jobs.c.status).where(memory_jobs.c.event_id == event_id)
+        )
+    assert status == MemoryJobStatus.PENDING.value
+
+
 async def test_skip_locked_prevents_duplicate_claims_between_workers(
     engine: AsyncEngine,
     session_id: str,

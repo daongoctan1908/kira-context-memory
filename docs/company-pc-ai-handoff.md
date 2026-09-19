@@ -838,3 +838,31 @@ Trước khi chạy candidate:
 
 Đây là technical acceptance cho thay đổi runtime/persisted contract, chưa phải official benchmark và
 không quyết định promotion.
+
+## 21. Phase 8 active-owner fencing acceptance trên PC
+
+T8.2 nâng package candidate lên `viettel-mem0==2.0.20+viettel.6`. Memory schema vẫn là version 3;
+thay đổi `.5 -> .6` chỉ cập nhật package contract marker, không đổi bảng, vector, embedding hay dữ
+liệu memory. Historical control vẫn giữ nguyên package/database của nó.
+
+Trước khi chạy candidate:
+
+1. Chạy memory initializer bằng đúng image candidate và xác nhận metadata là
+   `schema_version = 3`, `mem0_version = 2.0.20+viettel.6`. Việc nâng marker `.5 -> .6` phải hoàn
+   tất tại chỗ, không reset schema và không chạy lại embedding.
+2. Tạo ba conversation cùng database: một `active`, một `deletion_pending`, một thuộc user khác.
+   Search của product runtime chỉ được trả memory có owner active và đúng user; owner thiếu, pending
+   hoặc cross-user đều phải bị loại.
+3. Chặn provider formation giữa chừng, chuyển conversation sang `deletion_pending`, rồi cho provider
+   trả kết quả. Job phải kết thúc `skipped` (không retry/dead-letter), không có vector, receipt hay
+   entity link mới.
+4. Giữ row lock xóa trong lúc thread persist đang chờ và mô phỏng timeout phía caller. Sau khi commit
+   pending/delete, thread chạy muộn phải thất bại bằng source-unavailable; kiểm tra lại trực tiếp DB
+   để xác nhận vector và receipt vẫn bằng 0.
+5. Xác nhận job còn `pending` của conversation đã pending không được Worker claim; job đã chạy mà
+   đọc boundary sau thời điểm pending cũng phải được acknowledge dạng `skipped`.
+6. Chạy lại formation/retrieval/cross-session acceptance và kiểm tra trace/log chỉ chứa outcome cùng
+   identifier đã quy định, không chứa raw prompt, response hoặc credential.
+
+Đây là technical/concurrency acceptance cho candidate. Không dùng kết quả này thay official
+benchmark trên K8s.

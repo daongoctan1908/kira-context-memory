@@ -27,11 +27,20 @@ def pair(session_id="session-1", turn_id="old-turn", user="old query", assistant
 
 
 class MemoryStore:
-    def __init__(self, recent=(), *, read_error=None, write_error=None, inserted=True):
+    def __init__(
+        self,
+        recent=(),
+        *,
+        read_error=None,
+        write_error=None,
+        inserted=True,
+        active=True,
+    ):
         self.recent = tuple(recent)
         self.read_error = read_error
         self.write_error = write_error
         self.inserted = inserted
+        self.active = active
         self.reads = []
         self.read_users = []
         self.writes = []
@@ -46,6 +55,10 @@ class MemoryStore:
         if self.read_error:
             raise self.read_error
         return self.recent[-limit:]
+
+    async def is_conversation_active(self, user_id, session_id):
+        self.read_users.append(user_id)
+        return self.active
 
     async def append_turn(
         self,

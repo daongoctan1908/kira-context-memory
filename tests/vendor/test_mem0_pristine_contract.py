@@ -68,7 +68,7 @@ def _memory_source(
 
 
 def test_internal_distribution_preserves_upstream_namespace() -> None:
-    assert mem0.__version__ == "2.0.20+viettel.5"
+    assert mem0.__version__ == "2.0.20+viettel.6"
     assert Memory.__module__ == "mem0.memory.main"
 
 

@@ -102,6 +102,9 @@ class FakeConversationStore:
     ) -> tuple[ConversationMessage, ...]:
         return ()
 
+    async def is_conversation_active(self, user_id: str, session_id: str) -> bool:
+        return True
+
     async def append_turn(
         self,
         user_id: str,

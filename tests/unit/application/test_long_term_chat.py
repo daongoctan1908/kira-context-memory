@@ -97,6 +97,23 @@ async def test_ltm_only_context_still_invokes_rewriter_for_cross_session_recall(
     assert client.messages == ["standalone from cross-session memory"]
 
 
+async def test_inactive_conversation_discards_loaded_context_before_builder():
+    ltm = FakeLongTermMemory((memory(1),))
+    rewriter = FakeRewriter("must not be used")
+    client = FakeKiraClient()
+
+    await make_use_case(
+        client,
+        conversation_store=MemoryStore(pair(), active=False),
+        query_rewriter=rewriter,
+        long_term_memory=ltm,
+    ).execute(COMMAND, principal=PRINCIPAL)
+
+    assert ltm.searches
+    assert rewriter.contexts == []
+    assert client.messages == [COMMAND.message]
+
+
 async def test_empty_recent_and_ltm_bypasses_rewriter():
     ltm = FakeLongTermMemory()
     rewriter = FakeRewriter(error=QueryRewriterTimeoutError())

@@ -14,7 +14,7 @@ import httpx
 import psycopg
 import pytest
 from psycopg import sql
-from sqlalchemy import delete
+from sqlalchemy import delete, insert
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.application.services.context_builder import ContextBuilder
@@ -175,6 +175,7 @@ async def test_session_a_formation_is_recalled_in_session_b_without_cross_user_l
     session_b = f"c4-session-b-{uuid4().hex}"
     session_c = f"c4-session-c-{uuid4().hex}"
     session_d = f"c4-session-d-{uuid4().hex}"
+    fallback_session = f"c4-session-fallback-{uuid4().hex}"
     resolved_settings = settings(database, schema_name, user_a)
     engine = create_async_engine(database)
     store = PostgresConversationStoreAdapter(engine)
@@ -217,6 +218,37 @@ async def test_session_a_formation_is_recalled_in_session_b_without_cross_user_l
             resolved_settings.memory_embedding_model,
             resolved_settings.memory_embedding_dims,
         )
+        await store.validate_schema()
+        async with engine.begin() as connection:
+            await connection.execute(
+                insert(conversations),
+                [
+                    {
+                        "conversation_id": uuid4(),
+                        "user_id": user_a,
+                        "session_id": session_b,
+                        "status": "active",
+                    },
+                    {
+                        "conversation_id": uuid4(),
+                        "user_id": user_b,
+                        "session_id": session_b,
+                        "status": "active",
+                    },
+                    {
+                        "conversation_id": uuid4(),
+                        "user_id": user_a,
+                        "session_id": session_c,
+                        "status": "active",
+                    },
+                    {
+                        "conversation_id": uuid4(),
+                        "user_id": user_a,
+                        "session_id": fallback_session,
+                        "status": "active",
+                    },
+                ],
+            )
         with (
             patch("mem0.memory.main.EmbedderFactory.create", return_value=RecallEmbedding()),
             patch("mem0.memory.main.LlmFactory.create", return_value=RecallMemoryLlm()),
@@ -354,7 +386,7 @@ async def test_session_a_formation_is_recalled_in_session_b_without_cross_user_l
                 )
                 fallback_metrics = await post_chat(
                     app_fallback,
-                    f"c4-session-fallback-{uuid4().hex}",
+                    fallback_session,
                     FOLLOW_UP,
                 )
                 assert kira_fallback.messages == [FOLLOW_UP]

@@ -102,6 +102,20 @@ def test_worker_telemetry_uses_one_isolated_registry_per_process_instance() -> N
     )
 
 
+def test_skipped_deleted_source_has_bounded_metric_without_lifecycle_sample() -> None:
+    telemetry = MemoryJobTelemetry()
+
+    telemetry.job_processed(
+        make_job(),
+        ProcessMemoryJobResult(MemoryJobProcessOutcome.SKIPPED),
+        0.01,
+    )
+
+    payload = generate_latest(telemetry.registry).decode()
+    assert 'kira_memory_job_processing_total{outcome="skipped"} 1.0' in payload
+    assert "kira_memory_job_lifecycle_event_count_count 0.0" in payload
+
+
 def test_phase5_maps_legacy_success_to_otel_completed_without_changing_old_scrape() -> None:
     reader = InMemoryMetricReader()
     provider = MeterProvider(metric_readers=[reader])

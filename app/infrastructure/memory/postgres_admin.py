@@ -24,8 +24,10 @@ LEGACY_MEMORY_SCHEMA_VERSION = 1
 LEGACY_MEM0_VERSION = "2.0.20+viettel.2"
 PREVIOUS_MEMORY_SCHEMA_VERSION = 2
 PREVIOUS_MEM0_SCHEMA_CONTRACT_VERSION = "2.0.20+viettel.3"
-MEM0_SCHEMA_CONTRACT_VERSION = "2.0.20+viettel.5"
-CURRENT_MEM0_DISTRIBUTION_VERSION = "2.0.20+viettel.5"
+COMPATIBLE_MEMORY_SCHEMA_VERSION = 3
+COMPATIBLE_MEM0_SCHEMA_CONTRACT_VERSION = "2.0.20+viettel.5"
+MEM0_SCHEMA_CONTRACT_VERSION = "2.0.20+viettel.6"
+CURRENT_MEM0_DISTRIBUTION_VERSION = "2.0.20+viettel.6"
 FORMATION_RECEIPT_SUFFIX = "_formation_receipts"
 
 
@@ -336,7 +338,14 @@ def _initialize_memory_schema_sync(
             PREVIOUS_MEM0_SCHEMA_CONTRACT_VERSION,
             pgvector_version,
         )
-        if row is None or tuple(row) not in (expected, legacy, previous):
+        compatible = (
+            COMPATIBLE_MEMORY_SCHEMA_VERSION,
+            embedding_model,
+            embedding_dims,
+            COMPATIBLE_MEM0_SCHEMA_CONTRACT_VERSION,
+            pgvector_version,
+        )
+        if row is None or tuple(row) not in (expected, legacy, previous, compatible):
             raise LongTermMemoryConfigurationError
 
         for table_name in (collection_name, f"{collection_name}_entities"):
@@ -426,7 +435,7 @@ def _initialize_memory_schema_sync(
             )
         )
 
-        if tuple(row) in (legacy, previous):
+        if tuple(row) in (legacy, previous, compatible):
             cursor.execute(
                 sql.SQL(
                     "UPDATE {} SET schema_version = %s, mem0_version = %s "

@@ -23,7 +23,7 @@ from app.domain.errors.memory_job import (
     MemoryJobQueueOperationError,
     MemoryJobQueueProtocolError,
 )
-from app.domain.models.conversation import CompletedTurnReference
+from app.domain.models.conversation import CompletedTurnReference, ConversationStatus
 from app.domain.models.memory_job import (
     DeadMemoryJob,
     MemoryJob,
@@ -368,10 +368,20 @@ class PostgresMemoryJobQueueAdapter:
     def _claim_candidates(self, limit: int, max_attempts: int):
         exhausted_ids = (
             select(memory_jobs.c.event_id)
+            .select_from(
+                memory_jobs.join(
+                    conversation_messages,
+                    memory_jobs.c.boundary_message_id == conversation_messages.c.message_id,
+                ).join(
+                    conversations,
+                    conversation_messages.c.conversation_id == conversations.c.conversation_id,
+                )
+            )
             .where(
                 memory_jobs.c.status == MemoryJobStatus.PROCESSING.value,
                 memory_jobs.c.lease_expires_at <= func.now(),
                 memory_jobs.c.attempt_count >= max_attempts,
+                conversations.c.status == ConversationStatus.ACTIVE.value,
             )
             .order_by(memory_jobs.c.lease_expires_at.asc(), memory_jobs.c.event_id.asc())
             .limit(limit)
@@ -435,6 +445,7 @@ class PostgresMemoryJobQueueAdapter:
             )
             .where(
                 memory_jobs.c.attempt_count < max_attempts,
+                conversations.c.status == ConversationStatus.ACTIVE.value,
                 or_(
                     (
                         (memory_jobs.c.status == MemoryJobStatus.PENDING.value)

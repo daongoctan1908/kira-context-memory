@@ -9,8 +9,11 @@ from psycopg.types.json import Json
 
 from app.domain.errors.memory import LongTermMemoryConfigurationError
 from app.infrastructure.memory.postgres_admin import (
+    COMPATIBLE_MEM0_SCHEMA_CONTRACT_VERSION,
+    COMPATIBLE_MEMORY_SCHEMA_VERSION,
     LEGACY_MEM0_VERSION,
     LEGACY_MEMORY_SCHEMA_VERSION,
+    MEM0_SCHEMA_CONTRACT_VERSION,
     MEMORY_SCHEMA_VERSION,
     PREVIOUS_MEM0_SCHEMA_CONTRACT_VERSION,
     PREVIOUS_MEMORY_SCHEMA_VERSION,
@@ -139,6 +142,48 @@ async def test_memory_schema_init_is_idempotent_and_validates_dimension() -> Non
                 "different-model",
                 3,
             )
+    finally:
+        with psycopg.connect(dsn) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(sql.Identifier(schema_name))
+            )
+
+
+async def test_memory_schema_upgrades_compatible_v3_package_marker_in_place() -> None:
+    dsn = _test_dsn()
+    schema_name = f"memory_package_upgrade_{uuid4().hex}"
+    try:
+        await asyncio.to_thread(
+            _initialize_memory_schema_sync,
+            dsn,
+            schema_name,
+            "memories",
+            "test-embedding-model",
+            3,
+        )
+        with psycopg.connect(dsn) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                sql.SQL(
+                    "UPDATE {}.kira_memory_schema SET schema_version = %s, mem0_version = %s "
+                    "WHERE singleton"
+                ).format(sql.Identifier(schema_name)),
+                (
+                    COMPATIBLE_MEMORY_SCHEMA_VERSION,
+                    COMPATIBLE_MEM0_SCHEMA_CONTRACT_VERSION,
+                ),
+            )
+
+        state = await asyncio.to_thread(
+            _initialize_memory_schema_sync,
+            dsn,
+            schema_name,
+            "memories",
+            "test-embedding-model",
+            3,
+        )
+
+        assert state.schema_version == MEMORY_SCHEMA_VERSION
+        assert state.mem0_version == MEM0_SCHEMA_CONTRACT_VERSION
     finally:
         with psycopg.connect(dsn) as connection, connection.cursor() as cursor:
             cursor.execute(

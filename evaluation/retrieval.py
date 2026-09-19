@@ -21,6 +21,7 @@ from app.domain.errors.memory import (
     LongTermMemoryProtocolError,
     LongTermMemoryTimeoutError,
 )
+from app.domain.models.conversation import ConversationSummary
 from app.domain.models.memory import LongTermMemory
 from app.domain.ports.long_term_memory import LongTermMemoryPort
 from app.infrastructure.memory.mem0_adapter import Mem0Adapter
@@ -46,6 +47,48 @@ class GoldFixtureClient(Protocol):
     async def add(self, messages: object, **kwargs: Any) -> object: ...
 
     async def delete(self, memory_id: str) -> object: ...
+
+
+class RetrievalFixtureConversationStore(Protocol):
+    """Conversation lifecycle surface needed to give fixture memories a real owner."""
+
+    async def create_conversation(
+        self,
+        user_id: str,
+        *,
+        title: str | None = None,
+    ) -> ConversationSummary: ...
+
+    async def mark_deletion_pending(self, user_id: str, session_id: str) -> bool: ...
+
+
+class _FixtureOwners:
+    def __init__(self, store: RetrievalFixtureConversationStore | None, *, title: str) -> None:
+        self._store = store
+        self._title = title
+        self._conversations: dict[str, ConversationSummary] = {}
+
+    async def conversation_id(self, user_id: str) -> UUID | None:
+        if self._store is None:
+            return None
+        existing = self._conversations.get(user_id)
+        if existing is None:
+            existing = await self._store.create_conversation(user_id, title=self._title)
+            self._conversations[user_id] = existing
+        return existing.conversation_id
+
+    async def retire(self) -> bool:
+        if self._store is None:
+            return False
+        failed = False
+        for user_id, conversation in reversed(tuple(self._conversations.items())):
+            try:
+                if not await self._store.mark_deletion_pending(user_id, conversation.session_id):
+                    failed = True
+            except Exception:
+                failed = True
+        self._conversations.clear()
+        return failed
 
 
 class GoldFixtureError(RuntimeError):
@@ -150,9 +193,15 @@ def _parse_add_result(response: object, expected_content: str) -> UUID:
 class GoldRetrievalFixtureManager:
     """Create and remove an exact gold corpus owned by one isolation plan."""
 
-    def __init__(self, client: GoldFixtureClient, plan: IsolationPlan) -> None:
+    def __init__(
+        self,
+        client: GoldFixtureClient,
+        plan: IsolationPlan,
+        conversation_store: RetrievalFixtureConversationStore | None = None,
+    ) -> None:
         self._client = client
         self._plan = plan
+        self._owners = _FixtureOwners(conversation_store, title="evaluation:gold-retrieval")
 
     async def setup(self, cases: Sequence[EvalCase]) -> GoldRetrievalFixture:
         case_ids = tuple(case.case_id for case in cases)
@@ -164,15 +213,19 @@ class GoldRetrievalFixtureManager:
         try:
             for seed in seeds:
                 persisted_user_id = _persisted_fixture_user(self._plan, seed.user_id)
+                conversation_id = await self._owners.conversation_id(persisted_user_id)
+                metadata = {
+                    "eval_fixture": "gold_retrieval",
+                    "eval_run_id": str(self._plan.run_id),
+                    "gold_memory_id": seed.gold_id,
+                    "logical_user_id": seed.user_id,
+                }
+                if conversation_id is not None:
+                    metadata["conversation_id"] = str(conversation_id)
                 response = await self._client.add(
                     [{"role": "user", "content": seed.text}],
                     user_id=persisted_user_id,
-                    metadata={
-                        "eval_fixture": "gold_retrieval",
-                        "eval_run_id": str(self._plan.run_id),
-                        "gold_memory_id": seed.gold_id,
-                        "logical_user_id": seed.user_id,
-                    },
+                    metadata=metadata,
                     infer=False,
                 )
                 created.append(
@@ -186,6 +239,7 @@ class GoldRetrievalFixtureManager:
                 )
         except BaseException as error:
             await self._rollback(created)
+            await self._owners.retire()
             if not isinstance(error, Exception):
                 raise
             if isinstance(error, GoldFixtureError):
@@ -210,7 +264,8 @@ class GoldRetrievalFixtureManager:
     async def cleanup(self, fixture: GoldRetrievalFixture) -> None:
         self._validate_owner(fixture)
         failed = await self._delete_exact(fixture.memories)
-        if failed:
+        owner_failed = await self._owners.retire()
+        if failed or owner_failed:
             raise GoldFixtureError("gold_fixture_cleanup_failed")
 
     async def _rollback(self, memories: Sequence[GoldFixtureMemory]) -> None:
@@ -310,9 +365,15 @@ class FormationRetrievalFixture(EvalModel):
 class FormationRetrievalFixtureManager:
     """Materialize formation outputs without rerunning extraction or substituting gold text."""
 
-    def __init__(self, client: GoldFixtureClient, plan: IsolationPlan) -> None:
+    def __init__(
+        self,
+        client: GoldFixtureClient,
+        plan: IsolationPlan,
+        conversation_store: RetrievalFixtureConversationStore | None = None,
+    ) -> None:
         self._client = client
         self._plan = plan
+        self._owners = _FixtureOwners(conversation_store, title="evaluation:formed-retrieval")
 
     async def setup(
         self,
@@ -336,16 +397,20 @@ class FormationRetrievalFixtureManager:
                     self._plan,
                     memory.logical_user_id,
                 )
+                conversation_id = await self._owners.conversation_id(persisted_user_id)
+                metadata = {
+                    "eval_fixture": "formation_produced",
+                    "eval_run_id": str(self._plan.run_id),
+                    "source_memory_id": str(memory.memory_id),
+                    "source_gold_ids": list(memory.source_gold_ids),
+                    "logical_user_id": memory.logical_user_id,
+                }
+                if conversation_id is not None:
+                    metadata["conversation_id"] = str(conversation_id)
                 response = await self._client.add(
                     [{"role": "user", "content": memory.content}],
                     user_id=persisted_user_id,
-                    metadata={
-                        "eval_fixture": "formation_produced",
-                        "eval_run_id": str(self._plan.run_id),
-                        "source_memory_id": str(memory.memory_id),
-                        "source_gold_ids": list(memory.source_gold_ids),
-                        "logical_user_id": memory.logical_user_id,
-                    },
+                    metadata=metadata,
                     infer=False,
                 )
                 created.append(
@@ -360,6 +425,7 @@ class FormationRetrievalFixtureManager:
                 )
         except BaseException as error:
             await self._delete_exact(created)
+            await self._owners.retire()
             if not isinstance(error, Exception):
                 raise
             if isinstance(error, GoldFixtureError):
@@ -383,7 +449,9 @@ class FormationRetrievalFixtureManager:
 
     async def cleanup(self, fixture: FormationRetrievalFixture) -> None:
         self._validate_owner(fixture)
-        if await self._delete_exact(fixture.memories):
+        failed = await self._delete_exact(fixture.memories)
+        owner_failed = await self._owners.retire()
+        if failed or owner_failed:
             raise GoldFixtureError("formation_fixture_cleanup_failed")
 
     async def _delete_exact(self, memories: Sequence[FormedFixtureMemory]) -> bool:

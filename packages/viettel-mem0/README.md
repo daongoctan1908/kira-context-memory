@@ -64,7 +64,7 @@ See the [migration guide](https://docs.mem0.ai/migration/oss-v2-to-v3) for upgra
 
 ### Viettel extensions
 
-The internal `2.0.20+viettel.5` distribution keeps the native V3 extraction policy. Its `.3`
+The internal `2.0.20+viettel.6` distribution keeps the native V3 extraction policy. Its `.3`
 persisted contract adds optional PostgreSQL/pgvector idempotency: when
 `metadata.formation_event_id` is a UUID on a user-scoped `add(..., infer=True)` call, the pgvector
 adapter writes every generated memory and a collection-scoped receipt in one database transaction.
@@ -79,10 +79,16 @@ The `.5` package adds an opt-out for the auxiliary SQLite history (default remai
 extends formation receipts with the UUID of the conversation that created the memory row. KiRa
 disables auxiliary history because its bounded PostgreSQL conversation window is authoritative.
 
+The `.6` package adds an opt-in PostgreSQL ownership fence used by KiRa. Memory search excludes
+rows whose source conversation is missing or not active, and vector/receipt writes take a shared
+row lock on the active owner. Entity writes retain only links to existing, same-user memories with
+active owners. Native Mem0 behavior remains unchanged unless the fence is explicitly enabled.
+
 This extension requires the custom pgvector adapter and a pre-initialized
 `<collection>_formation_receipts` table. Other vector stores fail closed when an event-scoped
-formation is requested. SQLite history and entity links are derived, best-effort side effects after
-the atomic memory/receipt commit; they are not part of that transaction.
+formation is requested. SQLite history and entity links are derived side effects after the atomic
+memory/receipt commit; they are not part of that transaction. In fenced mode each entity write
+independently revalidates its linked memories and active owners.
 
 ## Research Highlights
 - **92.5 on LoCoMo** -- +21 points over the previous algorithm

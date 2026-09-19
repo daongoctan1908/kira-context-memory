@@ -11,6 +11,7 @@ from sqlalchemy import delete, func, insert, select, text, update
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from app.domain.errors.conversation import (
+    ConversationSourceUnavailableError,
     ConversationStoreOperationError,
     ConversationStoreProtocolError,
 )
@@ -818,7 +819,7 @@ async def test_same_session_is_isolated_by_user_and_boundary_is_exact(
         "private question",
         "private answer",
     ]
-    with pytest.raises(ConversationStoreProtocolError):
+    with pytest.raises(ConversationSourceUnavailableError):
         await adapter.read_through_boundary(
             other_user,
             first.reference.conversation_id,

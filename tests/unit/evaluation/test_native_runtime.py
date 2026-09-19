@@ -124,7 +124,7 @@ def _provenance() -> RunProvenance:
         prompt_sha256={"memory_extraction": "a" * 64, "rewrite_system": "b" * 64},
         package_versions={
             "kira-context-memory": "0.4.1",
-            "viettel-mem0": "2.0.20+viettel.5",
+            "viettel-mem0": "2.0.20+viettel.6",
         },
     )
 
@@ -321,6 +321,17 @@ class _RecordingStore:
     def __init__(self) -> None:
         self.schedule_flags: list[bool] = []
         self.last_reference: CompletedTurnReference | None = None
+        self.created_sessions: list[str] = []
+
+    async def create_conversation(self, user_id, *, title=None):
+        del user_id, title
+        session_id = f"managed-session-{len(self.created_sessions) + 1}"
+        self.created_sessions.append(session_id)
+        return SimpleNamespace(session_id=session_id)
+
+    async def is_conversation_active(self, user_id, session_id):
+        del user_id, session_id
+        return True
 
     async def read_recent(self, user_id, session_id, limit):
         del user_id, session_id, limit

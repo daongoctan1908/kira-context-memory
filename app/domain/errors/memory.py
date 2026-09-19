@@ -29,3 +29,10 @@ class LongTermMemoryOperationError(LongTermMemoryError):
 class LongTermMemoryProtocolError(LongTermMemoryError):
     def __init__(self) -> None:
         super().__init__("Long-term memory returned invalid data")
+
+
+class LongTermMemorySourceUnavailableError(LongTermMemoryError):
+    """The conversation that owns a formation operation is not active."""
+
+    def __init__(self) -> None:
+        super().__init__("Long-term memory source is no longer available")

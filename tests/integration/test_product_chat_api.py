@@ -212,6 +212,9 @@ class FakeStore:
     async def read_recent(self, *_args):
         return self.messages or ()
 
+    async def is_conversation_active(self, *_args):
+        return True
+
 
 def _settings(**overrides) -> Settings:
     values = {

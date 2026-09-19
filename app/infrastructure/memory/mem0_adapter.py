@@ -8,6 +8,7 @@ from typing import Any, Protocol
 
 import httpx
 from mem0.observability import bind_observer
+from mem0.vector_stores.pgvector import InactiveMemoryOwnerError
 
 from app.application.services.memory_policy import MEMORY_EXTRACTION_INSTRUCTIONS
 from app.config.runtime_contracts import MemoryRuntimeSettings
@@ -16,6 +17,7 @@ from app.domain.errors.memory import (
     LongTermMemoryConnectionError,
     LongTermMemoryOperationError,
     LongTermMemoryProtocolError,
+    LongTermMemorySourceUnavailableError,
     LongTermMemoryTimeoutError,
 )
 from app.domain.models.memory import (
@@ -75,6 +77,9 @@ def build_mem0_config(settings: MemoryRuntimeSettings) -> dict[str, object]:
                 "collection_name": settings.memory_collection_name,
                 "schema_name": settings.memory_schema,
                 "auto_create": False,
+                "enforce_active_conversation_ownership": True,
+                "conversation_schema_name": "public",
+                "conversation_table_name": "conversations",
                 "embedding_model_dims": settings.memory_embedding_dims,
                 "hnsw": True,
                 "diskann": False,
@@ -286,6 +291,8 @@ class Mem0Adapter:
 
     @staticmethod
     def _raise_mapped(error: Exception) -> None:
+        if isinstance(error, InactiveMemoryOwnerError):
+            raise LongTermMemorySourceUnavailableError from error
         if (
             isinstance(error, (httpx.TimeoutException, TimeoutError))
             or "Timeout" in type(error).__name__

@@ -68,6 +68,10 @@ class FakeConversationStore:
         self.user_ids.append(user_id)
         return ()
 
+    async def is_conversation_active(self, user_id, _session_id):
+        self.user_ids.append(user_id)
+        return True
+
     async def append_turn(
         self,
         user_id,

@@ -9,6 +9,7 @@ from uuid import uuid4
 import psycopg
 import pytest
 from psycopg import sql
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.config.settings import Settings
 from app.infrastructure.memory.mem0_adapter import Mem0Adapter, create_mem0_client
@@ -16,6 +17,7 @@ from app.infrastructure.memory.postgres_admin import (
     _initialize_memory_schema_sync,
     normalize_psycopg_dsn,
 )
+from app.infrastructure.postgres.conversation_store import PostgresConversationStoreAdapter
 from evaluation.compiler import compile_dataset
 from evaluation.isolation import create_isolation_plan
 from evaluation.models import Outcome, Profile, RetrievalInput
@@ -78,6 +80,7 @@ async def test_gold_fixture_uses_native_pgvector_retrieval_and_exact_cleanup() -
     psycopg_dsn = normalize_psycopg_dsn(database_url)
     client = None
     adapter = None
+    engine = create_async_engine(database_url)
     try:
         await asyncio.to_thread(
             _initialize_memory_schema_sync,
@@ -108,8 +111,10 @@ async def test_gold_fixture_uses_native_pgvector_retrieval_and_exact_cleanup() -
             patch("mem0.memory.main.EmbedderFactory.create", return_value=FixtureEmbedding()),
             patch("mem0.memory.main.LlmFactory.create", return_value=ExtractionMustNotRun()),
         ):
+            store = PostgresConversationStoreAdapter(engine)
+            await store.validate_schema()
             client = create_mem0_client(settings)
-            manager = GoldRetrievalFixtureManager(client, plan)
+            manager = GoldRetrievalFixtureManager(client, plan, store)
             fixture = await manager.setup((case,))
             adapter = Mem0Adapter(
                 client,
@@ -141,6 +146,7 @@ async def test_gold_fixture_uses_native_pgvector_retrieval_and_exact_cleanup() -
                 == ()
             )
     finally:
+        await engine.dispose()
         if adapter is not None:
             adapter.close()
         elif client is not None:

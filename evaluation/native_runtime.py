@@ -404,12 +404,13 @@ class PersistentRetrievalRuntime:
         client: GoldFixtureClient,
         evaluator: RetrievalEvaluator,
         formation: PersistentFormationRuntime,
+        conversation_store: PostgresConversationStoreAdapter | None = None,
     ) -> None:
         self._cases = tuple(case for case in cases if isinstance(case.inputs, RetrievalInput))
         self._evaluator = evaluator
         self._formation = formation
-        self._gold_manager = GoldRetrievalFixtureManager(client, plan)
-        self._formed_manager = FormationRetrievalFixtureManager(client, plan)
+        self._gold_manager = GoldRetrievalFixtureManager(client, plan, conversation_store)
+        self._formed_manager = FormationRetrievalFixtureManager(client, plan, conversation_store)
         self._gold: GoldRetrievalFixture | None = None
         self._formed: FormationRetrievalFixture | None = None
         self._lock = asyncio.Lock()
@@ -638,7 +639,11 @@ class NativeCrossSessionRuntime(CrossSessionRuntimePort):
             memory_search_timeout_seconds=self._settings.memory_search_timeout_seconds,
             memory_formation_enabled=False,
         )
-        actual_session = f"{resource.session_id}:{condition.value}"
+        conversation = await self._store.create_conversation(
+            resource.user_id,
+            title=f"evaluation:{condition.value}",
+        )
+        actual_session = conversation.session_id
         session = await use_case.execute(
             ChatCommand(session_id=actual_session, message=case.inputs.session_b_query),
             principal=AuthenticatedPrincipal(user_id=resource.user_id),
@@ -824,6 +829,7 @@ async def create_native_runtime(
         client=cast(GoldFixtureClient, memory_client),
         evaluator=retrieval_evaluator,
         formation=formation,
+        conversation_store=store,
     )
     process_job = ProcessMemoryJobUseCase(
         processor,

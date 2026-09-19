@@ -5,6 +5,7 @@ import uuid
 from unittest.mock import MagicMock, patch
 
 from mem0.vector_stores.pgvector import (
+    InactiveMemoryOwnerError,
     PGVector,
     _build_filter_conditions,
     _with_sslmode,
@@ -51,6 +52,133 @@ class TestPGVector(unittest.TestCase):
             schema_name="memory",
             auto_create=False,
         )
+
+    def _fenced_pgvector(self, *, owner_collection_name=None):
+        return PGVector(
+            dbname="unused",
+            collection_name="memories_entities" if owner_collection_name else "memories",
+            embedding_model_dims=3,
+            user=None,
+            password=None,
+            host=None,
+            port=None,
+            diskann=False,
+            hnsw=True,
+            connection_pool=self.mock_pool_psycopg,
+            schema_name="memory",
+            auto_create=False,
+            enforce_active_conversation_ownership=True,
+            conversation_schema_name="public",
+            conversation_table_name="conversations",
+            owner_collection_name=owner_collection_name,
+        )
+
+    def test_fenced_search_requires_authoritative_active_owner(self):
+        pgvector = self._fenced_pgvector()
+        pgvector._collection_ensured = True
+        self.mock_cursor.fetchall.return_value = []
+
+        with patch.object(pgvector, "_get_cursor") as get_cursor:
+            get_cursor.return_value.__enter__.return_value = self.mock_cursor
+            self.assertEqual(
+                pgvector.search("query", [1.0, 0.0, 0.0], filters={"user_id": "user-1"}),
+                [],
+            )
+
+        query = str(self.mock_cursor.execute.call_args.args[0])
+        self.assertIn("active_owner", query)
+        self.assertIn("conversations", query)
+        self.assertIn("conversation_id", query)
+
+    def test_fenced_formation_locks_active_owner_before_receipt_and_vectors(self):
+        pgvector = self._fenced_pgvector()
+        event_id = str(uuid.uuid4())
+        conversation_id = str(uuid.uuid4())
+        memory_id = str(uuid.uuid4())
+        result = [{"id": memory_id, "memory": "durable fact", "event": "ADD"}]
+        payload = {
+            "user_id": "user-1",
+            "formation_event_id": event_id,
+            "conversation_id": conversation_id,
+            "data": "durable fact",
+        }
+        self.mock_cursor.fetchone.side_effect = [(1,), (event_id,)]
+
+        with patch.object(pgvector, "_get_cursor") as get_cursor:
+            get_cursor.return_value.__enter__.return_value = self.mock_cursor
+            created, committed = pgvector.insert_with_formation_receipt(
+                [[1.0, 0.0, 0.0]],
+                [payload],
+                [memory_id],
+                event_id=event_id,
+                user_id="user-1",
+                conversation_id=conversation_id,
+                result=result,
+            )
+
+        self.assertTrue(created)
+        self.assertEqual(committed, result)
+        owner_query = str(self.mock_cursor.execute.call_args_list[0].args[0])
+        self.assertIn("FOR KEY SHARE", owner_query)
+        self.mock_cursor.executemany.assert_called_once()
+
+    def test_fenced_formation_rejects_missing_or_pending_owner_without_writes(self):
+        pgvector = self._fenced_pgvector()
+        self.mock_cursor.fetchone.return_value = None
+
+        with (
+            patch.object(pgvector, "_get_cursor") as get_cursor,
+            self.assertRaises(InactiveMemoryOwnerError),
+        ):
+            get_cursor.return_value.__enter__.return_value = self.mock_cursor
+            pgvector.insert_with_formation_receipt(
+                [],
+                [],
+                [],
+                event_id=str(uuid.uuid4()),
+                user_id="user-1",
+                conversation_id=str(uuid.uuid4()),
+                result=[],
+            )
+
+        self.assertEqual(self.mock_cursor.execute.call_count, 1)
+        self.mock_cursor.executemany.assert_not_called()
+
+    def test_entity_insert_drops_orphan_and_cross_owner_links(self):
+        pgvector = self._fenced_pgvector(owner_collection_name="memories")
+        pgvector._collection_ensured = True
+        active_id = str(uuid.uuid4())
+        missing_id = str(uuid.uuid4())
+        self.mock_cursor.fetchall.return_value = [(active_id,)]
+
+        with patch.object(pgvector, "_get_cursor") as get_cursor:
+            get_cursor.return_value.__enter__.return_value = self.mock_cursor
+            pgvector.insert(
+                [[1.0, 0.0, 0.0]],
+                payloads=[
+                    {
+                        "user_id": "user-1",
+                        "data": "Hanoi",
+                        "linked_memory_ids": [active_id, missing_id, "not-a-uuid"],
+                    }
+                ],
+                ids=[str(uuid.uuid4())],
+            )
+
+        inserted = self.mock_cursor.executemany.call_args.args[1][0]
+        self.assertIn(active_id, inserted[2])
+        self.assertNotIn(missing_id, inserted[2])
+
+        self.mock_cursor.reset_mock()
+        self.mock_cursor.fetchall.return_value = []
+        with patch.object(pgvector, "_get_cursor") as get_cursor:
+            get_cursor.return_value.__enter__.return_value = self.mock_cursor
+            pgvector.insert(
+                [[1.0, 0.0, 0.0]],
+                payloads=[{"user_id": "user-1", "linked_memory_ids": [active_id]}],
+                ids=[str(uuid.uuid4())],
+            )
+        self.mock_cursor.executemany.assert_not_called()
 
     def test_exact_formation_receipt_lookup_does_not_use_semantic_search(self):
         pgvector = self._runtime_pgvector()

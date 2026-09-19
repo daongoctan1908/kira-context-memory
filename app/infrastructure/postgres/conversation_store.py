@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 from app.domain.errors.conversation import (
     ChatRequestConflictError,
     ChatRequestLeaseLostError,
+    ConversationSourceUnavailableError,
     ConversationStoreConfigurationError,
     ConversationStoreConnectionError,
     ConversationStoreOperationError,
@@ -269,6 +270,24 @@ class PostgresConversationStoreAdapter:
                     )
                 )
                 return True
+        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+            self._raise_mapped(error)
+
+    async def is_conversation_active(self, user_id: str, session_id: str) -> bool:
+        """Check the authoritative owner/status immediately before context use."""
+        self._require_conversation_management_schema()
+        if not user_id.strip():
+            raise ValueError("user_id must not be empty")
+        if not session_id.strip():
+            raise ValueError("session_id must not be empty")
+        statement = select(conversations.c.conversation_id).where(
+            conversations.c.user_id == user_id,
+            conversations.c.session_id == session_id,
+            conversations.c.status == ConversationStatus.ACTIVE.value,
+        )
+        try:
+            async with self._engine.connect() as connection:
+                return await connection.scalar(statement) is not None
         except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
             self._raise_mapped(error)
 
@@ -775,6 +794,7 @@ class PostgresConversationStoreAdapter:
             .where(
                 conversations.c.user_id == user_id,
                 conversations.c.conversation_id == conversation_id,
+                conversations.c.status == ConversationStatus.ACTIVE.value,
                 conversation_messages.c.message_id == boundary_message_id,
                 conversation_messages.c.message_index == 1,
             )
@@ -809,9 +829,9 @@ class PostgresConversationStoreAdapter:
             async with self._engine.connect() as connection:
                 session_id = await connection.scalar(owner_query)
                 if session_id is None:
-                    raise ConversationStoreProtocolError
+                    raise ConversationSourceUnavailableError
                 rows = (await connection.execute(chronological)).mappings().all()
-        except ConversationStoreProtocolError:
+        except (ConversationStoreProtocolError, ConversationSourceUnavailableError):
             raise
         except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
             self._raise_mapped(error)

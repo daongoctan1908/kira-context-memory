@@ -222,6 +222,7 @@ class MemoryJobTelemetry:
     ) -> None:
         outcome = {
             MemoryJobProcessOutcome.COMPLETED: "success",
+            MemoryJobProcessOutcome.SKIPPED: "skipped",
             MemoryJobProcessOutcome.RETRY: "retry",
             MemoryJobProcessOutcome.DEAD: "dead",
         }[result.outcome]

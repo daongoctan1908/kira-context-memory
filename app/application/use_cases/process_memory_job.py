@@ -10,6 +10,7 @@ from typing import Protocol
 from uuid import UUID
 
 from app.domain.errors.conversation import (
+    ConversationSourceUnavailableError,
     ConversationStoreConfigurationError,
     ConversationStoreConnectionError,
     ConversationStoreOperationError,
@@ -20,6 +21,7 @@ from app.domain.errors.memory import (
     LongTermMemoryConnectionError,
     LongTermMemoryOperationError,
     LongTermMemoryProtocolError,
+    LongTermMemorySourceUnavailableError,
     LongTermMemoryTimeoutError,
 )
 from app.domain.models.conversation import CompletedTurnReference
@@ -51,6 +53,10 @@ _PERMANENT_ERRORS = (
     LongTermMemoryConfigurationError,
     LongTermMemoryProtocolError,
 )
+_SOURCE_UNAVAILABLE_ERRORS = (
+    ConversationSourceUnavailableError,
+    LongTermMemorySourceUnavailableError,
+)
 
 
 class MemoryProcessor(Protocol):
@@ -67,6 +73,7 @@ class MemoryJobProcessOutcome(StrEnum):
     """Low-cardinality result of one claimed-job delivery."""
 
     COMPLETED = "completed"
+    SKIPPED = "skipped"
     RETRY = "retry"
     DEAD = "dead"
 
@@ -120,6 +127,8 @@ class ProcessMemoryJobUseCase:
 
         try:
             result = await self._process_memory.execute(job.reference, job.event_id)
+        except _SOURCE_UNAVAILABLE_ERRORS:
+            return await self._skip(job)
         except _PERMANENT_ERRORS as error:
             return await self._dead_letter(job, error)
         except _RETRYABLE_ERRORS as error:
@@ -147,6 +156,21 @@ class ProcessMemoryJobUseCase:
             outcome=MemoryJobProcessOutcome.COMPLETED,
             lifecycle_event_count=lifecycle_event_count,
         )
+
+    async def _skip(self, job: MemoryJob) -> ProcessMemoryJobResult:
+        """Terminally acknowledge a job whose source can no longer own memories."""
+        with self._transition_stage("skip") as observation:
+            try:
+                await self._queue.complete(
+                    job.event_id,
+                    job.lease_token,
+                    lifecycle_event_count=0,
+                )
+            except BaseException:
+                _observe(observation.set_outcome, "error")
+                raise
+            _observe(observation.set_outcome, "skipped")
+        return ProcessMemoryJobResult(outcome=MemoryJobProcessOutcome.SKIPPED)
 
     async def _retry(
         self,

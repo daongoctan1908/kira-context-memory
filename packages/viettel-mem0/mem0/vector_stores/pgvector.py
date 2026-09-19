@@ -154,6 +154,10 @@ def _validate_formation_identity(event_id: str, user_id: str, conversation_id: s
     return normalized_event_id, user_id, normalized_conversation_id
 
 
+class InactiveMemoryOwnerError(RuntimeError):
+    """The authoritative conversation owner is pending deletion or unavailable."""
+
+
 class OutputData(BaseModel):
     id: Optional[str]
     score: Optional[float]
@@ -179,6 +183,10 @@ class PGVector(VectorStoreBase):
         connection_pool=None,
         schema_name="public",
         auto_create=True,
+        enforce_active_conversation_ownership=False,
+        conversation_schema_name="public",
+        conversation_table_name="conversations",
+        owner_collection_name=None,
     ):
         """
         Initialize the PGVector database.
@@ -202,6 +210,10 @@ class PGVector(VectorStoreBase):
         self.collection_name = collection_name
         self.schema_name = schema_name
         self.auto_create = auto_create
+        self.enforce_active_conversation_ownership = enforce_active_conversation_ownership
+        self.conversation_schema_name = conversation_schema_name
+        self.conversation_table_name = conversation_table_name
+        self.owner_collection_name = owner_collection_name
         self.use_diskann = diskann
         self.use_hnsw = hnsw
         self.embedding_model_dims = embedding_model_dims
@@ -295,6 +307,81 @@ class PGVector(VectorStoreBase):
             f"{self.collection_name}_formation_receipts",
         )
 
+    def _conversation_table(self) -> "sql.Identifier":
+        return sql.Identifier(self.conversation_schema_name, self.conversation_table_name)
+
+    def _owner_collection(self) -> "sql.Identifier":
+        if self.owner_collection_name is None:
+            raise RuntimeError("owner collection is not configured")
+        return sql.Identifier(self.schema_name, self.owner_collection_name)
+
+    def _active_owner_condition(self) -> "sql.Composed":
+        return sql.SQL(
+            "EXISTS ("
+            "SELECT 1 FROM {} AS active_owner "
+            "WHERE active_owner.conversation_id::text = payload->>'conversation_id' "
+            "AND active_owner.user_id = payload->>'user_id' "
+            "AND active_owner.status = 'active'"
+            ")"
+        ).format(self._conversation_table())
+
+    def _filter_clause(self, conditions, *, prefix="WHERE"):
+        fragments = [sql.SQL(condition) for condition in conditions]
+        if self.enforce_active_conversation_ownership and self.owner_collection_name is None:
+            fragments.append(self._active_owner_condition())
+        if not fragments:
+            return sql.SQL("")
+        return sql.SQL(f"{prefix} ") + sql.SQL(" AND ").join(fragments)
+
+    def _require_active_owner(self, cur, user_id, conversation_id, *, lock):
+        lock_clause = sql.SQL(" FOR KEY SHARE") if lock else sql.SQL("")
+        cur.execute(
+            sql.SQL(
+                "SELECT 1 FROM {} "
+                "WHERE conversation_id = %s AND user_id = %s AND status = 'active'{}"
+            ).format(self._conversation_table(), lock_clause),
+            (conversation_id, user_id),
+        )
+        if cur.fetchone() is None:
+            raise InactiveMemoryOwnerError("memory owner is not active")
+
+    def _filter_active_entity_links(self, cur, payload):
+        if self.owner_collection_name is None:
+            return payload
+        if not isinstance(payload, dict):
+            return None
+        user_id = payload.get("user_id")
+        linked_ids = payload.get("linked_memory_ids")
+        if not isinstance(user_id, str) or not user_id.strip() or not isinstance(linked_ids, list):
+            return None
+        normalized_ids = []
+        for value in linked_ids:
+            try:
+                normalized_ids.append(str(UUID(str(value))))
+            except (TypeError, ValueError, AttributeError):
+                continue
+        if not normalized_ids:
+            return None
+        cur.execute(
+            sql.SQL(
+                "SELECT memory_row.id::text FROM {} AS memory_row "
+                "JOIN {} AS active_owner "
+                "ON active_owner.conversation_id::text = memory_row.payload->>'conversation_id' "
+                "WHERE memory_row.id = ANY(%s::uuid[]) "
+                "AND memory_row.payload->>'user_id' = %s "
+                "AND active_owner.user_id = %s "
+                "AND active_owner.status = 'active' "
+                "FOR KEY SHARE OF active_owner"
+            ).format(self._owner_collection(), self._conversation_table()),
+            (normalized_ids, user_id, user_id),
+        )
+        active_ids = sorted(row[0] for row in cur.fetchall())
+        if not active_ids:
+            return None
+        filtered = dict(payload)
+        filtered["linked_memory_ids"] = active_ids
+        return filtered
+
     def create_col(self) -> None:
         """
         Create a new collection (table in PostgreSQL).
@@ -377,21 +464,23 @@ class PGVector(VectorStoreBase):
     def insert(self, vectors: list[list[float]], payloads=None, ids=None) -> None:
         self._ensure_collection()
         logger.info(f"Inserting {len(vectors)} vectors into collection {self.collection_name}")
-        json_payloads = [json.dumps(payload) for payload in payloads]
-
-        data = [(id, vector, payload) for id, vector, payload in zip(ids, vectors, json_payloads)]
-        if PSYCOPG_VERSION == 3:
-            with self._get_cursor(commit=True) as cur:
+        with self._get_cursor(commit=True) as cur:
+            filtered_rows = []
+            for vector_id, vector, payload in zip(ids, vectors, payloads):
+                filtered = self._filter_active_entity_links(cur, payload)
+                if self.owner_collection_name is not None and filtered is None:
+                    continue
+                filtered_rows.append((vector_id, vector, json.dumps(filtered)))
+            if PSYCOPG_VERSION == 3 and filtered_rows:
                 cur.executemany(
                     sql.SQL("INSERT INTO {} (id, vector, payload) VALUES (%s, %s, %s)").format(self._col()),
-                    data,
+                    filtered_rows,
                 )
-        else:
-            with self._get_cursor(commit=True) as cur:
+            elif filtered_rows:
                 execute_values(
                     cur,
                     sql.SQL("INSERT INTO {} (id, vector, payload) VALUES %s").format(self._col()),
-                    data,
+                    filtered_rows,
                 )
 
     def get_formation_result(self, event_id: str, user_id: str, conversation_id: str):
@@ -402,6 +491,13 @@ class PGVector(VectorStoreBase):
             conversation_id,
         )
         with self._get_cursor() as cur:
+            if self.enforce_active_conversation_ownership:
+                self._require_active_owner(
+                    cur,
+                    user_id,
+                    conversation_id,
+                    lock=False,
+                )
             cur.execute(
                 sql.SQL(
                     "SELECT user_id, conversation_id::text, result FROM {} WHERE event_id = %s"
@@ -453,6 +549,13 @@ class PGVector(VectorStoreBase):
             for memory_id, vector, payload in zip(ids, vectors, json_payloads)
         ]
         with self._get_cursor(commit=True) as cur:
+            if self.enforce_active_conversation_ownership:
+                self._require_active_owner(
+                    cur,
+                    user_id,
+                    conversation_id,
+                    lock=True,
+                )
             cur.execute(
                 sql.SQL(
                     "INSERT INTO {} (event_id, user_id, conversation_id, result, memory_count) "
@@ -516,7 +619,7 @@ class PGVector(VectorStoreBase):
         """
         self._ensure_collection()
         filter_conditions, filter_params = _build_filter_conditions(filters)
-        filter_clause = sql.SQL("WHERE " + " AND ".join(filter_conditions)) if filter_conditions else sql.SQL("")
+        filter_clause = self._filter_clause(filter_conditions)
 
         with self._get_cursor() as cur:
             cur.execute(
@@ -547,7 +650,7 @@ class PGVector(VectorStoreBase):
         """
         self._ensure_collection()
         filter_conditions, filter_params = _build_filter_conditions(filters)
-        filter_clause = sql.SQL("AND " + " AND ".join(filter_conditions)) if filter_conditions else sql.SQL("")
+        filter_clause = self._filter_clause(filter_conditions, prefix="AND")
 
         try:
             with self._get_cursor() as cur:
@@ -596,6 +699,15 @@ class PGVector(VectorStoreBase):
         """
         self._ensure_collection()
         with self._get_cursor(commit=True) as cur:
+            if payload is not None:
+                filtered = self._filter_active_entity_links(cur, payload)
+                if self.owner_collection_name is not None and filtered is None:
+                    cur.execute(
+                        sql.SQL("DELETE FROM {} WHERE id = %s").format(self._col()),
+                        (vector_id,),
+                    )
+                    return
+                payload = filtered
             if vector is not None:
                cur.execute(
                     sql.SQL("UPDATE {} SET vector = %s WHERE id = %s").format(self._col()),
@@ -701,7 +813,7 @@ class PGVector(VectorStoreBase):
         """
         self._ensure_collection()
         filter_conditions, filter_params = _build_filter_conditions(filters)
-        filter_clause = sql.SQL("WHERE " + " AND ".join(filter_conditions)) if filter_conditions else sql.SQL("")
+        filter_clause = self._filter_clause(filter_conditions)
 
         with self._get_cursor() as cur:
             cur.execute(

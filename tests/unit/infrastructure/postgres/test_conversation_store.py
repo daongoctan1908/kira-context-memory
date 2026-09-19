@@ -9,6 +9,7 @@ from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 
 from app.domain.errors.conversation import (
     ChatRequestConflictError,
+    ConversationSourceUnavailableError,
     ConversationStoreConfigurationError,
     ConversationStoreConnectionError,
     ConversationStoreOperationError,
@@ -331,6 +332,25 @@ async def test_mark_deletion_pending_is_owned_and_idempotent() -> None:
     assert not await missing.mark_deletion_pending(USER_ID, "missing")
 
 
+async def test_active_conversation_check_requires_owner_and_active_status() -> None:
+    conversation_id = uuid4()
+    connection = FakeConnection()
+    store = adapter(connection)
+    await store.validate_schema()
+    connection.scalar_value = conversation_id
+
+    assert await store.is_conversation_active(USER_ID, "public-session")
+    statement = connection.calls[1][0]
+    compiled = statement.compile()
+    assert "conversations.user_id" in str(statement)
+    assert "conversations.session_id" in str(statement)
+    assert "conversations.status" in str(statement)
+    assert compiled.params["status_1"] == ConversationStatus.ACTIVE.value
+
+    connection.scalar_value = None
+    assert not await store.is_conversation_active(USER_ID, "public-session")
+
+
 def _chat_request_row(
     *,
     status: str = "processing",
@@ -594,8 +614,20 @@ async def test_read_through_boundary_requires_owned_assistant_and_orders_message
 
 
 async def test_read_through_boundary_rejects_unowned_boundary() -> None:
-    with pytest.raises(ConversationStoreProtocolError):
+    with pytest.raises(ConversationSourceUnavailableError):
         await adapter(FakeConnection(scalar=None)).read_through_boundary(USER_ID, uuid4(), 42, 10)
+
+
+async def test_read_through_boundary_requires_active_source() -> None:
+    connection = FakeConnection()
+    store = adapter(connection)
+    await store.validate_schema()
+    connection.scalar_value = None
+
+    with pytest.raises(ConversationSourceUnavailableError):
+        await store.read_through_boundary(USER_ID, uuid4(), 42, 10)
+
+    assert "conversations.status" in str(connection.calls[1][0])
 
 
 @pytest.mark.parametrize(

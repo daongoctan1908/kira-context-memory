@@ -33,6 +33,13 @@ class ConversationStoreProtocolError(ConversationStoreError):
         super().__init__("Conversation store returned invalid data")
 
 
+class ConversationSourceUnavailableError(ConversationStoreError):
+    """A memory job's source conversation is pending deletion or gone."""
+
+    def __init__(self) -> None:
+        super().__init__("Conversation source is no longer available")
+
+
 class ChatRequestConflictError(ConversationStoreError):
     """A client message identifier was reused with different content."""
 

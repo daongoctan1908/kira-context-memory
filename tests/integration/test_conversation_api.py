@@ -129,6 +129,9 @@ class FakeConversationStore:
     async def read_recent(self, *_args):
         return ()
 
+    async def is_conversation_active(self, *_args):
+        return True
+
     async def append_turn(self, *_args, **_kwargs):
         raise AssertionError("conversation API test must not append a chat turn")
 

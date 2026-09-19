@@ -17,6 +17,7 @@ from app.domain.errors.chat import (
 from app.domain.errors.conversation import (
     ChatRequestConflictError,
     ChatRequestLeaseLostError,
+    ConversationSourceUnavailableError,
     ConversationStoreConfigurationError,
     ConversationStoreConnectionError,
     ConversationStoreError,
@@ -38,6 +39,7 @@ from app.domain.errors.memory import (
     LongTermMemoryError,
     LongTermMemoryOperationError,
     LongTermMemoryProtocolError,
+    LongTermMemorySourceUnavailableError,
     LongTermMemoryTimeoutError,
 )
 from app.domain.errors.memory_job import (
@@ -71,6 +73,7 @@ __all__ = [
     "ConversationStoreError",
     "ConversationStoreOperationError",
     "ConversationStoreProtocolError",
+    "ConversationSourceUnavailableError",
     "KiraAuthenticationError",
     "KiraClientError",
     "KiraConnectionError",
@@ -86,6 +89,7 @@ __all__ = [
     "LongTermMemoryError",
     "LongTermMemoryOperationError",
     "LongTermMemoryProtocolError",
+    "LongTermMemorySourceUnavailableError",
     "LongTermMemoryTimeoutError",
     "MemoryJobLeaseLostError",
     "MemoryJobQueueConfigurationError",

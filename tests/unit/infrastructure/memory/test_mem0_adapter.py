@@ -4,12 +4,14 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
+from mem0.vector_stores.pgvector import InactiveMemoryOwnerError
 
 from app.application.services.memory_policy import MEMORY_EXTRACTION_INSTRUCTIONS
 from app.config.settings import Settings
 from app.domain.errors.memory import (
     LongTermMemoryConnectionError,
     LongTermMemoryProtocolError,
+    LongTermMemorySourceUnavailableError,
     LongTermMemoryTimeoutError,
 )
 from app.domain.models.conversation import (
@@ -102,6 +104,9 @@ def test_build_config_pins_internal_endpoints_and_forbids_runtime_ddl():
     vector = config["vector_store"]["config"]
     assert vector["schema_name"] == "memory"
     assert vector["auto_create"] is False
+    assert vector["enforce_active_conversation_ownership"] is True
+    assert vector["conversation_schema_name"] == "public"
+    assert vector["conversation_table_name"] == "conversations"
     assert vector["connection_string"].startswith("postgresql://")
     assert config["embedder"]["config"]["model"] == "viettel-embedding"
     assert config["llm"]["config"]["model"] == "viettel-memory-llm"
@@ -324,6 +329,11 @@ async def test_process_memory_rejects_malformed_lifecycle_rows(response):
 async def test_provider_failures_are_sanitized(error, expected):
     with pytest.raises(expected):
         await adapter(FakeMem0(error=error)).search("user-1", "query", top_k=5, threshold=0.1)
+
+
+async def test_inactive_memory_owner_maps_to_terminal_source_error():
+    with pytest.raises(LongTermMemorySourceUnavailableError):
+        await adapter(FakeMem0(error=InactiveMemoryOwnerError())).process_memory(source())
 
 
 async def test_adapter_deadline_maps_to_timeout():

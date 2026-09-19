@@ -30,7 +30,7 @@ _CANDIDATE_SHA = "1" * 40
 def _provenance(variant: BenchmarkVariant) -> RunProvenance:
     runtime_sha = _CONTROL_SHA if variant is BenchmarkVariant.HISTORICAL_CONTROL else _CANDIDATE_SHA
     package = (
-        "2.0.20+viettel.3" if variant is BenchmarkVariant.HISTORICAL_CONTROL else "2.0.20+viettel.5"
+        "2.0.20+viettel.3" if variant is BenchmarkVariant.HISTORICAL_CONTROL else "2.0.20+viettel.6"
     )
     return RunProvenance(
         variant=variant,

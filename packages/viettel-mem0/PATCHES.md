@@ -75,3 +75,16 @@ required, and the Phase 3 runtime remains rollback-compatible.
 The extraction, embedding, hash deduplication, entity linking, and returned lifecycle semantics are
 unchanged. This is a persisted receipt-contract change: application schema version 3 backfills the
 owner from vector payloads or durable memory jobs and refuses to guess unresolved ownership.
+
+## Active conversation ownership fence: `2.0.20+viettel.6`
+
+- Add an opt-in PostgreSQL ownership fence; the native default is disabled.
+- Filter semantic, keyword, and list reads to memories whose payload owner matches an active
+  authoritative conversation.
+- Lock the active conversation row with `FOR KEY SHARE` in the vector/receipt transaction so a
+  concurrent deletion mark using `FOR UPDATE` is serialized with late formation writes.
+- Revalidate entity links in their own write transaction and drop missing, cross-user, or inactive
+  memory IDs so entity side effects cannot recreate orphan links after deletion.
+
+The memory table and receipt shape remain schema version 3. Existing `.5` schema metadata upgrades
+in place to `.6`; no vector, receipt, or application conversation data is rewritten.

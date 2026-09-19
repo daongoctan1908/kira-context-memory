@@ -54,6 +54,10 @@ class ConversationStorePort(Protocol):
         """Mark an owned conversation for deletion, returning false when not found."""
         ...
 
+    async def is_conversation_active(self, user_id: str, session_id: str) -> bool:
+        """Return whether the owned conversation still accepts context and writes."""
+        ...
+
     async def reserve_chat_request(
         self,
         user_id: str,

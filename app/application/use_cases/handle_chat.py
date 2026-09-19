@@ -8,7 +8,11 @@ from typing import Self
 from uuid import uuid4
 
 from app.application.services.context_builder import ContextBuilder
-from app.domain.errors.conversation import ConversationStoreError, ConversationStoreProtocolError
+from app.domain.errors.conversation import (
+    ConversationSourceUnavailableError,
+    ConversationStoreError,
+    ConversationStoreProtocolError,
+)
 from app.domain.errors.memory import (
     LongTermMemoryError,
     LongTermMemoryProtocolError,
@@ -463,6 +467,13 @@ class HandleChatUseCase:
             self._record_bypass_stage("rewrite.generate", kind="client")
             return command.message
 
+        if not await self._conversation_is_active(user_id, command.session_id, correlation_id):
+            self._observer.context_observed(0, 0)
+            self._observer.rewrite_observed("bypass", None)
+            self._record_bypass_stage("context.build")
+            self._record_bypass_stage("rewrite.generate", kind="client")
+            return command.message
+
         try:
             if any(message.session_id != command.session_id for message in recent_result):
                 raise ConversationStoreProtocolError()
@@ -585,6 +596,43 @@ class HandleChatUseCase:
             await asyncio.gather(*tasks, return_exceptions=True)
             raise
         return recent_result, memory_result
+
+    async def _conversation_is_active(
+        self,
+        user_id: str,
+        session_id: str,
+        correlation_id: str,
+    ) -> bool:
+        with self._observer.stage(
+            "conversation.check_active",
+            kind="client",
+        ) as observation:
+            try:
+                async with asyncio.timeout(self._store_timeout):
+                    active = await self._store.is_conversation_active(user_id, session_id)
+            except (ConversationStoreError, TimeoutError) as error:
+                observation.set_outcome("error")
+                self._observer.degraded(
+                    correlation_id,
+                    "postgres_read",
+                    type(error).__name__,
+                    "original_query",
+                )
+                return False
+            except BaseException:
+                observation.set_outcome("error")
+                raise
+            if not active:
+                observation.set_outcome("inactive")
+                self._observer.degraded(
+                    correlation_id,
+                    "postgres_read",
+                    ConversationSourceUnavailableError.__name__,
+                    "original_query",
+                )
+                return False
+            observation.set_outcome("active")
+            return True
 
     async def _read_recent(
         self,

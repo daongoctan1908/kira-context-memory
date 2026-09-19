@@ -105,6 +105,11 @@ class ManagedPostgresConversationStore:
             await self.validate_schema()
             return await self._adapter.mark_deletion_pending(user_id, session_id)
 
+    async def is_conversation_active(self, user_id: str, session_id: str) -> bool:
+        async with self._operation():
+            await self.validate_schema()
+            return await self._adapter.is_conversation_active(user_id, session_id)
+
     async def reserve_chat_request(
         self,
         user_id: str,

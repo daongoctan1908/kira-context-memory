@@ -20,6 +20,7 @@ WriteOutcome = Literal["inserted", "duplicate", "error"]
 StageKind = Literal["internal", "client", "producer"]
 StageName = Literal[
     "identity.resolve",
+    "conversation.check_active",
     "conversation.read_recent",
     "memory.search",
     "context.build",

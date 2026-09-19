@@ -51,6 +51,7 @@ _SPAN_KINDS: dict[StageKind, SpanKind] = {
 }
 _LANGFUSE_TYPES: dict[StageName, str] = {
     "identity.resolve": "span",
+    "conversation.check_active": "span",
     "conversation.read_recent": "span",
     "memory.search": "retriever",
     "context.build": "chain",
