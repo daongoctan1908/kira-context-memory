@@ -258,6 +258,23 @@ cùng origin; nếu thiếu biến này container sẽ dừng thay vì chạy v�
 browser smoke trên image đang mở ở cổng 8080 bằng cách đặt
 `PLAYWRIGHT_BASE_URL=http://127.0.0.1:8080` rồi chạy `corepack pnpm test:e2e` trong `frontend/`.
 
+### Local product stack
+
+T10.1 có stack product synthetic riêng: auth/session API thật, PostgreSQL + migration/init,
+Gateway, Worker, frontend production image và bốn provider mock explicit. Stack không gọi KiRa,
+OpenAI hay provider bên ngoài:
+
+```powershell
+docker compose -f compose.product.yaml config --quiet
+docker compose -f compose.product.yaml up -d --build --wait
+uv run python -m scripts.smoke_product_stack
+```
+
+Mở `http://127.0.0.1:18080`, đăng nhập bằng tài khoản disposable `local-admin` /
+`local-product-only`. Smoke đi qua frontend proxy và kiểm tra cả formation lẫn retrieval/rewrite
+chéo hai conversation. Chi tiết startup, port override, cleanup và observability overlay nằm tại
+[`docs/t10.1-local-product-stack.md`](docs/t10.1-local-product-stack.md).
+
 Khởi động PostgreSQL local, apply migration và chạy integration test thật:
 
 ```powershell

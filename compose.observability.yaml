@@ -1,5 +1,5 @@
-# Local OTel overlay. Use with: docker compose -f compose.week4.yaml
-# -f compose.observability.yaml --profile metrics up -d --build --wait
+# Optional local OTel overlay for compose.week4.yaml or compose.product.yaml.
+# Add --profile metrics only when Prometheus/Grafana are also needed.
 services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.160.0@sha256:799dc6cf12c96192af37b5bdba804da8c10b3bc563b43cb90c3f3c58d9572ad6
