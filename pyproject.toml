@@ -28,6 +28,7 @@ dependencies = [
 
 [project.scripts]
 kira-memory-jobs = "worker.job_admin:main"
+kira-auth-admin = "app.admin.auth_admin:main"
 
 [project.optional-dependencies]
 evaluation = ["python-dotenv>=1.0,<2.0"]

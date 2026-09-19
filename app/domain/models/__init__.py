@@ -1,6 +1,6 @@
 """Domain models used by KiRa application ports."""
 
-from app.domain.models.auth import AuthSession, AuthUser, IssuedSession
+from app.domain.models.auth import AuthSession, AuthUser, AuthUserSummary, IssuedSession
 from app.domain.models.chat import ChatCommand
 from app.domain.models.context import ConversationContext
 from app.domain.models.conversation import (
@@ -37,6 +37,7 @@ __all__ = [
     "AppendTurnResult",
     "AuthSession",
     "AuthUser",
+    "AuthUserSummary",
     "AuthenticatedPrincipal",
     "ChatCommand",
     "CompletedTurnReference",

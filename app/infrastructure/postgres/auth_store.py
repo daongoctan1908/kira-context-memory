@@ -4,19 +4,32 @@ from builtins import TimeoutError as BuiltinTimeoutError
 from datetime import datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import insert, select, update
+from sqlalchemy import insert, select, text, update
 from sqlalchemy.exc import DBAPIError, IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.domain.errors.auth import AuthConflictError, AuthStoreError
-from app.domain.models.auth import AuthSession, AuthUser
+from app.domain.models.auth import AuthSession, AuthUser, AuthUserSummary
 from app.domain.models.identity import AuthenticatedPrincipal
-from app.infrastructure.postgres.schema import auth_sessions, auth_users
+from app.infrastructure.postgres.schema import (
+    SUPPORTED_SCHEMA_REVISIONS,
+    auth_sessions,
+    auth_users,
+)
 
 
 class PostgresAuthStore:
     def __init__(self, engine: AsyncEngine) -> None:
         self._engine = engine
+
+    async def validate_schema(self) -> None:
+        try:
+            async with self._engine.connect() as connection:
+                revision = await connection.scalar(text("SELECT version_num FROM alembic_version"))
+        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+            self._raise_mapped(error)
+        if revision not in SUPPORTED_SCHEMA_REVISIONS:
+            raise AuthStoreError from None
 
     async def find_user_by_username(self, username: str) -> AuthUser | None:
         statement = select(auth_users).where(auth_users.c.username == username)
@@ -214,6 +227,93 @@ class PostgresAuthStore:
                 )
         except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
             self._raise_mapped(error)
+
+    async def create_user(
+        self,
+        *,
+        user_id: UUID,
+        username: str,
+        password_hash: str,
+        now: datetime,
+    ) -> None:
+        try:
+            async with self._engine.begin() as connection:
+                await connection.execute(
+                    insert(auth_users).values(
+                        user_id=user_id,
+                        username=username,
+                        password_hash=password_hash,
+                        created_at=now,
+                        updated_at=now,
+                        password_changed_at=now,
+                    )
+                )
+        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+            self._raise_mapped(error)
+
+    async def set_user_enabled(
+        self,
+        user_id: UUID,
+        *,
+        enabled: bool,
+        now: datetime,
+    ) -> None:
+        try:
+            async with self._engine.begin() as connection:
+                await connection.execute(
+                    update(auth_users)
+                    .where(auth_users.c.user_id == user_id)
+                    .values(enabled=enabled, updated_at=now)
+                )
+                if not enabled:
+                    await connection.execute(
+                        update(auth_sessions)
+                        .where(
+                            auth_sessions.c.user_id == user_id,
+                            auth_sessions.c.revoked_at.is_(None),
+                        )
+                        .values(revoked_at=now)
+                    )
+        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+            self._raise_mapped(error)
+
+    async def revoke_user_sessions(self, user_id: UUID, *, now: datetime) -> int:
+        try:
+            async with self._engine.begin() as connection:
+                result = await connection.execute(
+                    update(auth_sessions)
+                    .where(
+                        auth_sessions.c.user_id == user_id,
+                        auth_sessions.c.revoked_at.is_(None),
+                    )
+                    .values(revoked_at=now)
+                )
+                return max(result.rowcount or 0, 0)
+        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+            self._raise_mapped(error)
+
+    async def list_users(self, *, limit: int) -> tuple[AuthUserSummary, ...]:
+        if not 1 <= limit <= 1000:
+            raise ValueError("auth user list limit must be between 1 and 1000")
+        statement = (
+            select(
+                auth_users.c.user_id,
+                auth_users.c.username,
+                auth_users.c.enabled,
+                auth_users.c.failed_login_count,
+                auth_users.c.locked_until,
+                auth_users.c.created_at,
+                auth_users.c.password_changed_at,
+            )
+            .order_by(auth_users.c.username.asc(), auth_users.c.user_id.asc())
+            .limit(limit)
+        )
+        try:
+            async with self._engine.connect() as connection:
+                rows = (await connection.execute(statement)).mappings().all()
+        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+            self._raise_mapped(error)
+        return tuple(AuthUserSummary(**row) for row in rows)
 
     @staticmethod
     def _session_is_active(row, now: datetime) -> bool:

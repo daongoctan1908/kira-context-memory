@@ -61,3 +61,27 @@ class IssuedSession:
         if not self.username or not self.session_token or not self.csrf_token:
             raise ValueError("issued session fields must not be empty")
         _aware(self.absolute_expires_at, "absolute_expires_at")
+
+
+@dataclass(frozen=True, slots=True)
+class AuthUserSummary:
+    user_id: UUID
+    username: str
+    enabled: bool
+    failed_login_count: int
+    locked_until: datetime | None
+    created_at: datetime
+    password_changed_at: datetime
+
+    def __post_init__(self) -> None:
+        if not self.username or self.username != self.username.lower():
+            raise ValueError("username must be normalized")
+        if self.failed_login_count < 0:
+            raise ValueError("failed login count must not be negative")
+        for name, value in (
+            ("created_at", self.created_at),
+            ("password_changed_at", self.password_changed_at),
+        ):
+            _aware(value, name)
+        if self.locked_until is not None:
+            _aware(self.locked_until, "locked_until")

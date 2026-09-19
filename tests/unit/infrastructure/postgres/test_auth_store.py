@@ -16,14 +16,19 @@ _SESSION_ID = UUID("22222222-2222-4222-8222-222222222222")
 
 
 class FakeResult:
-    def __init__(self, row=None) -> None:
+    def __init__(self, row=None, *, rows=(), rowcount=0) -> None:
         self.row = row
+        self.rows = rows
+        self.rowcount = rowcount
 
     def mappings(self):
         return self
 
     def one_or_none(self):
         return self.row
+
+    def all(self):
+        return self.rows
 
 
 class FakeConnection:
@@ -40,6 +45,13 @@ class FakeConnection:
     async def execute(self, statement):
         self.calls.append(statement)
         result = self.results.popleft() if self.results else FakeResult()
+        if isinstance(result, BaseException):
+            raise result
+        return result
+
+    async def scalar(self, statement):
+        self.calls.append(statement)
+        result = self.results.popleft() if self.results else None
         if isinstance(result, BaseException):
             raise result
         return result
@@ -237,3 +249,48 @@ async def test_store_maps_integrity_and_database_errors_without_messages() -> No
     with pytest.raises(AuthStoreError) as unavailable:
         await _store(FakeConnection((SQLAlchemyError("secret"),))).find_user_by_username("alice")
     assert str(unavailable.value) == ""
+
+
+async def test_admin_operations_create_disable_revoke_list_and_validate_schema() -> None:
+    validated = FakeConnection(("20260919_0005",))
+    await _store(validated).validate_schema()
+    with pytest.raises(AuthStoreError):
+        await _store(FakeConnection(("old",))).validate_schema()
+
+    created = FakeConnection((FakeResult(),))
+    await _store(created).create_user(
+        user_id=_USER_ID,
+        username="alice",
+        password_hash="password-hash",
+        now=_NOW,
+    )
+    values = created.calls[0].compile().params
+    assert values["username"] == "alice"
+    assert values["password_hash"] == "password-hash"
+
+    disabled = FakeConnection((FakeResult(), FakeResult()))
+    await _store(disabled).set_user_enabled(_USER_ID, enabled=False, now=_NOW)
+    assert disabled.calls[0].compile().params["enabled"] is False
+    assert disabled.calls[1].compile().params["revoked_at"] == _NOW
+
+    enabled = FakeConnection((FakeResult(),))
+    await _store(enabled).set_user_enabled(_USER_ID, enabled=True, now=_NOW)
+    assert len(enabled.calls) == 1
+
+    revoked = FakeConnection((FakeResult(rowcount=3),))
+    assert await _store(revoked).revoke_user_sessions(_USER_ID, now=_NOW) == 3
+
+    summary = {
+        "user_id": _USER_ID,
+        "username": "alice",
+        "enabled": True,
+        "failed_login_count": 0,
+        "locked_until": None,
+        "created_at": _NOW,
+        "password_changed_at": _NOW,
+    }
+    listed = await _store(FakeConnection((FakeResult(rows=(summary,)),))).list_users(limit=100)
+    assert len(listed) == 1
+    assert listed[0].username == "alice"
+    with pytest.raises(ValueError, match="between 1 and 1000"):
+        await _store(FakeConnection()).list_users(limit=0)

@@ -10,6 +10,7 @@ from sqlalchemy import delete, insert, select
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.application.services.auth import AuthService, hash_session_token
+from app.application.services.auth_admin import AuthAdminService
 from app.domain.errors.auth import InvalidCredentialsError, InvalidSessionError
 from app.infrastructure.auth import PwdlibPasswordHasher
 from app.infrastructure.postgres.auth_store import PostgresAuthStore
@@ -88,11 +89,21 @@ async def test_real_login_lockout_resolve_and_password_change(engine) -> None:
         with pytest.raises(InvalidSessionError):
             await service.resolve(issued.session_token)
         replacement = await service.login(username, "replacement-password-123")
-        await service.logout(replacement.session_token)
+        admin = AuthAdminService(PostgresAuthStore(engine), hasher)
+        assert await admin.set_enabled(username, enabled=False)
+        with pytest.raises(InvalidSessionError):
+            await service.resolve(replacement.session_token)
+        assert await admin.set_enabled(username, enabled=True)
+        with pytest.raises(InvalidSessionError):
+            await service.resolve(replacement.session_token)
+        fresh = await service.login(username, "replacement-password-123")
+        assert await admin.revoke_sessions(username) == 1
+        with pytest.raises(InvalidSessionError):
+            await service.resolve(fresh.session_token)
         async with engine.connect() as connection:
             revoked = await connection.scalar(
                 select(auth_sessions.c.revoked_at).where(
-                    auth_sessions.c.token_hash == hash_session_token(replacement.session_token)
+                    auth_sessions.c.token_hash == hash_session_token(fresh.session_token)
                 )
             )
         assert revoked is not None

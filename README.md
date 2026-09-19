@@ -232,6 +232,22 @@ uv run pytest -m postgres_integration --no-cov
 Remove-Item Env:POSTGRES_TEST_URL
 ```
 
+Production không có public signup. Sau migration, quản trị tài khoản bằng CLI; password mặc định
+được nhập qua prompt ẩn, hoặc đọc đúng một dòng từ stdin cho automation:
+
+```powershell
+uv run kira-auth-admin create --username alice
+$env:NEW_KIRA_PASSWORD | uv run kira-auth-admin reset-password --username alice --password-stdin
+uv run kira-auth-admin disable --username alice
+uv run kira-auth-admin enable --username alice
+uv run kira-auth-admin revoke-sessions --username alice
+uv run kira-auth-admin list --limit 100
+```
+
+Không truyền password bằng command-line argument. Production phải cấu hình `AUTH_ENABLED=true`,
+`AUTH_ALLOWED_ORIGIN=https://...` và `AUTH_COOKIE_SECURE=true`; session cookie là
+`__Host-kira_session` với `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/`.
+
 Khởi tạo pgvector memory schema sau khi cấu hình embedding endpoint/model/dimension:
 
 ```powershell

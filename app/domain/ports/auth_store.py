@@ -4,10 +4,12 @@ from datetime import datetime, timedelta
 from typing import Protocol
 from uuid import UUID
 
-from app.domain.models.auth import AuthSession, AuthUser
+from app.domain.models.auth import AuthSession, AuthUser, AuthUserSummary
 
 
 class AuthStorePort(Protocol):
+    async def validate_schema(self) -> None: ...
+
     async def find_user_by_username(self, username: str) -> AuthUser | None: ...
 
     async def record_login_failure(
@@ -57,3 +59,24 @@ class AuthStorePort(Protocol):
         password_hash: str,
         now: datetime,
     ) -> None: ...
+
+    async def create_user(
+        self,
+        *,
+        user_id: UUID,
+        username: str,
+        password_hash: str,
+        now: datetime,
+    ) -> None: ...
+
+    async def set_user_enabled(
+        self,
+        user_id: UUID,
+        *,
+        enabled: bool,
+        now: datetime,
+    ) -> None: ...
+
+    async def revoke_user_sessions(self, user_id: UUID, *, now: datetime) -> int: ...
+
+    async def list_users(self, *, limit: int) -> tuple[AuthUserSummary, ...]: ...
