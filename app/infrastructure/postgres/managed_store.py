@@ -3,6 +3,7 @@
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
@@ -13,6 +14,8 @@ from app.domain.errors.conversation import (
 )
 from app.domain.models.conversation import (
     AppendTurnResult,
+    ChatRequestReservation,
+    ChatRequestStatus,
     ConversationHistoryPage,
     ConversationListCursor,
     ConversationMessage,
@@ -101,6 +104,44 @@ class ManagedPostgresConversationStore:
         async with self._operation():
             await self.validate_schema()
             return await self._adapter.mark_deletion_pending(user_id, session_id)
+
+    async def reserve_chat_request(
+        self,
+        user_id: str,
+        session_id: str,
+        client_message_id: UUID,
+        content_hash: bytes,
+        *,
+        now: datetime,
+        lease_seconds: float,
+    ) -> ChatRequestReservation | None:
+        async with self._operation():
+            await self.validate_schema()
+            return await self._adapter.reserve_chat_request(
+                user_id,
+                session_id,
+                client_message_id,
+                content_hash,
+                now=now,
+                lease_seconds=lease_seconds,
+            )
+
+    async def abandon_chat_request(
+        self,
+        request_id: UUID,
+        lease_token: UUID,
+        *,
+        status: ChatRequestStatus,
+        now: datetime,
+    ) -> bool:
+        async with self._operation():
+            await self.validate_schema()
+            return await self._adapter.abandon_chat_request(
+                request_id,
+                lease_token,
+                status=status,
+                now=now,
+            )
 
     async def read_recent(
         self,

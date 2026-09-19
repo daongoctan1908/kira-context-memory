@@ -23,6 +23,80 @@ class ConversationStatus(StrEnum):
     DELETION_PENDING = "deletion_pending"
 
 
+class ChatRequestStatus(StrEnum):
+    """Durable processing state for one idempotent client message."""
+
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class ChatRequestReservationOutcome(StrEnum):
+    """Result of attempting to own one client message request."""
+
+    ACQUIRED = "acquired"
+    RECLAIMED = "reclaimed"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+
+
+@dataclass(frozen=True, slots=True)
+class ChatRequestReservation:
+    """Fenced reservation returned to the request that may call KiRa."""
+
+    request_id: UUID
+    conversation_id: UUID
+    client_message_id: UUID
+    turn_id: str
+    status: ChatRequestStatus
+    outcome: ChatRequestReservationOutcome
+    attempt_count: int
+    lease_token: UUID | None
+    lease_expires_at: datetime | None
+
+    def __post_init__(self) -> None:
+        for name in ("request_id", "conversation_id", "client_message_id"):
+            if not isinstance(getattr(self, name), UUID):
+                raise ValueError(f"{name} must be a UUID")
+        if not self.turn_id.strip():
+            raise ValueError("turn_id must not be empty")
+        if not isinstance(self.status, ChatRequestStatus):
+            raise ValueError("status must be a supported chat request status")
+        if not isinstance(self.outcome, ChatRequestReservationOutcome):
+            raise ValueError("outcome must be a supported reservation outcome")
+        if (
+            isinstance(self.attempt_count, bool)
+            or not isinstance(self.attempt_count, int)
+            or self.attempt_count < 1
+        ):
+            raise ValueError("attempt_count must be positive")
+        owns_attempt = self.outcome in {
+            ChatRequestReservationOutcome.ACQUIRED,
+            ChatRequestReservationOutcome.RECLAIMED,
+        }
+        if owns_attempt:
+            if self.status is not ChatRequestStatus.PROCESSING or not isinstance(
+                self.lease_token, UUID
+            ):
+                raise ValueError("owned reservations must carry a processing lease")
+            if self.lease_expires_at is None:
+                raise ValueError("owned reservations must have lease expiry")
+            _aware(self.lease_expires_at, "lease_expires_at")
+        elif self.lease_token is not None or self.lease_expires_at is not None:
+            raise ValueError("non-owned reservations must not expose lease state")
+        if (
+            self.outcome is ChatRequestReservationOutcome.IN_PROGRESS
+            and self.status is not ChatRequestStatus.PROCESSING
+        ):
+            raise ValueError("in-progress outcome must reference processing state")
+        if (
+            self.outcome is ChatRequestReservationOutcome.COMPLETED
+            and self.status is not ChatRequestStatus.COMPLETED
+        ):
+            raise ValueError("completed outcome must reference completed state")
+
+
 def _aware(value: datetime, name: str) -> None:
     if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
         raise ValueError(f"{name} must be timezone-aware")

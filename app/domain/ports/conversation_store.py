@@ -1,10 +1,13 @@
 """Port for ordered short-term conversation persistence."""
 
+from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
 from app.domain.models.conversation import (
     AppendTurnResult,
+    ChatRequestReservation,
+    ChatRequestStatus,
     ConversationHistoryPage,
     ConversationListCursor,
     ConversationMessage,
@@ -49,6 +52,30 @@ class ConversationStorePort(Protocol):
 
     async def mark_deletion_pending(self, user_id: str, session_id: str) -> bool:
         """Mark an owned conversation for deletion, returning false when not found."""
+        ...
+
+    async def reserve_chat_request(
+        self,
+        user_id: str,
+        session_id: str,
+        client_message_id: UUID,
+        content_hash: bytes,
+        *,
+        now: datetime,
+        lease_seconds: float,
+    ) -> ChatRequestReservation | None:
+        """Acquire/replay/reclaim a fenced request for an active owned conversation."""
+        ...
+
+    async def abandon_chat_request(
+        self,
+        request_id: UUID,
+        lease_token: UUID,
+        *,
+        status: ChatRequestStatus,
+        now: datetime,
+    ) -> bool:
+        """Release a processing attempt only when its lease token is still current."""
         ...
 
     async def read_recent(

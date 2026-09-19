@@ -7,6 +7,9 @@ import pytest
 
 from app.domain.models.conversation import (
     MAX_CONVERSATION_TITLE_LENGTH,
+    ChatRequestReservation,
+    ChatRequestReservationOutcome,
+    ChatRequestStatus,
     ConversationHistoryPage,
     ConversationListCursor,
     ConversationMessage,
@@ -76,3 +79,36 @@ def test_cursor_and_pages_validate_their_contracts() -> None:
         ConversationListCursor(datetime(2026, 9, 19), uuid4())
     with pytest.raises(ValueError):
         ConversationHistoryPage((message,), 0)
+
+
+def test_chat_request_reservation_exposes_only_an_owned_attempt_lease() -> None:
+    values = {
+        "request_id": uuid4(),
+        "conversation_id": uuid4(),
+        "client_message_id": uuid4(),
+        "turn_id": "turn-1",
+        "status": ChatRequestStatus.PROCESSING,
+        "outcome": ChatRequestReservationOutcome.ACQUIRED,
+        "attempt_count": 1,
+        "lease_token": uuid4(),
+        "lease_expires_at": _NOW,
+    }
+    assert ChatRequestReservation(**values).lease_token == values["lease_token"]
+
+    values.update(
+        outcome=ChatRequestReservationOutcome.IN_PROGRESS,
+        lease_token=None,
+        lease_expires_at=None,
+    )
+    assert ChatRequestReservation(**values).lease_token is None
+
+    values.update(outcome=ChatRequestReservationOutcome.ACQUIRED)
+    with pytest.raises(ValueError, match="processing lease"):
+        ChatRequestReservation(**values)
+
+    values.update(
+        outcome=ChatRequestReservationOutcome.COMPLETED,
+        status=ChatRequestStatus.PROCESSING,
+    )
+    with pytest.raises(ValueError, match="completed state"):
+        ChatRequestReservation(**values)

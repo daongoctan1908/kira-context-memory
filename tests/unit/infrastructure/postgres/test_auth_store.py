@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.domain.errors.auth import AuthConflictError, AuthStoreError
 from app.infrastructure.postgres.auth_store import PostgresAuthStore
+from app.infrastructure.postgres.schema import EXPECTED_SCHEMA_REVISION
 
 _NOW = datetime(2026, 9, 19, 10, tzinfo=UTC)
 _USER_ID = UUID("11111111-1111-4111-8111-111111111111")
@@ -252,7 +253,7 @@ async def test_store_maps_integrity_and_database_errors_without_messages() -> No
 
 
 async def test_admin_operations_create_disable_revoke_list_and_validate_schema() -> None:
-    validated = FakeConnection(("20260919_0005",))
+    validated = FakeConnection((EXPECTED_SCHEMA_REVISION,))
     await _store(validated).validate_schema()
     with pytest.raises(AuthStoreError):
         await _store(FakeConnection(("old",))).validate_schema()

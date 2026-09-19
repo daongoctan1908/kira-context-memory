@@ -1,8 +1,9 @@
 """PostgreSQL implementation of durable conversation persistence."""
 
+import math
 from builtins import TimeoutError as BuiltinTimeoutError
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, NoReturn
 from uuid import UUID, uuid4
 
@@ -13,6 +14,7 @@ from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from app.domain.errors.conversation import (
+    ChatRequestConflictError,
     ConversationStoreConfigurationError,
     ConversationStoreConnectionError,
     ConversationStoreOperationError,
@@ -21,6 +23,9 @@ from app.domain.errors.conversation import (
 from app.domain.models.conversation import (
     MAX_CONVERSATION_TITLE_LENGTH,
     AppendTurnResult,
+    ChatRequestReservation,
+    ChatRequestReservationOutcome,
+    ChatRequestStatus,
     CompletedTurnReference,
     ConversationHistoryPage,
     ConversationListCursor,
@@ -36,9 +41,11 @@ from app.domain.models.telemetry_context import (
     serialize_telemetry_context,
 )
 from app.infrastructure.postgres.schema import (
+    CHAT_REQUEST_SCHEMA_REVISIONS,
     CONVERSATION_MANAGEMENT_SCHEMA_REVISIONS,
     SUPPORTED_SCHEMA_REVISIONS,
     TELEMETRY_CONTEXT_SCHEMA_REVISIONS,
+    chat_requests,
     conversation_messages,
     conversations,
     memory_jobs,
@@ -260,6 +267,179 @@ class PostgresConversationStoreAdapter:
                     )
                 )
                 return True
+        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+            self._raise_mapped(error)
+
+    async def reserve_chat_request(
+        self,
+        user_id: str,
+        session_id: str,
+        client_message_id: UUID,
+        content_hash: bytes,
+        *,
+        now: datetime,
+        lease_seconds: float,
+    ) -> ChatRequestReservation | None:
+        """Reserve one fenced attempt while serializing requests per conversation."""
+        self._require_chat_request_schema()
+        self._validate_chat_reservation_input(
+            user_id,
+            session_id,
+            client_message_id,
+            content_hash,
+            now,
+            lease_seconds,
+        )
+        try:
+            async with self._engine.begin() as connection:
+                conversation = (
+                    await connection.execute(
+                        select(conversations.c.conversation_id)
+                        .where(
+                            conversations.c.user_id == user_id,
+                            conversations.c.session_id == session_id,
+                            conversations.c.status == ConversationStatus.ACTIVE.value,
+                        )
+                        .with_for_update()
+                    )
+                ).one_or_none()
+                if conversation is None:
+                    return None
+
+                existing = (
+                    (
+                        await connection.execute(
+                            select(chat_requests)
+                            .where(
+                                chat_requests.c.conversation_id == conversation.conversation_id,
+                                chat_requests.c.client_message_id == client_message_id,
+                            )
+                            .with_for_update()
+                        )
+                    )
+                    .mappings()
+                    .one_or_none()
+                )
+                if existing is not None:
+                    stored_hash = existing["content_hash"]
+                    if not isinstance(stored_hash, (bytes, bytearray, memoryview)):
+                        raise ConversationStoreProtocolError
+                    if bytes(stored_hash) != content_hash:
+                        raise ChatRequestConflictError
+                    try:
+                        status = ChatRequestStatus(existing["status"])
+                    except (TypeError, ValueError) as error:
+                        raise ConversationStoreProtocolError from error
+                    if status is ChatRequestStatus.COMPLETED:
+                        return self._to_chat_reservation(
+                            existing,
+                            ChatRequestReservationOutcome.COMPLETED,
+                            expose_lease=False,
+                        )
+                    if status is ChatRequestStatus.PROCESSING:
+                        expires_at = existing["lease_expires_at"]
+                        if not isinstance(expires_at, datetime):
+                            raise ConversationStoreProtocolError
+                        if expires_at > now:
+                            return self._to_chat_reservation(
+                                existing,
+                                ChatRequestReservationOutcome.IN_PROGRESS,
+                                expose_lease=False,
+                            )
+                    return await self._reclaim_chat_request(
+                        connection,
+                        existing,
+                        now=now,
+                        lease_seconds=lease_seconds,
+                    )
+
+                processing = (
+                    (
+                        await connection.execute(
+                            select(chat_requests).where(
+                                chat_requests.c.conversation_id == conversation.conversation_id,
+                                chat_requests.c.status == ChatRequestStatus.PROCESSING.value,
+                            )
+                        )
+                    )
+                    .mappings()
+                    .one_or_none()
+                )
+                if processing is not None:
+                    return self._to_chat_reservation(
+                        processing,
+                        ChatRequestReservationOutcome.IN_PROGRESS,
+                        expose_lease=False,
+                    )
+
+                request_id = uuid4()
+                lease_token = uuid4()
+                lease_expires_at = now + timedelta(seconds=lease_seconds)
+                inserted = (
+                    (
+                        await connection.execute(
+                            insert(chat_requests)
+                            .values(
+                                request_id=request_id,
+                                conversation_id=conversation.conversation_id,
+                                client_message_id=client_message_id,
+                                content_hash=content_hash,
+                                turn_id=uuid4().hex,
+                                status=ChatRequestStatus.PROCESSING.value,
+                                attempt_count=1,
+                                lease_token=lease_token,
+                                lease_expires_at=lease_expires_at,
+                                created_at=now,
+                                updated_at=now,
+                            )
+                            .returning(*chat_requests.c)
+                        )
+                    )
+                    .mappings()
+                    .one()
+                )
+                return self._to_chat_reservation(
+                    inserted,
+                    ChatRequestReservationOutcome.ACQUIRED,
+                    expose_lease=True,
+                )
+        except (ChatRequestConflictError, ConversationStoreProtocolError):
+            raise
+        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+            self._raise_mapped(error)
+
+    async def abandon_chat_request(
+        self,
+        request_id: UUID,
+        lease_token: UUID,
+        *,
+        status: ChatRequestStatus,
+        now: datetime,
+    ) -> bool:
+        """Fence failure/cancellation transitions by the current attempt token."""
+        self._require_chat_request_schema()
+        if not isinstance(request_id, UUID) or not isinstance(lease_token, UUID):
+            raise ValueError("request_id and lease_token must be UUIDs")
+        if status not in {ChatRequestStatus.FAILED, ChatRequestStatus.CANCELLED}:
+            raise ValueError("abandoned chat request status must be failed or cancelled")
+        self._require_aware_datetime(now, "now")
+        try:
+            async with self._engine.begin() as connection:
+                result = await connection.execute(
+                    update(chat_requests)
+                    .where(
+                        chat_requests.c.request_id == request_id,
+                        chat_requests.c.status == ChatRequestStatus.PROCESSING.value,
+                        chat_requests.c.lease_token == lease_token,
+                    )
+                    .values(
+                        status=status.value,
+                        lease_token=None,
+                        lease_expires_at=None,
+                        updated_at=now,
+                    )
+                )
+                return bool(result.rowcount)
         except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
             self._raise_mapped(error)
 
@@ -621,6 +801,106 @@ class PostgresConversationStoreAdapter:
     def _require_conversation_management_schema(self) -> None:
         if not self._supports_conversation_management:
             raise ConversationStoreConfigurationError
+
+    def _require_chat_request_schema(self) -> None:
+        if self._schema_revision not in CHAT_REQUEST_SCHEMA_REVISIONS:
+            raise ConversationStoreConfigurationError
+
+    @staticmethod
+    async def _reclaim_chat_request(
+        connection: AsyncConnection,
+        existing: Mapping[str, Any],
+        *,
+        now: datetime,
+        lease_seconds: float,
+    ) -> ChatRequestReservation:
+        attempt_count = existing.get("attempt_count")
+        request_id = existing.get("request_id")
+        if (
+            isinstance(attempt_count, bool)
+            or not isinstance(attempt_count, int)
+            or attempt_count < 1
+            or not isinstance(request_id, UUID)
+        ):
+            raise ConversationStoreProtocolError
+        lease_token = uuid4()
+        reclaimed = (
+            (
+                await connection.execute(
+                    update(chat_requests)
+                    .where(chat_requests.c.request_id == request_id)
+                    .values(
+                        status=ChatRequestStatus.PROCESSING.value,
+                        attempt_count=attempt_count + 1,
+                        lease_token=lease_token,
+                        lease_expires_at=now + timedelta(seconds=lease_seconds),
+                        updated_at=now,
+                        completed_at=None,
+                    )
+                    .returning(*chat_requests.c)
+                )
+            )
+            .mappings()
+            .one()
+        )
+        return PostgresConversationStoreAdapter._to_chat_reservation(
+            reclaimed,
+            ChatRequestReservationOutcome.RECLAIMED,
+            expose_lease=True,
+        )
+
+    @staticmethod
+    def _to_chat_reservation(
+        row: Mapping[str, Any],
+        outcome: ChatRequestReservationOutcome,
+        *,
+        expose_lease: bool,
+    ) -> ChatRequestReservation:
+        try:
+            return ChatRequestReservation(
+                request_id=row["request_id"],
+                conversation_id=row["conversation_id"],
+                client_message_id=row["client_message_id"],
+                turn_id=row["turn_id"],
+                status=ChatRequestStatus(row["status"]),
+                outcome=outcome,
+                attempt_count=row["attempt_count"],
+                lease_token=row["lease_token"] if expose_lease else None,
+                lease_expires_at=row["lease_expires_at"] if expose_lease else None,
+            )
+        except (KeyError, TypeError, ValueError) as error:
+            raise ConversationStoreProtocolError from error
+
+    @staticmethod
+    def _validate_chat_reservation_input(
+        user_id: str,
+        session_id: str,
+        client_message_id: UUID,
+        content_hash: bytes,
+        now: datetime,
+        lease_seconds: float,
+    ) -> None:
+        if not user_id.strip():
+            raise ValueError("user_id must not be empty")
+        if not session_id.strip():
+            raise ValueError("session_id must not be empty")
+        if not isinstance(client_message_id, UUID):
+            raise ValueError("client_message_id must be a UUID")
+        if not isinstance(content_hash, bytes) or len(content_hash) != 32:
+            raise ValueError("content_hash must be 32 bytes")
+        PostgresConversationStoreAdapter._require_aware_datetime(now, "now")
+        if (
+            isinstance(lease_seconds, bool)
+            or not isinstance(lease_seconds, (int, float))
+            or not math.isfinite(float(lease_seconds))
+            or not 10 <= float(lease_seconds) <= 900
+        ):
+            raise ValueError("lease_seconds must be between 10 and 900")
+
+    @staticmethod
+    def _require_aware_datetime(value: datetime, name: str) -> None:
+        if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError(f"{name} must be timezone-aware")
 
     @staticmethod
     def _conversation_summary_columns() -> tuple[Any, ...]:

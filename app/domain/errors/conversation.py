@@ -31,3 +31,10 @@ class ConversationStoreProtocolError(ConversationStoreError):
 
     def __init__(self) -> None:
         super().__init__("Conversation store returned invalid data")
+
+
+class ChatRequestConflictError(ConversationStoreError):
+    """A client message identifier was reused with different content."""
+
+    def __init__(self) -> None:
+        super().__init__("Chat request idempotency conflict")

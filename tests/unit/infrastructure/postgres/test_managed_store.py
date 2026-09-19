@@ -10,7 +10,7 @@ from app.domain.errors.conversation import (
     ConversationStoreConnectionError,
     ConversationStoreOperationError,
 )
-from app.domain.models.conversation import ConversationListCursor
+from app.domain.models.conversation import ChatRequestStatus, ConversationListCursor
 from app.infrastructure.postgres.managed_store import ManagedPostgresConversationStore
 from tests.support.context_fakes import pair
 
@@ -101,6 +101,9 @@ async def test_conversation_management_operations_are_validated_and_forwarded() 
     adapter.list_conversations.return_value = listed
     adapter.read_history.return_value = history
     adapter.mark_deletion_pending.return_value = True
+    reservation = object()
+    adapter.reserve_chat_request.return_value = reservation
+    adapter.abandon_chat_request.return_value = True
     store = ManagedPostgresConversationStore(adapter, 1)
     cursor = ConversationListCursor(datetime(2026, 9, 19, tzinfo=UTC), uuid4())
 
@@ -111,6 +114,26 @@ async def test_conversation_management_operations_are_validated_and_forwarded() 
         is history
     )
     assert await store.mark_deletion_pending(USER_ID, "public-session")
+    client_message_id = uuid4()
+    now = datetime(2026, 9, 19, tzinfo=UTC)
+    assert (
+        await store.reserve_chat_request(
+            USER_ID,
+            "public-session",
+            client_message_id,
+            b"h" * 32,
+            now=now,
+            lease_seconds=120,
+        )
+        is reservation
+    )
+    request_id, lease_token = uuid4(), uuid4()
+    assert await store.abandon_chat_request(
+        request_id,
+        lease_token,
+        status=ChatRequestStatus.CANCELLED,
+        now=now,
+    )
 
     adapter.validate_schema.assert_awaited_once()
     adapter.create_conversation.assert_awaited_once_with(USER_ID, title="Support")
@@ -122,3 +145,17 @@ async def test_conversation_management_operations_are_validated_and_forwarded() 
         before_message_id=42,
     )
     adapter.mark_deletion_pending.assert_awaited_once_with(USER_ID, "public-session")
+    adapter.reserve_chat_request.assert_awaited_once_with(
+        USER_ID,
+        "public-session",
+        client_message_id,
+        b"h" * 32,
+        now=now,
+        lease_seconds=120,
+    )
+    adapter.abandon_chat_request.assert_awaited_once_with(
+        request_id,
+        lease_token,
+        status=ChatRequestStatus.CANCELLED,
+        now=now,
+    )

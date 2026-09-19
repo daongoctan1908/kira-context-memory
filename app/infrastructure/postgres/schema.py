@@ -21,11 +21,12 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import BYTEA, JSONB
 
-PREVIOUS_SCHEMA_REVISION = "20260919_0005"
-EXPECTED_SCHEMA_REVISION = "20260919_0006"
+PREVIOUS_SCHEMA_REVISION = "20260919_0006"
+EXPECTED_SCHEMA_REVISION = "20260919_0007"
 SUPPORTED_SCHEMA_REVISIONS = frozenset({PREVIOUS_SCHEMA_REVISION, EXPECTED_SCHEMA_REVISION})
 TELEMETRY_CONTEXT_SCHEMA_REVISIONS = SUPPORTED_SCHEMA_REVISIONS
-CONVERSATION_MANAGEMENT_SCHEMA_REVISIONS = frozenset({EXPECTED_SCHEMA_REVISION})
+CONVERSATION_MANAGEMENT_SCHEMA_REVISIONS = SUPPORTED_SCHEMA_REVISIONS
+CHAT_REQUEST_SCHEMA_REVISIONS = frozenset({EXPECTED_SCHEMA_REVISION})
 
 metadata = MetaData()
 
@@ -128,6 +129,71 @@ Index(
     conversations.c.user_id,
     func.coalesce(conversations.c.last_message_at, conversations.c.created_at).desc(),
     conversations.c.conversation_id.desc(),
+)
+
+chat_requests = Table(
+    "chat_requests",
+    metadata,
+    Column("request_id", Uuid(as_uuid=True), primary_key=True),
+    Column(
+        "conversation_id",
+        Uuid(as_uuid=True),
+        ForeignKey(
+            "conversations.conversation_id",
+            name="fk_chat_requests_conversation",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+    ),
+    Column("client_message_id", Uuid(as_uuid=True), nullable=False),
+    Column("content_hash", BYTEA, nullable=False),
+    Column("turn_id", Text, nullable=False),
+    Column("status", Text, nullable=False),
+    Column("attempt_count", SmallInteger, nullable=False, server_default=text("1")),
+    Column("lease_token", Uuid(as_uuid=True), nullable=True),
+    Column("lease_expires_at", DateTime(timezone=True), nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("completed_at", DateTime(timezone=True), nullable=True),
+    CheckConstraint("octet_length(content_hash) = 32", name="ck_chat_requests_content_hash"),
+    CheckConstraint("length(turn_id) > 0", name="ck_chat_requests_turn_id_nonempty"),
+    CheckConstraint("attempt_count >= 1", name="ck_chat_requests_attempt_count"),
+    CheckConstraint(
+        "status IN ('processing', 'completed', 'failed', 'cancelled')",
+        name="ck_chat_requests_status",
+    ),
+    CheckConstraint(
+        "(status = 'processing' AND lease_token IS NOT NULL AND lease_expires_at IS NOT NULL "
+        "AND completed_at IS NULL) OR "
+        "(status IN ('failed', 'cancelled') AND lease_token IS NULL "
+        "AND lease_expires_at IS NULL AND completed_at IS NULL) OR "
+        "(status = 'completed' AND lease_token IS NULL AND lease_expires_at IS NULL "
+        "AND completed_at IS NOT NULL)",
+        name="ck_chat_requests_lifecycle",
+    ),
+    CheckConstraint(
+        "lease_expires_at IS NULL OR lease_expires_at > updated_at",
+        name="ck_chat_requests_lease_expiry",
+    ),
+    UniqueConstraint(
+        "conversation_id",
+        "client_message_id",
+        name="uq_chat_requests_conversation_client_message",
+    ),
+    UniqueConstraint("turn_id", name="uq_chat_requests_turn_id"),
+)
+
+Index(
+    "uq_chat_requests_conversation_processing",
+    chat_requests.c.conversation_id,
+    unique=True,
+    postgresql_where=chat_requests.c.status == "processing",
+)
+Index(
+    "ix_chat_requests_processing_lease",
+    chat_requests.c.lease_expires_at,
+    chat_requests.c.request_id,
+    postgresql_where=chat_requests.c.status == "processing",
 )
 
 conversation_messages = Table(

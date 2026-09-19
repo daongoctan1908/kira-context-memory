@@ -10,6 +10,7 @@ from app.domain.errors.auth import (
     PasswordPolicyError,
 )
 from app.domain.errors.conversation import (
+    ChatRequestConflictError,
     ConversationStoreConfigurationError,
     ConversationStoreConnectionError,
     ConversationStoreError,
@@ -51,6 +52,7 @@ from app.domain.errors.query_rewriter import (
 )
 
 __all__ = [
+    "ChatRequestConflictError",
     "AuthConflictError",
     "AuthError",
     "AuthStoreError",

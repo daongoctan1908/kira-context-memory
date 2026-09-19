@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 from uuid import uuid4
@@ -8,12 +8,15 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 
 from app.domain.errors.conversation import (
+    ChatRequestConflictError,
     ConversationStoreConfigurationError,
     ConversationStoreConnectionError,
     ConversationStoreOperationError,
     ConversationStoreProtocolError,
 )
 from app.domain.models.conversation import (
+    ChatRequestReservationOutcome,
+    ChatRequestStatus,
     ConversationListCursor,
     ConversationMessage,
     ConversationRole,
@@ -41,6 +44,11 @@ class FakeMappings:
             raise AssertionError("expected exactly one row")
         return self._rows[0]
 
+    def one_or_none(self) -> dict[str, Any] | None:
+        if len(self._rows) > 1:
+            raise AssertionError("expected zero or one row")
+        return self._rows[0] if self._rows else None
+
 
 class FakeResult:
     def __init__(
@@ -48,9 +56,11 @@ class FakeResult:
         *,
         rows: list[dict[str, Any]] | None = None,
         one: object | None = None,
+        rowcount: int = 0,
     ) -> None:
         self._rows = rows or []
         self._one = one
+        self.rowcount = rowcount
 
     def mappings(self) -> FakeMappings:
         return FakeMappings(self._rows)
@@ -205,11 +215,18 @@ async def test_create_conversation_generates_public_id_and_normalizes_title() ->
     assert params["session_id"] != "public-session"
 
 
-async def test_management_operations_require_current_schema_and_bounded_input() -> None:
+async def test_chat_reservations_require_current_schema_and_management_input_is_bounded() -> None:
     store = adapter(FakeConnection(scalar=PREVIOUS_SCHEMA_REVISION))
     await store.validate_schema()
     with pytest.raises(ConversationStoreConfigurationError):
-        await store.create_conversation(USER_ID)
+        await store.reserve_chat_request(
+            USER_ID,
+            "public-session",
+            uuid4(),
+            b"h" * 32,
+            now=datetime(2026, 9, 19, tzinfo=UTC),
+            lease_seconds=120,
+        )
 
     current = adapter(FakeConnection())
     await current.validate_schema()
@@ -312,6 +329,212 @@ async def test_mark_deletion_pending_is_owned_and_idempotent() -> None:
     missing = adapter(FakeConnection([FakeResult(one=None)]))
     await missing.validate_schema()
     assert not await missing.mark_deletion_pending(USER_ID, "missing")
+
+
+def _chat_request_row(
+    *,
+    status: str = "processing",
+    content_hash: bytes = b"h" * 32,
+    attempt_count: int = 1,
+    lease_expires_at: datetime | None = None,
+) -> dict[str, Any]:
+    return {
+        "request_id": uuid4(),
+        "conversation_id": uuid4(),
+        "client_message_id": uuid4(),
+        "content_hash": content_hash,
+        "turn_id": "turn-request",
+        "status": status,
+        "attempt_count": attempt_count,
+        "lease_token": uuid4() if status == "processing" else None,
+        "lease_expires_at": lease_expires_at if status == "processing" else None,
+        "created_at": datetime(2026, 9, 19, tzinfo=UTC),
+        "updated_at": datetime(2026, 9, 19, tzinfo=UTC),
+        "completed_at": datetime(2026, 9, 19, tzinfo=UTC) if status == "completed" else None,
+    }
+
+
+async def test_reserve_chat_request_acquires_new_fenced_attempt() -> None:
+    now = datetime(2026, 9, 19, tzinfo=UTC)
+    conversation_id = uuid4()
+    inserted = _chat_request_row(lease_expires_at=now + timedelta(minutes=2))
+    inserted["conversation_id"] = conversation_id
+    client_message_id = inserted["client_message_id"]
+    connection = FakeConnection(
+        [
+            FakeResult(one=SimpleNamespace(conversation_id=conversation_id)),
+            FakeResult(rows=[]),
+            FakeResult(rows=[]),
+            FakeResult(rows=[inserted]),
+        ]
+    )
+    store = adapter(connection)
+    await store.validate_schema()
+
+    reservation = await store.reserve_chat_request(
+        USER_ID,
+        "public-session",
+        client_message_id,
+        b"h" * 32,
+        now=now,
+        lease_seconds=120,
+    )
+
+    assert reservation is not None
+    assert reservation.outcome is ChatRequestReservationOutcome.ACQUIRED
+    assert reservation.lease_token == inserted["lease_token"]
+    assert "FOR UPDATE" in str(connection.calls[1][0])
+    assert "INSERT INTO chat_requests" in str(connection.calls[4][0])
+
+
+async def test_duplicate_request_detects_conflict_in_progress_and_completed() -> None:
+    now = datetime(2026, 9, 19, tzinfo=UTC)
+    conversation_id = uuid4()
+    active = _chat_request_row(lease_expires_at=now + timedelta(minutes=1))
+    active["conversation_id"] = conversation_id
+
+    for expected_status, expected_outcome in (
+        ("processing", ChatRequestReservationOutcome.IN_PROGRESS),
+        ("completed", ChatRequestReservationOutcome.COMPLETED),
+    ):
+        existing = dict(active)
+        existing.update(
+            status=expected_status,
+            lease_token=active["lease_token"] if expected_status == "processing" else None,
+            lease_expires_at=active["lease_expires_at"]
+            if expected_status == "processing"
+            else None,
+            completed_at=now if expected_status == "completed" else None,
+        )
+        connection = FakeConnection(
+            [
+                FakeResult(one=SimpleNamespace(conversation_id=conversation_id)),
+                FakeResult(rows=[existing]),
+            ]
+        )
+        store = adapter(connection)
+        await store.validate_schema()
+        reservation = await store.reserve_chat_request(
+            USER_ID,
+            "public-session",
+            existing["client_message_id"],
+            b"h" * 32,
+            now=now,
+            lease_seconds=120,
+        )
+        assert reservation is not None
+        assert reservation.outcome is expected_outcome
+        assert reservation.lease_token is None
+
+    conflict_connection = FakeConnection(
+        [
+            FakeResult(one=SimpleNamespace(conversation_id=conversation_id)),
+            FakeResult(rows=[active]),
+        ]
+    )
+    conflict_store = adapter(conflict_connection)
+    await conflict_store.validate_schema()
+    with pytest.raises(ChatRequestConflictError):
+        await conflict_store.reserve_chat_request(
+            USER_ID,
+            "public-session",
+            active["client_message_id"],
+            b"x" * 32,
+            now=now,
+            lease_seconds=120,
+        )
+
+
+async def test_expired_or_failed_request_is_reclaimed_with_new_attempt() -> None:
+    now = datetime(2026, 9, 19, tzinfo=UTC)
+    conversation_id = uuid4()
+    expired = _chat_request_row(lease_expires_at=now - timedelta(seconds=1))
+    expired["conversation_id"] = conversation_id
+    reclaimed = dict(expired)
+    reclaimed.update(
+        status="processing",
+        attempt_count=2,
+        lease_token=uuid4(),
+        lease_expires_at=now + timedelta(minutes=2),
+    )
+    connection = FakeConnection(
+        [
+            FakeResult(one=SimpleNamespace(conversation_id=conversation_id)),
+            FakeResult(rows=[expired]),
+            FakeResult(rows=[reclaimed]),
+        ]
+    )
+    store = adapter(connection)
+    await store.validate_schema()
+
+    reservation = await store.reserve_chat_request(
+        USER_ID,
+        "public-session",
+        expired["client_message_id"],
+        b"h" * 32,
+        now=now,
+        lease_seconds=120,
+    )
+    assert reservation is not None
+    assert reservation.outcome is ChatRequestReservationOutcome.RECLAIMED
+    assert reservation.attempt_count == 2
+    assert reservation.lease_token == reclaimed["lease_token"]
+
+
+async def test_other_processing_request_blocks_new_reservation_without_exposing_lease() -> None:
+    now = datetime(2026, 9, 19, tzinfo=UTC)
+    conversation_id = uuid4()
+    processing = _chat_request_row(lease_expires_at=now + timedelta(minutes=1))
+    processing["conversation_id"] = conversation_id
+    connection = FakeConnection(
+        [
+            FakeResult(one=SimpleNamespace(conversation_id=conversation_id)),
+            FakeResult(rows=[]),
+            FakeResult(rows=[processing]),
+        ]
+    )
+    store = adapter(connection)
+    await store.validate_schema()
+
+    result = await store.reserve_chat_request(
+        USER_ID,
+        "public-session",
+        uuid4(),
+        b"n" * 32,
+        now=now,
+        lease_seconds=120,
+    )
+    assert result is not None
+    assert result.outcome is ChatRequestReservationOutcome.IN_PROGRESS
+    assert result.lease_token is None
+
+
+async def test_abandon_chat_request_fences_stale_attempt_token() -> None:
+    connection = FakeConnection([FakeResult(rowcount=1)])
+    store = adapter(connection)
+    await store.validate_schema()
+    now = datetime(2026, 9, 19, tzinfo=UTC)
+
+    assert await store.abandon_chat_request(
+        uuid4(),
+        uuid4(),
+        status=ChatRequestStatus.FAILED,
+        now=now,
+    )
+    statement = connection.calls[1][0]
+    sql = str(statement)
+    assert "chat_requests.lease_token" in sql
+    assert "chat_requests.status" in sql
+    assert statement.compile().params["status"] == "failed"
+
+    stale = adapter(FakeConnection([FakeResult(rowcount=0)]))
+    await stale.validate_schema()
+    assert not await stale.abandon_chat_request(
+        uuid4(),
+        uuid4(),
+        status=ChatRequestStatus.CANCELLED,
+        now=now,
+    )
 
 
 async def test_read_recent_returns_chronological_domain_messages() -> None:

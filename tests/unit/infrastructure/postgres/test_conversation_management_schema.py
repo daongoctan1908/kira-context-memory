@@ -5,12 +5,16 @@ from sqlalchemy import CheckConstraint, UniqueConstraint
 from app.infrastructure.postgres.schema import (
     CONVERSATION_MANAGEMENT_SCHEMA_REVISIONS,
     EXPECTED_SCHEMA_REVISION,
+    PREVIOUS_SCHEMA_REVISION,
     conversations,
 )
 
 
 def test_conversation_management_schema_is_current_only() -> None:
-    assert CONVERSATION_MANAGEMENT_SCHEMA_REVISIONS == {EXPECTED_SCHEMA_REVISION}
+    assert CONVERSATION_MANAGEMENT_SCHEMA_REVISIONS == {
+        PREVIOUS_SCHEMA_REVISION,
+        EXPECTED_SCHEMA_REVISION,
+    }
     assert list(conversations.c.keys()) == [
         "conversation_id",
         "user_id",
