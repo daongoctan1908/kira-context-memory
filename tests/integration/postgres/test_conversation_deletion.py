@@ -74,9 +74,7 @@ async def deletion_runtime(migrated_database: str):
         yield engine, store, schema_name
     finally:
         async with engine.begin() as connection:
-            await connection.execute(
-                text(f'DROP SCHEMA IF EXISTS "{schema_name}" CASCADE')
-            )
+            await connection.execute(text(f'DROP SCHEMA IF EXISTS "{schema_name}" CASCADE'))
         await engine.dispose()
 
 
@@ -219,17 +217,17 @@ async def test_delete_removes_every_owned_row_without_list_limit_and_is_idempote
     async with engine.connect() as connection:
         assert (
             await connection.scalar(
-                select(func.count()).select_from(conversations).where(
-                    conversations.c.conversation_id == target.reference.conversation_id
-                )
+                select(func.count())
+                .select_from(conversations)
+                .where(conversations.c.conversation_id == target.reference.conversation_id)
             )
             == 0
         )
         assert (
             await connection.scalar(
-                select(func.count()).select_from(conversation_messages).where(
-                    conversation_messages.c.conversation_id == target.reference.conversation_id
-                )
+                select(func.count())
+                .select_from(conversation_messages)
+                .where(conversation_messages.c.conversation_id == target.reference.conversation_id)
             )
             == 0
         )
@@ -262,18 +260,20 @@ async def test_delete_removes_every_owned_row_without_list_limit_and_is_idempote
             == 0
         )
         remaining_entities = (
-            await connection.execute(
-                text(f'SELECT payload FROM "{schema_name}".memories_entities ORDER BY id')
+            (
+                await connection.execute(
+                    text(f'SELECT payload FROM "{schema_name}".memories_entities ORDER BY id')
+                )
             )
-        ).scalars().all()
-        assert remaining_entities == [
-            {"user_id": other_user, "linked_memory_ids": [str(other_id)]}
-        ]
+            .scalars()
+            .all()
+        )
+        assert remaining_entities == [{"user_id": other_user, "linked_memory_ids": [str(other_id)]}]
         assert (
             await connection.scalar(
-                select(func.count()).select_from(conversations).where(
-                    conversations.c.conversation_id == other.reference.conversation_id
-                )
+                select(func.count())
+                .select_from(conversations)
+                .where(conversations.c.conversation_id == other.reference.conversation_id)
             )
             == 1
         )
@@ -359,10 +359,14 @@ async def test_operator_purge_pending_is_bounded_and_leaves_active_rows(
     assert await store.purge_pending_conversations(limit=1) == 0
     async with engine.connect() as connection:
         rows = (
-            await connection.execute(
-                select(conversations.c.session_id, conversations.c.status).where(
-                    conversations.c.user_id == user_id
+            (
+                await connection.execute(
+                    select(conversations.c.session_id, conversations.c.status).where(
+                        conversations.c.user_id == user_id
+                    )
                 )
             )
-        ).tuples().all()
+            .tuples()
+            .all()
+        )
     assert rows == [(active_session, "active")]

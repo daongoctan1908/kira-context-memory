@@ -275,6 +275,22 @@ Mở `http://127.0.0.1:18080`, đăng nhập bằng tài khoản disposable `loc
 chéo hai conversation. Chi tiết startup, port override, cleanup và observability overlay nằm tại
 [`docs/t10.1-local-product-stack.md`](docs/t10.1-local-product-stack.md).
 
+Chạy full product E2E T10.2 (lệnh này bao gồm lại smoke formation/cross-session của T10.1):
+
+```powershell
+uv run python -m scripts.smoke_product_e2e
+```
+
+Gate này kiểm tra auth/isolation, SSE + history, concurrent/completed retry, disconnect/cancel,
+deletion race, restart và KiRa/PostgreSQL/Collector outage. Nó dùng mock explicit để kiểm tra
+product contract, không tạo kết luận về chất lượng semantic. Ma trận gate và PostgreSQL companion
+tests nằm tại [`docs/t10.2-product-e2e.md`](docs/t10.2-product-e2e.md).
+
+CI T10.3 chạy cùng các contract bằng ba job độc lập: backend + PostgreSQL/coverage, frontend +
+Playwright, rồi product image + synthetic E2E. CI không nhận credential provider và không chạy
+benchmark chất lượng. Chi tiết gate và cách tái hiện local nằm tại
+[`docs/t10.3-ci.md`](docs/t10.3-ci.md).
+
 Khởi động PostgreSQL local, apply migration và chạy integration test thật:
 
 ```powershell

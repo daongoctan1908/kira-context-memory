@@ -86,6 +86,66 @@ async def test_embedding_mock_supports_admin_probe_and_runtime_batch() -> None:
     assert invalid.status_code == 400
 
 
+async def test_kira_mock_supports_bounded_failure_and_stream_block_control() -> None:
+    payload = {
+        "token": "local-runtime-token",
+        "stream": True,
+        "message": {"text": "synthetic query"},
+    }
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=mock_kira_server.app),
+        base_url="http://kira.test",
+    ) as client:
+        reset = await client.post(
+            "/_test/reset",
+            json={"failures": 1, "block_after_text_fragments": 1},
+        )
+        failed = await client.post("/api/v1/chat", json=payload)
+        pending = asyncio.create_task(client.post("/api/v1/chat", json=payload))
+        for _ in range(100):
+            state = (await client.get("/_test/requests")).json()
+            if state["blocked_request_count"] == 1:
+                break
+            await asyncio.sleep(0.01)
+        else:
+            raise AssertionError("KiRa mock did not enter the requested block")
+
+        assert reset.status_code == 200
+        assert failed.status_code == 503
+        assert pending.done() is False
+        assert state["request_count"] == 2
+        assert state["failure_count"] == 1
+        assert state["remaining_failures"] == 0
+        assert state["released"] is False
+
+        assert (await client.post("/_test/release")).status_code == 200
+        response = await asyncio.wait_for(pending, timeout=1)
+
+    assert response.status_code == 200
+    assert "Mock " in response.text
+
+
+@pytest.mark.parametrize(
+    "control",
+    [
+        [],
+        {"failures": True},
+        {"failures": -1},
+        {"failures": 101},
+        {"block_after_text_fragments": True},
+        {"block_after_text_fragments": -1},
+    ],
+)
+async def test_kira_mock_rejects_invalid_fault_control(control: object) -> None:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=mock_kira_server.app),
+        base_url="http://kira.test",
+    ) as client:
+        response = await client.post("/_test/reset", json=control)
+
+    assert response.status_code == 400
+
+
 async def test_memory_llm_mock_extracts_only_explicit_synthetic_marker() -> None:
     marked_fact = "The local user's preferred synthetic region is North."
     prompt = (

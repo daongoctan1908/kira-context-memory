@@ -163,9 +163,9 @@ class Settings(BaseSettings):
             if missing:
                 raise ValueError(f"LTM configuration is incomplete: {', '.join(missing)}")
             if self.database_url is not None and self.memory_database_url is not None:
-                if _postgres_database_identity(
-                    self.database_url
-                ) != _postgres_database_identity(self.memory_database_url):
+                if _postgres_database_identity(self.database_url) != _postgres_database_identity(
+                    self.memory_database_url
+                ):
                     raise ValueError(
                         "conversation and memory storage must use the same PostgreSQL database"
                     )
