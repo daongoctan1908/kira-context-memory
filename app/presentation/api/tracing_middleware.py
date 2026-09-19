@@ -36,9 +36,14 @@ class ChatTracingMiddleware:
         correlation_id = scope.get("state", {}).get("correlation_id")
         tracer = _request_tracer(scope)
         started = perf_counter()
+        normalized_path = (
+            "/chat"
+            if scope.get("path") == "/chat"
+            else "/api/v1/conversations/{session_id}/messages"
+        )
         attributes: dict[str, object] = {
             "http.request.method": "POST",
-            "url.path": "/chat",
+            "url.path": normalized_path,
             OBSERVATION_TYPE: "chain",
         }
         if isinstance(correlation_id, str):
@@ -134,6 +139,11 @@ def _is_cancellation(error: BaseException) -> bool:
 
 
 def _is_chat_request(scope: Scope) -> bool:
-    return (
-        scope["type"] == "http" and scope.get("method") == "POST" and scope.get("path") == "/chat"
+    if scope["type"] != "http" or scope.get("method") != "POST":
+        return False
+    path = scope.get("path")
+    return path == "/chat" or (
+        isinstance(path, str)
+        and path.startswith("/api/v1/conversations/")
+        and path.endswith("/messages")
     )

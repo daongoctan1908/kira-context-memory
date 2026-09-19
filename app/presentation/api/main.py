@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.application.services.auth import AuthService
+from app.application.services.chat_idempotency import ChatIdempotencyService
 from app.application.services.context_builder import ContextBuilder
 from app.application.use_cases.handle_chat import HandleChatUseCase
 from app.config.settings import Settings, get_settings
@@ -206,6 +207,10 @@ def create_app(
             application.state.telemetry = telemetry
             application.state.identity_provider = resolved_identity
             application.state.auth_service = resolved_auth_service
+            application.state.chat_idempotency = ChatIdempotencyService(
+                resolved_conversation_store,
+                lease_seconds=resolved_settings.chat_request_lease_seconds,
+            )
             application.state.handle_chat = HandleChatUseCase(
                 resolved_kira_client,
                 conversation_store=resolved_conversation_store,

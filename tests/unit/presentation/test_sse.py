@@ -14,7 +14,11 @@ from app.infrastructure.observability.tracing import (
     RequestTraceState,
     bind_request_trace_state,
 )
-from app.presentation.api.sse import ChatStreamingResponse, stream_gateway_events
+from app.presentation.api.sse import (
+    ChatStreamingResponse,
+    ProductChatStreamingResponse,
+    stream_gateway_events,
+)
 
 
 def event(text: str) -> KiraStreamEvent:
@@ -149,3 +153,47 @@ async def test_unexpected_stream_error_is_sanitized():
     assert len(frames) == 2
     assert b"gateway_error" in frames[1]
     assert b"private content" not in frames[1]
+
+
+@pytest.mark.parametrize("spec_version", ["2.0", "2.4"])
+async def test_product_disconnect_abandons_cancelled_without_completion(spec_version):
+    source = GatedStream()
+    complete = AsyncMock()
+    abandon = AsyncMock()
+    response = ProductChatStreamingResponse(
+        session=ChatStreamSession(source, complete),
+        correlation_id="correlation-product",
+        turn_id="turn-product",
+        client_message_id="11111111-1111-4111-8111-111111111111",
+        on_abort=abandon,
+        headers={},
+    )
+    first_sent = asyncio.Event()
+
+    async def receive():
+        await first_sent.wait()
+        return {"type": "http.disconnect"}
+
+    async def send(message):
+        if message["type"] == "http.response.body":
+            first_sent.set()
+            if spec_version == "2.4":
+                raise OSError("client disconnected")
+
+    async with asyncio.timeout(1):
+        if spec_version == "2.4":
+            with pytest.raises(ClientDisconnect):
+                await response(
+                    {"type": "http", "asgi": {"spec_version": spec_version}},
+                    receive,
+                    send,
+                )
+        else:
+            await response(
+                {"type": "http", "asgi": {"spec_version": spec_version}},
+                receive,
+                send,
+            )
+    assert source.closed
+    complete.assert_not_awaited()
+    abandon.assert_awaited_once_with(True)

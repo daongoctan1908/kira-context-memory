@@ -24,6 +24,15 @@ class CreateConversationRequest(BaseModel):
     title: ConversationTitle | None = None
 
 
+class SendConversationMessageRequest(BaseModel):
+    """One idempotent message submitted to an existing owned conversation."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    client_message_id: UUID
+    message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+
 class ConversationSummaryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 

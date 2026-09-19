@@ -17,7 +17,13 @@ from app.domain.errors.memory import (
 from app.domain.errors.query_rewriter import QueryRewriterError
 from app.domain.models.chat import ChatCommand
 from app.domain.models.context import MAX_LONG_TERM_MEMORIES
-from app.domain.models.conversation import AppendTurnResult, ConversationMessage, ConversationRole
+from app.domain.models.conversation import (
+    AppendTurnResult,
+    ChatRequestReservation,
+    ChatRequestReservationOutcome,
+    ConversationMessage,
+    ConversationRole,
+)
 from app.domain.models.identity import AuthenticatedPrincipal
 from app.domain.models.kira import KiraStreamEvent
 from app.domain.models.memory import LongTermMemory
@@ -35,7 +41,7 @@ class ChatStreamSession(AsyncIterator[KiraStreamEvent]):
     def __init__(
         self,
         source: AsyncIterator[KiraStreamEvent],
-        on_complete: Callable[[str], Awaitable[None]] | None = None,
+        on_complete: Callable[[str], Awaitable[object | None]] | None = None,
     ) -> None:
         self._source = source
         self._text_fragments: list[str] = []
@@ -44,6 +50,7 @@ class ChatStreamSession(AsyncIterator[KiraStreamEvent]):
         self._on_complete = on_complete
         self._completion_started = False
         self._source_exhausted = False
+        self._completion_result: object | None = None
 
     @property
     def final_text(self) -> str:
@@ -54,6 +61,11 @@ class ChatStreamSession(AsyncIterator[KiraStreamEvent]):
     def source_exhausted(self) -> bool:
         """Whether KiRa ended normally rather than through cancellation or failure."""
         return self._source_exhausted
+
+    @property
+    def completion_result(self) -> object | None:
+        """Return the durable completion result after normal source exhaustion."""
+        return self._completion_result
 
     def __aiter__(self) -> Self:
         return self
@@ -91,7 +103,7 @@ class ChatStreamSession(AsyncIterator[KiraStreamEvent]):
             return
         # Set before awaiting so concurrent end-of-stream observation cannot schedule twice.
         self._completion_started = True
-        await self._on_complete(self.final_text)
+        self._completion_result = await self._on_complete(self.final_text)
 
 
 class HandleChatUseCase:
@@ -263,6 +275,96 @@ class HandleChatUseCase:
 
         return ChatStreamSession(source, on_complete=persist)
 
+    async def execute_reserved(
+        self,
+        command: ChatCommand,
+        reservation: ChatRequestReservation,
+        *,
+        principal: AuthenticatedPrincipal,
+        correlation_id: str,
+    ) -> ChatStreamSession:
+        """Run a product chat whose completion must satisfy the fenced DB contract."""
+        if reservation.outcome not in {
+            ChatRequestReservationOutcome.ACQUIRED,
+            ChatRequestReservationOutcome.RECLAIMED,
+        }:
+            raise ValueError("reserved chat execution requires an owned attempt")
+        started_at = datetime.now(UTC)
+        query = await self._resolve_query(command, principal.user_id, correlation_id)
+        source = await self._kira_client.chat_stream(query)
+
+        async def persist(final_text: str) -> AppendTurnResult:
+            user = ConversationMessage(
+                command.session_id,
+                reservation.turn_id,
+                ConversationRole.USER,
+                command.message,
+                started_at,
+            )
+            assistant = ConversationMessage(
+                command.session_id,
+                reservation.turn_id,
+                ConversationRole.ASSISTANT,
+                final_text,
+                datetime.now(UTC),
+            )
+            telemetry_context = (
+                self._capture_telemetry_context(correlation_id)
+                if self._memory_formation_enabled
+                else None
+            )
+            with self._observer.stage(
+                "conversation.append_turn",
+                kind="client",
+            ) as write_observation:
+                try:
+                    if self._memory_formation_enabled:
+                        with self._observer.stage(
+                            "memory_job.enqueue",
+                            kind="producer",
+                        ) as enqueue_observation:
+                            try:
+                                result = await self._complete_chat_request(
+                                    principal.user_id,
+                                    reservation,
+                                    user,
+                                    assistant,
+                                    telemetry_context=telemetry_context,
+                                )
+                            except BaseException:
+                                enqueue_observation.set_outcome("error")
+                                raise
+                            schedule_outcome = self._observe_memory_job_schedule(
+                                correlation_id,
+                                result,
+                            )
+                            enqueue_observation.set_outcome(schedule_outcome)
+                            if result.memory_job_event_id is not None:
+                                event_id = str(result.memory_job_event_id)
+                                enqueue_observation.set_attribute("event_id", event_id)
+                                self._observer.request_attribute("event_id", event_id)
+                    else:
+                        self._observer.memory_job_schedule_observed("disabled")
+                        result = await self._complete_chat_request(
+                            principal.user_id,
+                            reservation,
+                            user,
+                            assistant,
+                        )
+                except BaseException:
+                    write_observation.set_outcome("error")
+                    self._observer.conversation_write_observed("error")
+                    raise
+                write_observation.set_outcome("inserted")
+                write_observation.set_attribute(
+                    "kira.conversation.boundary_message_id",
+                    result.reference.boundary_message_id,
+                )
+            self._observer.conversation_write_observed("inserted")
+            return result
+
+        return ChatStreamSession(source, on_complete=persist)
+
     async def _append_turn(
         self,
         user_id: str,
@@ -280,6 +382,26 @@ class HandleChatUseCase:
                 user,
                 assistant,
                 **options,
+            )
+
+    async def _complete_chat_request(
+        self,
+        user_id: str,
+        reservation: ChatRequestReservation,
+        user: ConversationMessage,
+        assistant: ConversationMessage,
+        *,
+        telemetry_context: TelemetryContext | None = None,
+    ) -> AppendTurnResult:
+        async with asyncio.timeout(self._store_timeout):
+            return await self._store.complete_chat_request(
+                user_id,
+                reservation,
+                user,
+                assistant,
+                completed_at=datetime.now(UTC),
+                schedule_memory=self._memory_formation_enabled,
+                telemetry_context=telemetry_context,
             )
 
     def _capture_telemetry_context(self, correlation_id: str) -> TelemetryContext | None:

@@ -143,6 +143,43 @@ class ManagedPostgresConversationStore:
                 now=now,
             )
 
+    async def complete_chat_request(
+        self,
+        user_id: str,
+        reservation: ChatRequestReservation,
+        user_message: ConversationMessage,
+        assistant_message: ConversationMessage,
+        *,
+        completed_at: datetime,
+        schedule_memory: bool = False,
+        telemetry_context: TelemetryContext | None = None,
+    ) -> AppendTurnResult:
+        async with self._operation():
+            await self.validate_schema()
+            return await self._adapter.complete_chat_request(
+                user_id,
+                reservation,
+                user_message,
+                assistant_message,
+                completed_at=completed_at,
+                schedule_memory=schedule_memory,
+                telemetry_context=telemetry_context,
+            )
+
+    async def read_completed_chat_request(
+        self,
+        user_id: str,
+        session_id: str,
+        reservation: ChatRequestReservation,
+    ) -> tuple[ConversationMessage, ConversationMessage] | None:
+        async with self._operation():
+            await self.validate_schema()
+            return await self._adapter.read_completed_chat_request(
+                user_id,
+                session_id,
+                reservation,
+            )
+
     async def read_recent(
         self,
         user_id: str,

@@ -10,7 +10,12 @@ from app.domain.errors.conversation import (
     ConversationStoreConnectionError,
     ConversationStoreOperationError,
 )
-from app.domain.models.conversation import ChatRequestStatus, ConversationListCursor
+from app.domain.models.conversation import (
+    ChatRequestReservation,
+    ChatRequestReservationOutcome,
+    ChatRequestStatus,
+    ConversationListCursor,
+)
 from app.infrastructure.postgres.managed_store import ManagedPostgresConversationStore
 from tests.support.context_fakes import pair
 
@@ -104,6 +109,10 @@ async def test_conversation_management_operations_are_validated_and_forwarded() 
     reservation = object()
     adapter.reserve_chat_request.return_value = reservation
     adapter.abandon_chat_request.return_value = True
+    completed = object()
+    replayed = pair()
+    adapter.complete_chat_request.return_value = completed
+    adapter.read_completed_chat_request.return_value = replayed
     store = ManagedPostgresConversationStore(adapter, 1)
     cursor = ConversationListCursor(datetime(2026, 9, 19, tzinfo=UTC), uuid4())
 
@@ -134,6 +143,43 @@ async def test_conversation_management_operations_are_validated_and_forwarded() 
         status=ChatRequestStatus.CANCELLED,
         now=now,
     )
+    owned = ChatRequestReservation(
+        request_id,
+        uuid4(),
+        client_message_id,
+        "turn-1",
+        ChatRequestStatus.PROCESSING,
+        ChatRequestReservationOutcome.ACQUIRED,
+        1,
+        lease_token,
+        now,
+    )
+    completion_pair = pair()
+    assert (
+        await store.complete_chat_request(
+            USER_ID,
+            owned,
+            *completion_pair,
+            completed_at=now,
+            schedule_memory=True,
+        )
+        is completed
+    )
+    replay_reservation = ChatRequestReservation(
+        request_id,
+        owned.conversation_id,
+        client_message_id,
+        "turn-1",
+        ChatRequestStatus.COMPLETED,
+        ChatRequestReservationOutcome.COMPLETED,
+        1,
+        None,
+        None,
+    )
+    assert (
+        await store.read_completed_chat_request(USER_ID, "public-session", replay_reservation)
+        == replayed
+    )
 
     adapter.validate_schema.assert_awaited_once()
     adapter.create_conversation.assert_awaited_once_with(USER_ID, title="Support")
@@ -158,4 +204,17 @@ async def test_conversation_management_operations_are_validated_and_forwarded() 
         lease_token,
         status=ChatRequestStatus.CANCELLED,
         now=now,
+    )
+    adapter.complete_chat_request.assert_awaited_once_with(
+        USER_ID,
+        owned,
+        *completion_pair,
+        completed_at=now,
+        schedule_memory=True,
+        telemetry_context=None,
+    )
+    adapter.read_completed_chat_request.assert_awaited_once_with(
+        USER_ID,
+        "public-session",
+        replay_reservation,
     )

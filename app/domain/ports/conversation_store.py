@@ -78,6 +78,29 @@ class ConversationStorePort(Protocol):
         """Release a processing attempt only when its lease token is still current."""
         ...
 
+    async def complete_chat_request(
+        self,
+        user_id: str,
+        reservation: ChatRequestReservation,
+        user_message: ConversationMessage,
+        assistant_message: ConversationMessage,
+        *,
+        completed_at: datetime,
+        schedule_memory: bool = False,
+        telemetry_context: TelemetryContext | None = None,
+    ) -> AppendTurnResult:
+        """Atomically persist a fenced request, completed turn and optional memory job."""
+        ...
+
+    async def read_completed_chat_request(
+        self,
+        user_id: str,
+        session_id: str,
+        reservation: ChatRequestReservation,
+    ) -> tuple[ConversationMessage, ConversationMessage] | None:
+        """Read the persisted pair for an owned completed request without calling KiRa."""
+        ...
+
     async def read_recent(
         self,
         user_id: str,

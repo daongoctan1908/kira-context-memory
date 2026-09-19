@@ -38,3 +38,10 @@ class ChatRequestConflictError(ConversationStoreError):
 
     def __init__(self) -> None:
         super().__init__("Chat request idempotency conflict")
+
+
+class ChatRequestLeaseLostError(ConversationStoreError):
+    """A stale or expired attempt tried to finalize a chat request."""
+
+    def __init__(self) -> None:
+        super().__init__("Chat request lease is no longer current")

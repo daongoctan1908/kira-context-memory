@@ -9,19 +9,27 @@ from uuid import uuid4
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import delete, select, text
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
-from app.domain.errors.conversation import ChatRequestConflictError
+from app.domain.errors.conversation import (
+    ChatRequestConflictError,
+    ChatRequestLeaseLostError,
+    ConversationStoreProtocolError,
+)
 from app.domain.models.conversation import (
     ChatRequestReservationOutcome,
     ChatRequestStatus,
+    ConversationMessage,
+    ConversationRole,
 )
 from app.infrastructure.postgres.conversation_store import PostgresConversationStoreAdapter
 from app.infrastructure.postgres.schema import (
     EXPECTED_SCHEMA_REVISION,
     chat_requests,
+    conversation_messages,
     conversations,
+    memory_jobs,
 )
 
 pytestmark = pytest.mark.postgres_integration
@@ -215,3 +223,208 @@ async def test_expired_attempt_reclaims_and_stale_owner_cannot_release(
     )
     assert replacement is not None
     assert replacement.outcome is ChatRequestReservationOutcome.ACQUIRED
+
+
+async def test_completion_atomically_persists_turn_job_and_replays_without_new_owner(
+    managed_conversation,
+    engine: AsyncEngine,
+) -> None:
+    adapter, user_id, created = managed_conversation
+    client_message_id = uuid4()
+    now = datetime.now(UTC)
+    reservation = await adapter.reserve_chat_request(
+        user_id,
+        created.session_id,
+        client_message_id,
+        sha256(b"hello").digest(),
+        now=now,
+        lease_seconds=120,
+    )
+    assert reservation is not None
+    user = ConversationMessage(
+        created.session_id,
+        reservation.turn_id,
+        ConversationRole.USER,
+        "hello",
+        now,
+    )
+    assistant = ConversationMessage(
+        created.session_id,
+        reservation.turn_id,
+        ConversationRole.ASSISTANT,
+        "xin chao",
+        now + timedelta(seconds=1),
+    )
+
+    completed = await adapter.complete_chat_request(
+        user_id,
+        reservation,
+        user,
+        assistant,
+        completed_at=now + timedelta(seconds=2),
+        schedule_memory=True,
+    )
+    assert completed.inserted
+    assert completed.memory_job_event_id is not None
+
+    replay_reservation = await adapter.reserve_chat_request(
+        user_id,
+        created.session_id,
+        client_message_id,
+        sha256(b"hello").digest(),
+        now=now + timedelta(seconds=3),
+        lease_seconds=120,
+    )
+    assert replay_reservation is not None
+    assert replay_reservation.outcome is ChatRequestReservationOutcome.COMPLETED
+    replay = await adapter.read_completed_chat_request(
+        user_id,
+        created.session_id,
+        replay_reservation,
+    )
+    assert replay is not None
+    assert [message.content for message in replay] == ["hello", "xin chao"]
+
+    async with engine.connect() as connection:
+        request_row = (
+            (
+                await connection.execute(
+                    select(chat_requests).where(
+                        chat_requests.c.request_id == reservation.request_id
+                    )
+                )
+            )
+            .mappings()
+            .one()
+        )
+        message_count = await connection.scalar(
+            select(func.count())
+            .select_from(conversation_messages)
+            .where(conversation_messages.c.turn_id == reservation.turn_id)
+        )
+        job_count = await connection.scalar(
+            select(func.count())
+            .select_from(memory_jobs)
+            .where(memory_jobs.c.boundary_message_id == completed.reference.boundary_message_id)
+        )
+    assert request_row["status"] == "completed"
+    assert request_row["lease_token"] is None
+    assert message_count == 2
+    assert job_count == 1
+
+
+async def test_stale_completion_is_fenced_and_writes_nothing(
+    managed_conversation,
+    engine: AsyncEngine,
+) -> None:
+    adapter, user_id, created = managed_conversation
+    client_message_id = uuid4()
+    old_now = datetime.now(UTC) - timedelta(minutes=10)
+    digest = sha256(b"stale").digest()
+    stale = await adapter.reserve_chat_request(
+        user_id,
+        created.session_id,
+        client_message_id,
+        digest,
+        now=old_now,
+        lease_seconds=60,
+    )
+    current = await adapter.reserve_chat_request(
+        user_id,
+        created.session_id,
+        client_message_id,
+        digest,
+        now=datetime.now(UTC),
+        lease_seconds=120,
+    )
+    assert stale is not None and current is not None
+    timestamp = datetime.now(UTC)
+    user = ConversationMessage(
+        created.session_id,
+        stale.turn_id,
+        ConversationRole.USER,
+        "stale",
+        timestamp,
+    )
+    assistant = ConversationMessage(
+        created.session_id,
+        stale.turn_id,
+        ConversationRole.ASSISTANT,
+        "must not persist",
+        timestamp,
+    )
+
+    with pytest.raises(ChatRequestLeaseLostError):
+        await adapter.complete_chat_request(
+            user_id,
+            stale,
+            user,
+            assistant,
+            completed_at=timestamp,
+        )
+    async with engine.connect() as connection:
+        count = await connection.scalar(
+            select(func.count())
+            .select_from(conversation_messages)
+            .where(conversation_messages.c.turn_id == stale.turn_id)
+        )
+    assert count == 0
+
+
+async def test_completion_rolls_back_when_memory_job_scheduling_fails(
+    managed_conversation,
+    engine: AsyncEngine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter, user_id, created = managed_conversation
+    now = datetime.now(UTC)
+    reservation = await adapter.reserve_chat_request(
+        user_id,
+        created.session_id,
+        uuid4(),
+        sha256(b"rollback").digest(),
+        now=now,
+        lease_seconds=120,
+    )
+    assert reservation is not None
+
+    async def fail_schedule(*_args, **_kwargs):
+        raise ConversationStoreProtocolError
+
+    monkeypatch.setattr(adapter, "_schedule_memory_job", fail_schedule)
+    with pytest.raises(ConversationStoreProtocolError):
+        await adapter.complete_chat_request(
+            user_id,
+            reservation,
+            ConversationMessage(
+                created.session_id,
+                reservation.turn_id,
+                ConversationRole.USER,
+                "rollback",
+                now,
+            ),
+            ConversationMessage(
+                created.session_id,
+                reservation.turn_id,
+                ConversationRole.ASSISTANT,
+                "not committed",
+                now,
+            ),
+            completed_at=now + timedelta(seconds=1),
+            schedule_memory=True,
+        )
+    async with engine.connect() as connection:
+        row = (
+            await connection.execute(
+                select(chat_requests.c.status).where(
+                    chat_requests.c.request_id == reservation.request_id
+                )
+            )
+        ).one()
+        count = await connection.scalar(
+            select(func.count())
+            .select_from(conversation_messages)
+            .where(conversation_messages.c.turn_id == reservation.turn_id)
+        )
+    assert row.status == "processing"
+    assert count == 0

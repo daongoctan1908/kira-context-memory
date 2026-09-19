@@ -4,6 +4,7 @@ import math
 from builtins import TimeoutError as BuiltinTimeoutError
 from collections.abc import Mapping
 from datetime import datetime, timedelta
+from hashlib import sha256
 from typing import Any, NoReturn
 from uuid import UUID, uuid4
 
@@ -15,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from app.domain.errors.conversation import (
     ChatRequestConflictError,
+    ChatRequestLeaseLostError,
     ConversationStoreConfigurationError,
     ConversationStoreConnectionError,
     ConversationStoreOperationError,
@@ -443,6 +445,246 @@ class PostgresConversationStoreAdapter:
         except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
             self._raise_mapped(error)
 
+    async def complete_chat_request(
+        self,
+        user_id: str,
+        reservation: ChatRequestReservation,
+        user_message: ConversationMessage,
+        assistant_message: ConversationMessage,
+        *,
+        completed_at: datetime,
+        schedule_memory: bool = False,
+        telemetry_context: TelemetryContext | None = None,
+    ) -> AppendTurnResult:
+        """Commit the turn, optional job and request state under one fenced lease."""
+        self._require_chat_request_schema()
+        if not user_id.strip():
+            raise ValueError("user_id must not be empty")
+        if not isinstance(reservation, ChatRequestReservation):
+            raise ValueError("reservation must be a chat request reservation")
+        if (
+            reservation.outcome
+            not in {
+                ChatRequestReservationOutcome.ACQUIRED,
+                ChatRequestReservationOutcome.RECLAIMED,
+            }
+            or reservation.lease_token is None
+        ):
+            raise ValueError("completion requires an owned chat request reservation")
+        if not isinstance(schedule_memory, bool):
+            raise ValueError("schedule_memory must be a boolean")
+        self._require_aware_datetime(completed_at, "completed_at")
+        self._validate_turn(user_message, assistant_message)
+        if user_message.turn_id != reservation.turn_id:
+            raise ValueError("turn messages must match the reserved turn_id")
+
+        try:
+            async with self._engine.begin() as connection:
+                conversation = (
+                    await connection.execute(
+                        select(
+                            conversations.c.conversation_id,
+                            conversations.c.session_id,
+                            conversations.c.next_turn_sequence,
+                        )
+                        .where(
+                            conversations.c.conversation_id == reservation.conversation_id,
+                            conversations.c.user_id == user_id,
+                            conversations.c.status == ConversationStatus.ACTIVE.value,
+                        )
+                        .with_for_update()
+                    )
+                ).one_or_none()
+                if conversation is None:
+                    raise ChatRequestLeaseLostError
+                if user_message.session_id != conversation.session_id:
+                    raise ValueError("turn messages must match the reserved conversation")
+
+                request_row = (
+                    (
+                        await connection.execute(
+                            select(chat_requests)
+                            .where(
+                                chat_requests.c.request_id == reservation.request_id,
+                                chat_requests.c.conversation_id == reservation.conversation_id,
+                            )
+                            .with_for_update()
+                        )
+                    )
+                    .mappings()
+                    .one_or_none()
+                )
+                if not self._owns_chat_request_attempt(request_row, reservation):
+                    raise ChatRequestLeaseLostError
+                stored_hash = request_row["content_hash"]
+                if (
+                    not isinstance(stored_hash, (bytes, bytearray, memoryview))
+                    or bytes(stored_hash) != sha256(user_message.content.encode("utf-8")).digest()
+                ):
+                    raise ChatRequestConflictError
+
+                completed = await connection.execute(
+                    update(chat_requests)
+                    .where(
+                        chat_requests.c.request_id == reservation.request_id,
+                        chat_requests.c.status == ChatRequestStatus.PROCESSING.value,
+                        chat_requests.c.lease_token == reservation.lease_token,
+                        chat_requests.c.lease_expires_at > func.now(),
+                    )
+                    .values(
+                        status=ChatRequestStatus.COMPLETED.value,
+                        lease_token=None,
+                        lease_expires_at=None,
+                        updated_at=completed_at,
+                        completed_at=completed_at,
+                    )
+                )
+                if completed.rowcount != 1:
+                    raise ChatRequestLeaseLostError
+
+                turn_sequence = conversation.next_turn_sequence
+                if isinstance(turn_sequence, bool) or not isinstance(turn_sequence, int):
+                    raise ConversationStoreProtocolError
+                inserted_rows = (
+                    (
+                        await connection.execute(
+                            insert(conversation_messages).returning(
+                                conversation_messages.c.message_id,
+                                conversation_messages.c.message_index,
+                            ),
+                            [
+                                self._message_values(
+                                    reservation.conversation_id,
+                                    turn_sequence,
+                                    0,
+                                    user_message,
+                                ),
+                                self._message_values(
+                                    reservation.conversation_id,
+                                    turn_sequence,
+                                    1,
+                                    assistant_message,
+                                ),
+                            ],
+                        )
+                    )
+                    .mappings()
+                    .all()
+                )
+                boundary_message_id = next(
+                    (row["message_id"] for row in inserted_rows if row["message_index"] == 1),
+                    None,
+                )
+                if not isinstance(boundary_message_id, int):
+                    raise ConversationStoreProtocolError
+
+                memory_job_event_id = None
+                if schedule_memory:
+                    memory_job_event_id = await self._schedule_memory_job(
+                        connection,
+                        boundary_message_id,
+                        telemetry_context,
+                        supports_telemetry_context=(
+                            self._schema_revision in TELEMETRY_CONTEXT_SCHEMA_REVISIONS
+                        ),
+                    )
+
+                await connection.execute(
+                    update(conversations)
+                    .where(conversations.c.conversation_id == reservation.conversation_id)
+                    .values(
+                        next_turn_sequence=turn_sequence + 1,
+                        updated_at=completed_at,
+                        last_message_at=assistant_message.timestamp,
+                    )
+                )
+        except (
+            ChatRequestConflictError,
+            ChatRequestLeaseLostError,
+            ConversationStoreProtocolError,
+        ):
+            raise
+        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+            self._raise_mapped(error)
+
+        return AppendTurnResult(
+            inserted=True,
+            reference=CompletedTurnReference(
+                user_id=user_id,
+                session_id=user_message.session_id,
+                conversation_id=reservation.conversation_id,
+                turn_id=reservation.turn_id,
+                boundary_message_id=boundary_message_id,
+            ),
+            memory_job_event_id=memory_job_event_id,
+        )
+
+    async def read_completed_chat_request(
+        self,
+        user_id: str,
+        session_id: str,
+        reservation: ChatRequestReservation,
+    ) -> tuple[ConversationMessage, ConversationMessage] | None:
+        """Read a completed pair through relational ownership and request state."""
+        self._require_chat_request_schema()
+        if not user_id.strip() or not session_id.strip():
+            raise ValueError("user_id and session_id must not be empty")
+        if (
+            not isinstance(reservation, ChatRequestReservation)
+            or reservation.outcome is not ChatRequestReservationOutcome.COMPLETED
+        ):
+            raise ValueError("replay requires a completed chat request reservation")
+        statement = (
+            select(
+                conversation_messages.c.turn_id,
+                conversation_messages.c.role,
+                conversation_messages.c.content,
+                conversation_messages.c.message_timestamp,
+                conversation_messages.c.schema_version,
+                conversation_messages.c.turn_sequence,
+                conversation_messages.c.message_index,
+            )
+            .select_from(
+                chat_requests.join(
+                    conversations,
+                    chat_requests.c.conversation_id == conversations.c.conversation_id,
+                ).join(
+                    conversation_messages,
+                    (conversation_messages.c.conversation_id == conversations.c.conversation_id)
+                    & (conversation_messages.c.turn_id == chat_requests.c.turn_id),
+                )
+            )
+            .where(
+                chat_requests.c.request_id == reservation.request_id,
+                chat_requests.c.status == ChatRequestStatus.COMPLETED.value,
+                conversations.c.conversation_id == reservation.conversation_id,
+                conversations.c.user_id == user_id,
+                conversations.c.session_id == session_id,
+                conversations.c.status == ConversationStatus.ACTIVE.value,
+            )
+            .order_by(conversation_messages.c.message_index)
+        )
+        try:
+            async with self._engine.connect() as connection:
+                rows = (await connection.execute(statement)).mappings().all()
+        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+            self._raise_mapped(error)
+        if not rows:
+            return None
+        if len(rows) != 2:
+            raise ConversationStoreProtocolError
+        try:
+            messages = tuple(self._to_domain_message(session_id, row) for row in rows)
+        except (KeyError, TypeError, ValueError) as error:
+            raise ConversationStoreProtocolError from error
+        if (
+            messages[0].role is not ConversationRole.USER
+            or messages[1].role is not ConversationRole.ASSISTANT
+            or any(message.turn_id != reservation.turn_id for message in messages)
+        ):
+            raise ConversationStoreProtocolError
+        return messages
+
     async def read_recent(
         self,
         user_id: str,
@@ -870,6 +1112,24 @@ class PostgresConversationStoreAdapter:
             )
         except (KeyError, TypeError, ValueError) as error:
             raise ConversationStoreProtocolError from error
+
+    @staticmethod
+    def _owns_chat_request_attempt(
+        row: Mapping[str, Any] | None,
+        reservation: ChatRequestReservation,
+    ) -> bool:
+        if row is None:
+            return False
+        try:
+            return bool(
+                row["status"] == ChatRequestStatus.PROCESSING.value
+                and row["turn_id"] == reservation.turn_id
+                and row["client_message_id"] == reservation.client_message_id
+                and row["lease_token"] == reservation.lease_token
+                and isinstance(row["lease_expires_at"], datetime)
+            )
+        except (KeyError, TypeError):
+            raise ConversationStoreProtocolError from None
 
     @staticmethod
     def _validate_chat_reservation_input(

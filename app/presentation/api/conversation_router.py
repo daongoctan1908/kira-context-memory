@@ -1,21 +1,34 @@
 """Authenticated conversation management endpoints."""
 
+import asyncio
 import base64
 import binascii
 from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi.responses import StreamingResponse
 
-from app.domain.models.conversation import ConversationListCursor
+from app.application.services.chat_idempotency import ChatIdempotencyService
+from app.application.use_cases.handle_chat import HandleChatUseCase
+from app.domain.errors.conversation import ChatRequestConflictError
+from app.domain.models.chat import ChatCommand
+from app.domain.models.conversation import (
+    ChatRequestReservationOutcome,
+    ConversationListCursor,
+)
 from app.domain.ports.conversation_store import ConversationStorePort
+from app.infrastructure.observability.context import bind_observability_context
+from app.infrastructure.observability.tracing import set_request_span_attribute
 from app.presentation.api.auth_dependencies import resolve_auth_session
+from app.presentation.api.sse import ProductChatStreamingResponse
 from app.presentation.schemas.conversation import (
     ConversationDeletionResponse,
     ConversationHistoryResponse,
     ConversationListResponse,
     ConversationSummaryResponse,
     CreateConversationRequest,
+    SendConversationMessageRequest,
 )
 
 router = APIRouter(prefix="/api/v1/conversations", tags=["conversations"])
@@ -71,6 +84,96 @@ async def read_conversation_history(
     if page is None:
         raise HTTPException(status_code=404, detail="conversation_not_found")
     return ConversationHistoryResponse.from_domain(page)
+
+
+@router.post(
+    "/{session_id}/messages",
+    response_class=StreamingResponse,
+    responses={409: {"description": "Request is already processing or conflicts"}},
+)
+async def send_conversation_message(
+    session_id: str,
+    body: SendConversationMessageRequest,
+    request: Request,
+) -> StreamingResponse:
+    """Stream one idempotent product turn for an existing active conversation."""
+    auth_session = await resolve_auth_session(request, require_csrf=True)
+    user_id = auth_session.principal.user_id
+    correlation_id: str = request.state.correlation_id
+    coordinator: ChatIdempotencyService = request.app.state.chat_idempotency
+    try:
+        reservation = await coordinator.reserve(
+            user_id,
+            session_id,
+            body.client_message_id,
+            body.message,
+        )
+    except ChatRequestConflictError:
+        raise HTTPException(status_code=409, detail="idempotency_conflict") from None
+    if reservation is None:
+        raise HTTPException(status_code=404, detail="conversation_not_found")
+    if reservation.outcome is ChatRequestReservationOutcome.IN_PROGRESS:
+        raise HTTPException(status_code=409, detail="request_in_progress")
+
+    request.state.turn_id = reservation.turn_id
+    set_request_span_attribute("turn_id", reservation.turn_id)
+    set_request_span_attribute("client_message_id", str(body.client_message_id))
+    headers = {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+        "X-Correlation-ID": correlation_id,
+    }
+    store: ConversationStorePort = request.app.state.conversation_store
+    if reservation.outcome is ChatRequestReservationOutcome.COMPLETED:
+        completed = await store.read_completed_chat_request(
+            user_id,
+            session_id,
+            reservation,
+        )
+        if completed is None:
+            raise HTTPException(status_code=404, detail="conversation_not_found")
+        return ProductChatStreamingResponse(
+            correlation_id=correlation_id,
+            turn_id=reservation.turn_id,
+            client_message_id=str(body.client_message_id),
+            replayed_message=completed[1],
+            headers=headers,
+        )
+
+    use_case: HandleChatUseCase = request.app.state.handle_chat
+    with bind_observability_context(
+        correlation_id=correlation_id,
+        turn_id=reservation.turn_id,
+    ):
+        try:
+            stream = await use_case.execute_reserved(
+                ChatCommand(session_id=session_id, message=body.message),
+                reservation,
+                principal=auth_session.principal,
+                correlation_id=correlation_id,
+            )
+        except BaseException as error:
+            try:
+                await coordinator.abandon(
+                    reservation,
+                    cancelled=isinstance(error, asyncio.CancelledError),
+                )
+            except Exception:
+                pass
+            raise
+
+    return ProductChatStreamingResponse(
+        correlation_id=correlation_id,
+        turn_id=reservation.turn_id,
+        client_message_id=str(body.client_message_id),
+        session=stream,
+        on_abort=lambda cancelled: coordinator.abandon(
+            reservation,
+            cancelled=cancelled,
+        ),
+        headers=headers,
+    )
 
 
 @router.delete(
