@@ -223,7 +223,7 @@ uv run ruff format --check .
 uv run pytest
 ```
 
-Frontend React nằm trong `frontend/`. Cài dependency và chạy các gate T9.1:
+Frontend React nằm trong `frontend/`. Cài dependency và chạy các gate T9.1-T9.2:
 
 ```powershell
 Set-Location frontend
@@ -238,8 +238,10 @@ Set-Location ..
 ```
 
 Chạy local bằng `corepack pnpm dev` trong thư mục `frontend/`, sau đó mở
-`http://127.0.0.1:4173/chat/new`. Scaffold hiện chỉ khóa route `/login`, `/chat/new` và
-`/chat/:sessionId`; auth, API conversation và streaming lần lượt thuộc T9.2-T9.4.
+`http://127.0.0.1:5173/login`. Vite proxy `/api` tới Gateway tại
+`http://127.0.0.1:8000` theo mặc định; có thể đổi bằng `VITE_API_TARGET` trong
+`frontend/.env.local`. Login/logout/change-password, session rehydration và CSRF đã hoàn thành ở
+T9.2; API conversation và streaming lần lượt thuộc T9.3-T9.4.
 
 Khởi động PostgreSQL local, apply migration và chạy integration test thật:
 
