@@ -6,9 +6,9 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from app.application.use_cases.handle_chat import HandleChatUseCase
-from app.domain.ports.identity import IdentityPort
 from app.infrastructure.observability.context import bind_observability_context
 from app.infrastructure.observability.tracing import set_request_span_attribute
+from app.presentation.api.auth_dependencies import resolve_chat_principal
 from app.presentation.api.sse import ChatStreamingResponse
 from app.presentation.schemas.chat import ChatRequest
 from app.presentation.schemas.errors import GatewayError
@@ -31,12 +31,11 @@ async def chat(body: ChatRequest, request: Request) -> StreamingResponse:
     request.state.turn_id = turn_id
     set_request_span_attribute("turn_id", turn_id)
     use_case: HandleChatUseCase = request.app.state.handle_chat
-    identity: IdentityPort = request.app.state.identity_provider
     observer = request.app.state.telemetry
     with bind_observability_context(correlation_id=correlation_id, turn_id=turn_id):
         with observer.stage("identity.resolve") as observation:
             try:
-                principal = await identity.resolve()
+                principal = await resolve_chat_principal(request)
             except BaseException:
                 observation.set_outcome("error")
                 raise

@@ -1,5 +1,6 @@
 """Environment-backed application settings."""
 
+from datetime import timedelta
 from functools import lru_cache
 from typing import Literal
 
@@ -40,6 +41,15 @@ class Settings(BaseSettings):
     app_version: str = Field(default="0.4.1", min_length=1, max_length=64)
     dev_static_identity_enabled: bool = False
     dev_static_user_id: str | None = Field(default=None, min_length=1)
+
+    auth_enabled: bool = False
+    auth_allowed_origin: AnyHttpUrl | None = None
+    auth_cookie_secure: bool = False
+    auth_session_idle_seconds: int = Field(default=7200, ge=300, le=86400)
+    auth_session_absolute_seconds: int = Field(default=28800, ge=900, le=604800)
+    auth_session_touch_seconds: int = Field(default=300, ge=60, le=3600)
+    auth_lock_threshold: int = Field(default=5, ge=1, le=20)
+    auth_lock_seconds: int = Field(default=900, ge=60, le=86400)
 
     otel_enabled: bool = False
     otel_exporter_otlp_endpoint: AnyHttpUrl | None = None
@@ -104,6 +114,25 @@ class Settings(BaseSettings):
                 raise ValueError("static development identity is forbidden in production")
             if self.dev_static_user_id is None:
                 raise ValueError("DEV_STATIC_USER_ID is required when static identity is enabled")
+        if self.auth_enabled and self.dev_static_identity_enabled:
+            raise ValueError("session auth and static development identity are mutually exclusive")
+        if self.app_environment == "production" and not self.auth_enabled:
+            raise ValueError("application-managed auth is required in production")
+        if self.auth_enabled:
+            if self.database_url is None:
+                raise ValueError("DATABASE_URL is required when auth is enabled")
+            if self.auth_allowed_origin is None:
+                raise ValueError("AUTH_ALLOWED_ORIGIN is required when auth is enabled")
+            if self.auth_session_absolute_seconds < self.auth_session_idle_seconds:
+                raise ValueError("auth absolute TTL must be at least the idle TTL")
+            if self.auth_session_touch_seconds > self.auth_session_idle_seconds:
+                raise ValueError("auth touch interval must not exceed the idle TTL")
+        if self.app_environment == "production":
+            if not self.auth_cookie_secure:
+                raise ValueError("secure auth cookies are required in production")
+            assert self.auth_allowed_origin is not None
+            if self.auth_allowed_origin.scheme != "https":
+                raise ValueError("production auth origin must use HTTPS")
         if self.memory_postgres_max_connections < self.memory_postgres_min_connections:
             raise ValueError("memory PostgreSQL max connections must be at least min connections")
         if self.otel_batch_max_export_batch_size > self.otel_batch_max_queue_size:
@@ -130,6 +159,30 @@ class Settings(BaseSettings):
             if missing:
                 raise ValueError(f"LTM configuration is incomplete: {', '.join(missing)}")
         return self
+
+    @property
+    def auth_idle_ttl(self) -> timedelta:
+        return timedelta(seconds=self.auth_session_idle_seconds)
+
+    @property
+    def auth_absolute_ttl(self) -> timedelta:
+        return timedelta(seconds=self.auth_session_absolute_seconds)
+
+    @property
+    def auth_touch_interval(self) -> timedelta:
+        return timedelta(seconds=self.auth_session_touch_seconds)
+
+    @property
+    def auth_lock_duration(self) -> timedelta:
+        return timedelta(seconds=self.auth_lock_seconds)
+
+    @property
+    def auth_session_cookie_name(self) -> str:
+        return "__Host-kira_session" if self.auth_cookie_secure else "kira_session_dev"
+
+    @property
+    def auth_csrf_cookie_name(self) -> str:
+        return "__Host-kira_csrf" if self.auth_cookie_secure else "kira_csrf_dev"
 
 
 @lru_cache

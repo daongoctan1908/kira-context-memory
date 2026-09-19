@@ -149,6 +149,75 @@ def test_static_identity_is_forbidden_in_production() -> None:
         )
 
 
+def test_production_requires_application_auth_https_origin_and_secure_cookie() -> None:
+    common = {
+        "_env_file": None,
+        "kira_base_url": "https://kira.test",
+        "kira_username": "service-account",
+        "kira_basic_auth": "secret",
+        "app_environment": "production",
+        "database_url": "postgresql://user:password@db/kira",
+    }
+    with pytest.raises(ValidationError, match="auth is required"):
+        Settings(**common)
+    with pytest.raises(ValidationError, match="AUTH_ALLOWED_ORIGIN"):
+        Settings(**common, auth_enabled=True)
+    with pytest.raises(ValidationError, match="secure auth cookies"):
+        Settings(
+            **common,
+            auth_enabled=True,
+            auth_allowed_origin="https://chat.test",
+        )
+    with pytest.raises(ValidationError, match="must use HTTPS"):
+        Settings(
+            **common,
+            auth_enabled=True,
+            auth_allowed_origin="http://chat.test",
+            auth_cookie_secure=True,
+        )
+
+    settings = Settings(
+        **common,
+        auth_enabled=True,
+        auth_allowed_origin="https://chat.test",
+        auth_cookie_secure=True,
+    )
+    assert settings.auth_session_cookie_name == "__Host-kira_session"
+    assert settings.auth_csrf_cookie_name == "__Host-kira_csrf"
+    assert settings.auth_idle_ttl.total_seconds() == 7200
+    assert settings.auth_absolute_ttl.total_seconds() == 28800
+
+
+def test_auth_settings_require_database_origin_and_consistent_ttls() -> None:
+    common = {
+        "_env_file": None,
+        "kira_base_url": "http://kira.test",
+        "kira_username": "service-account",
+        "kira_basic_auth": "secret",
+        "auth_enabled": True,
+    }
+    with pytest.raises(ValidationError, match="DATABASE_URL"):
+        Settings(**common)
+    with pytest.raises(ValidationError, match="AUTH_ALLOWED_ORIGIN"):
+        Settings(**common, database_url="postgresql://user:password@db/kira")
+    with pytest.raises(ValidationError, match="absolute TTL"):
+        Settings(
+            **common,
+            database_url="postgresql://user:password@db/kira",
+            auth_allowed_origin="http://localhost:5173",
+            auth_session_idle_seconds=7200,
+            auth_session_absolute_seconds=3600,
+        )
+    with pytest.raises(ValidationError, match="mutually exclusive"):
+        Settings(
+            **common,
+            database_url="postgresql://user:password@db/kira",
+            auth_allowed_origin="http://localhost:5173",
+            dev_static_identity_enabled=True,
+            dev_static_user_id="dev-user",
+        )
+
+
 def test_enabled_ltm_requires_all_runtime_dependencies() -> None:
     with pytest.raises(ValidationError, match="MEMORY_DATABASE_URL"):
         Settings(

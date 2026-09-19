@@ -8,9 +8,11 @@ import httpx
 from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from app.application.services.auth import AuthService
 from app.application.services.context_builder import ContextBuilder
 from app.application.use_cases.handle_chat import HandleChatUseCase
 from app.config.settings import Settings, get_settings
+from app.domain.errors.auth import AuthError
 from app.domain.errors.conversation import ConversationStoreConnectionError
 from app.domain.errors.kira import KiraClientError
 from app.domain.ports.conversation_store import ConversationStorePort
@@ -18,6 +20,7 @@ from app.domain.ports.identity import IdentityPort
 from app.domain.ports.kira_client import KiraClientPort
 from app.domain.ports.long_term_memory import LongTermMemoryPort
 from app.domain.ports.query_rewriter import QueryRewriterPort
+from app.infrastructure.auth import PwdlibPasswordHasher
 from app.infrastructure.identity import NullIdentityAdapter, StaticIdentityAdapter
 from app.infrastructure.kira.http_kira_client import KiraHttpAdapter
 from app.infrastructure.llm.vllm_query_rewriter import VllmQueryRewriterAdapter
@@ -27,13 +30,15 @@ from app.infrastructure.observability.logging import configure_app_logging
 from app.infrastructure.observability.runtime import create_observability_runtime
 from app.infrastructure.observability.settings import build_observability_settings
 from app.infrastructure.postgres import (
+    PostgresAuthStore,
     PostgresConversationStoreAdapter,
     create_postgres_engine,
 )
 from app.infrastructure.postgres.managed_store import ManagedPostgresConversationStore
+from app.presentation.api.auth_router import router as auth_router
 from app.presentation.api.chat_router import router as chat_router
 from app.presentation.api.correlation_middleware import CorrelationMiddleware
-from app.presentation.api.errors import kira_client_exception_handler
+from app.presentation.api.errors import auth_exception_handler, kira_client_exception_handler
 from app.presentation.api.health_router import router as health_router
 from app.presentation.api.metrics_router import router as metrics_router
 from app.presentation.api.tracing_middleware import ChatTracingMiddleware
@@ -52,6 +57,7 @@ def create_app(
     rewriter_http_client: httpx.AsyncClient | None = None,
     identity_provider: IdentityPort | None = None,
     long_term_memory: LongTermMemoryPort | None = None,
+    auth_service: AuthService | None = None,
 ) -> FastAPI:
     """Create a Gateway app with optional dependency injection for tests."""
 
@@ -114,9 +120,9 @@ def create_app(
                 )
 
             resolved_conversation_store = conversation_store
+            resolved_postgres_engine = postgres_engine
             postgres_status = "injected" if conversation_store is not None else "initializing"
             if resolved_conversation_store is None:
-                resolved_postgres_engine = postgres_engine
                 if resolved_postgres_engine is None:
                     owned_postgres_engine = create_postgres_engine(resolved_settings)
                     resolved_postgres_engine = owned_postgres_engine
@@ -163,6 +169,21 @@ def create_app(
                 else:
                     resolved_identity = NullIdentityAdapter()
 
+            resolved_auth_service = auth_service
+            if resolved_settings.auth_enabled and resolved_auth_service is None:
+                if resolved_postgres_engine is None:
+                    owned_postgres_engine = create_postgres_engine(resolved_settings)
+                    resolved_postgres_engine = owned_postgres_engine
+                resolved_auth_service = AuthService(
+                    PostgresAuthStore(resolved_postgres_engine),
+                    PwdlibPasswordHasher(),
+                    idle_ttl=resolved_settings.auth_idle_ttl,
+                    absolute_ttl=resolved_settings.auth_absolute_ttl,
+                    touch_interval=resolved_settings.auth_touch_interval,
+                    lock_threshold=resolved_settings.auth_lock_threshold,
+                    lock_duration=resolved_settings.auth_lock_duration,
+                )
+
             resolved_long_term_memory = long_term_memory
             if resolved_long_term_memory is not None:
                 ltm_status = "injected"
@@ -183,6 +204,7 @@ def create_app(
             application.state.memory_formation_enabled = resolved_settings.memory_formation_enabled
             application.state.telemetry = telemetry
             application.state.identity_provider = resolved_identity
+            application.state.auth_service = resolved_auth_service
             application.state.handle_chat = HandleChatUseCase(
                 resolved_kira_client,
                 conversation_store=resolved_conversation_store,
@@ -236,7 +258,9 @@ def create_app(
     application.add_middleware(ChatTracingMiddleware)
     application.add_middleware(CorrelationMiddleware)
     application.add_exception_handler(KiraClientError, kira_client_exception_handler)
+    application.add_exception_handler(AuthError, auth_exception_handler)
     application.include_router(health_router)
+    application.include_router(auth_router)
     application.include_router(chat_router)
     application.include_router(metrics_router)
     return application

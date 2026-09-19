@@ -6,12 +6,65 @@ from uuid import uuid4
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+from app.domain.errors.auth import (
+    AuthError,
+    AuthStoreError,
+    InvalidCredentialsError,
+    InvalidCsrfTokenError,
+    PasswordPolicyError,
+)
 from app.domain.errors.kira import KiraClientError, KiraTimeoutError
 from app.infrastructure.observability.tracing import (
     mark_request_outcome,
     set_request_span_attribute,
 )
 from app.presentation.schemas.errors import GatewayError
+
+
+async def auth_exception_handler(request: Request, error: AuthError) -> JSONResponse:
+    """Map authentication failures without exposing usernames, tokens or database details."""
+    correlation_id = getattr(request.state, "correlation_id", uuid4().hex)
+    if isinstance(error, InvalidCsrfTokenError):
+        status_code, code, message, retryable = 403, "AUTH_CSRF_INVALID", "Request rejected", False
+    elif isinstance(error, PasswordPolicyError):
+        status_code, code, message, retryable = (
+            422,
+            "AUTH_PASSWORD_POLICY",
+            "Password does not meet policy",
+            False,
+        )
+    elif isinstance(error, AuthStoreError):
+        status_code, code, message, retryable = (
+            503,
+            "AUTH_UNAVAILABLE",
+            "Authentication temporarily unavailable",
+            True,
+        )
+    elif isinstance(error, InvalidCredentialsError):
+        status_code, code, message, retryable = (
+            401,
+            "AUTH_INVALID_CREDENTIALS",
+            "Invalid credentials",
+            False,
+        )
+    else:
+        status_code, code, message, retryable = (
+            401,
+            "AUTH_SESSION_INVALID",
+            "Authentication required",
+            False,
+        )
+    payload = GatewayError(
+        code=code,
+        message=message,
+        correlation_id=correlation_id,
+        retryable=retryable,
+    )
+    return JSONResponse(
+        status_code=status_code,
+        content=payload.model_dump(),
+        headers={"X-Correlation-ID": correlation_id},
+    )
 
 
 def gateway_error(error: KiraClientError, correlation_id: str) -> GatewayError:
