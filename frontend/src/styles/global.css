@@ -171,6 +171,8 @@ input:focus-visible {
 }
 
 .sidebar {
+  min-width: 0;
+  overflow-y: auto;
   padding: 24px 18px;
   border-right: 1px solid var(--border);
   background: var(--surface-muted);
@@ -222,15 +224,399 @@ input:focus-visible {
   line-height: 1.5;
 }
 
+.conversation-list-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 28px 8px 12px;
+}
+
+.conversation-list-header h2 {
+  margin: 0;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+}
+
+.conversation-list-header span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.conversation-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.conversation-item {
+  position: relative;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 9px;
+}
+
+.conversation-item:hover,
+.conversation-item:focus-within {
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+.conversation-item.pending {
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--surface) 72%, var(--surface-muted));
+}
+
+.conversation-link,
+.conversation-summary {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 11px 48px 11px 10px;
+  text-decoration: none;
+}
+
+.conversation-link strong,
+.conversation-summary strong {
+  overflow: hidden;
+  font-size: 0.9rem;
+  font-weight: 680;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-link time,
+.conversation-summary span {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.conversation-link.active {
+  color: var(--accent-strong);
+}
+
+.conversation-item-actions {
+  position: absolute;
+  top: 8px;
+  right: 7px;
+}
+
+.conversation-item-actions button,
+.load-more-button,
+.load-history-button {
+  border: 0;
+  background: transparent;
+  color: var(--accent-strong);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 680;
+}
+
+.conversation-item-actions button {
+  min-height: 30px;
+  padding: 0 4px;
+}
+
+.conversation-item-actions button:disabled,
+.load-more-button:disabled,
+.load-history-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.conversation-delete-error {
+  display: block;
+  padding: 0 10px 10px;
+  color: #91322f;
+  font-size: 0.75rem;
+}
+
+.load-more-button {
+  width: 100%;
+  min-height: 40px;
+  margin-top: 8px;
+}
+
+.sidebar-state {
+  display: grid;
+  gap: 12px;
+}
+
+.sidebar-state .form-error {
+  margin-top: 0;
+}
+
+.inline-sidebar-error {
+  margin: 10px 0;
+}
+
+.sidebar-empty {
+  margin: 0;
+  padding: 18px 8px;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.conversation-skeleton,
+.history-skeleton {
+  display: grid;
+  gap: 10px;
+}
+
+.conversation-skeleton span,
+.history-skeleton span {
+  display: block;
+  border-radius: 8px;
+  background: var(--border);
+  opacity: 0.48;
+}
+
+.conversation-skeleton span {
+  height: 52px;
+}
+
+.history-skeleton {
+  width: 100%;
+  margin: auto 0;
+}
+
+.history-skeleton span {
+  width: min(72%, 520px);
+  height: 96px;
+}
+
+.history-skeleton span:nth-child(2) {
+  justify-self: end;
+  width: min(58%, 420px);
+}
+
 .content {
   min-width: 0;
-  display: grid;
-  place-items: center;
-  padding: 48px 32px;
+  min-height: 0;
+  display: flex;
+  padding: 0;
+  overflow: hidden;
 }
 
 .empty-conversation {
   width: min(100%, 640px);
+}
+
+.new-conversation {
+  width: min(100%, 680px);
+  margin: auto;
+  padding: 48px 32px;
+}
+
+.new-conversation h1,
+.conversation-view-header h1,
+.conversation-state h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 1.06;
+  letter-spacing: -0.04em;
+}
+
+.new-conversation > p:not(.route-kicker) {
+  margin: 18px 0 0;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.new-conversation-form {
+  display: grid;
+  gap: 20px;
+  margin-top: 30px;
+}
+
+.new-conversation-form .primary-button {
+  justify-self: start;
+}
+
+.conversation-view {
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 38px clamp(20px, 5vw, 72px) 48px;
+}
+
+.conversation-view-header {
+  width: min(100%, 860px);
+  margin: 0 auto 32px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.conversation-view-header h1 {
+  max-width: 24ch;
+  font-size: clamp(1.8rem, 4vw, 3rem);
+}
+
+.load-history-button {
+  align-self: center;
+  min-height: 40px;
+  margin-bottom: 18px;
+  padding: 0 14px;
+}
+
+.message-list {
+  width: min(100%, 860px);
+  display: grid;
+  gap: 18px;
+  margin: auto auto 0;
+  padding: 0;
+  list-style: none;
+}
+
+.message-row {
+  display: flex;
+}
+
+.message-row.user {
+  justify-content: flex-end;
+}
+
+.message-bubble {
+  width: fit-content;
+  max-width: min(78%, 680px);
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.message-row.user .message-bubble {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+
+.message-role {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--accent-strong);
+  font-size: 0.76rem;
+  font-weight: 740;
+}
+
+.message-bubble p {
+  margin: 0;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.message-bubble time {
+  display: block;
+  margin-top: 9px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.conversation-state {
+  width: min(100%, 600px);
+  display: grid;
+  gap: 18px;
+  margin: auto;
+  padding: 32px;
+}
+
+.conversation-state .form-error {
+  margin: 0;
+}
+
+.conversation-state .secondary-link,
+.conversation-state .secondary-button {
+  justify-self: start;
+  margin-top: 0;
+}
+
+.compact-state {
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.compact-state p {
+  margin: 0;
+}
+
+.secondary-button,
+.danger-button {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 680;
+}
+
+.secondary-button:hover:not(:disabled) {
+  border-color: var(--text-muted);
+}
+
+.danger-button {
+  border-color: #9c3b34;
+  background: #9c3b34;
+  color: #fff8f6;
+}
+
+.secondary-button:disabled,
+.danger-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.compact-button {
+  justify-self: start;
+  min-height: 36px;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(12 20 15 / 58%);
+}
+
+.confirm-dialog {
+  width: min(100%, 480px);
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.confirm-dialog h2 {
+  margin: 0;
+  font-size: 1.45rem;
+}
+
+.confirm-dialog p {
+  margin: 14px 0 0;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.confirm-dialog .dialog-subject {
+  color: var(--text);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 26px;
 }
 
 .empty-conversation h1,
@@ -416,10 +802,14 @@ input:focus-visible {
   }
 
   .workspace {
-    display: contents;
+    min-height: 0;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
   }
 
   .sidebar {
+    max-height: 42dvh;
     padding: 12px 16px;
     border-right: 0;
     border-bottom: 1px solid var(--border);
@@ -430,13 +820,41 @@ input:focus-visible {
   }
 
   .content {
-    place-items: start;
-    padding: 48px 20px;
+    flex: 1;
+    overflow: auto;
   }
 
   .empty-conversation h1,
   .route-panel h1 {
     font-size: clamp(2rem, 11vw, 3rem);
+  }
+
+  .new-conversation {
+    margin: 0;
+    padding: 40px 20px;
+  }
+
+  .new-conversation-form .primary-button {
+    width: 100%;
+  }
+
+  .conversation-view {
+    overflow: visible;
+    padding: 30px 16px 36px;
+  }
+
+  .message-bubble {
+    max-width: 90%;
+  }
+
+  .conversation-state {
+    margin: 0;
+    padding: 40px 20px;
+  }
+
+  .dialog-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 }
 

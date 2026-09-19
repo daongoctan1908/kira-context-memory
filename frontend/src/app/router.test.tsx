@@ -43,8 +43,28 @@ function requestPath(input: RequestInfo | URL): string {
   return input.url;
 }
 
+function emptyConversationList(): Response {
+  return response({ items: [], next_cursor: null });
+}
+
+function emptyHistory(): Response {
+  return response({ items: [], next_before_message_id: null });
+}
+
 function mockAuthenticatedFetch(): ReturnType<typeof vi.fn> {
-  const fetchMock = vi.fn(() => Promise.resolve(response(USER)));
+  const fetchMock = vi.fn((input: RequestInfo | URL) => {
+    const path = requestPath(input);
+    if (path.endsWith("/me")) {
+      return Promise.resolve(response(USER));
+    }
+    if (path.includes("/api/v1/conversations?") && !path.includes("/messages?")) {
+      return Promise.resolve(emptyConversationList());
+    }
+    if (path.includes("/messages?")) {
+      return Promise.resolve(emptyHistory());
+    }
+    return Promise.reject(new Error(`Unexpected request: ${path}`));
+  });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }
@@ -77,6 +97,12 @@ describe("application authentication routes", () => {
       if (path.endsWith("/login") && init?.method === "POST") {
         return Promise.resolve(response(USER));
       }
+      if (path.includes("/api/v1/conversations?") && !path.includes("/messages?")) {
+        return Promise.resolve(emptyConversationList());
+      }
+      if (path.includes("/messages?")) {
+        return Promise.resolve(emptyHistory());
+      }
       return Promise.reject(new Error(`Unexpected request: ${path}`));
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -87,7 +113,16 @@ describe("application authentication routes", () => {
     await user.type(screen.getByLabelText("Mật khẩu"), "private-password");
     await user.click(screen.getByRole("button", { name: "Đăng nhập" }));
 
-    expect(await screen.findByText("company-session-01")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Cuộc trò chuyện" }),
+    ).toBeVisible();
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(([input]) =>
+          requestPath(input).includes("/company-session-01/messages?"),
+        ),
+      ).toBe(true);
+    });
     const loginCall = fetchMock.mock.calls.find(([input]) => requestPath(input).endsWith("/login"));
     expect(loginCall?.[1]).toMatchObject({
       credentials: "include",
@@ -111,14 +146,18 @@ describe("application authentication routes", () => {
   });
 
   it("shows dependency failure separately and can retry rehydration", async () => {
-    let attempt = 0;
+    let meAttempt = 0;
     vi.stubGlobal(
       "fetch",
-      vi.fn(() => {
-        attempt += 1;
-        return Promise.resolve(
-          attempt === 1 ? authError("AUTH_UNAVAILABLE", 503) : response(USER),
-        );
+      vi.fn((input: RequestInfo | URL) => {
+        const path = requestPath(input);
+        if (path.endsWith("/me")) {
+          meAttempt += 1;
+          return Promise.resolve(
+            meAttempt === 1 ? authError("AUTH_UNAVAILABLE", 503) : response(USER),
+          );
+        }
+        return Promise.resolve(emptyConversationList());
       }),
     );
     const user = userEvent.setup();
@@ -132,9 +171,12 @@ describe("application authentication routes", () => {
   it("sends CSRF on password change and requires login again", async () => {
     document.cookie = "kira_csrf_dev=csrf%20value; Path=/";
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = requestPath(input);
       return Promise.resolve(
-        requestPath(input).endsWith("/me") && init?.body === undefined
+        path.endsWith("/me") && init?.body === undefined
           ? response(USER)
+          : path.includes("/api/v1/conversations?")
+            ? emptyConversationList()
           : response(null, 204),
       );
     });
@@ -161,8 +203,12 @@ describe("application authentication routes", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn((input: RequestInfo | URL) => {
-        if (requestPath(input).endsWith("/me")) {
+        const path = requestPath(input);
+        if (path.endsWith("/me")) {
           return Promise.resolve(response(USER));
+        }
+        if (path.includes("/api/v1/conversations?")) {
+          return Promise.resolve(emptyConversationList());
         }
         return Promise.reject(new TypeError("offline detail"));
       }),
@@ -178,13 +224,16 @@ describe("application authentication routes", () => {
 
   it("sends CSRF on logout and returns to the login screen", async () => {
     document.cookie = "kira_csrf_dev=logout-token; Path=/";
-    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
-      Promise.resolve(
-        requestPath(input).endsWith("/me") && init?.body === undefined
-          ? response(USER)
-          : response(null, 204),
-      ),
-    );
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const path = requestPath(input);
+        if (path.endsWith("/me") && init?.body === undefined) {
+          return Promise.resolve(response(USER));
+        }
+        if (path.includes("/api/v1/conversations?")) {
+          return Promise.resolve(emptyConversationList());
+        }
+        return Promise.resolve(response(null, 204));
+      });
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 

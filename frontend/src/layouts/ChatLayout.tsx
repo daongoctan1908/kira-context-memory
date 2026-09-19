@@ -3,8 +3,18 @@ import { NavLink, Outlet } from "react-router-dom";
 
 import { useAuth } from "../auth/useAuth";
 import { FormError } from "../components/FormError";
+import { ConversationList } from "../conversations/ConversationList";
+import { ConversationProvider } from "../conversations/ConversationProvider";
 
 export function ChatLayout() {
+  return (
+    <ConversationProvider>
+      <ChatWorkspace />
+    </ConversationProvider>
+  );
+}
+
+function ChatWorkspace() {
   const auth = useAuth();
   const [logoutError, setLogoutError] = useState<unknown>(null);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -58,7 +68,7 @@ export function ChatLayout() {
             <NavLink className="new-chat-link" to="/chat/new">
               Cuộc trò chuyện mới
             </NavLink>
-            <p className="sidebar-hint">Lịch sử trò chuyện sẽ xuất hiện tại đây.</p>
+            <ConversationList />
           </nav>
         </aside>
         <main className="content" id="main-content">
