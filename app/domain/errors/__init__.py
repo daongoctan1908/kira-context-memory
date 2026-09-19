@@ -1,5 +1,14 @@
 """Typed errors exposed by outbound domain ports."""
 
+from app.domain.errors.auth import (
+    AuthConflictError,
+    AuthError,
+    AuthStoreError,
+    InvalidCredentialsError,
+    InvalidCsrfTokenError,
+    InvalidSessionError,
+    PasswordPolicyError,
+)
 from app.domain.errors.conversation import (
     ConversationStoreConfigurationError,
     ConversationStoreConnectionError,
@@ -42,6 +51,9 @@ from app.domain.errors.query_rewriter import (
 )
 
 __all__ = [
+    "AuthConflictError",
+    "AuthError",
+    "AuthStoreError",
     "ConversationStoreConfigurationError",
     "ConversationStoreConnectionError",
     "ConversationStoreError",
@@ -54,6 +66,9 @@ __all__ = [
     "KiraMalformedSseError",
     "KiraProtocolError",
     "KiraTimeoutError",
+    "InvalidCredentialsError",
+    "InvalidCsrfTokenError",
+    "InvalidSessionError",
     "LongTermMemoryConfigurationError",
     "LongTermMemoryConnectionError",
     "LongTermMemoryError",
@@ -66,6 +81,7 @@ __all__ = [
     "MemoryJobQueueError",
     "MemoryJobQueueOperationError",
     "MemoryJobQueueProtocolError",
+    "PasswordPolicyError",
     "QueryRewriterConfigurationError",
     "QueryRewriterConnectionError",
     "QueryRewriterError",

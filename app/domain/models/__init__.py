@@ -1,5 +1,6 @@
 """Domain models used by KiRa application ports."""
 
+from app.domain.models.auth import AuthSession, AuthUser, IssuedSession
 from app.domain.models.chat import ChatCommand
 from app.domain.models.context import ConversationContext
 from app.domain.models.conversation import (
@@ -34,6 +35,8 @@ from app.domain.models.telemetry_context import (
 __all__ = [
     "CONVERSATION_MESSAGE_SCHEMA_VERSION",
     "AppendTurnResult",
+    "AuthSession",
+    "AuthUser",
     "AuthenticatedPrincipal",
     "ChatCommand",
     "CompletedTurnReference",
@@ -43,6 +46,7 @@ __all__ = [
     "KiraAuthResult",
     "KiraEventKind",
     "KiraStreamEvent",
+    "IssuedSession",
     "LongTermMemory",
     "MemoryLifecycleEvent",
     "MEMORY_JOB_SCHEMA_VERSION",
