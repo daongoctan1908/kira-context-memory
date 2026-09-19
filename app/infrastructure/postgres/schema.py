@@ -21,10 +21,11 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import BYTEA, JSONB
 
-PREVIOUS_SCHEMA_REVISION = "20260915_0004"
-EXPECTED_SCHEMA_REVISION = "20260919_0005"
+PREVIOUS_SCHEMA_REVISION = "20260919_0005"
+EXPECTED_SCHEMA_REVISION = "20260919_0006"
 SUPPORTED_SCHEMA_REVISIONS = frozenset({PREVIOUS_SCHEMA_REVISION, EXPECTED_SCHEMA_REVISION})
 TELEMETRY_CONTEXT_SCHEMA_REVISIONS = SUPPORTED_SCHEMA_REVISIONS
+CONVERSATION_MANAGEMENT_SCHEMA_REVISIONS = frozenset({EXPECTED_SCHEMA_REVISION})
 
 metadata = MetaData()
 
@@ -104,11 +105,29 @@ conversations = Table(
     Column("conversation_id", Uuid(as_uuid=True), primary_key=True),
     Column("user_id", Text, nullable=False),
     Column("session_id", Text, nullable=False),
+    Column("title", Text, nullable=True),
+    Column("status", Text, nullable=False, server_default=text("'active'")),
     Column("next_turn_sequence", BigInteger, nullable=False, server_default=text("1")),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("last_message_at", DateTime(timezone=True), nullable=True),
     CheckConstraint("next_turn_sequence >= 1", name="ck_conversations_next_turn_sequence"),
+    CheckConstraint(
+        "title IS NULL OR (title = btrim(title) AND length(title) BETWEEN 1 AND 200)",
+        name="ck_conversations_title",
+    ),
+    CheckConstraint(
+        "status IN ('active', 'deletion_pending')",
+        name="ck_conversations_status",
+    ),
     UniqueConstraint("user_id", "session_id", name="uq_conversations_user_session"),
+)
+
+Index(
+    "ix_conversations_user_activity",
+    conversations.c.user_id,
+    func.coalesce(conversations.c.last_message_at, conversations.c.created_at).desc(),
+    conversations.c.conversation_id.desc(),
 )
 
 conversation_messages = Table(

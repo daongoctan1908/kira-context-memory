@@ -7,7 +7,7 @@ import httpx
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import delete, func, insert, select, text
+from sqlalchemy import delete, func, insert, select, text, update
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from app.domain.errors.conversation import (
@@ -15,7 +15,11 @@ from app.domain.errors.conversation import (
     ConversationStoreProtocolError,
 )
 from app.domain.errors.kira import KiraTimeoutError
-from app.domain.models.conversation import ConversationMessage, ConversationRole
+from app.domain.models.conversation import (
+    ConversationMessage,
+    ConversationRole,
+    ConversationStatus,
+)
 from app.domain.models.telemetry_context import TelemetryContext
 from app.infrastructure.postgres import conversation_store as conversation_store_module
 from app.infrastructure.postgres.conversation_store import PostgresConversationStoreAdapter
@@ -173,12 +177,131 @@ async def test_migration_revision_and_recent_index_exist(engine: AsyncEngine) ->
                 "AND indexname = 'ix_messages_conversation_recent'"
             )
         )
+        activity_index_definition = await connection.scalar(
+            text(
+                "SELECT indexdef FROM pg_indexes "
+                "WHERE schemaname = current_schema() "
+                "AND indexname = 'ix_conversations_user_activity'"
+            )
+        )
 
     assert revision == EXPECTED_SCHEMA_REVISION
     assert index_definition is not None
     assert "conversation_id" in index_definition
     assert "turn_sequence DESC" in index_definition
     assert "message_index DESC" in index_definition
+    assert activity_index_definition is not None
+    assert "user_id" in activity_index_definition
+    assert "COALESCE(last_message_at, created_at) DESC" in activity_index_definition
+    assert "conversation_id DESC" in activity_index_definition
+
+
+async def test_conversation_management_is_owned_paginated_and_hides_pending_history(
+    engine: AsyncEngine,
+) -> None:
+    adapter = PostgresConversationStoreAdapter(engine)
+    await adapter.validate_schema()
+    owner = f"owner-{uuid4()}"
+    other_owner = f"owner-{uuid4()}"
+    created_ids = []
+    try:
+        first = await adapter.create_conversation(owner, title=" First request ")
+        second = await adapter.create_conversation(owner)
+        other = await adapter.create_conversation(other_owner, title="Private")
+        created_ids.extend((first.conversation_id, second.conversation_id, other.conversation_id))
+
+        assert first.title == "First request"
+        assert first.status is ConversationStatus.ACTIVE
+        assert len(first.session_id) == 32
+        assert len({first.session_id, second.session_id, other.session_id}) == 3
+
+        tied_at = datetime.now(UTC) + timedelta(minutes=1)
+        async with engine.begin() as connection:
+            await connection.execute(
+                update(conversations)
+                .where(conversations.c.conversation_id.in_(created_ids[:2]))
+                .values(last_message_at=tied_at)
+            )
+        expected = sorted((first, second), key=lambda item: item.conversation_id, reverse=True)
+        first_page = await adapter.list_conversations(owner, limit=1)
+        second_page = await adapter.list_conversations(
+            owner,
+            limit=1,
+            cursor=first_page.next_cursor,
+        )
+        assert [first_page.items[0].conversation_id, second_page.items[0].conversation_id] == [
+            item.conversation_id for item in expected
+        ]
+        assert first_page.next_cursor is not None
+        assert second_page.next_cursor is None
+        assert [
+            item.conversation_id
+            for item in (await adapter.list_conversations(other_owner, limit=10)).items
+        ] == [other.conversation_id]
+        empty_history = await adapter.read_history(owner, second.session_id, limit=10)
+        assert empty_history is not None
+        assert empty_history.messages == ()
+        assert empty_history.next_before_message_id is None
+
+        for turn_number in (1, 2):
+            turn_id = f"managed-{uuid4()}"
+            timestamp = tied_at + timedelta(minutes=turn_number)
+            result = await adapter.append_turn(
+                owner,
+                ConversationMessage(
+                    first.session_id,
+                    turn_id,
+                    ConversationRole.USER,
+                    f"question {turn_number}",
+                    timestamp,
+                ),
+                ConversationMessage(
+                    first.session_id,
+                    turn_id,
+                    ConversationRole.ASSISTANT,
+                    f"answer {turn_number}",
+                    timestamp + timedelta(seconds=1),
+                ),
+            )
+            assert result.inserted
+
+        listed = await adapter.list_conversations(owner, limit=10)
+        assert listed.items[0].conversation_id == first.conversation_id
+        assert listed.items[0].last_message_at == tied_at + timedelta(minutes=2, seconds=1)
+
+        newest = await adapter.read_history(owner, first.session_id, limit=2)
+        assert newest is not None
+        assert [message.content for message in newest.messages] == ["question 2", "answer 2"]
+        assert newest.next_before_message_id is not None
+        older = await adapter.read_history(
+            owner,
+            first.session_id,
+            limit=2,
+            before_message_id=newest.next_before_message_id,
+        )
+        assert older is not None
+        assert [message.content for message in older.messages] == ["question 1", "answer 1"]
+        assert older.next_before_message_id is None
+        assert await adapter.read_history(other_owner, first.session_id, limit=10) is None
+
+        async with engine.begin() as connection:
+            await connection.execute(
+                update(conversations)
+                .where(conversations.c.conversation_id == first.conversation_id)
+                .values(status=ConversationStatus.DELETION_PENDING.value)
+            )
+        assert await adapter.read_history(owner, first.session_id, limit=10) is None
+        assert await adapter.read_recent(owner, first.session_id, 10) == ()
+        pending = await adapter.list_conversations(owner, limit=10)
+        first_summary = next(
+            item for item in pending.items if item.conversation_id == first.conversation_id
+        )
+        assert first_summary.status is ConversationStatus.DELETION_PENDING
+    finally:
+        async with engine.begin() as connection:
+            await connection.execute(
+                delete(conversations).where(conversations.c.conversation_id.in_(created_ids))
+            )
 
 
 async def test_full_history_is_retained_while_recent_read_is_bounded(

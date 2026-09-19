@@ -11,7 +11,14 @@ from app.domain.errors.conversation import (
     ConversationStoreConnectionError,
     ConversationStoreError,
 )
-from app.domain.models.conversation import AppendTurnResult, ConversationMessage
+from app.domain.models.conversation import (
+    AppendTurnResult,
+    ConversationHistoryPage,
+    ConversationListCursor,
+    ConversationMessage,
+    ConversationPage,
+    ConversationSummary,
+)
 from app.domain.models.telemetry_context import TelemetryContext
 from app.infrastructure.postgres.conversation_store import PostgresConversationStoreAdapter
 
@@ -47,6 +54,48 @@ class ManagedPostgresConversationStore:
             if self.status != "available":
                 await self._adapter.validate_schema()
                 self.status = "available"
+
+    async def create_conversation(
+        self,
+        user_id: str,
+        *,
+        title: str | None = None,
+    ) -> ConversationSummary:
+        async with self._operation():
+            await self.validate_schema()
+            return await self._adapter.create_conversation(user_id, title=title)
+
+    async def list_conversations(
+        self,
+        user_id: str,
+        *,
+        limit: int,
+        cursor: ConversationListCursor | None = None,
+    ) -> ConversationPage:
+        async with self._operation():
+            await self.validate_schema()
+            return await self._adapter.list_conversations(
+                user_id,
+                limit=limit,
+                cursor=cursor,
+            )
+
+    async def read_history(
+        self,
+        user_id: str,
+        session_id: str,
+        *,
+        limit: int,
+        before_message_id: int | None = None,
+    ) -> ConversationHistoryPage | None:
+        async with self._operation():
+            await self.validate_schema()
+            return await self._adapter.read_history(
+                user_id,
+                session_id,
+                limit=limit,
+                before_message_id=before_message_id,
+            )
 
     async def read_recent(
         self,

@@ -1,4 +1,5 @@
 import asyncio
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -9,6 +10,7 @@ from app.domain.errors.conversation import (
     ConversationStoreConnectionError,
     ConversationStoreOperationError,
 )
+from app.domain.models.conversation import ConversationListCursor
 from app.infrastructure.postgres.managed_store import ManagedPostgresConversationStore
 from tests.support.context_fakes import pair
 
@@ -88,3 +90,32 @@ async def test_exact_boundary_read_is_forwarded() -> None:
 
     assert await store.read_through_boundary(USER_ID, conversation_id, 42, 10) == expected
     adapter.read_through_boundary.assert_awaited_once_with(USER_ID, conversation_id, 42, 10)
+
+
+async def test_conversation_management_operations_are_validated_and_forwarded() -> None:
+    adapter = AsyncMock()
+    created = object()
+    listed = object()
+    history = object()
+    adapter.create_conversation.return_value = created
+    adapter.list_conversations.return_value = listed
+    adapter.read_history.return_value = history
+    store = ManagedPostgresConversationStore(adapter, 1)
+    cursor = ConversationListCursor(datetime(2026, 9, 19, tzinfo=UTC), uuid4())
+
+    assert await store.create_conversation(USER_ID, title="Support") is created
+    assert await store.list_conversations(USER_ID, limit=20, cursor=cursor) is listed
+    assert (
+        await store.read_history(USER_ID, "public-session", limit=50, before_message_id=42)
+        is history
+    )
+
+    adapter.validate_schema.assert_awaited_once()
+    adapter.create_conversation.assert_awaited_once_with(USER_ID, title="Support")
+    adapter.list_conversations.assert_awaited_once_with(USER_ID, limit=20, cursor=cursor)
+    adapter.read_history.assert_awaited_once_with(
+        USER_ID,
+        "public-session",
+        limit=50,
+        before_message_id=42,
+    )

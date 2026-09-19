@@ -13,8 +13,8 @@ from app.infrastructure.postgres.schema import (
 
 
 def test_auth_schema_advances_one_additive_bridge_revision() -> None:
-    assert PREVIOUS_SCHEMA_REVISION == "20260915_0004"
-    assert EXPECTED_SCHEMA_REVISION == "20260919_0005"
+    assert PREVIOUS_SCHEMA_REVISION == "20260919_0005"
+    assert EXPECTED_SCHEMA_REVISION == "20260919_0006"
     assert SUPPORTED_SCHEMA_REVISIONS == {
         PREVIOUS_SCHEMA_REVISION,
         EXPECTED_SCHEMA_REVISION,

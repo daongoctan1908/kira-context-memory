@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any, NoReturn
 from uuid import UUID, uuid4
 
-from sqlalchemy import func, insert, select, text, update
+from sqlalchemy import func, insert, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.exc import DBAPIError, IntegrityError, SQLAlchemyError
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
@@ -19,10 +19,16 @@ from app.domain.errors.conversation import (
     ConversationStoreProtocolError,
 )
 from app.domain.models.conversation import (
+    MAX_CONVERSATION_TITLE_LENGTH,
     AppendTurnResult,
     CompletedTurnReference,
+    ConversationHistoryPage,
+    ConversationListCursor,
     ConversationMessage,
+    ConversationPage,
     ConversationRole,
+    ConversationStatus,
+    ConversationSummary,
 )
 from app.domain.models.memory_job import MEMORY_JOB_SCHEMA_VERSION
 from app.domain.models.telemetry_context import (
@@ -30,6 +36,7 @@ from app.domain.models.telemetry_context import (
     serialize_telemetry_context,
 )
 from app.infrastructure.postgres.schema import (
+    CONVERSATION_MANAGEMENT_SCHEMA_REVISIONS,
     SUPPORTED_SCHEMA_REVISIONS,
     TELEMETRY_CONTEXT_SCHEMA_REVISIONS,
     conversation_messages,
@@ -66,6 +73,163 @@ class PostgresConversationStoreAdapter:
             raise ConversationStoreConfigurationError
         self._schema_revision = revision
 
+    async def create_conversation(
+        self,
+        user_id: str,
+        *,
+        title: str | None = None,
+    ) -> ConversationSummary:
+        """Create one active conversation with an opaque public session identifier."""
+        self._require_conversation_management_schema()
+        if not user_id.strip():
+            raise ValueError("user_id must not be empty")
+        normalized_title = self._normalize_title(title)
+        try:
+            async with self._engine.begin() as connection:
+                row = (
+                    (
+                        await connection.execute(
+                            insert(conversations)
+                            .values(
+                                conversation_id=uuid4(),
+                                user_id=user_id,
+                                session_id=uuid4().hex,
+                                title=normalized_title,
+                                status=ConversationStatus.ACTIVE.value,
+                                next_turn_sequence=1,
+                            )
+                            .returning(*self._conversation_summary_columns())
+                        )
+                    )
+                    .mappings()
+                    .one()
+                )
+        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+            self._raise_mapped(error)
+        try:
+            return self._to_conversation_summary(row)
+        except (KeyError, TypeError, ValueError) as error:
+            raise ConversationStoreProtocolError from error
+
+    async def list_conversations(
+        self,
+        user_id: str,
+        *,
+        limit: int,
+        cursor: ConversationListCursor | None = None,
+    ) -> ConversationPage:
+        """List owned conversations with stable descending keyset pagination."""
+        self._require_conversation_management_schema()
+        if not user_id.strip():
+            raise ValueError("user_id must not be empty")
+        self._validate_page_limit(limit)
+        if cursor is not None and not isinstance(cursor, ConversationListCursor):
+            raise ValueError("cursor must be a conversation list cursor")
+
+        activity_at = func.coalesce(
+            conversations.c.last_message_at,
+            conversations.c.created_at,
+        )
+        statement = select(*self._conversation_summary_columns()).where(
+            conversations.c.user_id == user_id
+        )
+        if cursor is not None:
+            statement = statement.where(
+                or_(
+                    activity_at < cursor.activity_at,
+                    (
+                        (activity_at == cursor.activity_at)
+                        & (conversations.c.conversation_id < cursor.conversation_id)
+                    ),
+                )
+            )
+        statement = statement.order_by(
+            activity_at.desc(),
+            conversations.c.conversation_id.desc(),
+        ).limit(limit + 1)
+
+        try:
+            async with self._engine.connect() as connection:
+                rows = (await connection.execute(statement)).mappings().all()
+        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+            self._raise_mapped(error)
+        try:
+            items = tuple(self._to_conversation_summary(row) for row in rows[:limit])
+        except (KeyError, TypeError, ValueError) as error:
+            raise ConversationStoreProtocolError from error
+        next_cursor = None
+        if len(rows) > limit:
+            last = items[-1]
+            next_cursor = ConversationListCursor(last.activity_at, last.conversation_id)
+        return ConversationPage(items, next_cursor)
+
+    async def read_history(
+        self,
+        user_id: str,
+        session_id: str,
+        *,
+        limit: int,
+        before_message_id: int | None = None,
+    ) -> ConversationHistoryPage | None:
+        """Read a chronological page from an active conversation owned by the caller."""
+        self._require_conversation_management_schema()
+        if not user_id.strip():
+            raise ValueError("user_id must not be empty")
+        if not session_id.strip():
+            raise ValueError("session_id must not be empty")
+        self._validate_page_limit(limit)
+        if before_message_id is not None and (
+            isinstance(before_message_id, bool)
+            or not isinstance(before_message_id, int)
+            or before_message_id < 1
+        ):
+            raise ValueError("before_message_id must be positive")
+
+        owner_query = select(conversations.c.conversation_id).where(
+            conversations.c.user_id == user_id,
+            conversations.c.session_id == session_id,
+            conversations.c.status == ConversationStatus.ACTIVE.value,
+        )
+        statement = select(
+            conversation_messages.c.message_id,
+            conversation_messages.c.turn_id,
+            conversation_messages.c.role,
+            conversation_messages.c.content,
+            conversation_messages.c.message_timestamp,
+            conversation_messages.c.schema_version,
+            conversation_messages.c.turn_sequence,
+            conversation_messages.c.message_index,
+        ).where(conversation_messages.c.conversation_id == owner_query.scalar_subquery())
+        if before_message_id is not None:
+            statement = statement.where(conversation_messages.c.message_id < before_message_id)
+        statement = statement.order_by(
+            conversation_messages.c.turn_sequence.desc(),
+            conversation_messages.c.message_index.desc(),
+        ).limit(limit + 1)
+
+        try:
+            async with self._engine.connect() as connection:
+                conversation_id = await connection.scalar(owner_query)
+                if conversation_id is None:
+                    return None
+                rows = (await connection.execute(statement)).mappings().all()
+        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+            self._raise_mapped(error)
+
+        visible_desc = rows[:limit]
+        try:
+            messages = tuple(
+                self._to_domain_message(session_id, row) for row in reversed(visible_desc)
+            )
+            next_before_message_id = None
+            if len(rows) > limit:
+                next_before_message_id = visible_desc[-1]["message_id"]
+                if not isinstance(next_before_message_id, int):
+                    raise ValueError
+            return ConversationHistoryPage(messages, next_before_message_id)
+        except (KeyError, TypeError, ValueError) as error:
+            raise ConversationStoreProtocolError from error
+
     async def read_recent(
         self,
         user_id: str,
@@ -80,6 +244,12 @@ class PostgresConversationStoreAdapter:
         if limit < 1:
             raise ValueError("limit must be positive")
 
+        filters = [
+            conversations.c.user_id == user_id,
+            conversations.c.session_id == session_id,
+        ]
+        if self._supports_conversation_management:
+            filters.append(conversations.c.status == ConversationStatus.ACTIVE.value)
         recent_desc = (
             select(
                 conversation_messages.c.turn_id,
@@ -96,10 +266,7 @@ class PostgresConversationStoreAdapter:
                     conversation_messages.c.conversation_id == conversations.c.conversation_id,
                 )
             )
-            .where(
-                conversations.c.user_id == user_id,
-                conversations.c.session_id == session_id,
-            )
+            .where(*filters)
             .order_by(
                 conversation_messages.c.turn_sequence.desc(),
                 conversation_messages.c.message_index.desc(),
@@ -275,13 +442,16 @@ class PostgresConversationStoreAdapter:
                 )
                 if not isinstance(boundary_message_id, int):
                     raise ConversationStoreProtocolError
+                conversation_values: dict[str, object] = {
+                    "next_turn_sequence": turn_sequence + 1,
+                    "updated_at": func.now(),
+                }
+                if self._supports_conversation_management:
+                    conversation_values["last_message_at"] = assistant_message.timestamp
                 await connection.execute(
                     update(conversations)
                     .where(conversations.c.conversation_id == conversation_id)
-                    .values(
-                        next_turn_sequence=turn_sequence + 1,
-                        updated_at=func.now(),
-                    )
+                    .values(**conversation_values)
                 )
                 memory_job_event_id = None
                 if schedule_memory:
@@ -391,22 +561,73 @@ class PostgresConversationStoreAdapter:
                 index_elements=[conversations.c.user_id, conversations.c.session_id]
             )
         )
+        filters = [
+            conversations.c.user_id == user_id,
+            conversations.c.session_id == session_id,
+        ]
+        if self._supports_conversation_management:
+            filters.append(conversations.c.status == ConversationStatus.ACTIVE.value)
         row = (
             await connection.execute(
                 select(
                     conversations.c.conversation_id,
                     conversations.c.next_turn_sequence,
                 )
-                .where(
-                    conversations.c.user_id == user_id,
-                    conversations.c.session_id == session_id,
-                )
+                .where(*filters)
                 .with_for_update()
             )
         ).one_or_none()
         if row is None:
             raise ConversationStoreProtocolError
         return row.conversation_id, row.next_turn_sequence
+
+    @property
+    def _supports_conversation_management(self) -> bool:
+        return self._schema_revision in CONVERSATION_MANAGEMENT_SCHEMA_REVISIONS
+
+    def _require_conversation_management_schema(self) -> None:
+        if not self._supports_conversation_management:
+            raise ConversationStoreConfigurationError
+
+    @staticmethod
+    def _conversation_summary_columns() -> tuple[Any, ...]:
+        return (
+            conversations.c.conversation_id,
+            conversations.c.session_id,
+            conversations.c.title,
+            conversations.c.status,
+            conversations.c.created_at,
+            conversations.c.updated_at,
+            conversations.c.last_message_at,
+        )
+
+    @staticmethod
+    def _to_conversation_summary(row: Mapping[str, Any]) -> ConversationSummary:
+        return ConversationSummary(
+            conversation_id=row["conversation_id"],
+            session_id=row["session_id"],
+            title=row["title"],
+            status=ConversationStatus(row["status"]),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+            last_message_at=row["last_message_at"],
+        )
+
+    @staticmethod
+    def _normalize_title(title: str | None) -> str | None:
+        if title is None:
+            return None
+        if not isinstance(title, str):
+            raise ValueError("title must be a string")
+        normalized = title.strip()
+        if not normalized or len(normalized) > MAX_CONVERSATION_TITLE_LENGTH:
+            raise ValueError("title must be between 1 and 200 characters")
+        return normalized
+
+    @staticmethod
+    def _validate_page_limit(limit: int) -> None:
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
+            raise ValueError("page limit must be between 1 and 100")
 
     @staticmethod
     async def _read_existing_turn(

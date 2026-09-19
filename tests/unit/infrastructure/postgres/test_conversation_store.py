@@ -13,7 +13,12 @@ from app.domain.errors.conversation import (
     ConversationStoreOperationError,
     ConversationStoreProtocolError,
 )
-from app.domain.models.conversation import ConversationMessage, ConversationRole
+from app.domain.models.conversation import (
+    ConversationListCursor,
+    ConversationMessage,
+    ConversationRole,
+    ConversationStatus,
+)
 from app.infrastructure.postgres.conversation_store import (
     PostgresConversationStoreAdapter,
     _find_sqlstate,
@@ -30,6 +35,11 @@ class FakeMappings:
 
     def all(self) -> list[dict[str, Any]]:
         return self._rows
+
+    def one(self) -> dict[str, Any]:
+        if len(self._rows) != 1:
+            raise AssertionError("expected exactly one row")
+        return self._rows[0]
 
 
 class FakeResult:
@@ -155,6 +165,131 @@ async def test_validate_schema_maps_connection_timeout() -> None:
         await adapter(
             FakeConnection(), enter_error=SqlAlchemyTimeoutError("unavailable")
         ).validate_schema()
+
+
+def _conversation_row(
+    *,
+    conversation_id=None,
+    session_id: str = "public-session",
+    title: str | None = "Support",
+    status: str = "active",
+    created_at: datetime | None = None,
+    last_message_at: datetime | None = None,
+) -> dict[str, Any]:
+    timestamp = created_at or datetime(2026, 9, 19, tzinfo=UTC)
+    return {
+        "conversation_id": conversation_id or uuid4(),
+        "session_id": session_id,
+        "title": title,
+        "status": status,
+        "created_at": timestamp,
+        "updated_at": timestamp,
+        "last_message_at": last_message_at,
+    }
+
+
+async def test_create_conversation_generates_public_id_and_normalizes_title() -> None:
+    row = _conversation_row(title="Support request")
+    connection = FakeConnection([FakeResult(rows=[row])])
+    store = adapter(connection)
+    await store.validate_schema()
+
+    result = await store.create_conversation(USER_ID, title="  Support request  ")
+
+    assert result.session_id == "public-session"
+    assert result.status is ConversationStatus.ACTIVE
+    statement = connection.calls[1][0]
+    params = statement.compile().params
+    assert params["title"] == "Support request"
+    assert len(params["session_id"]) == 32
+    assert params["session_id"] != "public-session"
+
+
+async def test_management_operations_require_current_schema_and_bounded_input() -> None:
+    store = adapter(FakeConnection(scalar=PREVIOUS_SCHEMA_REVISION))
+    await store.validate_schema()
+    with pytest.raises(ConversationStoreConfigurationError):
+        await store.create_conversation(USER_ID)
+
+    current = adapter(FakeConnection())
+    await current.validate_schema()
+    with pytest.raises(ValueError):
+        await current.create_conversation("", title="valid")
+    with pytest.raises(ValueError):
+        await current.create_conversation(USER_ID, title=" ")
+    with pytest.raises(ValueError):
+        await current.list_conversations(USER_ID, limit=101)
+    with pytest.raises(ValueError):
+        await current.read_history(USER_ID, "public-session", limit=10, before_message_id=0)
+
+
+async def test_list_conversations_uses_matching_keyset_order_and_cursor() -> None:
+    newest = datetime(2026, 9, 19, 3, tzinfo=UTC)
+    rows = [
+        _conversation_row(session_id="one", last_message_at=newest),
+        _conversation_row(session_id="two", created_at=datetime(2026, 9, 19, 2, tzinfo=UTC)),
+        _conversation_row(session_id="lookahead"),
+    ]
+    connection = FakeConnection([FakeResult(rows=rows)])
+    store = adapter(connection)
+    await store.validate_schema()
+
+    page = await store.list_conversations(USER_ID, limit=2)
+
+    assert [item.session_id for item in page.items] == ["one", "two"]
+    assert page.next_cursor == ConversationListCursor(
+        page.items[-1].activity_at,
+        page.items[-1].conversation_id,
+    )
+    sql = str(connection.calls[1][0])
+    assert "coalesce(conversations.last_message_at, conversations.created_at) DESC" in sql
+    assert "conversations.conversation_id DESC" in sql
+    assert "conversations.user_id" in sql
+
+    next_connection = FakeConnection([FakeResult(rows=[])])
+    next_store = adapter(next_connection)
+    await next_store.validate_schema()
+    await next_store.list_conversations(USER_ID, limit=2, cursor=page.next_cursor)
+    cursor_sql = str(next_connection.calls[1][0])
+    assert "coalesce(conversations.last_message_at, conversations.created_at) <" in cursor_sql
+    assert "conversations.conversation_id <" in cursor_sql
+
+
+async def test_read_history_is_chronological_paginated_and_owned() -> None:
+    rows = [
+        {
+            "message_id": message_id,
+            "turn_id": f"turn-{(message_id + 1) // 2}",
+            "role": role,
+            "content": role,
+            "message_timestamp": datetime(2026, 9, 19, 0, message_id, tzinfo=UTC),
+            "schema_version": 1,
+            "turn_sequence": (message_id + 1) // 2,
+            "message_index": 0 if role == "user" else 1,
+        }
+        for message_id, role in ((4, "assistant"), (3, "user"), (2, "assistant"))
+    ]
+    connection = FakeConnection([FakeResult(rows=rows)])
+    store = adapter(connection)
+    await store.validate_schema()
+    connection.scalar_value = uuid4()
+
+    page = await store.read_history(USER_ID, "public-session", limit=2)
+
+    assert page is not None
+    assert [message.role for message in page.messages] == [
+        ConversationRole.USER,
+        ConversationRole.ASSISTANT,
+    ]
+    assert page.next_before_message_id == 3
+    assert "conversations.status" in str(connection.calls[1][0])
+    assert "conversation_messages.turn_sequence DESC" in str(connection.calls[2][0])
+
+    missing_connection = FakeConnection()
+    missing = adapter(missing_connection)
+    await missing.validate_schema()
+    missing_connection.scalar_value = None
+    assert await missing.read_history(USER_ID, "missing", limit=2) is None
 
 
 async def test_read_recent_returns_chronological_domain_messages() -> None:

@@ -5,10 +5,16 @@ from app.domain.models.chat import ChatCommand
 from app.domain.models.context import ConversationContext
 from app.domain.models.conversation import (
     CONVERSATION_MESSAGE_SCHEMA_VERSION,
+    MAX_CONVERSATION_TITLE_LENGTH,
     AppendTurnResult,
     CompletedTurnReference,
+    ConversationHistoryPage,
+    ConversationListCursor,
     ConversationMessage,
+    ConversationPage,
     ConversationRole,
+    ConversationStatus,
+    ConversationSummary,
 )
 from app.domain.models.identity import AuthenticatedPrincipal
 from app.domain.models.kira import KiraAuthResult, KiraEventKind, KiraStreamEvent
@@ -34,6 +40,7 @@ from app.domain.models.telemetry_context import (
 
 __all__ = [
     "CONVERSATION_MESSAGE_SCHEMA_VERSION",
+    "MAX_CONVERSATION_TITLE_LENGTH",
     "AppendTurnResult",
     "AuthSession",
     "AuthUser",
@@ -42,8 +49,13 @@ __all__ = [
     "ChatCommand",
     "CompletedTurnReference",
     "ConversationContext",
+    "ConversationHistoryPage",
+    "ConversationListCursor",
     "ConversationMessage",
+    "ConversationPage",
     "ConversationRole",
+    "ConversationStatus",
+    "ConversationSummary",
     "KiraAuthResult",
     "KiraEventKind",
     "KiraStreamEvent",
