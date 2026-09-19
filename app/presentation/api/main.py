@@ -6,15 +6,18 @@ from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.application.services.auth import AuthService
 from app.application.services.chat_idempotency import ChatIdempotencyService
+from app.application.services.chat_traffic import ChatTrafficGuard
 from app.application.services.context_builder import ContextBuilder
 from app.application.use_cases.handle_chat import HandleChatUseCase
 from app.config.settings import Settings, get_settings
 from app.domain.errors.auth import AuthError
-from app.domain.errors.conversation import ConversationStoreConnectionError
+from app.domain.errors.chat import ChatAdmissionError
+from app.domain.errors.conversation import ConversationStoreConnectionError, ConversationStoreError
 from app.domain.errors.kira import KiraClientError
 from app.domain.ports.conversation_store import ConversationStorePort
 from app.domain.ports.identity import IdentityPort
@@ -37,10 +40,19 @@ from app.infrastructure.postgres import (
 )
 from app.infrastructure.postgres.managed_store import ManagedPostgresConversationStore
 from app.presentation.api.auth_router import router as auth_router
+from app.presentation.api.chat_body_limit_middleware import ChatBodyLimitMiddleware
 from app.presentation.api.chat_router import router as chat_router
 from app.presentation.api.conversation_router import router as conversation_router
 from app.presentation.api.correlation_middleware import CorrelationMiddleware
-from app.presentation.api.errors import auth_exception_handler, kira_client_exception_handler
+from app.presentation.api.errors import (
+    ProductApiError,
+    auth_exception_handler,
+    chat_admission_exception_handler,
+    conversation_store_exception_handler,
+    kira_client_exception_handler,
+    product_api_exception_handler,
+    sanitized_validation_exception_handler,
+)
 from app.presentation.api.health_router import router as health_router
 from app.presentation.api.metrics_router import router as metrics_router
 from app.presentation.api.tracing_middleware import ChatTracingMiddleware
@@ -211,6 +223,10 @@ def create_app(
                 resolved_conversation_store,
                 lease_seconds=resolved_settings.chat_request_lease_seconds,
             )
+            application.state.chat_traffic = ChatTrafficGuard(
+                requests_per_minute=resolved_settings.chat_requests_per_minute,
+                max_concurrent_per_user=resolved_settings.chat_max_concurrent_per_user,
+            )
             application.state.handle_chat = HandleChatUseCase(
                 resolved_kira_client,
                 conversation_store=resolved_conversation_store,
@@ -259,12 +275,23 @@ def create_app(
     )
     application.state.ready = False
     application.state.observability = None
-    # ``add_middleware`` prepends entries. Add tracing first so correlation is outermost
-    # and therefore available before validation and before the root span is created.
+    # ``add_middleware`` prepends entries. Correlation remains outermost, then tracing,
+    # then the bounded-body reader before FastAPI parses product JSON.
+    application.add_middleware(ChatBodyLimitMiddleware)
     application.add_middleware(ChatTracingMiddleware)
     application.add_middleware(CorrelationMiddleware)
     application.add_exception_handler(KiraClientError, kira_client_exception_handler)
     application.add_exception_handler(AuthError, auth_exception_handler)
+    application.add_exception_handler(ProductApiError, product_api_exception_handler)
+    application.add_exception_handler(ChatAdmissionError, chat_admission_exception_handler)
+    application.add_exception_handler(
+        ConversationStoreError,
+        conversation_store_exception_handler,
+    )
+    application.add_exception_handler(
+        RequestValidationError,
+        sanitized_validation_exception_handler,
+    )
     application.include_router(health_router)
     application.include_router(auth_router)
     application.include_router(conversation_router)

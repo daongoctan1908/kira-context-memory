@@ -29,6 +29,7 @@ def test_formatter_injects_app_and_trace_ids_without_merging_them() -> None:
         correlation_id="correlation-app",
         turn_id="turn-app",
         event_id="event-app",
+        origin_trace_id="origin-app",
     ):
         with tracer.start_as_current_span("test") as span:
             payload = json.loads(formatter.format(record))
@@ -37,6 +38,7 @@ def test_formatter_injects_app_and_trace_ids_without_merging_them() -> None:
     assert payload["correlation_id"] == "correlation-app"
     assert payload["turn_id"] == "turn-app"
     assert payload["event_id"] == "event-app"
+    assert payload["origin_trace_id"] == "origin-app"
     assert payload["trace_id"] == format(span_context.trace_id, "032x")
     assert payload["span_id"] == format(span_context.span_id, "016x")
     assert payload["correlation_id"] != payload["trace_id"]

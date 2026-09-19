@@ -160,12 +160,14 @@ async def test_product_disconnect_abandons_cancelled_without_completion(spec_ver
     source = GatedStream()
     complete = AsyncMock()
     abandon = AsyncMock()
+    finish = AsyncMock()
     response = ProductChatStreamingResponse(
         session=ChatStreamSession(source, complete),
         correlation_id="correlation-product",
         turn_id="turn-product",
         client_message_id="11111111-1111-4111-8111-111111111111",
         on_abort=abandon,
+        on_finish=finish,
         headers={},
     )
     first_sent = asyncio.Event()
@@ -197,3 +199,4 @@ async def test_product_disconnect_abandons_cancelled_without_completion(spec_ver
     assert source.closed
     complete.assert_not_awaited()
     abandon.assert_awaited_once_with(True)
+    finish.assert_awaited_once_with()

@@ -172,6 +172,10 @@ Defaults:
 | **T7.4 — Atomic completion/SSE** | Persist user/assistant pair, optional memory job, request completed và activity timestamp trong một transaction. Emit completed sau commit. | Crash/rollback không tạo completed request thiếu history; completed replay không gọi KiRa lại; cancellation không lưu partial assistant turn. | T7.3 | L |
 | **T7.5 — Limits/errors/observability** | Message tối đa 8.000 ký tự; body/rate/concurrency limits; sanitized error codes; trace/log gắn các app IDs. | KiRa/DB outage, persistence failure và telemetry outage tests pass; IDs/content không thành metric labels. | T7.4 | M |
 
+Rate/concurrency guard của MVP là bounded state theo từng Gateway process. Nếu pilot cần nhiều
+Gateway replicas và global quota chính xác thì mới thay bằng coordinator dùng chung; không đưa Redis
+vào single-replica MVP chỉ để rate limit.
+
 Các interface mới:
 
 ```text

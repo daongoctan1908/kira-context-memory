@@ -9,6 +9,11 @@ from app.domain.errors.auth import (
     InvalidSessionError,
     PasswordPolicyError,
 )
+from app.domain.errors.chat import (
+    ChatAdmissionError,
+    ChatConcurrencyLimitError,
+    ChatRateLimitExceededError,
+)
 from app.domain.errors.conversation import (
     ChatRequestConflictError,
     ChatRequestLeaseLostError,
@@ -53,6 +58,9 @@ from app.domain.errors.query_rewriter import (
 )
 
 __all__ = [
+    "ChatAdmissionError",
+    "ChatConcurrencyLimitError",
+    "ChatRateLimitExceededError",
     "ChatRequestConflictError",
     "ChatRequestLeaseLostError",
     "AuthConflictError",

@@ -69,6 +69,9 @@ class Settings(BaseSettings):
     postgres_command_timeout_seconds: float = Field(default=5.0, gt=0)
     conversation_operation_timeout_seconds: float = Field(default=5.0, gt=0)
     chat_request_lease_seconds: float = Field(default=360.0, ge=10, le=900)
+    chat_max_body_bytes: int = Field(default=131_072, ge=16_384, le=1_048_576)
+    chat_requests_per_minute: int = Field(default=30, ge=1, le=10_000)
+    chat_max_concurrent_per_user: int = Field(default=2, ge=1, le=100)
 
     max_recent_messages: int = Field(default=10, ge=2, multiple_of=2)
     recent_context_token_budget: int = Field(default=3000, ge=1)

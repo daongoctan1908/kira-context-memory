@@ -53,6 +53,10 @@ def test_settings_have_safe_baseline_defaults(monkeypatch) -> None:
     assert settings.postgres_pool_timeout_seconds == 2.0
     assert settings.postgres_connect_timeout_seconds == 2.0
     assert settings.postgres_command_timeout_seconds == 5.0
+    assert settings.chat_request_lease_seconds == 360.0
+    assert settings.chat_max_body_bytes == 131_072
+    assert settings.chat_requests_per_minute == 30
+    assert settings.chat_max_concurrent_per_user == 2
     assert settings.max_recent_messages == 10
     assert settings.recent_context_token_budget == 3000
     assert settings.vllm_base_url is None
@@ -76,6 +80,26 @@ def test_settings_have_safe_baseline_defaults(monkeypatch) -> None:
     assert settings.memory_collection_name == "memories"
     assert settings.memory_formation_message_limit == 10
     assert settings.memory_search_top_k == 10
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("chat_request_lease_seconds", 9),
+        ("chat_max_body_bytes", 16_383),
+        ("chat_requests_per_minute", 0),
+        ("chat_max_concurrent_per_user", 0),
+    ],
+)
+def test_chat_admission_limits_are_bounded(field: str, value: int) -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            _env_file=None,
+            kira_base_url="http://kira.test",
+            kira_username="service-account",
+            kira_basic_auth="secret",
+            **{field: value},
+        )
 
 
 def test_settings_hide_postgres_credentials_from_repr(monkeypatch) -> None:

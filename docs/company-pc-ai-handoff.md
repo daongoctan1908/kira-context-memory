@@ -790,3 +790,28 @@ Chỉ báo Phase 4 complete khi có bằng chứng thật:
 
 Nếu một mục chưa có artifact, ghi `NOT_RUN` hoặc blocker cụ thể. Không hạ acceptance criteria để kết
 thúc nhanh.
+
+## 19. Product chat acceptance với KiRa thật (sau khi pull Phase 7)
+
+Phase 7 được implement và kiểm thử trên laptop bằng KiRa mock + PostgreSQL thật. Trên PC công ty phải
+chạy thêm acceptance dưới đây; đây là kiểm tra product API, không thay thế benchmark Phase 4/5.
+
+1. Chạy `alembic upgrade head`, xác nhận schema có `chat_requests` và revision đúng runtime.
+2. Cấu hình `AUTH_*`, `DATABASE_URL`, KiRa thật và provider retrieval/rewrite cần thiết; không ghi
+   credential vào artifact hay commit.
+3. Tạo user thử nghiệm bằng `uv run kira-auth-admin create ...`, đăng nhập qua
+   `/api/v1/auth/login`, giữ cookie + CSRF token.
+4. Tạo conversation bằng `POST /api/v1/conversations`, rồi gửi message qua
+   `POST /api/v1/conversations/{session_id}/messages` với một UUID `client_message_id` ổn định.
+5. Xác nhận SSE lần lượt có `message.started`, các `message.delta`, rồi `message.completed`; chỉ sau
+   completed mới được thấy đủ user/assistant pair, request `completed` và optional memory job trong DB.
+6. Gửi lại đúng client ID + content: phải replay từ DB và không gọi KiRa lần hai. Gửi cùng client ID
+   nhưng content khác: phải nhận `409 IDEMPOTENCY_CONFLICT`.
+7. Ngắt stream giữa chừng và thử KiRa/DB outage: không có partial turn; response chỉ dùng sanitized
+   error code/correlation ID, không chứa message, credential hay raw exception.
+8. Kiểm tra trace thật có `correlation_id`, `turn_id`, optional `event_id`, `origin_trace_id`; tắt
+   Collector/Langfuse rồi lặp lại để xác nhận chat và Worker vẫn chạy.
+
+Giới hạn MVP khi acceptance: message 8.000 ký tự, body 131.072 bytes, rate 30 request/phút và tối đa 2
+stream đồng thời mỗi user trên **mỗi Gateway process**. Chỉ thêm shared coordinator khi pilot chạy
+nhiều replicas và thực sự cần global quota chính xác.

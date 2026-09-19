@@ -130,6 +130,16 @@ async def stream_product_events(
     yield _product_event("message.started", base)
     if replayed_message is not None:
         yield _product_event("message.delta", {**base, "text": replayed_message.content})
+        logger.info(
+            "Product chat replayed",
+            extra={
+                "event": "chat.replayed",
+                "correlation_id": correlation_id,
+                "turn_id": turn_id,
+                "operation": "replay",
+                "outcome": "success",
+            },
+        )
         yield _product_event("message.completed", {**base, "replayed": True})
         return
     if session is None:
@@ -145,6 +155,17 @@ async def stream_product_events(
         completed_payload = {**base, "replayed": False}
         if completion.memory_job_event_id is not None:
             completed_payload["event_id"] = str(completion.memory_job_event_id)
+        logger.info(
+            "Product chat completed",
+            extra={
+                "event": "chat.completed",
+                "correlation_id": correlation_id,
+                "turn_id": turn_id,
+                "event_id": completed_payload.get("event_id"),
+                "operation": "complete",
+                "outcome": "success",
+            },
+        )
         yield _product_event("message.completed", completed_payload)
     except KiraClientError as error:
         await abort(False)
@@ -200,6 +221,7 @@ class ProductChatStreamingResponse(StreamingResponse):
         session: ChatStreamSession | None = None,
         replayed_message: ConversationMessage | None = None,
         on_abort: Callable[[bool], Awaitable[None]] | None = None,
+        on_finish: Callable[[], Awaitable[None]] | None = None,
         headers: dict[str, str],
     ) -> None:
         self._session = session
@@ -207,6 +229,8 @@ class ProductChatStreamingResponse(StreamingResponse):
         self._turn_id = turn_id
         self._abort_callback = on_abort
         self._abort_started = False
+        self._finish_callback = on_finish
+        self._finish_started = False
         self._events = stream_product_events(
             session,
             correlation_id=correlation_id,
@@ -235,6 +259,24 @@ class ProductChatStreamingResponse(StreamingResponse):
                 },
             )
 
+    async def _finish_once(self) -> None:
+        if self._finish_started or self._finish_callback is None:
+            return
+        self._finish_started = True
+        try:
+            await self._finish_callback()
+        except Exception as error:
+            logger.warning(
+                "Chat traffic lease release failed",
+                extra={
+                    "event": "chat.traffic_release_failed",
+                    "correlation_id": self._correlation_id,
+                    "operation": "release",
+                    "error_class": type(error).__name__,
+                    "fallback_mode": "process_lifetime_cleanup",
+                },
+            )
+
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         with bind_observability_context(
             correlation_id=self._correlation_id,
@@ -257,3 +299,5 @@ class ProductChatStreamingResponse(StreamingResponse):
                     finally:
                         if self._session is not None:
                             await self._session.aclose()
+                with anyio.CancelScope(shield=True):
+                    await self._finish_once()

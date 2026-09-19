@@ -6,21 +6,23 @@ import binascii
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, Query, Request, status
 from fastapi.responses import StreamingResponse
 
 from app.application.services.chat_idempotency import ChatIdempotencyService
+from app.application.services.chat_traffic import ChatTrafficGuard, ChatTrafficLease
 from app.application.use_cases.handle_chat import HandleChatUseCase
-from app.domain.errors.conversation import ChatRequestConflictError
 from app.domain.models.chat import ChatCommand
 from app.domain.models.conversation import (
     ChatRequestReservationOutcome,
     ConversationListCursor,
 )
+from app.domain.models.identity import AuthenticatedPrincipal
 from app.domain.ports.conversation_store import ConversationStorePort
 from app.infrastructure.observability.context import bind_observability_context
 from app.infrastructure.observability.tracing import set_request_span_attribute
 from app.presentation.api.auth_dependencies import resolve_auth_session
+from app.presentation.api.errors import ProductApiError
 from app.presentation.api.sse import ProductChatStreamingResponse
 from app.presentation.schemas.conversation import (
     ConversationDeletionResponse,
@@ -82,7 +84,7 @@ async def read_conversation_history(
         before_message_id=before_message_id,
     )
     if page is None:
-        raise HTTPException(status_code=404, detail="conversation_not_found")
+        raise ProductApiError(404, "CONVERSATION_NOT_FOUND", "Conversation not found")
     return ConversationHistoryResponse.from_domain(page)
 
 
@@ -100,20 +102,48 @@ async def send_conversation_message(
     auth_session = await resolve_auth_session(request, require_csrf=True)
     user_id = auth_session.principal.user_id
     correlation_id: str = request.state.correlation_id
-    coordinator: ChatIdempotencyService = request.app.state.chat_idempotency
+    traffic: ChatTrafficGuard = request.app.state.chat_traffic
+    traffic_lease = await traffic.acquire(user_id)
     try:
-        reservation = await coordinator.reserve(
-            user_id,
-            session_id,
-            body.client_message_id,
-            body.message,
+        return await _start_product_chat(
+            session_id=session_id,
+            body=body,
+            request=request,
+            principal=auth_session.principal,
+            correlation_id=correlation_id,
+            traffic_lease=traffic_lease,
         )
-    except ChatRequestConflictError:
-        raise HTTPException(status_code=409, detail="idempotency_conflict") from None
+    except BaseException:
+        await traffic_lease.release()
+        raise
+
+
+async def _start_product_chat(
+    *,
+    session_id: str,
+    body: SendConversationMessageRequest,
+    request: Request,
+    principal: AuthenticatedPrincipal,
+    correlation_id: str,
+    traffic_lease: ChatTrafficLease,
+) -> StreamingResponse:
+    user_id = principal.user_id
+    coordinator: ChatIdempotencyService = request.app.state.chat_idempotency
+    reservation = await coordinator.reserve(
+        user_id,
+        session_id,
+        body.client_message_id,
+        body.message,
+    )
     if reservation is None:
-        raise HTTPException(status_code=404, detail="conversation_not_found")
+        raise ProductApiError(404, "CONVERSATION_NOT_FOUND", "Conversation not found")
     if reservation.outcome is ChatRequestReservationOutcome.IN_PROGRESS:
-        raise HTTPException(status_code=409, detail="request_in_progress")
+        raise ProductApiError(
+            409,
+            "REQUEST_IN_PROGRESS",
+            "Chat request is already processing",
+            retryable=True,
+        )
 
     request.state.turn_id = reservation.turn_id
     set_request_span_attribute("turn_id", reservation.turn_id)
@@ -132,12 +162,13 @@ async def send_conversation_message(
             reservation,
         )
         if completed is None:
-            raise HTTPException(status_code=404, detail="conversation_not_found")
+            raise ProductApiError(404, "CONVERSATION_NOT_FOUND", "Conversation not found")
         return ProductChatStreamingResponse(
             correlation_id=correlation_id,
             turn_id=reservation.turn_id,
             client_message_id=str(body.client_message_id),
             replayed_message=completed[1],
+            on_finish=traffic_lease.release,
             headers=headers,
         )
 
@@ -150,7 +181,7 @@ async def send_conversation_message(
             stream = await use_case.execute_reserved(
                 ChatCommand(session_id=session_id, message=body.message),
                 reservation,
-                principal=auth_session.principal,
+                principal=principal,
                 correlation_id=correlation_id,
             )
         except BaseException as error:
@@ -163,15 +194,16 @@ async def send_conversation_message(
                 pass
             raise
 
+    async def abandon(cancelled: bool) -> None:
+        await coordinator.abandon(reservation, cancelled=cancelled)
+
     return ProductChatStreamingResponse(
         correlation_id=correlation_id,
         turn_id=reservation.turn_id,
         client_message_id=str(body.client_message_id),
         session=stream,
-        on_abort=lambda cancelled: coordinator.abandon(
-            reservation,
-            cancelled=cancelled,
-        ),
+        on_abort=abandon,
+        on_finish=traffic_lease.release,
         headers=headers,
     )
 
@@ -189,7 +221,7 @@ async def request_conversation_deletion(
     store: ConversationStorePort = request.app.state.conversation_store
     found = await store.mark_deletion_pending(session.principal.user_id, session_id)
     if not found:
-        raise HTTPException(status_code=404, detail="conversation_not_found")
+        raise ProductApiError(404, "CONVERSATION_NOT_FOUND", "Conversation not found")
     return ConversationDeletionResponse()
 
 
@@ -214,4 +246,8 @@ def _decode_cursor(value: str) -> ConversationListCursor:
             UUID(conversation_id),
         )
     except (binascii.Error, UnicodeDecodeError, ValueError):
-        raise HTTPException(status_code=422, detail="invalid_conversation_cursor") from None
+        raise ProductApiError(
+            422,
+            "CONVERSATION_CURSOR_INVALID",
+            "Conversation cursor is invalid",
+        ) from None

@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from app.domain.models.conversation import (
+    MAX_CHAT_MESSAGE_LENGTH,
     ConversationHistoryPage,
     ConversationPage,
     ConversationSummary,
@@ -30,7 +31,14 @@ class SendConversationMessageRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     client_message_id: UUID
-    message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    message: Annotated[
+        str,
+        StringConstraints(
+            strip_whitespace=True,
+            min_length=1,
+            max_length=MAX_CHAT_MESSAGE_LENGTH,
+        ),
+    ]
 
 
 class ConversationSummaryResponse(BaseModel):

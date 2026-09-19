@@ -48,6 +48,9 @@ def test_every_legacy_metric_has_one_reviewed_otel_spec() -> None:
         "provider_request_id",
         "memory_id",
         "event_id",
+        "content",
+        "prompt",
+        "response",
     ),
 )
 def test_metric_attributes_reject_all_identifier_dimensions(forbidden: str) -> None:

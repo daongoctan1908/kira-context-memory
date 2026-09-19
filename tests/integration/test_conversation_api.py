@@ -252,7 +252,7 @@ async def test_two_user_isolation_invalid_cursor_and_pending_delete() -> None:
         await _login(client, "alice")
         malformed = await client.get("/api/v1/conversations?cursor=not-a-cursor")
         assert malformed.status_code == 422
-        assert malformed.json()["detail"] == "invalid_conversation_cursor"
+        assert malformed.json()["code"] == "CONVERSATION_CURSOR_INVALID"
         assert (await client.delete("/api/v1/conversations/public-session")).status_code == 403
         deleted = await client.delete(
             "/api/v1/conversations/public-session",

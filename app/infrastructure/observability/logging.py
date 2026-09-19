@@ -12,6 +12,7 @@ _STRING_FIELDS = (
     "correlation_id",
     "turn_id",
     "event_id",
+    "origin_trace_id",
     "operation",
     "dependency",
     "outcome",

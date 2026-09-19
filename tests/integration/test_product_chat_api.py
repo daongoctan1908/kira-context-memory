@@ -10,7 +10,10 @@ import httpx
 from app.application.services.chat_idempotency import hash_chat_content
 from app.config.settings import Settings
 from app.domain.errors.auth import InvalidCsrfTokenError, InvalidSessionError
-from app.domain.errors.conversation import ChatRequestConflictError
+from app.domain.errors.conversation import (
+    ChatRequestConflictError,
+    ConversationStoreConnectionError,
+)
 from app.domain.errors.kira import KiraConnectionError
 from app.domain.models.auth import AuthSession, IssuedSession
 from app.domain.models.conversation import (
@@ -92,9 +95,12 @@ class FakeKira:
     def __init__(self) -> None:
         self.calls = 0
         self.fail_stream = False
+        self.open_error: Exception | None = None
 
     async def chat_stream(self, _message: str):
         self.calls += 1
+        if self.open_error is not None:
+            raise self.open_error
         return ListStream(fail=self.fail_stream)
 
 
@@ -207,26 +213,28 @@ class FakeStore:
         return self.messages or ()
 
 
-def _settings() -> Settings:
-    return Settings(
-        _env_file=None,
-        kira_base_url="https://kira.test",
-        kira_username="service-account",
-        kira_basic_auth="secret",
-        app_environment="production",
-        database_url="postgresql://user:password@db/kira",
-        auth_enabled=True,
-        auth_allowed_origin="https://chat.test",
-        auth_cookie_secure=True,
-    )
+def _settings(**overrides) -> Settings:
+    values = {
+        "_env_file": None,
+        "kira_base_url": "https://kira.test",
+        "kira_username": "service-account",
+        "kira_basic_auth": "secret",
+        "app_environment": "production",
+        "database_url": "postgresql://user:password@db/kira",
+        "auth_enabled": True,
+        "auth_allowed_origin": "https://chat.test",
+        "auth_cookie_secure": True,
+    }
+    values.update(overrides)
+    return Settings(**values)
 
 
 @asynccontextmanager
-async def _client():
-    store = FakeStore()
-    kira = FakeKira()
+async def _client(*, settings=None, store=None, kira=None):
+    store = store or FakeStore()
+    kira = kira or FakeKira()
     app = create_app(
-        settings=_settings(),
+        settings=settings or _settings(),
         kira_client=kira,  # type: ignore[arg-type]
         conversation_store=store,  # type: ignore[arg-type]
         query_rewriter=FakeRewriter(),
@@ -311,7 +319,7 @@ async def test_product_idempotency_conflict_and_in_progress_are_409() -> None:
             json={"client_message_id": str(client_message_id), "message": "hello"},
         )
         assert in_progress.status_code == 409
-        assert in_progress.json()["detail"] == "request_in_progress"
+        assert in_progress.json()["code"] == "REQUEST_IN_PROGRESS"
 
 
 async def test_stream_or_completion_failure_never_emits_completed() -> None:
@@ -326,6 +334,92 @@ async def test_stream_or_completion_failure_never_emits_completed() -> None:
         assert "event: message.completed" not in response.text
         assert store.messages is None
         assert store.abandoned is ChatRequestStatus.FAILED
+
+
+async def test_product_limits_return_sanitized_errors_before_downstream_work() -> None:
+    async with _client() as (client, _store, kira):
+        invalid = await client.post(
+            "/api/v1/conversations/public-session/messages",
+            headers=_headers(),
+            json={"client_message_id": str(uuid4()), "message": "x" * 8_001},
+        )
+        assert invalid.status_code == 422
+        assert invalid.json()["code"] == "REQUEST_INVALID"
+        assert "x" * 100 not in invalid.text
+        oversized = await client.post(
+            "/api/v1/conversations/public-session/messages",
+            headers=_headers(),
+            json={"client_message_id": str(uuid4()), "message": "x" * 140_000},
+        )
+        assert oversized.status_code == 413
+        assert oversized.json()["code"] == "CHAT_BODY_TOO_LARGE"
+        assert kira.calls == 0
+
+
+async def test_rate_limit_and_store_outage_are_sanitized() -> None:
+    settings = _settings(chat_requests_per_minute=1)
+    async with _client(settings=settings) as (client, _store, _kira):
+        first = await client.post(
+            "/api/v1/conversations/public-session/messages",
+            headers=_headers(),
+            json={"client_message_id": str(uuid4()), "message": "hello"},
+        )
+        assert first.status_code == 200
+        limited = await client.post(
+            "/api/v1/conversations/public-session/messages",
+            headers=_headers(),
+            json={"client_message_id": str(uuid4()), "message": "hello"},
+        )
+        assert limited.status_code == 429
+        assert limited.json()["code"] == "CHAT_RATE_LIMITED"
+
+    class UnavailableStore(FakeStore):
+        async def reserve_chat_request(self, *_args, **_kwargs):
+            raise ConversationStoreConnectionError
+
+    async with _client(store=UnavailableStore()) as (client, _store, kira):
+        unavailable = await client.post(
+            "/api/v1/conversations/public-session/messages",
+            headers=_headers(),
+            json={"client_message_id": str(uuid4()), "message": "private user text"},
+        )
+        assert unavailable.status_code == 503
+        assert unavailable.json()["code"] == "CHAT_STORE_UNAVAILABLE"
+        assert "private user text" not in unavailable.text
+        assert kira.calls == 0
+
+
+async def test_kira_open_failure_releases_reservation_and_returns_safe_http_error() -> None:
+    kira = FakeKira()
+    kira.open_error = KiraConnectionError()
+    async with _client(kira=kira) as (client, store, _kira):
+        response = await client.post(
+            "/api/v1/conversations/public-session/messages",
+            headers=_headers(),
+            json={"client_message_id": str(uuid4()), "message": "hello"},
+        )
+        assert response.status_code == 502
+        assert response.json()["code"] == "KIRA_CONNECTION_ERROR"
+        assert store.abandoned is ChatRequestStatus.FAILED
+
+
+async def test_unreachable_telemetry_backend_does_not_affect_product_chat() -> None:
+    settings = _settings(
+        otel_enabled=True,
+        otel_exporter_otlp_endpoint="http://127.0.0.1:1",
+        otel_export_timeout_seconds=0.05,
+        otel_batch_schedule_delay_seconds=0.01,
+        otel_shutdown_timeout_seconds=0.05,
+    )
+    async with _client(settings=settings) as (client, store, _kira):
+        response = await client.post(
+            "/api/v1/conversations/public-session/messages",
+            headers=_headers(),
+            json={"client_message_id": str(uuid4()), "message": "hello"},
+        )
+        assert response.status_code == 200
+        assert "event: message.completed" in response.text
+        assert store.messages is not None
 
     async with _client() as (client, store, _kira):
         store.fail_complete = True
