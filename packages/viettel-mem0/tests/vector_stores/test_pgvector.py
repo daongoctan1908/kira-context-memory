@@ -55,15 +55,16 @@ class TestPGVector(unittest.TestCase):
     def test_exact_formation_receipt_lookup_does_not_use_semantic_search(self):
         pgvector = self._runtime_pgvector()
         event_id = str(uuid.uuid4())
+        conversation_id = str(uuid.uuid4())
         committed = [{"id": str(uuid.uuid4()), "memory": "first wording", "event": "ADD"}]
-        self.mock_cursor.fetchone.return_value = ("user-1", committed)
+        self.mock_cursor.fetchone.return_value = ("user-1", conversation_id, committed)
 
         with (
             patch.object(pgvector, "_get_cursor") as get_cursor,
             patch.object(pgvector, "search") as semantic_search,
         ):
             get_cursor.return_value.__enter__.return_value = self.mock_cursor
-            result = pgvector.get_formation_result(event_id, "user-1")
+            result = pgvector.get_formation_result(event_id, "user-1", conversation_id)
 
         self.assertEqual(result, committed)
         semantic_search.assert_not_called()
@@ -71,11 +72,13 @@ class TestPGVector(unittest.TestCase):
     def test_formation_insert_writes_receipt_and_all_vectors_in_one_transaction(self):
         pgvector = self._runtime_pgvector()
         event_id = str(uuid.uuid4())
+        conversation_id = str(uuid.uuid4())
         memory_id = str(uuid.uuid4())
         result = [{"id": memory_id, "memory": "durable fact", "event": "ADD"}]
         payload = {
             "user_id": "user-1",
             "formation_event_id": event_id,
+            "conversation_id": conversation_id,
             "data": "durable fact",
         }
         self.mock_cursor.fetchone.return_value = (event_id,)
@@ -88,6 +91,7 @@ class TestPGVector(unittest.TestCase):
                 [memory_id],
                 event_id=event_id,
                 user_id="user-1",
+                conversation_id=conversation_id,
                 result=result,
             )
 
@@ -99,13 +103,14 @@ class TestPGVector(unittest.TestCase):
     def test_formation_conflict_returns_first_receipt_without_inserting_paraphrase(self):
         pgvector = self._runtime_pgvector()
         event_id = str(uuid.uuid4())
+        conversation_id = str(uuid.uuid4())
         first_id = str(uuid.uuid4())
         second_id = str(uuid.uuid4())
         first = [{"id": first_id, "memory": "threshold 10%", "event": "ADD"}]
         paraphrase = [
             {"id": second_id, "memory": "preferred threshold is ten percent", "event": "ADD"}
         ]
-        self.mock_cursor.fetchone.side_effect = [None, ("user-1", first)]
+        self.mock_cursor.fetchone.side_effect = [None, ("user-1", conversation_id, first)]
 
         with patch.object(pgvector, "_get_cursor") as get_cursor:
             get_cursor.return_value.__enter__.return_value = self.mock_cursor
@@ -115,12 +120,14 @@ class TestPGVector(unittest.TestCase):
                     {
                         "user_id": "user-1",
                         "formation_event_id": event_id,
+                        "conversation_id": conversation_id,
                         "data": "preferred threshold is ten percent",
                     }
                 ],
                 [second_id],
                 event_id=event_id,
                 user_id="user-1",
+                conversation_id=conversation_id,
                 result=paraphrase,
             )
 
@@ -131,6 +138,7 @@ class TestPGVector(unittest.TestCase):
     def test_formation_insert_rejects_misaligned_or_cross_user_provenance(self):
         pgvector = self._runtime_pgvector()
         event_id = str(uuid.uuid4())
+        conversation_id = str(uuid.uuid4())
         memory_id = str(uuid.uuid4())
 
         with self.assertRaisesRegex(ValueError, "align"):
@@ -140,15 +148,23 @@ class TestPGVector(unittest.TestCase):
                 [memory_id],
                 event_id=event_id,
                 user_id="user-1",
+                conversation_id=conversation_id,
                 result=[],
             )
         with self.assertRaisesRegex(ValueError, "provenance"):
             pgvector.insert_with_formation_receipt(
                 [[1.0, 0.0, 0.0]],
-                [{"user_id": "other-user", "formation_event_id": event_id}],
+                [
+                    {
+                        "user_id": "other-user",
+                        "formation_event_id": event_id,
+                        "conversation_id": conversation_id,
+                    }
+                ],
                 [memory_id],
                 event_id=event_id,
                 user_id="user-1",
+                conversation_id=conversation_id,
                 result=[{"id": memory_id, "memory": "fact", "event": "ADD"}],
             )
 

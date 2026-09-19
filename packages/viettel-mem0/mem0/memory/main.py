@@ -49,7 +49,7 @@ from mem0.memory.notices import (
     get_temporal_feature_error_message_async,
 )
 from mem0.memory.setup import mem0_dir, setup_config
-from mem0.memory.storage import SQLiteManager
+from mem0.memory.storage import DisabledHistoryManager, SQLiteManager
 from mem0.memory.telemetry import MEM0_TELEMETRY, capture_event
 from mem0.memory.utils import (
     extract_json,
@@ -427,12 +427,15 @@ def _formation_identity(metadata, filters):
     user_id = filters.get("user_id")
     if not isinstance(event_id, str) or not isinstance(user_id, str) or not user_id.strip():
         raise ValueError("formation_event_id requires a user-scoped memory operation")
+    conversation_id = metadata.get("conversation_id")
     try:
         normalized_event_id = str(uuid.UUID(event_id))
+        normalized_conversation_id = str(uuid.UUID(conversation_id))
     except (ValueError, AttributeError, TypeError) as exc:
-        raise ValueError("formation_event_id must be a UUID") from exc
+        raise ValueError("formation_event_id and conversation_id must be UUIDs") from exc
     metadata["formation_event_id"] = normalized_event_id
-    return normalized_event_id, user_id
+    metadata["conversation_id"] = normalized_conversation_id
+    return normalized_event_id, user_id, normalized_conversation_id
 
 
 def _formation_method(vector_store, name):
@@ -520,7 +523,11 @@ class Memory(MemoryBase):
             self.config.vector_store.provider, self.config.vector_store.config
         )
         self.llm = LlmFactory.create(self.config.llm.provider, self.config.llm.config)
-        self.db = SQLiteManager(self.config.history_db_path)
+        self.db = (
+            SQLiteManager(self.config.history_db_path)
+            if self.config.history_enabled
+            else DisabledHistoryManager()
+        )
         self.collection_name = self.config.vector_store.config.collection_name
         self.api_version = self.config.version
         self.custom_instructions = self.config.custom_instructions
@@ -1026,6 +1033,7 @@ class Memory(MemoryBase):
                     [],
                     event_id=formation_identity[0],
                     user_id=formation_identity[1],
+                    conversation_id=formation_identity[2],
                     result=[],
                 )
                 self.db.save_messages(messages, session_scope)
@@ -1095,6 +1103,7 @@ class Memory(MemoryBase):
                 [],
                 event_id=formation_identity[0],
                 user_id=formation_identity[1],
+                conversation_id=formation_identity[2],
                 result=[],
             )
             self.db.save_messages(messages, session_scope)
@@ -1122,6 +1131,7 @@ class Memory(MemoryBase):
                 payloads=all_payloads,
                 event_id=formation_identity[0],
                 user_id=formation_identity[1],
+                conversation_id=formation_identity[2],
                 result=returned_memories,
             )
             if not created:
@@ -2214,7 +2224,11 @@ class Memory(MemoryBase):
 
         self.db.reset()
         self.db.close()
-        self.db = SQLiteManager(self.config.history_db_path)
+        self.db = (
+            SQLiteManager(self.config.history_db_path)
+            if self.config.history_enabled
+            else DisabledHistoryManager()
+        )
 
         if hasattr(self.vector_store, "reset"):
             self.vector_store = VectorStoreFactory.reset(self.vector_store)
@@ -2258,7 +2272,11 @@ class AsyncMemory(MemoryBase):
             self.config.vector_store.provider, self.config.vector_store.config
         )
         self.llm = LlmFactory.create(self.config.llm.provider, self.config.llm.config)
-        self.db = SQLiteManager(self.config.history_db_path)
+        self.db = (
+            SQLiteManager(self.config.history_db_path)
+            if self.config.history_enabled
+            else DisabledHistoryManager()
+        )
         self.collection_name = self.config.vector_store.config.collection_name
         self.api_version = self.config.version
         self.custom_instructions = self.config.custom_instructions
@@ -2775,6 +2793,7 @@ class AsyncMemory(MemoryBase):
                         [],
                         event_id=formation_identity[0],
                         user_id=formation_identity[1],
+                        conversation_id=formation_identity[2],
                         result=[],
                     )
                     persist_observation.set_attribute("kira.memory.receipt.created", created)
@@ -2869,6 +2888,7 @@ class AsyncMemory(MemoryBase):
                     [],
                     event_id=formation_identity[0],
                     user_id=formation_identity[1],
+                    conversation_id=formation_identity[2],
                     result=[],
                 )
                 persist_observation.set_attribute("kira.memory.receipt.created", created)
@@ -2902,6 +2922,7 @@ class AsyncMemory(MemoryBase):
                     payloads=all_payloads,
                     event_id=formation_identity[0],
                     user_id=formation_identity[1],
+                    conversation_id=formation_identity[2],
                     result=returned_memories,
                 )
                 persist_observation.set_attribute("kira.memory.receipt.created", created)
@@ -4050,7 +4071,11 @@ class AsyncMemory(MemoryBase):
 
         await asyncio.to_thread(self.db.reset)
         await asyncio.to_thread(self.db.close)
-        self.db = SQLiteManager(self.config.history_db_path)
+        self.db = (
+            SQLiteManager(self.config.history_db_path)
+            if self.config.history_enabled
+            else DisabledHistoryManager()
+        )
 
         self.vector_store = VectorStoreFactory.create(
             self.config.vector_store.provider, self.config.vector_store.config

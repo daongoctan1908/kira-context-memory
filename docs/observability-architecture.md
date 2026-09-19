@@ -266,7 +266,7 @@ promotion.
 | Component | Current pin | Reason/constraint |
 | --- | --- | --- |
 | Application | `0.4.1`, Python `3.11.9` | Current runtime baseline |
-| `viettel-mem0` | `2.0.20+viettel.4` | Observer-only package patch; persisted schema contract remains `.3` |
+| `viettel-mem0` | `2.0.20+viettel.5` | Product can disable auxiliary history; receipt ownership requires memory schema 3 |
 | OTel Python API/SDK | `1.44.0` | API, SDK, and OTLP HTTP exporter stay on the same stable line |
 | OTel semantic conventions, if imported directly | `0.65b0` | Must match the `1.44.0` Python release line; avoid direct dependency unless needed |
 | OTel Collector Contrib | `0.160.0` | Required for OTLP, filelog, Kubernetes enrichment, filtering, and OTLP/HTTP export |

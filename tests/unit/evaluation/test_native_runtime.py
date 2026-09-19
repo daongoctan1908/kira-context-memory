@@ -124,7 +124,7 @@ def _provenance() -> RunProvenance:
         prompt_sha256={"memory_extraction": "a" * 64, "rewrite_system": "b" * 64},
         package_versions={
             "kira-context-memory": "0.4.1",
-            "viettel-mem0": "2.0.20+viettel.4",
+            "viettel-mem0": "2.0.20+viettel.5",
         },
     )
 
@@ -427,6 +427,7 @@ class _Inspector:
             receipt=FormationReceiptRecord(
                 event_id=event_id,
                 user_id=user_id,
+                conversation_id=UUID(int=1),
                 events=(lifecycle,),
                 memory_count=1,
                 committed_at=datetime(2026, 9, 19, tzinfo=UTC),

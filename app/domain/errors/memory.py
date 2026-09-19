@@ -6,8 +6,9 @@ class LongTermMemoryError(Exception):
 
 
 class LongTermMemoryConfigurationError(LongTermMemoryError):
-    def __init__(self) -> None:
-        super().__init__("Long-term memory configuration is invalid")
+    def __init__(self, detail: str | None = None) -> None:
+        message = "Long-term memory configuration is invalid"
+        super().__init__(f"{message}: {detail}" if detail else message)
 
 
 class LongTermMemoryConnectionError(LongTermMemoryError):

@@ -138,14 +138,20 @@ def _with_sslmode(connection_string: str, sslmode: str) -> str:
     return f"{connection_string} sslmode={sslmode}"
 
 
-def _validate_formation_identity(event_id: str, user_id: str):
-    if not isinstance(event_id, str) or not isinstance(user_id, str) or not user_id.strip():
-        raise ValueError("formation event_id and user_id must be non-empty strings")
+def _validate_formation_identity(event_id: str, user_id: str, conversation_id: str):
+    if (
+        not isinstance(event_id, str)
+        or not isinstance(user_id, str)
+        or not user_id.strip()
+        or not isinstance(conversation_id, str)
+    ):
+        raise ValueError("formation event_id, user_id, and conversation_id must be non-empty strings")
     try:
         normalized_event_id = str(UUID(event_id))
+        normalized_conversation_id = str(UUID(conversation_id))
     except (ValueError, AttributeError, TypeError) as exc:
-        raise ValueError("formation event_id must be a UUID") from exc
-    return normalized_event_id, user_id
+        raise ValueError("formation event_id and conversation_id must be UUIDs") from exc
+    return normalized_event_id, user_id, normalized_conversation_id
 
 
 class OutputData(BaseModel):
@@ -358,6 +364,7 @@ class PGVector(VectorStoreBase):
                 CREATE TABLE IF NOT EXISTS {} (
                     event_id UUID PRIMARY KEY,
                     user_id TEXT NOT NULL CHECK (btrim(user_id) <> ''),
+                    conversation_id UUID NOT NULL,
                     result JSONB NOT NULL CHECK (jsonb_typeof(result) = 'array'),
                     memory_count INTEGER NOT NULL CHECK (
                         memory_count >= 0 AND memory_count = jsonb_array_length(result)
@@ -387,12 +394,18 @@ class PGVector(VectorStoreBase):
                     data,
                 )
 
-    def get_formation_result(self, event_id: str, user_id: str):
+    def get_formation_result(self, event_id: str, user_id: str, conversation_id: str):
         """Return an exact committed formation receipt without semantic retrieval."""
-        event_id, user_id = _validate_formation_identity(event_id, user_id)
+        event_id, user_id, conversation_id = _validate_formation_identity(
+            event_id,
+            user_id,
+            conversation_id,
+        )
         with self._get_cursor() as cur:
             cur.execute(
-                sql.SQL("SELECT user_id, result FROM {} WHERE event_id = %s").format(
+                sql.SQL(
+                    "SELECT user_id, conversation_id::text, result FROM {} WHERE event_id = %s"
+                ).format(
                     self._formation_receipts()
                 ),
                 (event_id,),
@@ -400,9 +413,9 @@ class PGVector(VectorStoreBase):
             row = cur.fetchone()
         if row is None:
             return None
-        if row[0] != user_id or not isinstance(row[1], list):
+        if row[:2] != (user_id, conversation_id) or not isinstance(row[2], list):
             raise ValueError("formation receipt violates its identity contract")
-        return row[1]
+        return row[2]
 
     def insert_with_formation_receipt(
         self,
@@ -412,10 +425,15 @@ class PGVector(VectorStoreBase):
         *,
         event_id: str,
         user_id: str,
+        conversation_id: str,
         result: list[dict],
     ):
         """Atomically insert every memory and its event-scoped formation receipt."""
-        event_id, user_id = _validate_formation_identity(event_id, user_id)
+        event_id, user_id, conversation_id = _validate_formation_identity(
+            event_id,
+            user_id,
+            conversation_id,
+        )
         if not (len(vectors) == len(payloads) == len(ids) == len(result)):
             raise ValueError("formation vectors, payloads, ids, and result must align")
         for memory_id, payload, item in zip(ids, payloads, result):
@@ -423,6 +441,7 @@ class PGVector(VectorStoreBase):
                 not isinstance(payload, dict)
                 or payload.get("formation_event_id") != event_id
                 or payload.get("user_id") != user_id
+                or payload.get("conversation_id") != conversation_id
                 or not isinstance(item, dict)
                 or item.get("id") != memory_id
             ):
@@ -436,23 +455,27 @@ class PGVector(VectorStoreBase):
         with self._get_cursor(commit=True) as cur:
             cur.execute(
                 sql.SQL(
-                    "INSERT INTO {} (event_id, user_id, result, memory_count) "
-                    "VALUES (%s, %s, %s, %s) "
+                    "INSERT INTO {} (event_id, user_id, conversation_id, result, memory_count) "
+                    "VALUES (%s, %s, %s, %s, %s) "
                     "ON CONFLICT (event_id) DO NOTHING RETURNING event_id"
                 ).format(self._formation_receipts()),
-                (event_id, user_id, Json(result), len(result)),
+                (event_id, user_id, conversation_id, Json(result), len(result)),
             )
             if cur.fetchone() is None:
                 cur.execute(
-                    sql.SQL("SELECT user_id, result FROM {} WHERE event_id = %s").format(
-                        self._formation_receipts()
-                    ),
+                    sql.SQL(
+                        "SELECT user_id, conversation_id::text, result FROM {} WHERE event_id = %s"
+                    ).format(self._formation_receipts()),
                     (event_id,),
                 )
                 existing = cur.fetchone()
-                if existing is None or existing[0] != user_id or not isinstance(existing[1], list):
+                if (
+                    existing is None
+                    or existing[:2] != (user_id, conversation_id)
+                    or not isinstance(existing[2], list)
+                ):
                     raise ValueError("formation receipt violates its identity contract")
-                return False, existing[1]
+                return False, existing[2]
 
             if data:
                 if PSYCOPG_VERSION == 3:

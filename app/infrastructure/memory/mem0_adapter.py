@@ -66,6 +66,7 @@ def build_mem0_config(settings: MemoryRuntimeSettings) -> dict[str, object]:
     return {
         "version": "v1.1",
         "history_db_path": ":memory:",
+        "history_enabled": False,
         "custom_instructions": MEMORY_EXTRACTION_INSTRUCTIONS,
         "vector_store": {
             "provider": "pgvector",

@@ -48,6 +48,7 @@ async def test_receipt_conflict_ignores_paraphrase_and_never_inserts_second_memo
     dsn = _test_dsn()
     schema_name = f"memory_receipt_{uuid4().hex}"
     event_id = str(uuid4())
+    conversation_id = str(uuid4())
     first_id = str(uuid4())
     second_id = str(uuid4())
     store = None
@@ -76,12 +77,14 @@ async def test_receipt_conflict_ignores_paraphrase_and_never_inserts_second_memo
                 {
                     "user_id": "user-1",
                     "formation_event_id": event_id,
+                    "conversation_id": conversation_id,
                     "data": first[0]["memory"],
                 }
             ],
             [first_id],
             event_id=event_id,
             user_id="user-1",
+            conversation_id=conversation_id,
             result=first,
         )
         duplicate_created, duplicate_result = store.insert_with_formation_receipt(
@@ -90,12 +93,14 @@ async def test_receipt_conflict_ignores_paraphrase_and_never_inserts_second_memo
                 {
                     "user_id": "user-1",
                     "formation_event_id": event_id,
+                    "conversation_id": conversation_id,
                     "data": paraphrase[0]["memory"],
                 }
             ],
             [second_id],
             event_id=event_id,
             user_id="user-1",
+            conversation_id=conversation_id,
             result=paraphrase,
         )
 
@@ -103,7 +108,7 @@ async def test_receipt_conflict_ignores_paraphrase_and_never_inserts_second_memo
         assert committed == first
         assert duplicate_created is False
         assert duplicate_result == first
-        assert store.get_formation_result(event_id, "user-1") == first
+        assert store.get_formation_result(event_id, "user-1", conversation_id) == first
         with psycopg.connect(dsn) as connection, connection.cursor() as cursor:
             cursor.execute(
                 sql.SQL(
@@ -133,6 +138,7 @@ async def test_failed_batch_rolls_back_memories_and_receipt_then_retry_can_commi
     dsn = _test_dsn()
     schema_name = f"memory_rollback_{uuid4().hex}"
     event_id = str(uuid4())
+    conversation_id = str(uuid4())
     duplicated_id = str(uuid4())
     store = None
     try:
@@ -153,6 +159,7 @@ async def test_failed_batch_rolls_back_memories_and_receipt_then_retry_can_commi
             {
                 "user_id": "user-1",
                 "formation_event_id": event_id,
+                "conversation_id": conversation_id,
                 "data": item["memory"],
             }
             for item in results
@@ -165,6 +172,7 @@ async def test_failed_batch_rolls_back_memories_and_receipt_then_retry_can_commi
                 [duplicated_id, duplicated_id],
                 event_id=event_id,
                 user_id="user-1",
+                conversation_id=conversation_id,
                 result=results,
             )
 
@@ -187,12 +195,14 @@ async def test_failed_batch_rolls_back_memories_and_receipt_then_retry_can_commi
                 {
                     "user_id": "user-1",
                     "formation_event_id": event_id,
+                    "conversation_id": conversation_id,
                     "data": "retry fact",
                 }
             ],
             [retry_id],
             event_id=event_id,
             user_id="user-1",
+            conversation_id=conversation_id,
             result=retry_result,
         )
         assert created is True
@@ -210,6 +220,7 @@ async def test_concurrent_same_event_elects_one_complete_formation() -> None:
     dsn = _test_dsn()
     schema_name = f"memory_concurrent_receipt_{uuid4().hex}"
     event_id = str(uuid4())
+    conversation_id = str(uuid4())
     store = None
     try:
         await asyncio.to_thread(
@@ -237,12 +248,14 @@ async def test_concurrent_same_event_elects_one_complete_formation() -> None:
                         {
                             "user_id": "user-1",
                             "formation_event_id": event_id,
+                            "conversation_id": conversation_id,
                             "data": wording,
                         }
                     ],
                     [memory_id],
                     event_id=event_id,
                     user_id="user-1",
+                    conversation_id=conversation_id,
                     result=result,
                 )
             )

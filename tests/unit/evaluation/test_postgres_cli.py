@@ -115,7 +115,7 @@ def test_cli_mock_creates_safe_artifact_and_wont_overwrite(tmp_path, capsys):
     assert report["provenance"]["runtime"]["sha"]
     assert report["provenance"]["harness"]["sha"]
     assert report["provenance"]["prompt_sha256"]
-    assert report["provenance"]["package_versions"]["viettel-mem0"] == "2.0.20+viettel.4"
+    assert report["provenance"]["package_versions"]["viettel-mem0"] == "2.0.20+viettel.5"
     assert report["provenance"]["attribution_scope"] == "working_tree"
     assert json.loads(output.read_text(encoding="utf-8")) == report
     assert main(args) == 2

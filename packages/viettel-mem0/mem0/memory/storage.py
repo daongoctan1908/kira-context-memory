@@ -8,6 +8,33 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 
+class DisabledHistoryManager:
+    """No-op history backend for runtimes with an authoritative external transcript."""
+
+    def add_history(self, *args: Any, **kwargs: Any) -> None:
+        del args, kwargs
+
+    def batch_add_history(self, records: List[Dict[str, Any]]) -> None:
+        del records
+
+    def get_history(self, memory_id: str) -> List[Dict[str, Any]]:
+        del memory_id
+        return []
+
+    def save_messages(self, messages: List[Dict[str, Any]], session_scope: str) -> None:
+        del messages, session_scope
+
+    def get_last_messages(self, session_scope: str, limit: int = 10) -> List[Dict[str, Any]]:
+        del session_scope, limit
+        return []
+
+    def reset(self) -> None:
+        return None
+
+    def close(self) -> None:
+        return None
+
+
 class SQLiteManager:
     def __init__(self, db_path: str = ":memory:"):
         self.db_path = db_path

@@ -284,8 +284,15 @@ class _BoundaryStore:
 
 
 class _StateInspector:
-    def __init__(self, store: MagicMock, *, corrupt_content: bool = False) -> None:
+    def __init__(
+        self,
+        store: MagicMock,
+        conversation_id: UUID,
+        *,
+        corrupt_content: bool = False,
+    ) -> None:
         self.store = store
+        self.conversation_id = conversation_id
         self.corrupt_content = corrupt_content
 
     async def inspect(self, *, event_id: UUID, user_id: str) -> FormationPersistenceSnapshot:
@@ -312,7 +319,14 @@ class _StateInspector:
         receipt = None
         if raw_receipt is not None:
             receipt = PostgresFormationInspector._parse_receipt(
-                (event_id, user_id, raw_receipt, len(raw_receipt), _NOW),
+                (
+                    event_id,
+                    user_id,
+                    self.conversation_id,
+                    raw_receipt,
+                    len(raw_receipt),
+                    _NOW,
+                ),
                 expected_event_id=event_id,
                 expected_user_id=user_id,
             )
@@ -351,12 +365,14 @@ def _persistent_runtime(response: str):
     state: dict[str, dict] = {"rows": {}, "receipts": {}}
     store.formation_state = state
 
-    def get_receipt(event_id: str, user_id: str):
+    def get_receipt(event_id: str, user_id: str, conversation_id: str):
         del user_id
+        assert conversation_id == str(_CONVERSATION_ID)
         return state["receipts"].get(event_id)
 
-    def commit(vectors, payloads, ids, *, event_id, user_id, result):
+    def commit(vectors, payloads, ids, *, event_id, user_id, conversation_id, result):
         del vectors, user_id
+        assert conversation_id == str(_CONVERSATION_ID)
         if event_id in state["receipts"]:
             return False, state["receipts"][event_id]
         state["receipts"][event_id] = result
@@ -398,7 +414,8 @@ def _persistent_runtime(response: str):
         observer=observer,
     )
     processor = ProcessMemoryUseCase(_BoundaryStore(reference, messages), adapter)
-    return processor, observer, _StateInspector(store), reference, llm, store
+    inspector = _StateInspector(store, reference.conversation_id)
+    return processor, observer, inspector, reference, llm, store
 
 
 def _formation_identity() -> ArtifactRunIdentity:
@@ -414,7 +431,7 @@ def _formation_identity() -> ArtifactRunIdentity:
             prompt_sha256={"memory_extraction": "a" * 64, "rewrite_system": "b" * 64},
             package_versions={
                 "kira-context-memory": "0.4.1",
-                "viettel-mem0": "2.0.20+viettel.4",
+                "viettel-mem0": "2.0.20+viettel.5",
             },
         ),
         dataset_id="kira-ltm-v1",
@@ -523,6 +540,7 @@ async def test_persistent_evaluator_refuses_nonfresh_event_without_calling_proce
     receipt = FormationReceiptRecord(
         event_id=_EVENT_ID,
         user_id=reference.user_id,
+        conversation_id=reference.conversation_id,
         events=(),
         memory_count=0,
         committed_at=_NOW,
@@ -567,6 +585,7 @@ def test_postgres_inspector_parses_only_exact_provenance_and_receipt_contract():
         (
             _EVENT_ID,
             "eval:run:user-1",
+            _CONVERSATION_ID,
             [{"id": str(_MEMORY_ID), "memory": "Ưu tiên Hà Nội", "event": "ADD"}],
             1,
             _NOW,

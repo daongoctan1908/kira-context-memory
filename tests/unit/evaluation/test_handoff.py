@@ -40,7 +40,7 @@ def _provenance(variant: BenchmarkVariant) -> RunProvenance:
             "viettel-mem0": (
                 "2.0.20+viettel.3"
                 if variant is BenchmarkVariant.HISTORICAL_CONTROL
-                else "2.0.20+viettel.4"
+                else "2.0.20+viettel.5"
             ),
         },
         candidate=(

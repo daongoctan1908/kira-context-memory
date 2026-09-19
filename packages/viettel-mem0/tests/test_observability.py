@@ -235,6 +235,7 @@ async def _form(memory, observer=None):
             messages=[{"role": "user", "content": "User likes tea"}],
             metadata={
                 "formation_event_id": "11111111-1111-1111-1111-111111111111",
+                "conversation_id": "33333333-3333-3333-3333-333333333333",
                 "created_at": "2026-09-15T00:00:00+00:00",
             },
             effective_filters={"user_id": "user-1"},

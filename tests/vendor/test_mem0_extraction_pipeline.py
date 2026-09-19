@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from mem0 import AsyncMemory
 from mem0.configs.base import MemoryConfig
+from mem0.memory.storage import DisabledHistoryManager
 from mem0.memory.utils import parse_messages
 
 from app.application.services.memory_policy import MEMORY_EXTRACTION_INSTRUCTIONS
@@ -74,8 +75,91 @@ async def test_configured_policy_reaches_extraction_without_changing_saved_messa
         assert store.insert_with_formation_receipt.call_args.kwargs["event_id"] == str(
             item.formation_event_id
         )
+        assert store.insert_with_formation_receipt.call_args.kwargs["conversation_id"] == str(
+            item.reference.conversation_id
+        )
         # Replay after a committed empty extraction still bypasses providers.
         store.get_formation_result.return_value = []
         await memory_adapter.process_memory(item)
         llm.generate_response.assert_called_once()
         embedder.embed.assert_called_once()
+
+
+async def test_product_history_option_does_not_cache_messages_between_formations():
+    store = MagicMock()
+    store.get_formation_result.return_value = None
+    store.search.return_value = []
+    store.insert_with_formation_receipt.return_value = (True, [])
+    embedder = MagicMock()
+    embedder.embed.return_value = [0.1, 0.2, 0.3]
+    llm = MagicMock()
+    llm.generate_response.return_value = '{"memory": []}'
+    first = MemorySource(
+        CompletedTurnReference("user-a", "session-a", uuid4(), "turn-a", 2),
+        (
+            ConversationMessage(
+                "session-a",
+                "turn-a",
+                ConversationRole.USER,
+                "First authoritative PostgreSQL window.",
+                datetime(2026, 9, 14, 2, tzinfo=UTC),
+            ),
+            ConversationMessage(
+                "session-a",
+                "turn-a",
+                ConversationRole.ASSISTANT,
+                "First answer.",
+                datetime(2026, 9, 14, 2, 1, tzinfo=UTC),
+            ),
+        ),
+        uuid4(),
+    )
+    second = MemorySource(
+        CompletedTurnReference("user-a", "session-a", uuid4(), "turn-b", 4),
+        (
+            ConversationMessage(
+                "session-a",
+                "turn-b",
+                ConversationRole.USER,
+                "Second authoritative PostgreSQL window.",
+                datetime(2026, 9, 14, 3, tzinfo=UTC),
+            ),
+            ConversationMessage(
+                "session-a",
+                "turn-b",
+                ConversationRole.ASSISTANT,
+                "Second answer.",
+                datetime(2026, 9, 14, 3, 1, tzinfo=UTC),
+            ),
+        ),
+        uuid4(),
+    )
+    with (
+        patch("mem0.memory.main.MEM0_TELEMETRY", False),
+        patch("mem0.utils.factory.EmbedderFactory.create", return_value=embedder),
+        patch("mem0.utils.factory.VectorStoreFactory.create", return_value=store),
+        patch("mem0.utils.factory.LlmFactory.create", return_value=llm),
+        patch("mem0.memory.main.SQLiteManager") as sqlite_history,
+    ):
+        memory = AsyncMemory(
+            MemoryConfig(
+                custom_instructions=MEMORY_EXTRACTION_INSTRUCTIONS,
+                history_enabled=False,
+            )
+        )
+        memory_adapter = Mem0Adapter(
+            memory,
+            search_timeout_seconds=2,
+            operation_timeout_seconds=5,
+        )
+        await memory_adapter.process_memory(first)
+        await memory_adapter.process_memory(second)
+
+    sqlite_history.assert_not_called()
+    assert isinstance(memory.db, DisabledHistoryManager)
+    prompts = [
+        call.kwargs["messages"][1]["content"] for call in llm.generate_response.call_args_list
+    ]
+    assert "First authoritative PostgreSQL window." in prompts[0]
+    assert "First authoritative PostgreSQL window." not in prompts[1]
+    assert "Second authoritative PostgreSQL window." in prompts[1]

@@ -65,7 +65,7 @@ def _identity(
         prompt_sha256={"memory_extraction": _HASH, "rewrite_system": "b" * 64},
         package_versions={
             "kira-context-memory": "0.4.1",
-            "viettel-mem0": "2.0.20+viettel.4",
+            "viettel-mem0": "2.0.20+viettel.5",
         },
     )
     return ArtifactRunIdentity(

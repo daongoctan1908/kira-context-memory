@@ -137,6 +137,7 @@ class PersistedFormationMemory(EvalModel):
 class FormationReceiptRecord(EvalModel):
     event_id: UUID
     user_id: Identifier
+    conversation_id: UUID
     events: tuple[FormationLifecycleRecord, ...]
     memory_count: int = Field(ge=0, strict=True)
     committed_at: datetime
@@ -450,7 +451,7 @@ class PostgresFormationInspector:
             memory_rows = list(cursor.fetchall())
             cursor.execute(
                 sql.SQL(
-                    "SELECT event_id, user_id, result, memory_count, committed_at "
+                    "SELECT event_id, user_id, conversation_id, result, memory_count, committed_at "
                     "FROM {} WHERE event_id = %s"
                 ).format(
                     sql.Identifier(
@@ -496,15 +497,16 @@ class PostgresFormationInspector:
         expected_event_id: UUID,
         expected_user_id: str,
     ) -> FormationReceiptRecord:
-        if not isinstance(row, Sequence) or len(row) != 5:
+        if not isinstance(row, Sequence) or len(row) != 6:
             raise ValueError("invalid formation receipt row")
-        event_id, user_id, raw_result, memory_count, committed_at = row
+        event_id, user_id, conversation_id, raw_result, memory_count, committed_at = row
         if event_id != expected_event_id or user_id != expected_user_id:
             raise ValueError("formation receipt identity does not match")
         events = _safe_lifecycle({"results": raw_result})
         return FormationReceiptRecord(
             event_id=event_id,
             user_id=user_id,
+            conversation_id=conversation_id,
             events=events,
             memory_count=memory_count,
             committed_at=committed_at,
@@ -855,6 +857,8 @@ class PersistentFormationEvaluator:
         receipt = persistence.receipt
         if receipt is None:
             return "formation_receipt_missing"
+        if receipt.conversation_id != reference.conversation_id:
+            return "formation_receipt_provenance_mismatch"
         if receipt.events != extraction.lifecycle_events:
             return "formation_receipt_lifecycle_mismatch"
         expected = {event.memory_id: event.memory for event in receipt.events}

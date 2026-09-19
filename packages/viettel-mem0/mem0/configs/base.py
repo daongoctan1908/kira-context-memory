@@ -43,6 +43,10 @@ class MemoryConfig(BaseModel):
         description="Path to the history database",
         default=os.path.join(mem0_dir, "history.db"),
     )
+    history_enabled: bool = Field(
+        description="Whether to retain the auxiliary SQLite message and lifecycle history",
+        default=True,
+    )
     reranker: Optional[RerankerConfig] = Field(
         description="Configuration for the reranker",
         default=None,

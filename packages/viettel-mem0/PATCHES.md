@@ -62,3 +62,16 @@ Observer-enabled and observer-disabled tests assert identical provider requests,
 memory rows, and receipts. Because this patch changes no persisted contract, the `.4` package keeps
 the `.3` schema-contract marker; no metadata, vector schema, receipt, or stored-memory migration is
 required, and the Phase 3 runtime remains rollback-compatible.
+
+## Product history and receipt ownership: `2.0.20+viettel.5`
+
+- Add an explicit `MemoryConfig.history_enabled` switch. It defaults to `true`, preserving native
+  Mem0 behavior; the KiRa product runtime sets it to `false` because PostgreSQL is the authoritative
+  bounded transcript and lifecycle source.
+- Require `conversation_id` for event-scoped formation and persist it on every receipt, including
+  empty/deduplicated formations.
+- Validate `event_id + user_id + conversation_id` together on receipt replay and atomic insert.
+
+The extraction, embedding, hash deduplication, entity linking, and returned lifecycle semantics are
+unchanged. This is a persisted receipt-contract change: application schema version 3 backfills the
+owner from vector payloads or durable memory jobs and refuses to guess unresolved ownership.

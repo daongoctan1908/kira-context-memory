@@ -3,6 +3,7 @@
 import asyncio
 from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, version
+from uuid import UUID
 
 import httpx
 import psycopg
@@ -17,12 +18,14 @@ from app.domain.errors.memory import (
     LongTermMemoryTimeoutError,
 )
 
-MEMORY_SCHEMA_VERSION = 2
+MEMORY_SCHEMA_VERSION = 3
 MEM0_DISTRIBUTION = "viettel-mem0"
 LEGACY_MEMORY_SCHEMA_VERSION = 1
 LEGACY_MEM0_VERSION = "2.0.20+viettel.2"
-MEM0_SCHEMA_CONTRACT_VERSION = "2.0.20+viettel.3"
-CURRENT_MEM0_DISTRIBUTION_VERSION = "2.0.20+viettel.4"
+PREVIOUS_MEMORY_SCHEMA_VERSION = 2
+PREVIOUS_MEM0_SCHEMA_CONTRACT_VERSION = "2.0.20+viettel.3"
+MEM0_SCHEMA_CONTRACT_VERSION = "2.0.20+viettel.5"
+CURRENT_MEM0_DISTRIBUTION_VERSION = "2.0.20+viettel.5"
 FORMATION_RECEIPT_SUFFIX = "_formation_receipts"
 
 
@@ -326,7 +329,14 @@ def _initialize_memory_schema_sync(
             LEGACY_MEM0_VERSION,
             pgvector_version,
         )
-        if row is None or tuple(row) not in (expected, legacy):
+        previous = (
+            PREVIOUS_MEMORY_SCHEMA_VERSION,
+            embedding_model,
+            embedding_dims,
+            PREVIOUS_MEM0_SCHEMA_CONTRACT_VERSION,
+            pgvector_version,
+        )
+        if row is None or tuple(row) not in (expected, legacy, previous):
             raise LongTermMemoryConfigurationError
 
         for table_name in (collection_name, f"{collection_name}_entities"):
@@ -391,6 +401,7 @@ def _initialize_memory_schema_sync(
                 CREATE TABLE IF NOT EXISTS {} (
                     event_id UUID PRIMARY KEY,
                     user_id TEXT NOT NULL CHECK (btrim(user_id) <> ''),
+                    conversation_id UUID NOT NULL,
                     result JSONB NOT NULL CHECK (jsonb_typeof(result) = 'array'),
                     memory_count INTEGER NOT NULL CHECK (
                         memory_count >= 0 AND memory_count = jsonb_array_length(result)
@@ -401,7 +412,21 @@ def _initialize_memory_schema_sync(
             ).format(receipt_table)
         )
 
-        if tuple(row) == legacy:
+        receipt_owner_index = sql.Identifier(f"{collection_name}_formation_receipt_owner_idx")
+        if tuple(row) == previous:
+            _backfill_receipt_conversation_ownership(
+                cursor,
+                schema_name,
+                collection_name,
+            )
+        cursor.execute(
+            sql.SQL("CREATE INDEX IF NOT EXISTS {} ON {} (user_id, conversation_id)").format(
+                receipt_owner_index,
+                receipt_table,
+            )
+        )
+
+        if tuple(row) in (legacy, previous):
             cursor.execute(
                 sql.SQL(
                     "UPDATE {} SET schema_version = %s, mem0_version = %s "
@@ -410,8 +435,8 @@ def _initialize_memory_schema_sync(
                 (
                     MEMORY_SCHEMA_VERSION,
                     mem0_version,
-                    LEGACY_MEMORY_SCHEMA_VERSION,
-                    LEGACY_MEM0_VERSION,
+                    row[0],
+                    row[3],
                 ),
             )
             if cursor.rowcount != 1:
@@ -419,6 +444,92 @@ def _initialize_memory_schema_sync(
         _validate_formation_schema(cursor, schema_name, collection_name)
 
     return MemorySchemaState(*expected)
+
+
+def _backfill_receipt_conversation_ownership(
+    cursor,
+    schema_name: str,
+    collection_name: str,
+) -> None:
+    """Upgrade v2 receipts without guessing ownership for unresolvable events."""
+
+    receipt_table = sql.Identifier(
+        schema_name,
+        formation_receipt_table_name(collection_name),
+    )
+    memory_table = sql.Identifier(schema_name, collection_name)
+    cursor.execute(
+        sql.SQL("ALTER TABLE {} ADD COLUMN IF NOT EXISTS conversation_id UUID").format(
+            receipt_table
+        )
+    )
+    cursor.execute(
+        sql.SQL(
+            "SELECT r.event_id::text, r.user_id, "
+            "m.payload->>'conversation_id', m.payload->>'user_id' "
+            "FROM {} AS r JOIN {} AS m "
+            "ON m.payload->>'formation_event_id' = r.event_id::text "
+            "WHERE r.conversation_id IS NULL ORDER BY r.event_id"
+        ).format(receipt_table, memory_table)
+    )
+    payload_owners: dict[tuple[str, str], set[str]] = {}
+    invalid_events: set[str] = set()
+    for event_id, receipt_user_id, conversation_id, payload_user_id in cursor.fetchall():
+        if payload_user_id != receipt_user_id:
+            invalid_events.add(event_id)
+            continue
+        try:
+            normalized = str(UUID(conversation_id))
+        except (ValueError, AttributeError, TypeError):
+            invalid_events.add(event_id)
+            continue
+        payload_owners.setdefault((event_id, receipt_user_id), set()).add(normalized)
+
+    for (event_id, user_id), owners in payload_owners.items():
+        if len(owners) != 1 or event_id in invalid_events:
+            continue
+        cursor.execute(
+            sql.SQL(
+                "UPDATE {} SET conversation_id = %s "
+                "WHERE event_id = %s AND user_id = %s AND conversation_id IS NULL"
+            ).format(receipt_table),
+            (next(iter(owners)), event_id, user_id),
+        )
+
+    cursor.execute(
+        "SELECT to_regclass('public.memory_jobs'), "
+        "to_regclass('public.conversation_messages'), "
+        "to_regclass('public.conversations')"
+    )
+    app_tables = cursor.fetchone()
+    if app_tables and all(table is not None for table in app_tables):
+        cursor.execute(
+            sql.SQL(
+                "UPDATE {} AS r SET conversation_id = c.conversation_id "
+                "FROM public.memory_jobs AS j "
+                "JOIN public.conversation_messages AS m "
+                "ON m.message_id = j.boundary_message_id "
+                "JOIN public.conversations AS c "
+                "ON c.conversation_id = m.conversation_id "
+                "WHERE r.conversation_id IS NULL AND r.event_id = j.event_id "
+                "AND r.user_id = c.user_id"
+            ).format(receipt_table)
+        )
+
+    cursor.execute(
+        sql.SQL(
+            "SELECT event_id::text FROM {} WHERE conversation_id IS NULL ORDER BY event_id"
+        ).format(receipt_table)
+    )
+    unresolved = [row[0] for row in cursor.fetchall()]
+    if unresolved:
+        joined = ", ".join(unresolved)
+        raise LongTermMemoryConfigurationError(
+            f"cannot backfill formation receipt conversation_id for events [{joined}]"
+        )
+    cursor.execute(
+        sql.SQL("ALTER TABLE {} ALTER COLUMN conversation_id SET NOT NULL").format(receipt_table)
+    )
 
 
 def _validate_formation_schema(cursor, schema_name: str, collection_name: str) -> None:
@@ -433,6 +544,7 @@ def _validate_formation_schema(cursor, schema_name: str, collection_name: str) -
     required_columns = {
         "event_id": ("uuid", "NO"),
         "user_id": ("text", "NO"),
+        "conversation_id": ("uuid", "NO"),
         "result": ("jsonb", "NO"),
         "memory_count": ("integer", "NO"),
         "committed_at": ("timestamp with time zone", "NO"),
@@ -446,6 +558,14 @@ def _validate_formation_schema(cursor, schema_name: str, collection_name: str) -
         (f"{schema_name}.{receipt_table_name}",),
     )
     if cursor.fetchone() != ("PRIMARY KEY (event_id)",):
+        raise LongTermMemoryConfigurationError
+
+    cursor.execute(
+        "SELECT to_regclass(%s)",
+        (f"{schema_name}.{collection_name}_formation_receipt_owner_idx",),
+    )
+    owner_index_registration = cursor.fetchone()
+    if not owner_index_registration or owner_index_registration[0] is None:
         raise LongTermMemoryConfigurationError
 
     cursor.execute(

@@ -815,3 +815,26 @@ chạy thêm acceptance dưới đây; đây là kiểm tra product API, không 
 Giới hạn MVP khi acceptance: message 8.000 ký tự, body 131.072 bytes, rate 30 request/phút và tối đa 2
 stream đồng thời mỗi user trên **mỗi Gateway process**. Chỉ thêm shared coordinator khi pilot chạy
 nhiều replicas và thực sự cần global quota chính xác.
+
+## 20. Phase 8 memory schema 3 acceptance trên PC
+
+T8.1 nâng package candidate lên `viettel-mem0==2.0.20+viettel.5` và memory schema lên version 3.
+Historical control vẫn giữ `.3`; không sửa hoặc migrate database của control bằng runtime candidate.
+
+Trước khi chạy candidate:
+
+1. Backup database/schema candidate. Không reset hoặc xóa memory để né migration.
+2. Chạy memory admin initializer bằng đúng image candidate. Receipt v2 phải được backfill
+   `conversation_id` từ vector payload hoặc durable `memory_jobs`.
+3. Nếu initializer báo `cannot backfill ... events [...]`, dừng lại và review đúng các event ID đó;
+   không tự gán owner, không xóa receipt im lặng.
+4. Xác nhận `kira_memory_schema.schema_version = 3`, `mem0_version = 2.0.20+viettel.5`, receipt có
+   `conversation_id NOT NULL` và owner index.
+5. Chạy formation, retrieval và cross-session suite của candidate với KiRa/OpenAI theo PC acceptance.
+   So sánh prompt/quality vì product runtime đã tắt auxiliary SQLite history; message window từ
+   PostgreSQL là nguồn transcript duy nhất.
+6. Xác nhận empty/deduplicated formation cũng tạo receipt có đúng `conversation_id`, replay không gọi
+   provider lần hai, và package/runtime provenance trong artifact ghi `.5`.
+
+Đây là technical acceptance cho thay đổi runtime/persisted contract, chưa phải official benchmark và
+không quyết định promotion.

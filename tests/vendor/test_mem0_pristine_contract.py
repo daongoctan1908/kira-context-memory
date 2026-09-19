@@ -68,7 +68,7 @@ def _memory_source(
 
 
 def test_internal_distribution_preserves_upstream_namespace() -> None:
-    assert mem0.__version__ == "2.0.20+viettel.4"
+    assert mem0.__version__ == "2.0.20+viettel.5"
     assert Memory.__module__ == "mem0.memory.main"
 
 
@@ -202,7 +202,8 @@ async def test_application_adapter_preserves_creation_conversation_for_duplicate
     def search(*, filters: dict[str, str], **_: object) -> list[StoredVector]:
         return [row for row in stored if row.payload.get("user_id") == filters["user_id"]]
 
-    def get_formation_result(event_id: str, user_id: str):
+    def get_formation_result(event_id: str, user_id: str, conversation_id: str):
+        del conversation_id
         return receipts.get((event_id, user_id))
 
     def insert_with_formation_receipt(
@@ -212,9 +213,11 @@ async def test_application_adapter_preserves_creation_conversation_for_duplicate
         *,
         event_id: str,
         user_id: str,
+        conversation_id: str,
         result: list[dict[str, object]],
     ) -> tuple[bool, list[dict[str, object]]]:
         del vectors
+        assert all(payload["conversation_id"] == conversation_id for payload in payloads)
         key = (event_id, user_id)
         if key in receipts:
             return False, receipts[key]
@@ -232,9 +235,7 @@ async def test_application_adapter_preserves_creation_conversation_for_duplicate
     embedder = MagicMock()
     embedder.config = MagicMock(embedding_dims=3)
     embedder.embed.return_value = [0.1, 0.2, 0.3]
-    embedder.embed_batch.side_effect = lambda texts, _operation: [
-        [0.4, 0.5, 0.6] for _ in texts
-    ]
+    embedder.embed_batch.side_effect = lambda texts, _operation: [[0.4, 0.5, 0.6] for _ in texts]
 
     llm = MagicMock()
     llm.generate_response.side_effect = [
