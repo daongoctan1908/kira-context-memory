@@ -866,3 +866,27 @@ Trước khi chạy candidate:
 
 Đây là technical/concurrency acceptance cho candidate. Không dùng kết quả này thay official
 benchmark trên K8s.
+
+## 22. Phase 8 idempotent conversation erasure acceptance trên PC
+
+T8.3 đổi `DELETE /api/v1/conversations/{session_id}` thành flow đồng bộ, idempotent và trả `204`.
+`DATABASE_URL` và `MEMORY_DATABASE_URL` phải là cùng PostgreSQL database; hai URL được phép dùng role
+khác nhau. Không chạy acceptance nếu hai cấu hình trỏ sang database khác.
+
+1. Tạo một conversation có nhiều hơn 10 memory, ít nhất một empty/deduplicated receipt, memory job và
+   entity link; tạo thêm conversation của cùng user và user khác làm control.
+2. Gọi DELETE với cookie + CSRF hợp lệ. Xác nhận response `204`, conversation/messages/jobs/chat
+   requests biến mất; toàn bộ vector và receipt theo `user_id + conversation_id` bằng 0; entity link
+   tương ứng bị bỏ và entity orphan bị xóa. Control rows phải còn nguyên.
+3. Gọi lại cùng DELETE và gọi bằng user khác. Cả hai đều trả `204`, không tiết lộ conversation từng
+   tồn tại hay thuộc ai.
+4. Giữ lock hoặc gây DB failure sau lúc mark pending nhưng trước commit purge. Endpoint phải trả
+   `503 DELETION_RETRY_REQUIRED`, history/chat mới bị chặn và row vẫn `deletion_pending`. Bỏ lỗi rồi
+   retry cùng DELETE; lần sau phải hoàn tất.
+5. Trong lúc DELETE, cho một formation/provider cũ trả về muộn. Sau khi purge hoàn tất không được có
+   vector, receipt hay entity link tái xuất hiện; Worker ghi outcome `skipped`, không retry.
+6. Tạo một pending row thử nghiệm rồi chạy
+   `uv run kira-conversations purge-pending --limit 100`. Xác nhận JSON chỉ có `limit`/`purged`, batch
+   xóa đúng pending rows và chạy lại cho `purged=0`.
+7. Kiểm tra log/error không chứa message, memory content, raw exception hoặc credential. Đây là
+   technical acceptance; không thay official benchmark.

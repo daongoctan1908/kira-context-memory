@@ -253,6 +253,39 @@ def test_enabled_ltm_requires_all_runtime_dependencies() -> None:
         )
 
 
+def test_product_ltm_requires_same_postgres_database_but_allows_separate_roles() -> None:
+    memory_runtime = {
+        "memory_embedding_base_url": "http://embedding.test",
+        "memory_embedding_model": "embedding-model",
+        "memory_embedding_dims": 1024,
+        "memory_llm_base_url": "http://memory-llm.test",
+        "memory_llm_model": "memory-model",
+    }
+    settings = Settings(
+        _env_file=None,
+        kira_base_url="http://kira.test",
+        kira_username="service-account",
+        kira_basic_auth="secret",
+        database_url="postgresql://gateway:password@db:5432/kira",
+        ltm_enabled=True,
+        memory_database_url="postgresql://memory:other-password@db:5432/kira",
+        **memory_runtime,
+    )
+    assert settings.ltm_enabled is True
+
+    with pytest.raises(ValidationError, match="same PostgreSQL database"):
+        Settings(
+            _env_file=None,
+            kira_base_url="http://kira.test",
+            kira_username="service-account",
+            kira_basic_auth="secret",
+            database_url="postgresql://gateway:password@db:5432/kira",
+            ltm_enabled=True,
+            memory_database_url="postgresql://memory:other-password@db:5432/other",
+            **memory_runtime,
+        )
+
+
 @pytest.mark.parametrize(
     ("ltm_enabled", "memory_formation_enabled"),
     [

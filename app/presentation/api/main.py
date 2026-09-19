@@ -140,7 +140,12 @@ def create_app(
                 if resolved_postgres_engine is None:
                     owned_postgres_engine = create_postgres_engine(resolved_settings)
                     resolved_postgres_engine = owned_postgres_engine
-                postgres_adapter = PostgresConversationStoreAdapter(resolved_postgres_engine)
+                postgres_adapter = PostgresConversationStoreAdapter(
+                    resolved_postgres_engine,
+                    memory_enabled=resolved_settings.ltm_enabled,
+                    memory_schema=resolved_settings.memory_schema,
+                    memory_collection=resolved_settings.memory_collection_name,
+                )
                 managed_store = ManagedPostgresConversationStore(
                     postgres_adapter,
                     resolved_settings.conversation_operation_timeout_seconds,

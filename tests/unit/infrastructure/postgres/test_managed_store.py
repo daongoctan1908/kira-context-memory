@@ -106,6 +106,7 @@ async def test_conversation_management_operations_are_validated_and_forwarded() 
     adapter.list_conversations.return_value = listed
     adapter.read_history.return_value = history
     adapter.mark_deletion_pending.return_value = True
+    adapter.purge_deletion_pending.return_value = True
     adapter.is_conversation_active.return_value = True
     reservation = object()
     adapter.reserve_chat_request.return_value = reservation
@@ -124,6 +125,7 @@ async def test_conversation_management_operations_are_validated_and_forwarded() 
         is history
     )
     assert await store.mark_deletion_pending(USER_ID, "public-session")
+    assert await store.purge_deletion_pending(USER_ID, "public-session")
     assert await store.is_conversation_active(USER_ID, "public-session")
     client_message_id = uuid4()
     now = datetime(2026, 9, 19, tzinfo=UTC)
@@ -193,6 +195,7 @@ async def test_conversation_management_operations_are_validated_and_forwarded() 
         before_message_id=42,
     )
     adapter.mark_deletion_pending.assert_awaited_once_with(USER_ID, "public-session")
+    adapter.purge_deletion_pending.assert_awaited_once_with(USER_ID, "public-session")
     adapter.is_conversation_active.assert_awaited_once_with(USER_ID, "public-session")
     adapter.reserve_chat_request.assert_awaited_once_with(
         USER_ID,

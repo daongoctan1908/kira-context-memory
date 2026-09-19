@@ -61,6 +61,8 @@ class RetrievalFixtureConversationStore(Protocol):
 
     async def mark_deletion_pending(self, user_id: str, session_id: str) -> bool: ...
 
+    async def purge_deletion_pending(self, user_id: str, session_id: str) -> bool: ...
+
 
 class _FixtureOwners:
     def __init__(self, store: RetrievalFixtureConversationStore | None, *, title: str) -> None:
@@ -84,6 +86,11 @@ class _FixtureOwners:
         for user_id, conversation in reversed(tuple(self._conversations.items())):
             try:
                 if not await self._store.mark_deletion_pending(user_id, conversation.session_id):
+                    failed = True
+                elif not await self._store.purge_deletion_pending(
+                    user_id,
+                    conversation.session_id,
+                ):
                     failed = True
             except Exception:
                 failed = True

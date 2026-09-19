@@ -332,6 +332,36 @@ async def test_mark_deletion_pending_is_owned_and_idempotent() -> None:
     assert not await missing.mark_deletion_pending(USER_ID, "missing")
 
 
+async def test_purge_deletion_pending_requires_owned_pending_row_and_deletes_once() -> None:
+    conversation_id = uuid4()
+    connection = FakeConnection([FakeResult(rowcount=1)])
+    store = adapter(connection)
+    await store.validate_schema()
+    connection.scalar_value = conversation_id
+
+    assert await store.purge_deletion_pending(USER_ID, "public-session")
+    lock_sql = str(connection.calls[1][0])
+    delete_sql = str(connection.calls[2][0])
+    assert "conversations.status" in lock_sql
+    assert "FOR UPDATE" in lock_sql
+    assert "DELETE FROM conversations" in delete_sql
+
+    missing_connection = FakeConnection()
+    missing = adapter(missing_connection)
+    await missing.validate_schema()
+    missing_connection.scalar_value = None
+    assert not await missing.purge_deletion_pending(USER_ID, "missing")
+
+
+def test_memory_table_identifiers_are_validated_at_adapter_construction() -> None:
+    with pytest.raises(ValueError, match="identifier"):
+        PostgresConversationStoreAdapter(  # type: ignore[arg-type]
+            FakeEngine(FakeConnection()),
+            memory_enabled=True,
+            memory_schema='memory"; DROP SCHEMA public; --',
+        )
+
+
 async def test_active_conversation_check_requires_owner_and_active_status() -> None:
     conversation_id = uuid4()
     connection = FakeConnection()

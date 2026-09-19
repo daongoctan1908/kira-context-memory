@@ -257,10 +257,22 @@ uv run python -m worker.memory_admin init
 Lệnh này cần `MEMORY_ADMIN_DATABASE_URL` (hoặc fallback `MEMORY_DATABASE_URL`) có quyền
 `CREATE EXTENSION`/schema. Nó probe `/v1/embeddings`, kiểm tra dimension thật rồi tạo/validate
 hai collection `memory.memories`, `memory.memories_entities`, receipt table
-`memory.memories_formation_receipts` cùng metadata/index. Memory schema version 2 hỗ trợ controlled
-upgrade từ baseline version 1 / `viettel.2`; cấu hình hoặc version lạ vẫn fail closed. Chạy lại
+`memory.memories_formation_receipts` cùng metadata/index. Memory schema version 3 hỗ trợ controlled
+upgrade từ các contract tương thích đã khai báo tới `viettel.6`; cấu hình hoặc version lạ vẫn fail closed. Chạy lại
 idempotent; model, dimension, Mem0 version hoặc pgvector version lệch metadata sẽ fail closed.
 Runtime service account chỉ cần DML và không được cấp quyền DDL.
+
+Gateway và memory phải trỏ tới cùng PostgreSQL database (có thể dùng role khác nhau) để transaction
+xóa conversation khóa được owner và xóa đầy đủ vector/receipt/entity-link. Nếu một lần xóa bị lỗi
+sau khi đã đánh dấu pending, user có thể gọi lại cùng endpoint; operator cũng có thể chạy một batch
+bounded:
+
+```powershell
+uv run kira-conversations purge-pending --limit 100
+```
+
+CLI không dùng semantic search và không gọi KiRa/LLM/embedding. Nó chỉ purge các conversation đã ở
+trạng thái `deletion_pending`; output chỉ gồm `limit` và số lượng đã xóa.
 
 Kiểm tra queue và requeue có chủ đích một dead job bằng operator CLI PostgreSQL-only:
 

@@ -113,9 +113,3 @@ class ConversationHistoryResponse(BaseModel):
             ),
             next_before_message_id=value.next_before_message_id,
         )
-
-
-class ConversationDeletionResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    status: str = "deletion_pending"

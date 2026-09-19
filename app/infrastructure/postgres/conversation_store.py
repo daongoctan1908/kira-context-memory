@@ -1,6 +1,7 @@
 """PostgreSQL implementation of durable conversation persistence."""
 
 import math
+import re
 from builtins import TimeoutError as BuiltinTimeoutError
 from collections.abc import Mapping
 from datetime import datetime, timedelta
@@ -8,7 +9,8 @@ from hashlib import sha256
 from typing import Any, NoReturn
 from uuid import UUID, uuid4
 
-from sqlalchemy import func, insert, or_, select, text, update
+from sqlalchemy import Text, bindparam, delete, func, insert, or_, select, text, update
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.exc import DBAPIError, IntegrityError, SQLAlchemyError
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
@@ -62,14 +64,25 @@ _CONFIGURATION_SQLSTATES = {
     "42P01",  # undefined table
     "42703",  # undefined column (runtime schema mismatch)
 }
+_POSTGRES_IDENTIFIER = re.compile(r"^[a-z_][a-z0-9_]*$")
 
 
 class PostgresConversationStoreAdapter:
     """Persist full conversations and expose an indexed recent-message window."""
 
-    def __init__(self, engine: AsyncEngine) -> None:
+    def __init__(
+        self,
+        engine: AsyncEngine,
+        *,
+        memory_enabled: bool = False,
+        memory_schema: str = "memory",
+        memory_collection: str = "memories",
+    ) -> None:
         self._engine = engine
         self._schema_revision: str | None = None
+        self._memory_enabled = memory_enabled
+        self._memory_schema = _postgres_identifier(memory_schema)
+        self._memory_collection = _postgres_identifier(memory_collection)
 
     async def validate_schema(self) -> None:
         """Check connectivity and require the exact migration revision for this build."""
@@ -272,6 +285,142 @@ class PostgresConversationStoreAdapter:
                 return True
         except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
             self._raise_mapped(error)
+
+    async def purge_deletion_pending(self, user_id: str, session_id: str) -> bool:
+        """Erase one owned pending conversation and all directly-owned memory state."""
+        self._require_conversation_management_schema()
+        if not user_id.strip():
+            raise ValueError("user_id must not be empty")
+        if not session_id.strip():
+            raise ValueError("session_id must not be empty")
+        try:
+            async with self._engine.begin() as connection:
+                return await self._purge_locked_conversation(connection, user_id, session_id)
+        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+            self._raise_mapped(error)
+
+    async def purge_pending_conversations(self, *, limit: int) -> int:
+        """Purge one bounded operator batch of deletion-pending conversations."""
+        self._require_conversation_management_schema()
+        self._validate_page_limit(limit)
+        statement = (
+            select(conversations.c.user_id, conversations.c.session_id)
+            .where(conversations.c.status == ConversationStatus.DELETION_PENDING.value)
+            .order_by(conversations.c.updated_at.asc(), conversations.c.conversation_id.asc())
+            .limit(limit)
+        )
+        try:
+            async with self._engine.connect() as connection:
+                candidates = (await connection.execute(statement)).tuples().all()
+            purged = 0
+            for user_id, session_id in candidates:
+                if await self.purge_deletion_pending(user_id, session_id):
+                    purged += 1
+            return purged
+        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+            self._raise_mapped(error)
+
+    async def _purge_locked_conversation(
+        self,
+        connection: AsyncConnection,
+        user_id: str,
+        session_id: str,
+    ) -> bool:
+        conversation_id = await connection.scalar(
+            select(conversations.c.conversation_id)
+            .where(
+                conversations.c.user_id == user_id,
+                conversations.c.session_id == session_id,
+                conversations.c.status == ConversationStatus.DELETION_PENDING.value,
+            )
+            .with_for_update()
+        )
+        if conversation_id is None:
+            return False
+
+        if self._memory_enabled:
+            await self._delete_owned_memory(connection, user_id, conversation_id)
+        result = await connection.execute(
+            delete(conversations).where(
+                conversations.c.conversation_id == conversation_id,
+                conversations.c.user_id == user_id,
+                conversations.c.status == ConversationStatus.DELETION_PENDING.value,
+            )
+        )
+        if result.rowcount != 1:
+            raise ConversationStoreProtocolError
+        return True
+
+    async def _delete_owned_memory(
+        self,
+        connection: AsyncConnection,
+        user_id: str,
+        conversation_id: UUID,
+    ) -> None:
+        memory_table = self._memory_table(self._memory_collection)
+        entity_table = self._memory_table(f"{self._memory_collection}_entities")
+        receipt_table = self._memory_table(f"{self._memory_collection}_formation_receipts")
+        payload_parameters = {
+            "user_id": user_id,
+            "conversation_id": str(conversation_id),
+        }
+        memory_ids = tuple(
+            (
+                await connection.execute(
+                    text(
+                        f"SELECT id::text FROM {memory_table} "
+                        "WHERE payload->>'user_id' = :user_id "
+                        "AND payload->>'conversation_id' = CAST(:conversation_id AS text)"
+                    ),
+                    payload_parameters,
+                )
+            ).scalars()
+        )
+        if memory_ids:
+            array_parameter = bindparam("memory_ids", type_=ARRAY(Text()))
+            await connection.execute(
+                text(
+                    f"UPDATE {entity_table} AS entity_row SET payload = jsonb_set("
+                    "entity_row.payload, '{linked_memory_ids}', COALESCE(("
+                    "SELECT jsonb_agg(link.value) FROM jsonb_array_elements_text("
+                    "COALESCE(entity_row.payload->'linked_memory_ids', '[]'::jsonb)"
+                    ") AS link(value) WHERE NOT (link.value = ANY(:memory_ids)) "
+                    f"AND EXISTS (SELECT 1 FROM {memory_table} AS linked_memory "
+                    "WHERE linked_memory.id::text = link.value AND "
+                    "linked_memory.payload->>'user_id' = entity_row.payload->>'user_id')"
+                    "), '[]'::jsonb)) "
+                    "WHERE entity_row.payload->>'user_id' = :user_id AND EXISTS ("
+                    "SELECT 1 FROM jsonb_array_elements_text(COALESCE("
+                    "entity_row.payload->'linked_memory_ids', '[]'::jsonb"
+                    ")) AS link(value) WHERE link.value = ANY(:memory_ids))"
+                ).bindparams(array_parameter),
+                {"user_id": user_id, "memory_ids": list(memory_ids)},
+            )
+            await connection.execute(
+                text(
+                    f"DELETE FROM {entity_table} WHERE payload->>'user_id' = :user_id "
+                    "AND jsonb_typeof(payload->'linked_memory_ids') = 'array' "
+                    "AND jsonb_array_length(payload->'linked_memory_ids') = 0"
+                ),
+                {"user_id": user_id},
+            )
+        await connection.execute(
+            text(
+                f"DELETE FROM {receipt_table} WHERE user_id = :user_id "
+                "AND conversation_id = :conversation_id"
+            ),
+            {"user_id": user_id, "conversation_id": conversation_id},
+        )
+        await connection.execute(
+            text(
+                f"DELETE FROM {memory_table} WHERE payload->>'user_id' = :user_id "
+                "AND payload->>'conversation_id' = CAST(:conversation_id AS text)"
+            ),
+            payload_parameters,
+        )
+
+    def _memory_table(self, table_name: str) -> str:
+        return f'"{self._memory_schema}"."{_postgres_identifier(table_name)}"'
 
     async def is_conversation_active(self, user_id: str, session_id: str) -> bool:
         """Check the authoritative owner/status immediately before context use."""
@@ -1349,6 +1498,12 @@ def _find_sqlstate(error: BaseException) -> str | None:
         if isinstance(sqlstate, str):
             return sqlstate
     return None
+
+
+def _postgres_identifier(value: str) -> str:
+    if not isinstance(value, str) or _POSTGRES_IDENTIFIER.fullmatch(value) is None:
+        raise ValueError("PostgreSQL identifier is invalid")
+    return value
 
 
 def _has_connection_failure(error: BaseException) -> bool:

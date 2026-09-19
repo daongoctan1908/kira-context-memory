@@ -9,6 +9,7 @@ import httpx
 
 from app.config.settings import Settings
 from app.domain.errors.auth import InvalidCsrfTokenError, InvalidSessionError
+from app.domain.errors.conversation import ConversationStoreOperationError
 from app.domain.models.auth import AuthSession, IssuedSession
 from app.domain.models.conversation import (
     ConversationHistoryPage,
@@ -65,7 +66,7 @@ class FakeAuthService:
 
 
 class FakeConversationStore:
-    def __init__(self) -> None:
+    def __init__(self, *, purge_error: bool = False) -> None:
         self.owner = str(_USER_A)
         self.summary = ConversationSummary(
             _CONVERSATION_ID,
@@ -77,6 +78,8 @@ class FakeConversationStore:
             None,
         )
         self.deleted = False
+        self.purged = False
+        self.purge_error = purge_error
         self.list_cursors: list[ConversationListCursor | None] = []
 
     async def create_conversation(self, user_id, *, title=None):
@@ -126,6 +129,14 @@ class FakeConversationStore:
         self.deleted = True
         return True
 
+    async def purge_deletion_pending(self, user_id, session_id):
+        if self.purge_error:
+            raise ConversationStoreOperationError
+        if user_id != self.owner or session_id != self.summary.session_id or not self.deleted:
+            return False
+        self.purged = True
+        return True
+
     async def read_recent(self, *_args):
         return ()
 
@@ -172,8 +183,8 @@ def _settings() -> Settings:
 
 
 @asynccontextmanager
-async def _client():
-    store = FakeConversationStore()
+async def _client(*, purge_error: bool = False):
+    store = FakeConversationStore(purge_error=purge_error)
     app = create_app(
         settings=_settings(),
         kira_client=FakeKira(),  # type: ignore[arg-type]
@@ -242,7 +253,7 @@ async def test_create_list_and_history_require_session_and_csrf() -> None:
 
 
 async def test_two_user_isolation_invalid_cursor_and_pending_delete() -> None:
-    async with _client() as (client, _store):
+    async with _client() as (client, store):
         await _login(client, "bob")
         assert (await client.get("/api/v1/conversations")).json()["items"] == []
         assert (
@@ -250,7 +261,7 @@ async def test_two_user_isolation_invalid_cursor_and_pending_delete() -> None:
         ).status_code == 404
         assert (
             await client.delete("/api/v1/conversations/public-session", headers=_unsafe_headers())
-        ).status_code == 404
+        ).status_code == 204
 
         await _login(client, "alice")
         malformed = await client.get("/api/v1/conversations?cursor=not-a-cursor")
@@ -261,8 +272,32 @@ async def test_two_user_isolation_invalid_cursor_and_pending_delete() -> None:
             "/api/v1/conversations/public-session",
             headers=_unsafe_headers(),
         )
-        assert deleted.status_code == 202
-        assert deleted.json() == {"status": "deletion_pending"}
+        assert deleted.status_code == 204
+        assert deleted.content == b""
+        assert store.purged is True
+        repeated = await client.delete(
+            "/api/v1/conversations/public-session",
+            headers=_unsafe_headers(),
+        )
+        assert repeated.status_code == 204
+        assert (
+            await client.get("/api/v1/conversations/public-session/messages")
+        ).status_code == 404
+
+
+async def test_delete_failure_keeps_pending_and_returns_sanitized_retry_contract() -> None:
+    async with _client(purge_error=True) as (client, store):
+        await _login(client, "alice")
+        response = await client.delete(
+            "/api/v1/conversations/public-session",
+            headers=_unsafe_headers(),
+        )
+
+        assert response.status_code == 503
+        assert response.json()["code"] == "DELETION_RETRY_REQUIRED"
+        assert response.json()["retryable"] is True
+        assert store.deleted is True
+        assert store.purged is False
         assert (
             await client.get("/api/v1/conversations/public-session/messages")
         ).status_code == 404

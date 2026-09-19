@@ -6,12 +6,13 @@ import binascii
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Query, Request, status
+from fastapi import APIRouter, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
 
 from app.application.services.chat_idempotency import ChatIdempotencyService
 from app.application.services.chat_traffic import ChatTrafficGuard, ChatTrafficLease
 from app.application.use_cases.handle_chat import HandleChatUseCase
+from app.domain.errors.conversation import ConversationStoreError
 from app.domain.models.chat import ChatCommand
 from app.domain.models.conversation import (
     ChatRequestReservationOutcome,
@@ -25,7 +26,6 @@ from app.presentation.api.auth_dependencies import resolve_auth_session
 from app.presentation.api.errors import ProductApiError
 from app.presentation.api.sse import ProductChatStreamingResponse
 from app.presentation.schemas.conversation import (
-    ConversationDeletionResponse,
     ConversationHistoryResponse,
     ConversationListResponse,
     ConversationSummaryResponse,
@@ -210,19 +210,26 @@ async def _start_product_chat(
 
 @router.delete(
     "/{session_id}",
-    response_model=ConversationDeletionResponse,
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_204_NO_CONTENT,
 )
 async def request_conversation_deletion(
     session_id: str,
     request: Request,
-) -> ConversationDeletionResponse:
+) -> Response:
     session = await resolve_auth_session(request, require_csrf=True)
     store: ConversationStorePort = request.app.state.conversation_store
-    found = await store.mark_deletion_pending(session.principal.user_id, session_id)
-    if not found:
-        raise ProductApiError(404, "CONVERSATION_NOT_FOUND", "Conversation not found")
-    return ConversationDeletionResponse()
+    try:
+        found = await store.mark_deletion_pending(session.principal.user_id, session_id)
+        if found:
+            await store.purge_deletion_pending(session.principal.user_id, session_id)
+    except ConversationStoreError:
+        raise ProductApiError(
+            503,
+            "DELETION_RETRY_REQUIRED",
+            "Conversation deletion must be retried",
+            retryable=True,
+        ) from None
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 def _encode_cursor(cursor: ConversationListCursor) -> str:

@@ -779,7 +779,12 @@ async def create_native_runtime(
     await _write_owner_marker(config, plan)
     await initialize_memory_schema(settings)
     engine = create_postgres_engine(settings)
-    store = PostgresConversationStoreAdapter(engine)
+    store = PostgresConversationStoreAdapter(
+        engine,
+        memory_enabled=True,
+        memory_schema=settings.memory_schema,
+        memory_collection=settings.memory_collection_name,
+    )
     await store.validate_schema()
     queue = PostgresMemoryJobQueueAdapter(engine)
     await queue.validate_schema()

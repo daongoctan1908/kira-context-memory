@@ -54,6 +54,10 @@ class ConversationStorePort(Protocol):
         """Mark an owned conversation for deletion, returning false when not found."""
         ...
 
+    async def purge_deletion_pending(self, user_id: str, session_id: str) -> bool:
+        """Atomically erase one owned pending conversation and its memory provenance."""
+        ...
+
     async def is_conversation_active(self, user_id: str, session_id: str) -> bool:
         """Return whether the owned conversation still accepts context and writes."""
         ...
