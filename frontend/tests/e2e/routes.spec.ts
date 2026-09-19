@@ -241,3 +241,57 @@ test("pending deletion remains visible and can be retried", async ({ context, pa
   await expect(page.getByText("Hỗ trợ chuyển vùng")).toHaveCount(0);
   expect(attempts).toBe(2);
 });
+
+test("conversation streams one durable turn without duplicate bubbles", async ({
+  context,
+  page,
+}) => {
+  await context.addCookies([
+    {
+      name: "kira_csrf_dev",
+      value: "csrf-stream",
+      url: "http://127.0.0.1:4173",
+    },
+  ]);
+  await page.route("**/api/v1/auth/me", async (route) => {
+    await fulfillJson(route, USER);
+  });
+  let postedMessage = "";
+  let postedClientMessageId = "";
+  await page.route("**/api/v1/conversations**", async (route) => {
+    const request = route.request();
+    if (request.method() === "POST" && request.url().endsWith("/messages")) {
+      const postedBody = request.postDataJSON() as Record<string, unknown>;
+      postedMessage = String(postedBody.message);
+      postedClientMessageId = String(postedBody.client_message_id);
+      const identity = {
+        turn_id: "turn-stream",
+        client_message_id: postedClientMessageId,
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: [
+          `event: message.started\ndata: ${JSON.stringify(identity)}\n\n`,
+          `event: message.delta\ndata: ${JSON.stringify({ ...identity, text: "Bạn có thể bật chuyển vùng trong ứng dụng." })}\n\n`,
+          `event: message.completed\ndata: ${JSON.stringify({ ...identity, replayed: false, event_id: "event-stream" })}\n\n`,
+        ].join(""),
+      });
+      return;
+    }
+    if (request.url().includes("/messages?")) {
+      await fulfillJson(route, { items: [], next_before_message_id: null });
+      return;
+    }
+    await fulfillJson(route, { items: [CONVERSATION], next_cursor: null });
+  });
+
+  await page.goto("/chat/company-session-01");
+  await page.getByLabel("Nội dung tin nhắn").fill("Cách bật chuyển vùng?");
+  await page.getByRole("button", { name: "Gửi" }).click();
+
+  await expect(page.getByText("Bạn có thể bật chuyển vùng trong ứng dụng.")).toBeVisible();
+  await expect(page.getByText("Cách bật chuyển vùng?")).toHaveCount(1);
+  expect(postedMessage).toBe("Cách bật chuyển vùng?");
+  expect(postedClientMessageId).toMatch(/^[0-9a-f-]{36}$/);
+});

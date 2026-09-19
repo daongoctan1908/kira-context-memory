@@ -223,7 +223,7 @@ uv run ruff format --check .
 uv run pytest
 ```
 
-Frontend React nằm trong `frontend/`. Cài dependency và chạy các gate T9.1-T9.3:
+Frontend React nằm trong `frontend/`. Cài dependency và chạy các gate T9.1-T9.4:
 
 ```powershell
 Set-Location frontend
@@ -241,7 +241,8 @@ Chạy local bằng `corepack pnpm dev` trong thư mục `frontend/`, sau đó m
 `http://127.0.0.1:5173/login`. Vite proxy `/api` tới Gateway tại
 `http://127.0.0.1:8000` theo mặc định; có thể đổi bằng `VITE_API_TARGET` trong
 `frontend/.env.local`. Auth, danh sách conversation, cursor history, create/delete và retry
-`deletion_pending` đã hoàn thành ở T9.3; streaming thuộc T9.4.
+`deletion_pending` đã hoàn thành. Chat dùng POST-SSE, hỗ trợ dừng, retry cùng
+`client_message_id`, completed replay và cảnh báo câu trả lời chưa được lưu.
 
 Khởi động PostgreSQL local, apply migration và chạy integration test thật:
 

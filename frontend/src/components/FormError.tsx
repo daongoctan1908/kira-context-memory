@@ -7,6 +7,10 @@ const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   AUTH_PASSWORD_POLICY: "Mật khẩu mới phải có từ 12 đến 128 ký tự.",
   AUTH_SESSION_INVALID: "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.",
   AUTH_UNAVAILABLE: "Dịch vụ xác thực đang tạm thời không khả dụng.",
+  CHAT_STREAM_INTERRUPTED: "Kết nối bị ngắt trước khi câu trả lời được lưu.",
+  CHAT_STREAM_INVALID: "Phản hồi từ máy chủ không đúng định dạng.",
+  KIRA_TIMEOUT: "KiRa phản hồi quá lâu. Hãy thử lại.",
+  REQUEST_IN_PROGRESS: "Yêu cầu này đang được xử lý. Hãy chờ rồi thử lại.",
   NETWORK_ERROR: "Không thể kết nối tới máy chủ. Hãy kiểm tra kết nối và thử lại.",
 };
 

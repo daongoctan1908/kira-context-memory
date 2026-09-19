@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { ApiError } from "../api/http";
+import { ChatComposer } from "../chat/ChatComposer";
+import { useChatStream, type LiveTurn } from "../chat/useChatStream";
 import { FormError } from "../components/FormError";
 import {
   readConversationHistory,
@@ -26,6 +28,7 @@ function ConversationSession({ sessionId }: { sessionId: string }) {
   const [loading, setLoading] = useState(true);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const chat = useChatStream({ sessionId });
   const current = useMemo(
     () => conversations.conversations.find((item) => item.session_id === sessionId),
     [conversations.conversations, sessionId],
@@ -115,41 +118,46 @@ function ConversationSession({ sessionId }: { sessionId: string }) {
         </h1>
       </header>
 
-      {loading ? <HistorySkeleton /> : null}
+      <div className="conversation-scroll">
+        {loading ? <HistorySkeleton /> : null}
 
-      {error ? (
-        <div className="conversation-state">
-          <FormError error={error} />
-          {error instanceof ApiError && error.code === "CONVERSATION_NOT_FOUND" ? (
-            <Link className="secondary-link" to="/chat/new">Về cuộc trò chuyện mới</Link>
-          ) : (
-            <button className="secondary-button" type="button" onClick={() => void retryHistory()}>
-              Thử lại
-            </button>
-          )}
-        </div>
-      ) : null}
+        {error ? (
+          <div className="conversation-state">
+            <FormError error={error} />
+            {error instanceof ApiError && error.code === "CONVERSATION_NOT_FOUND" ? (
+              <Link className="secondary-link" to="/chat/new">Về cuộc trò chuyện mới</Link>
+            ) : (
+              <button className="secondary-button" type="button" onClick={() => void retryHistory()}>
+                Thử lại
+              </button>
+            )}
+          </div>
+        ) : null}
 
-      {!loading && error === null && messages.length === 0 ? (
-        <div className="conversation-state compact-state">
-          <p>Cuộc trò chuyện này chưa có tin nhắn.</p>
-          <p>Khung gửi tin sẽ được bật ở bước streaming.</p>
-        </div>
-      ) : null}
+        {!loading && error === null && messages.length === 0 && chat.turns.length === 0 ? (
+          <div className="conversation-state compact-state">
+            <p>Cuộc trò chuyện này chưa có tin nhắn.</p>
+            <p>Gửi câu hỏi đầu tiên để bắt đầu.</p>
+          </div>
+        ) : null}
 
-      {messages.length > 0 ? (
-        <>
-          {nextBeforeMessageId !== null ? (
-            <button
-              className="load-history-button"
-              type="button"
-              disabled={loadingOlder}
-              onClick={() => void loadOlder()}
-            >
-              {loadingOlder ? "Đang tải" : "Tải tin nhắn cũ hơn"}
-            </button>
-          ) : null}
-          <ol className="message-list" aria-label="Tin nhắn trong cuộc trò chuyện">
+        {!loading && error === null && nextBeforeMessageId !== null ? (
+          <button
+            className="load-history-button"
+            type="button"
+            disabled={loadingOlder}
+            onClick={() => void loadOlder()}
+          >
+            {loadingOlder ? "Đang tải" : "Tải tin nhắn cũ hơn"}
+          </button>
+        ) : null}
+
+        {messages.length > 0 || chat.turns.length > 0 ? (
+          <ol
+            className="message-list"
+            aria-label="Tin nhắn trong cuộc trò chuyện"
+            aria-live="polite"
+          >
             {messages.map((message) => (
               <li
                 className={`message-row ${message.role}`}
@@ -164,11 +172,86 @@ function ConversationSession({ sessionId }: { sessionId: string }) {
                 </article>
               </li>
             ))}
+            {chat.turns.map((turn) => (
+              <LiveTurnMessages
+                key={turn.clientMessageId}
+                turn={turn}
+                active={chat.activeClientMessageId === turn.clientMessageId}
+                onRetry={() => {
+                  chat.retry(turn.clientMessageId);
+                }}
+              />
+            ))}
           </ol>
-        </>
+        ) : null}
+      </div>
+
+      {!loading && error === null ? (
+        <ChatComposer streaming={chat.isStreaming} onSend={chat.send} onStop={chat.stop} />
       ) : null}
     </section>
   );
+}
+
+function LiveTurnMessages({
+  turn,
+  active,
+  onRetry,
+}: {
+  turn: LiveTurn;
+  active: boolean;
+  onRetry: () => void;
+}) {
+  return (
+    <>
+      <li className="message-row user" data-client-message-id={turn.clientMessageId}>
+        <article className="message-bubble">
+          <span className="message-role">Bạn</span>
+          <p>{turn.userText}</p>
+        </article>
+      </li>
+      <li className="message-row assistant" data-client-message-id={turn.clientMessageId}>
+        <article className="message-bubble live-message-bubble">
+          <span className="message-role">KiRa</span>
+          {turn.assistantText.length > 0 ? (
+            <p>{turn.assistantText}</p>
+          ) : (
+            <p className="stream-placeholder">
+              {active ? "Đang nhận phản hồi..." : "Chưa nhận được câu trả lời."}
+            </p>
+          )}
+          <TurnStatus turn={turn} />
+          {turn.retryable && !active ? (
+            <button className="secondary-button compact-button" type="button" onClick={onRetry}>
+              Thử gửi lại
+            </button>
+          ) : null}
+        </article>
+      </li>
+    </>
+  );
+}
+
+function TurnStatus({ turn }: { turn: LiveTurn }) {
+  if (turn.status === "completed") {
+    return turn.replayed ? (
+      <p className="turn-status success">Đã khôi phục câu trả lời đã lưu.</p>
+    ) : null;
+  }
+  if (turn.status === "unsaved") {
+    return (
+      <div className="turn-warning" role="alert">
+        Câu trả lời phía trên chưa được xác nhận đã lưu. Thử gửi lại sẽ dùng đúng mã yêu cầu cũ.
+      </div>
+    );
+  }
+  if (turn.status === "stopped") {
+    return <div className="turn-warning">Đã dừng trước khi lưu câu trả lời.</div>;
+  }
+  if (turn.status === "failed") {
+    return <FormError error={turn.error} />;
+  }
+  return null;
 }
 
 function HistorySkeleton() {

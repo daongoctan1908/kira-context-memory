@@ -75,14 +75,7 @@ export async function apiRequest<T>(
   }
 
   if (!response.ok) {
-    const payload = await readGatewayError(response);
-    if (payload.code === "AUTH_SESSION_INVALID") {
-      window.dispatchEvent(new Event(AUTH_SESSION_INVALID_EVENT));
-    }
-    throw new ApiError(response.status, payload.code, payload.message, {
-      correlationId: payload.correlation_id,
-      retryable: payload.retryable,
-    });
+    throw await apiErrorFromResponse(response);
   }
   if (response.status === 204) {
     return undefined as T;
@@ -97,6 +90,17 @@ export async function apiRequest<T>(
 }
 
 export const AUTH_SESSION_INVALID_EVENT = "kira:auth-session-invalid";
+
+export async function apiErrorFromResponse(response: Response): Promise<ApiError> {
+  const payload = await readGatewayError(response);
+  if (payload.code === "AUTH_SESSION_INVALID") {
+    window.dispatchEvent(new Event(AUTH_SESSION_INVALID_EVENT));
+  }
+  return new ApiError(response.status, payload.code, payload.message, {
+    correlationId: payload.correlation_id,
+    retryable: payload.retryable,
+  });
+}
 
 export function readCsrfToken(cookieSource: string = document.cookie): string | null {
   const supportedNames = new Set(["__Host-kira_csrf", "kira_csrf_dev"]);
