@@ -34,8 +34,8 @@ from app.domain.models.memory_job import (
 from app.domain.models.telemetry_context import parse_telemetry_context
 from app.infrastructure.observability.tracing import set_span_attribute, start_span
 from app.infrastructure.postgres.schema import (
-    EXPECTED_SCHEMA_REVISION,
     SUPPORTED_SCHEMA_REVISIONS,
+    TELEMETRY_CONTEXT_SCHEMA_REVISIONS,
     conversation_messages,
     conversations,
     memory_jobs,
@@ -420,7 +420,7 @@ class PostgresMemoryJobQueueAdapter:
             conversations.c.user_id,
             conversations.c.session_id,
         ]
-        if self._schema_revision == EXPECTED_SCHEMA_REVISION:
+        if self._schema_revision in TELEMETRY_CONTEXT_SCHEMA_REVISIONS:
             columns.append(memory_jobs.c.telemetry_context)
         return (
             select(*columns)

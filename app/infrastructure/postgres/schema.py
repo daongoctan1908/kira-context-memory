@@ -2,6 +2,7 @@
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     Column,
     DateTime,
@@ -18,13 +19,84 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import BYTEA, JSONB
 
-PREVIOUS_SCHEMA_REVISION = "20260908_0003"
-EXPECTED_SCHEMA_REVISION = "20260915_0004"
+PREVIOUS_SCHEMA_REVISION = "20260915_0004"
+EXPECTED_SCHEMA_REVISION = "20260919_0005"
 SUPPORTED_SCHEMA_REVISIONS = frozenset({PREVIOUS_SCHEMA_REVISION, EXPECTED_SCHEMA_REVISION})
+TELEMETRY_CONTEXT_SCHEMA_REVISIONS = SUPPORTED_SCHEMA_REVISIONS
 
 metadata = MetaData()
+
+auth_users = Table(
+    "auth_users",
+    metadata,
+    Column("user_id", Uuid(as_uuid=True), primary_key=True),
+    Column("username", Text, nullable=False),
+    Column("password_hash", Text, nullable=False),
+    Column("enabled", Boolean, nullable=False, server_default=text("true")),
+    Column("failed_login_count", SmallInteger, nullable=False, server_default=text("0")),
+    Column("locked_until", DateTime(timezone=True), nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column(
+        "password_changed_at", DateTime(timezone=True), nullable=False, server_default=func.now()
+    ),
+    CheckConstraint(
+        "username = lower(username) AND username ~ '^[a-z0-9][a-z0-9._-]{2,63}$'",
+        name="ck_auth_users_username_normalized",
+    ),
+    CheckConstraint("length(password_hash) > 0", name="ck_auth_users_password_hash_nonempty"),
+    CheckConstraint("failed_login_count >= 0", name="ck_auth_users_failed_login_count"),
+    CheckConstraint(
+        "locked_until IS NULL OR locked_until >= created_at",
+        name="ck_auth_users_locked_until",
+    ),
+    UniqueConstraint("username", name="uq_auth_users_username"),
+)
+
+auth_sessions = Table(
+    "auth_sessions",
+    metadata,
+    Column("session_id", Uuid(as_uuid=True), primary_key=True),
+    Column(
+        "user_id",
+        Uuid(as_uuid=True),
+        ForeignKey("auth_users.user_id", name="fk_auth_sessions_user", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("token_hash", BYTEA, nullable=False),
+    Column("csrf_token_hash", BYTEA, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("last_seen_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("idle_expires_at", DateTime(timezone=True), nullable=False),
+    Column("absolute_expires_at", DateTime(timezone=True), nullable=False),
+    Column("revoked_at", DateTime(timezone=True), nullable=True),
+    CheckConstraint("octet_length(token_hash) = 32", name="ck_auth_sessions_token_hash"),
+    CheckConstraint("octet_length(csrf_token_hash) = 32", name="ck_auth_sessions_csrf_hash"),
+    CheckConstraint("last_seen_at >= created_at", name="ck_auth_sessions_last_seen"),
+    CheckConstraint(
+        "idle_expires_at > created_at AND idle_expires_at <= absolute_expires_at",
+        name="ck_auth_sessions_expiry",
+    ),
+    CheckConstraint(
+        "revoked_at IS NULL OR revoked_at >= created_at",
+        name="ck_auth_sessions_revoked_at",
+    ),
+    UniqueConstraint("token_hash", name="uq_auth_sessions_token_hash"),
+)
+
+Index(
+    "ix_auth_sessions_user_active",
+    auth_sessions.c.user_id,
+    auth_sessions.c.absolute_expires_at,
+    postgresql_where=auth_sessions.c.revoked_at.is_(None),
+)
+Index(
+    "ix_auth_sessions_expired_cleanup",
+    auth_sessions.c.absolute_expires_at,
+    auth_sessions.c.session_id,
+)
 
 conversations = Table(
     "conversations",

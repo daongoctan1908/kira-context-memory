@@ -30,8 +30,8 @@ from app.domain.models.telemetry_context import (
     serialize_telemetry_context,
 )
 from app.infrastructure.postgres.schema import (
-    EXPECTED_SCHEMA_REVISION,
     SUPPORTED_SCHEMA_REVISIONS,
+    TELEMETRY_CONTEXT_SCHEMA_REVISIONS,
     conversation_messages,
     conversations,
     memory_jobs,
@@ -290,7 +290,7 @@ class PostgresConversationStoreAdapter:
                         boundary_message_id,
                         telemetry_context,
                         supports_telemetry_context=(
-                            self._schema_revision == EXPECTED_SCHEMA_REVISION
+                            self._schema_revision in TELEMETRY_CONTEXT_SCHEMA_REVISIONS
                         ),
                     )
         except ConversationStoreProtocolError:
