@@ -97,6 +97,11 @@ class ManagedPostgresConversationStore:
                 before_message_id=before_message_id,
             )
 
+    async def mark_deletion_pending(self, user_id: str, session_id: str) -> bool:
+        async with self._operation():
+            await self.validate_schema()
+            return await self._adapter.mark_deletion_pending(user_id, session_id)
+
     async def read_recent(
         self,
         user_id: str,

@@ -47,6 +47,10 @@ class ConversationStorePort(Protocol):
         """Read an active owned conversation, or return ``None`` when unavailable."""
         ...
 
+    async def mark_deletion_pending(self, user_id: str, session_id: str) -> bool:
+        """Mark an owned conversation for deletion, returning false when not found."""
+        ...
+
     async def read_recent(
         self,
         user_id: str,

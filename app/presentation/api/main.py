@@ -37,6 +37,7 @@ from app.infrastructure.postgres import (
 from app.infrastructure.postgres.managed_store import ManagedPostgresConversationStore
 from app.presentation.api.auth_router import router as auth_router
 from app.presentation.api.chat_router import router as chat_router
+from app.presentation.api.conversation_router import router as conversation_router
 from app.presentation.api.correlation_middleware import CorrelationMiddleware
 from app.presentation.api.errors import auth_exception_handler, kira_client_exception_handler
 from app.presentation.api.health_router import router as health_router
@@ -261,6 +262,7 @@ def create_app(
     application.add_exception_handler(AuthError, auth_exception_handler)
     application.include_router(health_router)
     application.include_router(auth_router)
+    application.include_router(conversation_router)
     application.include_router(chat_router)
     application.include_router(metrics_router)
     return application

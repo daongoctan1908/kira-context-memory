@@ -284,14 +284,30 @@ async def test_conversation_management_is_owned_paginated_and_hides_pending_hist
         assert older.next_before_message_id is None
         assert await adapter.read_history(other_owner, first.session_id, limit=10) is None
 
-        async with engine.begin() as connection:
-            await connection.execute(
-                update(conversations)
-                .where(conversations.c.conversation_id == first.conversation_id)
-                .values(status=ConversationStatus.DELETION_PENDING.value)
-            )
+        assert not await adapter.mark_deletion_pending(other_owner, first.session_id)
+        assert await adapter.mark_deletion_pending(owner, first.session_id)
+        assert await adapter.mark_deletion_pending(owner, first.session_id)
         assert await adapter.read_history(owner, first.session_id, limit=10) is None
         assert await adapter.read_recent(owner, first.session_id, 10) == ()
+        blocked_turn = f"blocked-{uuid4()}"
+        with pytest.raises(ConversationStoreProtocolError):
+            await adapter.append_turn(
+                owner,
+                _message(
+                    first.session_id,
+                    blocked_turn,
+                    ConversationRole.USER,
+                    "must not persist",
+                    20,
+                ),
+                _message(
+                    first.session_id,
+                    blocked_turn,
+                    ConversationRole.ASSISTANT,
+                    "must not persist",
+                    21,
+                ),
+            )
         pending = await adapter.list_conversations(owner, limit=10)
         first_summary = next(
             item for item in pending.items if item.conversation_id == first.conversation_id

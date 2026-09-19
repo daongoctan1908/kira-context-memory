@@ -292,6 +292,28 @@ async def test_read_history_is_chronological_paginated_and_owned() -> None:
     assert await missing.read_history(USER_ID, "missing", limit=2) is None
 
 
+async def test_mark_deletion_pending_is_owned_and_idempotent() -> None:
+    conversation_id = uuid4()
+    connection = FakeConnection(
+        [FakeResult(one=SimpleNamespace(conversation_id=conversation_id)), FakeResult()]
+    )
+    store = adapter(connection)
+    await store.validate_schema()
+
+    assert await store.mark_deletion_pending(USER_ID, "public-session")
+    select_sql = str(connection.calls[1][0])
+    update_sql = str(connection.calls[2][0])
+    assert "conversations.user_id" in select_sql
+    assert "conversations.session_id" in select_sql
+    assert "FOR UPDATE" in select_sql
+    assert "UPDATE conversations" in update_sql
+    assert connection.calls[2][0].compile().params["status"] == "deletion_pending"
+
+    missing = adapter(FakeConnection([FakeResult(one=None)]))
+    await missing.validate_schema()
+    assert not await missing.mark_deletion_pending(USER_ID, "missing")
+
+
 async def test_read_recent_returns_chronological_domain_messages() -> None:
     rows = [
         {

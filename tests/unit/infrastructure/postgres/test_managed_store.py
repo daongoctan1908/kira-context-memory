@@ -100,6 +100,7 @@ async def test_conversation_management_operations_are_validated_and_forwarded() 
     adapter.create_conversation.return_value = created
     adapter.list_conversations.return_value = listed
     adapter.read_history.return_value = history
+    adapter.mark_deletion_pending.return_value = True
     store = ManagedPostgresConversationStore(adapter, 1)
     cursor = ConversationListCursor(datetime(2026, 9, 19, tzinfo=UTC), uuid4())
 
@@ -109,6 +110,7 @@ async def test_conversation_management_operations_are_validated_and_forwarded() 
         await store.read_history(USER_ID, "public-session", limit=50, before_message_id=42)
         is history
     )
+    assert await store.mark_deletion_pending(USER_ID, "public-session")
 
     adapter.validate_schema.assert_awaited_once()
     adapter.create_conversation.assert_awaited_once_with(USER_ID, title="Support")
@@ -119,3 +121,4 @@ async def test_conversation_management_operations_are_validated_and_forwarded() 
         limit=50,
         before_message_id=42,
     )
+    adapter.mark_deletion_pending.assert_awaited_once_with(USER_ID, "public-session")

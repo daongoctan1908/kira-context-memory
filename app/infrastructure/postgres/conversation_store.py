@@ -230,6 +230,39 @@ class PostgresConversationStoreAdapter:
         except (KeyError, TypeError, ValueError) as error:
             raise ConversationStoreProtocolError from error
 
+    async def mark_deletion_pending(self, user_id: str, session_id: str) -> bool:
+        """Idempotently move an owned conversation into deletion-pending state."""
+        self._require_conversation_management_schema()
+        if not user_id.strip():
+            raise ValueError("user_id must not be empty")
+        if not session_id.strip():
+            raise ValueError("session_id must not be empty")
+        try:
+            async with self._engine.begin() as connection:
+                row = (
+                    await connection.execute(
+                        select(conversations.c.conversation_id)
+                        .where(
+                            conversations.c.user_id == user_id,
+                            conversations.c.session_id == session_id,
+                        )
+                        .with_for_update()
+                    )
+                ).one_or_none()
+                if row is None:
+                    return False
+                await connection.execute(
+                    update(conversations)
+                    .where(conversations.c.conversation_id == row.conversation_id)
+                    .values(
+                        status=ConversationStatus.DELETION_PENDING.value,
+                        updated_at=func.now(),
+                    )
+                )
+                return True
+        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+            self._raise_mapped(error)
+
     async def read_recent(
         self,
         user_id: str,
