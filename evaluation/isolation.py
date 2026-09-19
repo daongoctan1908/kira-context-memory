@@ -195,6 +195,22 @@ def allocate_case_resources(
     )
 
 
+def claim_case_resources(
+    plan: IsolationPlan,
+    *,
+    case_id: str,
+    attempt: int,
+    conversation_id: UUID,
+    event_id: UUID,
+) -> CaseResourceOwnership:
+    """Bind database-generated UUIDs to the deterministic run-owned user/session scope."""
+
+    allocated = allocate_case_resources(plan, case_id=case_id, attempt=attempt)
+    if not isinstance(conversation_id, UUID) or not isinstance(event_id, UUID):
+        raise ValueError("observed conversation and event IDs must be UUIDs")
+    return allocated.model_copy(update={"conversation_id": conversation_id, "event_id": event_id})
+
+
 def register_case_resources(
     ledger: IsolationLedger,
     plan: IsolationPlan,
@@ -206,7 +222,12 @@ def register_case_resources(
         case_id=resource.case_id,
         attempt=resource.attempt,
     )
-    if resource != expected:
+    if (
+        resource.case_id != expected.case_id
+        or resource.attempt != expected.attempt
+        or resource.user_id != expected.user_id
+        or resource.session_id != expected.session_id
+    ):
         raise ValueError("case resources were not allocated by this isolation plan")
     existing = next(
         (
@@ -218,7 +239,13 @@ def register_case_resources(
     )
     if existing is not None:
         if existing != resource:
-            raise ValueError("case-attempt resources cannot be reassigned")
+            # The deterministic allocation is durably recorded before the first database write.
+            # PostgreSQL then supplies the real conversation/job UUIDs exactly once.  Once either
+            # observed UUID has been claimed, no later retry may reassign the ownership record.
+            if existing != expected or existing.memory_ids:
+                raise ValueError("case-attempt resources cannot be reassigned")
+            resources = tuple(resource if item == existing else item for item in ledger.resources)
+            return ledger.model_copy(update={"resources": resources})
         return ledger
     return IsolationLedger(
         run_id=ledger.run_id,

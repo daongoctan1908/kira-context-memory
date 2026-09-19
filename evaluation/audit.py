@@ -14,6 +14,14 @@ from evaluation.models import BenchmarkVariant, EvalModel, Identifier, Sha256, S
 from evaluation.scoring import JudgeVerdict
 
 SemanticSuite = Literal[Suite.FORMATION, Suite.REWRITE, Suite.CROSS_SESSION]
+AuditSubject = Annotated[
+    str,
+    StringConstraints(pattern=r"^[a-z][a-z0-9_]{0,63}$"),
+]
+AuditIdentifier = Annotated[
+    str,
+    StringConstraints(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,255}$"),
+]
 
 
 class AuditTrigger(StrEnum):
@@ -30,6 +38,7 @@ class AuditDisposition(StrEnum):
 
 class AuditCandidate(EvalModel):
     case_id: Identifier
+    subject: AuditSubject = "case"
     bundle_id: Identifier
     suite: SemanticSuite
     variant: BenchmarkVariant
@@ -43,11 +52,11 @@ class AuditCandidate(EvalModel):
 class AuditPolicy(EvalModel):
     seed: int = Field(ge=0, le=2**63 - 1, strict=True)
     sample_rate: float = Field(default=0.10, gt=0, le=1, allow_inf_nan=False)
-    minimum_sample_when_available: int = Field(default=5, ge=1, strict=True)
 
 
 class AuditSelection(EvalModel):
     case_id: Identifier
+    subject: AuditSubject = "case"
     bundle_id: Identifier
     suite: SemanticSuite
     variant: BenchmarkVariant
@@ -71,9 +80,18 @@ class AuditBatch(EvalModel):
     candidate_set_sha256: Sha256
     selections: tuple[AuditSelection, ...]
 
+    @field_validator("selections")
+    @classmethod
+    def selections_are_unique(cls, value: tuple[AuditSelection, ...]) -> tuple[AuditSelection, ...]:
+        keys = [(item.case_id, item.subject) for item in value]
+        if len(keys) != len(set(keys)):
+            raise ValueError("audit selections must have unique case/subject IDs")
+        return value
+
 
 class HumanAuditDecision(EvalModel):
     case_id: Identifier
+    subject: AuditSubject = "case"
     output_sha256: Sha256
     reviewer: Identifier
     reviewed_at: datetime
@@ -100,6 +118,10 @@ class HumanAuditDecision(EvalModel):
 
 class ReconciledAuditCase(EvalModel):
     case_id: Identifier
+    subject: AuditSubject = "case"
+    suite: SemanticSuite
+    variant: BenchmarkVariant
+    output_sha256: Sha256
     semantic_verdict: Literal[JudgeVerdict.PASS, JudgeVerdict.FAIL]
     safety_passed: bool
     overridden_by_human: bool
@@ -113,17 +135,38 @@ class ReconciledAuditCase(EvalModel):
 
 
 class AuditReconciliation(EvalModel):
+    candidate_set_sha256: Sha256
     cases: tuple[ReconciledAuditCase, ...]
     expansion: tuple[AuditSelection, ...]
-    pending_audit_case_ids: tuple[Identifier, ...]
+    pending_audit_ids: tuple[AuditIdentifier, ...]
     insufficient_evidence_suites: tuple[Suite, ...]
     dataset_revision_case_ids: tuple[Identifier, ...]
 
+    @model_validator(mode="after")
+    def identifiers_are_unique_and_disjoint(self) -> "AuditReconciliation":
+        case_ids = [_audit_id(item.case_id, item.subject) for item in self.cases]
+        expansion_ids = [_audit_id(item.case_id, item.subject) for item in self.expansion]
+        for label, values in (
+            ("reconciled cases", case_ids),
+            ("audit expansion", expansion_ids),
+            ("pending audit IDs", list(self.pending_audit_ids)),
+            ("insufficient evidence suites", list(self.insufficient_evidence_suites)),
+            ("dataset revision case IDs", list(self.dataset_revision_case_ids)),
+        ):
+            if len(values) != len(set(values)):
+                raise ValueError(f"{label} must be unique")
+        if set(case_ids).intersection(self.pending_audit_ids):
+            raise ValueError("reconciled and pending audit IDs must be disjoint")
+        if not set(expansion_ids).issubset(self.pending_audit_ids):
+            raise ValueError("audit expansion must remain pending")
+        return self
 
-def _candidate_digest(candidates: Sequence[AuditCandidate]) -> str:
+
+def audit_candidate_set_sha256(candidates: Sequence[AuditCandidate]) -> str:
     rows = sorted(
         (
             candidate.case_id,
+            candidate.subject,
             candidate.bundle_id,
             candidate.suite.value,
             candidate.variant.value,
@@ -144,14 +187,20 @@ def _candidate_digest(candidates: Sequence[AuditCandidate]) -> str:
 def _sample_key(candidate: AuditCandidate, seed: int) -> str:
     value = (
         f"{seed}\0{candidate.suite}\0{candidate.variant}\0{candidate.bundle_id}\0"
-        f"{candidate.judge_verdict}\0{candidate.case_id}"
+        f"{candidate.judge_verdict}\0{candidate.case_id}\0{candidate.subject}"
     )
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _stratum_key(stratum: tuple[BenchmarkVariant, Suite, JudgeVerdict, str], seed: int) -> str:
+    value = "\0".join((str(seed), *(str(item) for item in stratum)))
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 def _selection(candidate: AuditCandidate, triggers: Sequence[AuditTrigger]) -> AuditSelection:
     return AuditSelection(
         case_id=candidate.case_id,
+        subject=candidate.subject,
         bundle_id=candidate.bundle_id,
         suite=candidate.suite,
         variant=candidate.variant,
@@ -163,44 +212,55 @@ def _selection(candidate: AuditCandidate, triggers: Sequence[AuditTrigger]) -> A
     )
 
 
+def _audit_id(case_id: str, subject: str) -> str:
+    return f"{case_id}:{subject}"
+
+
 def _stratified_sample(
     candidates: Sequence[AuditCandidate],
     *,
     policy: AuditPolicy,
 ) -> set[str]:
-    selected: set[str] = set()
-    by_suite_variant: dict[tuple[Suite, BenchmarkVariant], list[AuditCandidate]] = defaultdict(list)
-    for candidate in candidates:
-        if candidate.judge_verdict in (JudgeVerdict.PASS, JudgeVerdict.FAIL):
-            by_suite_variant[(candidate.suite, candidate.variant)].append(candidate)
+    eligible = [
+        candidate
+        for candidate in candidates
+        if candidate.judge_verdict in (JudgeVerdict.PASS, JudgeVerdict.FAIL)
+    ]
+    requested = min(math.ceil(len(eligible) * policy.sample_rate), len(eligible))
+    strata: dict[tuple[BenchmarkVariant, Suite, JudgeVerdict, str], list[AuditCandidate]] = (
+        defaultdict(list)
+    )
+    for candidate in eligible:
+        strata[
+            (
+                candidate.variant,
+                candidate.suite,
+                candidate.judge_verdict,
+                candidate.bundle_id,
+            )
+        ].append(candidate)
 
-    for group in by_suite_variant.values():
-        requested = math.ceil(len(group) * policy.sample_rate)
-        if len(group) >= policy.minimum_sample_when_available:
-            requested = max(requested, policy.minimum_sample_when_available)
-        requested = min(requested, len(group))
-        strata: dict[tuple[str, JudgeVerdict], list[AuditCandidate]] = defaultdict(list)
-        for candidate in group:
-            strata[(candidate.bundle_id, candidate.judge_verdict)].append(candidate)
-        ordered_strata = [
-            sorted(values, key=lambda item: (_sample_key(item, policy.seed), item.case_id))
-            for _, values in sorted(strata.items(), key=lambda item: (item[0][0], item[0][1]))
-        ]
-        offset = 0
-        while len(selected.intersection(candidate.case_id for candidate in group)) < requested:
-            progressed = False
-            for stratum in ordered_strata:
-                if offset < len(stratum):
-                    selected.add(stratum[offset].case_id)
-                    progressed = True
-                    if (
-                        len(selected.intersection(candidate.case_id for candidate in group))
-                        >= requested
-                    ):
-                        break
-            if not progressed:
-                break
-            offset += 1
+    ordered_strata = [
+        sorted(values, key=lambda item: (_sample_key(item, policy.seed), item.case_id))
+        for key, values in sorted(
+            strata.items(),
+            key=lambda item: _stratum_key(item[0], policy.seed),
+        )
+    ]
+    selected: set[str] = set()
+    offset = 0
+    while len(selected) < requested:
+        progressed = False
+        for stratum in ordered_strata:
+            if offset < len(stratum):
+                candidate = stratum[offset]
+                selected.add(_audit_id(candidate.case_id, candidate.subject))
+                progressed = True
+                if len(selected) >= requested:
+                    break
+        if not progressed:
+            break
+        offset += 1
     return selected
 
 
@@ -209,29 +269,31 @@ def select_audit_batch(
     *,
     policy: AuditPolicy,
 ) -> AuditBatch:
-    by_id = {candidate.case_id: candidate for candidate in candidates}
+    by_id = {_audit_id(candidate.case_id, candidate.subject): candidate for candidate in candidates}
     if len(by_id) != len(candidates):
-        raise ValueError("audit candidate case IDs must be unique")
+        raise ValueError("audit candidate case/subject IDs must be unique")
 
     triggers: dict[str, list[AuditTrigger]] = defaultdict(list)
     for candidate in candidates:
         if candidate.judge_verdict is JudgeVerdict.UNCERTAIN:
-            triggers[candidate.case_id].append(AuditTrigger.UNCERTAIN)
+            triggers[_audit_id(candidate.case_id, candidate.subject)].append(AuditTrigger.UNCERTAIN)
         if (
             candidate.deterministic_verdict is not None
             and candidate.deterministic_verdict is not candidate.judge_verdict
         ):
-            triggers[candidate.case_id].append(AuditTrigger.DETERMINISTIC_CONFLICT)
-    for case_id in _stratified_sample(candidates, policy=policy):
-        triggers[case_id].append(AuditTrigger.STRATIFIED_SAMPLE)
+            triggers[_audit_id(candidate.case_id, candidate.subject)].append(
+                AuditTrigger.DETERMINISTIC_CONFLICT
+            )
+    for audit_id in _stratified_sample(candidates, policy=policy):
+        triggers[audit_id].append(AuditTrigger.STRATIFIED_SAMPLE)
 
     selections = tuple(
-        _selection(by_id[case_id], case_triggers)
-        for case_id, case_triggers in sorted(triggers.items())
+        _selection(by_id[audit_id], case_triggers)
+        for audit_id, case_triggers in sorted(triggers.items())
     )
     return AuditBatch(
         policy=policy,
-        candidate_set_sha256=_candidate_digest(candidates),
+        candidate_set_sha256=audit_candidate_set_sha256(candidates),
         selections=selections,
     )
 
@@ -241,27 +303,34 @@ def reconcile_audits(
     batch: AuditBatch,
     decisions: Sequence[HumanAuditDecision],
 ) -> AuditReconciliation:
-    by_candidate = {candidate.case_id: candidate for candidate in candidates}
-    by_selection = {selection.case_id: selection for selection in batch.selections}
-    by_decision = {decision.case_id: decision for decision in decisions}
+    by_candidate = {
+        _audit_id(candidate.case_id, candidate.subject): candidate for candidate in candidates
+    }
+    by_selection = {
+        _audit_id(selection.case_id, selection.subject): selection for selection in batch.selections
+    }
+    by_decision = {
+        _audit_id(decision.case_id, decision.subject): decision for decision in decisions
+    }
     if len(by_candidate) != len(candidates) or len(by_decision) != len(decisions):
-        raise ValueError("candidate and audit decision case IDs must be unique")
-    if batch.candidate_set_sha256 != _candidate_digest(candidates):
+        raise ValueError("candidate and audit decision case/subject IDs must be unique")
+    if batch.candidate_set_sha256 != audit_candidate_set_sha256(candidates):
         raise ValueError("audit batch does not belong to this candidate set")
 
-    for case_id, decision in by_decision.items():
-        selection = by_selection.get(case_id)
+    for audit_id, decision in by_decision.items():
+        selection = by_selection.get(audit_id)
         if selection is None:
             raise ValueError("human decision references a case outside the audit batch")
         if decision.output_sha256 != selection.output_sha256:
             raise ValueError("human decision is stale for the current output hash")
 
-    expansion_keys: set[tuple[Suite, str]] = set()
+    expansion_keys: set[tuple[Suite, str, str]] = set()
     insufficient: set[Suite] = set()
     dataset_revision: set[str] = set()
     reconciled: list[ReconciledAuditCase] = []
     for candidate in candidates:
-        decision = by_decision.get(candidate.case_id)
+        audit_id = _audit_id(candidate.case_id, candidate.subject)
+        decision = by_decision.get(audit_id)
         if decision and decision.disposition is AuditDisposition.GOLD_ERROR:
             dataset_revision.add(candidate.case_id)
             insufficient.add(candidate.suite)
@@ -270,11 +339,13 @@ def reconcile_audits(
         human_verdict = decision.human_verdict if decision else None
         if human_verdict is not None:
             disagrees = human_verdict is not candidate.judge_verdict
-            selection = by_selection[candidate.case_id]
+            selection = by_selection[audit_id]
             if disagrees and AuditTrigger.DISAGREEMENT_EXPANSION in selection.triggers:
                 insufficient.add(candidate.suite)
             elif disagrees:
-                expansion_keys.add((candidate.suite, candidate.judge_reason_code))
+                expansion_keys.add(
+                    (candidate.suite, candidate.subject, candidate.judge_reason_code)
+                )
             semantic = human_verdict
         else:
             semantic = candidate.judge_verdict
@@ -284,6 +355,10 @@ def reconcile_audits(
         reconciled.append(
             ReconciledAuditCase(
                 case_id=candidate.case_id,
+                subject=candidate.subject,
+                suite=candidate.suite,
+                variant=candidate.variant,
+                output_sha256=candidate.output_sha256,
                 semantic_verdict=semantic,
                 safety_passed=candidate.safety_passed,
                 overridden_by_human=human_verdict is not None
@@ -294,17 +369,36 @@ def reconcile_audits(
     expansion = tuple(
         _selection(candidate, (AuditTrigger.DISAGREEMENT_EXPANSION,))
         for candidate in sorted(candidates, key=lambda item: item.case_id)
-        if (candidate.suite, candidate.judge_reason_code) in expansion_keys
-        and candidate.case_id not in by_selection
+        if (candidate.suite, candidate.subject, candidate.judge_reason_code) in expansion_keys
+        and _audit_id(candidate.case_id, candidate.subject) not in by_selection
     )
     pending = {
-        *(case_id for case_id in by_selection if case_id not in by_decision),
-        *(selection.case_id for selection in expansion),
+        *(audit_id for audit_id in by_selection if audit_id not in by_decision),
+        *(_audit_id(selection.case_id, selection.subject) for selection in expansion),
     }
     return AuditReconciliation(
-        cases=tuple(case for case in reconciled if case.case_id not in pending),
+        candidate_set_sha256=batch.candidate_set_sha256,
+        cases=tuple(
+            case for case in reconciled if _audit_id(case.case_id, case.subject) not in pending
+        ),
         expansion=expansion,
-        pending_audit_case_ids=tuple(sorted(pending)),
+        pending_audit_ids=tuple(sorted(pending)),
         insufficient_evidence_suites=tuple(sorted(insufficient, key=lambda suite: suite.value)),
         dataset_revision_case_ids=tuple(sorted(dataset_revision)),
     )
+
+
+__all__ = [
+    "AuditBatch",
+    "AuditCandidate",
+    "AuditDisposition",
+    "AuditPolicy",
+    "AuditReconciliation",
+    "AuditSelection",
+    "AuditTrigger",
+    "HumanAuditDecision",
+    "ReconciledAuditCase",
+    "audit_candidate_set_sha256",
+    "reconcile_audits",
+    "select_audit_batch",
+]

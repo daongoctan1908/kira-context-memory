@@ -32,6 +32,7 @@ from evaluation.models import (
     Outcome,
     Profile,
     RunProvenance,
+    Suite,
 )
 from evaluation.scoring import output_sha256
 
@@ -82,13 +83,24 @@ def prepare_benchmark_run(
     provenance: RunProvenance,
     dataset_root: Path,
     seed: int,
+    isolation_sha256: str | None = None,
 ) -> tuple[BenchmarkRunPreparation, DatasetCompilation]:
     """Validate policy and compile before any network or persistent runtime action."""
 
     manifest = load_manifest(dataset_root)
     _validate_canonical_policy(manifest, config.profile)
     compilation = compile_dataset(dataset_root, seed=seed)
-    selected = tuple(case for case in compilation.cases if case.suite in config.suites)
+    # The compiler deliberately shuffles the full corpus, but suite dependencies are not
+    # interchangeable: formation must finish before formation-produced retrieval can be built,
+    # and paired cross-session cases run last because they create their own durable jobs.  Keep
+    # the compiler's deterministic order *within* each suite while enforcing that lifecycle.
+    selected = tuple(
+        case
+        for suite in Suite
+        if suite in config.suites
+        for case in compilation.cases
+        if case.suite is suite
+    )
     if not selected:
         raise ValueError("selected suites contain no compiled cases")
     compilation_sha256 = sha256(compilation_json_bytes(compilation)).hexdigest()
@@ -102,6 +114,7 @@ def prepare_benchmark_run(
         dataset_sha256=compilation.dataset_sha256,
         compilation_sha256=compilation_sha256,
         config_sha256=config.fingerprint(),
+        isolation_sha256=isolation_sha256,
         seed=seed,
         suites=config.suites,
         selected_case_ids=tuple(case.case_id for case in selected),

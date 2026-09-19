@@ -10,6 +10,7 @@ OpenAI metrics are diagnostic because the official target uses internal models i
 - T4.3 produced one exact runtime/eval image pair for the control and each declared candidate;
 - T4.4 produced a ready `pc-preflight/freeze.json` bound to the same dataset and config;
 - every variant starts with a fresh, isolated benchmark database and runs sequentially;
+- the normal variant Worker passed preflight and is then stopped before the native run;
 - control and candidates use the same corpus, case order, seed `742`, providers, retrieval config,
   timeout policy, and scorer revision.
 
@@ -30,6 +31,27 @@ and a separate artifact directory under:
 ```text
 artifacts/week5/pc-openai/<run-set-id>/<variant>/
 ```
+
+After live preflight, stop `control-worker` or `candidate-worker` for the selected stack. The native
+eval-controller owns queue claim/processing so it can bind formation to the run-specific Mem0
+schema. A concurrently running normal Worker is a contamination race and invalidates the run.
+
+Run from the exact eval image (Compose already supplies the local env plus variant database URLs):
+
+```powershell
+docker compose --env-file .env.week5.pc.local -f compose.week5.benchmark.yaml `
+  --profile tools run --rm eval-controller run `
+  --profile pc_openai_acceptance `
+  --suite formation --suite retrieval --suite rewrite --suite cross_session `
+  --formation-mode persistent `
+  --provenance-file /materialization/offline-handoff/provenance/<variant>.json `
+  --dataset-root /app/dataset/kira_ltm_v1 `
+  --artifact-root /artifacts/pc-openai/<run-set-id>/<variant> `
+  --seed 742
+```
+
+Do not add `--env-file-only` to this container command: the injected `WEEK5_DATABASE_URL` and
+`WEEK5_MEMORY_DATABASE_URL` are not values read from the host file by the CLI.
 
 The full runner must finish before technical acceptance is checked. A dependency/protocol result is
 not converted into a quality failure and remains unresolved evidence. A blocked dataset case must

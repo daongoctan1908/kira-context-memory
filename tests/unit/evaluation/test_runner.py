@@ -103,6 +103,20 @@ def test_pc_profile_preparation_is_nonofficial_and_external_synthetic_stays_reje
         )
 
 
+def test_preparation_groups_cases_in_native_dependency_order():
+    config = load_config(profile=Profile.MOCK, suites=tuple(reversed(tuple(Suite))))
+    preparation, _ = prepare_benchmark_run(
+        run_id=_RUN_ID,
+        config=config,
+        provenance=_provenance(),
+        dataset_root=default_dataset_root(),
+        seed=742,
+    )
+
+    suite_order = tuple(dict.fromkeys(case.suite for case in preparation.selected_cases))
+    assert suite_order == tuple(Suite)
+
+
 async def test_mock_full_corpus_runner_persists_and_resumes_without_reexecution(tmp_path):
     config = load_config(profile=Profile.MOCK, suites=(Suite.REWRITE,))
     preparation, _ = prepare_benchmark_run(

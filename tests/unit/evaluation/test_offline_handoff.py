@@ -109,11 +109,16 @@ def test_handoff_script_pins_control_and_verifies_offline_bundle():
     assert "PcAcceptancePath" in script
     assert "dataset_manifest_sha256" in script
     assert "bundle-manifest.json" in script
+    assert "K8S-RUNBOOK.md" in script
     assert "CandidateChangeScope" in script
     assert 'provenance_file = "provenance/control.json"' in script
     assert 'variant = "historical_control"' in script
     assert 'variant = "release_candidate"' in script
     assert "Export checkout differs from the exact accepted harness revision" in script
+    assert "registry-manifest.json" in script
+    assert "immutable_reference = $digests[0]" in script
+    assert "source_image_manifest_sha256 = Get-Sha256 $ManifestPath" in script
+    assert "Registry manifest already exists" in script
 
 
 def test_image_metadata_binds_dataset_prompts_packages_and_exact_revisions(monkeypatch):

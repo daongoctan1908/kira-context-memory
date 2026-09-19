@@ -1,0 +1,230 @@
+"""Native suite orchestration without provider or deployment composition.
+
+The executor in this module owns only benchmark semantics: suite dispatch, formation scoring and
+the two retrieval views.  Concrete PostgreSQL, Mem0, KiRa and HTTP clients are injected by the
+runtime composition root, which keeps this layer deterministic and prevents an evaluation-only
+transport from leaking into the production Gateway.
+"""
+
+from collections.abc import Mapping, Sequence
+from typing import Protocol
+
+from pydantic import model_validator
+
+from evaluation.cross_session import CrossSessionCaseEvaluation
+from evaluation.formation import (
+    FormationExtractionResult,
+    PersistentFormationResult,
+)
+from evaluation.judge import InternalSemanticJudge, JudgeError
+from evaluation.models import EvalCase, EvalModel, Identifier, Outcome, Suite
+from evaluation.retrieval import RetrievalCaseEvaluation
+from evaluation.runner import BenchmarkExecutionResult
+from evaluation.scoring import (
+    FormationMatchDecision,
+    FormationScore,
+    score_formation,
+)
+
+
+class NativeCaseEvaluator(Protocol):
+    async def evaluate(self, case: EvalCase) -> EvalModel: ...
+
+
+class NativeFormationRuntime(Protocol):
+    async def evaluate(
+        self, case: EvalCase
+    ) -> FormationExtractionResult | PersistentFormationResult: ...
+
+
+class NativeRetrievalRuntime(Protocol):
+    async def evaluate_gold(self, case: EvalCase) -> RetrievalCaseEvaluation: ...
+
+    async def evaluate_formed(self, case: EvalCase) -> RetrievalCaseEvaluation: ...
+
+
+class NativeFormationCaseEvaluation(EvalModel):
+    case_id: Identifier
+    outcome: Outcome
+    extraction: FormationExtractionResult | None = None
+    persistence: PersistentFormationResult | None = None
+    score: FormationScore | None = None
+    judge_decisions: tuple[FormationMatchDecision, ...] = ()
+    reason_codes: tuple[Identifier, ...] = ()
+
+    @model_validator(mode="after")
+    def state_is_consistent(self) -> "NativeFormationCaseEvaluation":
+        if len(self.reason_codes) != len(set(self.reason_codes)):
+            raise ValueError("formation reason codes must be unique")
+        if self.outcome in {Outcome.PASS, Outcome.FAIL, Outcome.REVIEW_REQUIRED}:
+            if self.extraction is None or self.score is None:
+                raise ValueError("formation quality outcome requires extraction and score")
+        elif self.score is not None or self.judge_decisions:
+            raise ValueError("formation execution failure cannot contain a quality score")
+        return self
+
+
+class NativeRetrievalCaseEvaluation(EvalModel):
+    case_id: Identifier
+    outcome: Outcome
+    gold_fixture: RetrievalCaseEvaluation | None = None
+    formation_produced: RetrievalCaseEvaluation | None = None
+    reason_codes: tuple[Identifier, ...] = ()
+
+    @model_validator(mode="after")
+    def modes_are_consistent(self) -> "NativeRetrievalCaseEvaluation":
+        if len(self.reason_codes) != len(set(self.reason_codes)):
+            raise ValueError("retrieval reason codes must be unique")
+        if self.outcome in {Outcome.PASS, Outcome.FAIL}:
+            if self.gold_fixture is None or self.formation_produced is None:
+                raise ValueError("retrieval quality outcome requires both corpus modes")
+        return self
+
+
+class NativeFormationEvaluator:
+    """Score one native formation, calling the judge only for semantic leftovers."""
+
+    def __init__(self, runtime: NativeFormationRuntime, judge: InternalSemanticJudge) -> None:
+        self._runtime = runtime
+        self._judge = judge
+
+    async def evaluate(self, case: EvalCase) -> NativeFormationCaseEvaluation:
+        native = await self._runtime.evaluate(case)
+        persistence = native if isinstance(native, PersistentFormationResult) else None
+        extraction = native.extraction if persistence is not None else native
+        if extraction is None or native.outcome not in {
+            Outcome.PASS,
+            Outcome.FAIL,
+            Outcome.REVIEW_REQUIRED,
+        }:
+            return NativeFormationCaseEvaluation(
+                case_id=case.case_id,
+                outcome=native.outcome,
+                extraction=extraction,
+                persistence=persistence,
+                reason_codes=tuple(native.reason_codes),
+            )
+
+        predicted = tuple(fact.text for fact in extraction.facts)
+        gold = {fact.gold_id: fact.text for fact in case.gold.facts}
+        score = score_formation(gold, predicted)
+        decisions: tuple[FormationMatchDecision, ...] = ()
+        if score.needs_judge_prediction_indexes:
+            try:
+                decisions = await self._judge.formation(
+                    predicted_facts=predicted,
+                    gold_facts=gold,
+                    prediction_indexes=score.needs_judge_prediction_indexes,
+                )
+                score = score_formation(gold, predicted, judge_decisions=decisions)
+            except JudgeError as error:
+                return NativeFormationCaseEvaluation(
+                    case_id=case.case_id,
+                    outcome=error.outcome,
+                    extraction=extraction,
+                    persistence=persistence,
+                    reason_codes=(error.reason_code,),
+                )
+            except Exception:
+                return NativeFormationCaseEvaluation(
+                    case_id=case.case_id,
+                    outcome=Outcome.PROTOCOL_ERROR,
+                    extraction=extraction,
+                    persistence=persistence,
+                    reason_codes=("judge_unexpected_error",),
+                )
+
+        if not score.complete:
+            outcome = Outcome.REVIEW_REQUIRED
+            reasons = ("formation_semantic_uncertain",)
+        elif (score.false_positive or 0) or (score.false_negative or 0):
+            outcome = Outcome.FAIL
+            reasons = ("formation_quality_mismatch",)
+        else:
+            outcome = Outcome.PASS
+            reasons = ()
+        return NativeFormationCaseEvaluation(
+            case_id=case.case_id,
+            outcome=outcome,
+            extraction=extraction,
+            persistence=persistence,
+            score=score,
+            judge_decisions=decisions,
+            reason_codes=reasons,
+        )
+
+
+class NativeRetrievalEvaluator:
+    """Keep gold-fixture and formation-produced retrieval evidence in one case artifact."""
+
+    def __init__(self, runtime: NativeRetrievalRuntime) -> None:
+        self._runtime = runtime
+
+    async def evaluate(self, case: EvalCase) -> NativeRetrievalCaseEvaluation:
+        gold = await self._runtime.evaluate_gold(case)
+        formed = await self._runtime.evaluate_formed(case)
+        outcome = _combined_outcome((gold.outcome, formed.outcome))
+        reasons = tuple(dict.fromkeys((*gold.reason_codes, *formed.reason_codes)))
+        return NativeRetrievalCaseEvaluation(
+            case_id=case.case_id,
+            outcome=outcome,
+            gold_fixture=gold,
+            formation_produced=formed,
+            reason_codes=reasons,
+        )
+
+
+class NativeBenchmarkExecutor:
+    """Dispatch a compiled case to an explicitly provided native suite evaluator."""
+
+    def __init__(self, evaluators: Mapping[Suite, NativeCaseEvaluator]) -> None:
+        if not evaluators:
+            raise ValueError("native executor requires at least one suite evaluator")
+        self._evaluators = dict(evaluators)
+
+    async def evaluate(self, case: EvalCase) -> EvalModel:
+        if case.eligibility.status == "blocked":
+            return BenchmarkExecutionResult(
+                case_id=case.case_id,
+                outcome=Outcome.NOT_RUN,
+                reason_codes=case.eligibility.blocked_reasons,
+            )
+        evaluator = self._evaluators.get(case.suite)
+        if evaluator is None:
+            return BenchmarkExecutionResult(
+                case_id=case.case_id,
+                outcome=Outcome.PROTOCOL_ERROR,
+                reason_codes=("native_suite_not_configured",),
+            )
+        result = await evaluator.evaluate(case)
+        if result.case_id != case.case_id:
+            return BenchmarkExecutionResult(
+                case_id=case.case_id,
+                outcome=Outcome.PROTOCOL_ERROR,
+                reason_codes=("native_case_identity_mismatch",),
+            )
+        return result
+
+
+def _combined_outcome(outcomes: Sequence[Outcome]) -> Outcome:
+    for outcome in (
+        Outcome.PROTOCOL_ERROR,
+        Outcome.DEPENDENCY_ERROR,
+        Outcome.NOT_RUN,
+        Outcome.FAIL,
+        Outcome.REVIEW_REQUIRED,
+        Outcome.INSUFFICIENT_EVIDENCE,
+    ):
+        if outcome in outcomes:
+            return outcome
+    return Outcome.PASS
+
+
+__all__ = [
+    "CrossSessionCaseEvaluation",
+    "NativeBenchmarkExecutor",
+    "NativeFormationCaseEvaluation",
+    "NativeFormationEvaluator",
+    "NativeRetrievalCaseEvaluation",
+    "NativeRetrievalEvaluator",
+]

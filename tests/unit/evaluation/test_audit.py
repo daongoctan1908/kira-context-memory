@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from evaluation.audit import (
+    AuditBatch,
     AuditCandidate,
     AuditDisposition,
     AuditPolicy,
@@ -77,7 +78,7 @@ def test_selection_is_deterministic_stratified_and_not_full_manual_review():
     reversed_batch = select_audit_batch(list(reversed(candidates)), policy=policy)
 
     assert first == reversed_batch
-    assert len(first.selections) == 5
+    assert len(first.selections) == 4
     assert {selection.bundle_id for selection in first.selections}.issubset(
         {"conv01", "conv02", "conv03", "conv04"}
     )
@@ -90,7 +91,7 @@ def test_selection_is_deterministic_stratified_and_not_full_manual_review():
     )
 
 
-def test_sample_minimum_is_applied_per_suite_and_variant():
+def test_sample_budget_is_global_across_suite_and_variant():
     candidates = [
         *[_candidate(index) for index in range(10)],
         *[
@@ -104,14 +105,30 @@ def test_sample_minimum_is_applied_per_suite_and_variant():
     ]
     batch = select_audit_batch(candidates, policy=AuditPolicy(seed=1))
 
-    by_group: dict[tuple[Suite, BenchmarkVariant], int] = {}
-    for selection in batch.selections:
-        key = (selection.suite, selection.variant)
-        by_group[key] = by_group.get(key, 0) + 1
-    assert by_group == {
-        (Suite.REWRITE, BenchmarkVariant.HISTORICAL_CONTROL): 5,
-        (Suite.CROSS_SESSION, BenchmarkVariant.RELEASE_CANDIDATE): 5,
+    assert len(batch.selections) == 2
+    assert {selection.suite for selection in batch.selections} == {
+        Suite.REWRITE,
+        Suite.CROSS_SESSION,
     }
+    assert {selection.variant for selection in batch.selections} == {
+        BenchmarkVariant.HISTORICAL_CONTROL,
+        BenchmarkVariant.RELEASE_CANDIDATE,
+    }
+
+
+def test_mandatory_cases_are_in_addition_to_global_sample_budget():
+    candidates = [_candidate(index) for index in range(20)]
+    candidates.append(_candidate(90, verdict=JudgeVerdict.UNCERTAIN))
+    candidates.append(_candidate(91, verdict=JudgeVerdict.PASS, deterministic=JudgeVerdict.FAIL))
+
+    batch = select_audit_batch(candidates, policy=AuditPolicy(seed=2))
+
+    sampled = [item for item in batch.selections if AuditTrigger.STRATIFIED_SAMPLE in item.triggers]
+    # 21 PASS/FAIL candidates => one global ceil(10%) budget of three.
+    assert len(sampled) == 3
+    assert {"conv01:case-90", "conv01:case-91"}.issubset(
+        {item.case_id for item in batch.selections}
+    )
 
 
 def test_uncertain_and_deterministic_conflict_are_always_selected():
@@ -126,6 +143,32 @@ def test_uncertain_and_deterministic_conflict_are_always_selected():
 
     assert AuditTrigger.UNCERTAIN in by_id[uncertain.case_id].triggers
     assert AuditTrigger.DETERMINISTIC_CONFLICT in by_id[conflict.case_id].triggers
+
+
+def test_same_case_with_distinct_semantic_subjects_is_audited_independently():
+    no_ltm = _candidate(1).model_copy(update={"subject": "final_no_ltm"})
+    with_ltm = _candidate(1).model_copy(
+        update={"subject": "final_with_ltm", "output_sha256": "f" * 64}
+    )
+
+    batch = select_audit_batch(
+        [no_ltm, with_ltm],
+        policy=AuditPolicy(seed=3, sample_rate=1.0),
+    )
+
+    assert {selection.subject for selection in batch.selections} == {
+        "final_no_ltm",
+        "final_with_ltm",
+    }
+    with pytest.raises(ValueError, match="case/subject"):
+        select_audit_batch([no_ltm, no_ltm], policy=AuditPolicy(seed=3))
+
+    with pytest.raises(ValidationError, match="unique case/subject"):
+        AuditBatch(
+            policy=AuditPolicy(seed=3),
+            candidate_set_sha256=batch.candidate_set_sha256,
+            selections=(batch.selections[0], batch.selections[0]),
+        )
 
 
 def test_human_override_expands_same_suite_and_reason_only():
@@ -152,7 +195,9 @@ def test_human_override_expands_same_suite_and_reason_only():
         if item.case_id != selected.case_id and item.judge_reason_code == selected_reason
     }
     assert all(item.triggers == (AuditTrigger.DISAGREEMENT_EXPANSION,) for item in result.expansion)
-    assert result.pending_audit_case_ids == tuple(sorted(item.case_id for item in result.expansion))
+    assert result.pending_audit_ids == tuple(
+        sorted(f"{item.case_id}:{item.subject}" for item in result.expansion)
+    )
 
 
 def test_second_disagreement_marks_suite_insufficient_evidence():
@@ -170,7 +215,7 @@ def test_second_disagreement_marks_suite_insufficient_evidence():
     )
 
     assert result.insufficient_evidence_suites == (Suite.REWRITE,)
-    assert result.pending_audit_case_ids == ()
+    assert result.pending_audit_ids == ()
 
 
 def test_review_is_output_hash_bound_and_unselected_cases_are_rejected():
@@ -219,7 +264,7 @@ def test_gold_error_requires_dataset_revision_and_no_case_verdict():
     assert result.cases == ()
     assert result.dataset_revision_case_ids == (candidate.case_id,)
     assert result.insufficient_evidence_suites == (Suite.REWRITE,)
-    assert result.pending_audit_case_ids == ()
+    assert result.pending_audit_ids == ()
     with pytest.raises(ValidationError):
         _decision(candidate, JudgeVerdict.PASS, disposition=AuditDisposition.GOLD_ERROR)
 
@@ -231,4 +276,4 @@ def test_required_audit_without_decision_is_not_silently_finalized():
     result = reconcile_audits([candidate], batch, [])
 
     assert result.cases == ()
-    assert result.pending_audit_case_ids == (candidate.case_id,)
+    assert result.pending_audit_ids == (f"{candidate.case_id}:{candidate.subject}",)

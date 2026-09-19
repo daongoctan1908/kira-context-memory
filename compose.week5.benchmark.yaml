@@ -233,7 +233,7 @@ services:
       WEEK5_DATABASE_URL: postgresql://kira:${WEEK5_POSTGRES_PASSWORD}@${WEEK5_BENCHMARK_POSTGRES_HOST:-candidate-postgres}:5432/${WEEK5_BENCHMARK_DATABASE:-kira_candidate}
       WEEK5_MEMORY_DATABASE_URL: postgresql://kira:${WEEK5_POSTGRES_PASSWORD}@${WEEK5_BENCHMARK_POSTGRES_HOST:-candidate-postgres}:5432/${WEEK5_BENCHMARK_DATABASE:-kira_candidate}
     volumes:
-      - ${WEEK5_ARTIFACT_ROOT:-./artifacts/week5/benchmark}:/artifacts
+      - ${WEEK5_ARTIFACT_ROOT:-./artifacts/week5}:/artifacts
       - ${WEEK5_MATERIALIZATION_ROOT:-./artifacts/week5}:/materialization
       - ${WEEK5_DATASET_ROOT:-./dataset/kira_ltm_v1}:/app/dataset/kira_ltm_v1
     command: ["validate"]

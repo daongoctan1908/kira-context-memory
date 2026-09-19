@@ -6,17 +6,22 @@ thuộc trực tiếp vào FastAPI, HTTPX, PostgreSQL SDK hoặc vLLM.
 
 ## Trạng thái
 
-**Week 5:** T5.1 đã lưu [plan và backlog](docs/week5-plan.md),
-[benchmark contract v4](docs/week5-benchmark-contract.md) và
-[control manifest](docs/week5-baseline.json) tại baseline `75deb1d`.
-[T5.2](docs/week5-t5.2-preflight.md) đã có eval types và CLI preflight; ba OpenAI probes cùng
-PostgreSQL/pgvector live pass. T5.3–T5.4 đang triển khai: [dataset KiRa LTM v1](dataset/kira_ltm_v1/README.md)
-có bốn storyline, manifest/checksum, full-corpus scope, schema, typed loader và validator. Corpus
-vẫn ở trạng thái `contract_frozen`: 140 KiRa fill và 54 answer chưa materialize, gold chưa được
-reviewer ký revision và chưa chuyển thành bốn suite `EvalCase`; chưa có semantic benchmark Week 5.
-Khi kết nối được KiRa Test, dùng CLI resume-safe trong
-[dataset materialization runbook](dataset/kira_ltm_v1/README.md#materialize-with-kira-test) để thu
-80 response duy nhất, ghép 140 assistant turn và 54 QA answer rồi validate trước khi commit.
+[Full implementation plan: benchmark → chatbot MVP → production-ready tối thiểu](docs/production-readiness-plan.md)
+bao gồm auth backend, durable conversation API, xóa conversation kèm memory, frontend React và
+deployment tối thiểu. Các tài liệu Week 5 bên dưới là runbook chi tiết cho riêng nhánh benchmark.
+
+**Week 5:** benchmark contract, full-corpus compiler, deterministic/semantic scorers, audit policy,
+crash-safe artifacts và native bốn-suite runner đã có. Control vẫn khóa tại `75deb1d`. Dataset
+[KiRa LTM v1](dataset/kira_ltm_v1/README.md) có bốn storyline nhưng cố ý còn
+`contract_frozen`: 80 KiRa requests/140 assistant fills/54 final answers phải được materialize và
+human-review trên PC công ty trước khi freeze. Quy trình đầy đủ nằm trong
+[PC AI handoff](docs/company-pc-ai-handoff.md). Sau PC acceptance, dùng
+[Phase 5 internal K8s runbook](docs/week5-internal-k8s-acceptance.md) cho immutable registry publish,
+internal preflight, discovery, three-pair confirmation và late performance. Chưa có semantic
+benchmark chính thức; mọi KiRa/OpenAI/internal live gate chưa chạy vẫn là `NOT_RUN`.
+
+[T5.2 provider preflight](docs/week5-t5.2-preflight.md) giữ evidence lịch sử cho OpenAI và local
+PostgreSQL/pgvector; evidence đó không thay thế KiRa PC acceptance hoặc internal K8s benchmark.
 Để kiểm tra Gateway + Worker bằng OpenAI thật nhưng vẫn giữ dữ liệu/KiRa synthetic, dùng
 [Week 5 OpenAI runtime smoke](docs/week5-openai-runtime-smoke.md). Stack này thay ba provider mock
 bằng OpenAI và giữ database Week 5 tách biệt; kết quả smoke không được coi là benchmark chất lượng.

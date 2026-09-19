@@ -32,6 +32,7 @@ $ControlRevision = "75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00"
 $ContractId = "kira-week5-benchmark-v4"
 $BundleRoot = Resolve-InputPath $BundleDirectory
 $ManifestPath = Join-Path $BundleRoot "image-manifest.json"
+$RegistryManifestPath = Join-Path $BundleRoot "registry-manifest.json"
 $ComposeFile = Join-Path $RepositoryRoot "compose.week5.benchmark.yaml"
 $ResolvedEnvFile = Resolve-InputPath $EnvFile
 $ResolvedPcPreflightPath = Resolve-InputPath $PcPreflightPath
@@ -386,6 +387,7 @@ switch ($Action) {
             @{ source = $ComposeFile; name = "compose.week5.benchmark.yaml" },
             @{ source = (Join-Path $RepositoryRoot "evaluation/week5.internal.env.example"); name = "week5.internal.env.example" },
             @{ source = (Join-Path $RepositoryRoot "docs/week5-offline-handoff.md"); name = "RUNBOOK.md" },
+            @{ source = (Join-Path $RepositoryRoot "docs/week5-internal-k8s-acceptance.md"); name = "K8S-RUNBOOK.md" },
             @{ source = (Join-Path $RepositoryRoot "docs/company-pc-ai-handoff.md"); name = "COMPANY-PC-AI-HANDOFF.md" }
         )
         foreach ($file in $copiedFiles) {
@@ -395,7 +397,7 @@ switch ($Action) {
             "kira-week5-images.tar", "kira-week5-images.tar.sha256", "image-manifest.json",
             "handoff-evidence.json", "pc-preflight.json", "pc-acceptance.json",
             "dataset-manifest.json", "compose.week5.benchmark.yaml", "week5.internal.env.example",
-            "RUNBOOK.md", "COMPANY-PC-AI-HANDOFF.md"
+            "RUNBOOK.md", "K8S-RUNBOOK.md", "COMPANY-PC-AI-HANDOFF.md"
         )
         $bundleFileNames += @($manifest.variants | ForEach-Object { $_.provenance_file })
         $bundleFiles = $bundleFileNames | ForEach-Object {
@@ -500,14 +502,57 @@ switch ($Action) {
         if (-not $Registry) {
             throw "Publish requires -Registry"
         }
+        if ($Registry -match '^https?://' -or $Registry -match '[\s@]') {
+            throw "Registry must be a bare host/path without scheme, digest or whitespace"
+        }
+        if (Test-Path -LiteralPath $RegistryManifestPath) {
+            throw "Registry manifest already exists; publish evidence is create-only"
+        }
         $manifest = Read-Manifest
+        Assert-ManifestImagesUnchanged $manifest
+        $published = @()
         foreach ($image in $manifest.images | Where-Object { $_.role -ne "postgres-dependency" }) {
             $sourceSuffix = $image.source_revision.Substring(0, 12)
             $runtimeSuffix = $image.runtime_revision.Substring(0, 12)
             $target = "$($Registry.TrimEnd('/'))/kira/$($image.role):$sourceSuffix-$runtimeSuffix"
             Invoke-Checked docker @("tag", $image.reference, $target)
             Invoke-Checked docker @("push", $target)
+            $inspect = (& docker image inspect $target | ConvertFrom-Json)[0]
+            if ($LASTEXITCODE -ne 0 -or $inspect.Id -ne $image.image_id) {
+                throw "Published image identity differs from the accepted source image"
+            }
+            $tagSeparator = $target.LastIndexOf(':')
+            $lastSlash = $target.LastIndexOf('/')
+            if ($tagSeparator -le $lastSlash) {
+                throw "Published image target has no immutable tag"
+            }
+            $repository = $target.Substring(0, $tagSeparator)
+            $digests = @($inspect.RepoDigests | Where-Object { $_ -like "$repository@sha256:*" })
+            if ($digests.Count -ne 1 -or $digests[0] -notmatch '@sha256:[a-f0-9]{64}$') {
+                throw "Registry did not return one immutable digest for the published image"
+            }
+            $published += [ordered]@{
+                role = $image.role
+                variant = $image.variant
+                source_reference = $image.reference
+                source_image_id = $image.image_id
+                pushed_tag = $target
+                immutable_reference = $digests[0]
+            }
         }
-        Write-Output "PASS benchmark images published to the internal registry"
+        $registryManifest = [ordered]@{
+            schema_version = 1
+            contract_id = $ContractId
+            created_at = [DateTime]::UtcNow.ToString("o")
+            source_image_manifest_sha256 = Get-Sha256 $ManifestPath
+            image_count = $published.Count
+            images = @($published)
+        }
+        [System.IO.File]::WriteAllText(
+            $RegistryManifestPath,
+            ($registryManifest | ConvertTo-Json -Depth 6),
+            [System.Text.UTF8Encoding]::new($false)
+        )
+        Write-Output "PASS benchmark images published with immutable registry digest evidence"
     }
 }

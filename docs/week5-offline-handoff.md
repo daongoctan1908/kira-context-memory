@@ -1,7 +1,8 @@
 # Week 5 offline benchmark handoff
 
 Đọc [company-pc-ai-handoff.md](company-pc-ai-handoff.md) để có quy trình đầy đủ từ materialization
-đến K8s. Tài liệu này chỉ mô tả boundary của bundle.
+đến K8s và [week5-internal-k8s-acceptance.md](week5-internal-k8s-acceptance.md) cho toàn bộ Phase 5.
+Tài liệu này chỉ mô tả boundary của bundle.
 
 ## Thứ tự đúng
 
@@ -93,6 +94,16 @@ Chuyển đúng các file được liệt kê trong `bundle-manifest.json`, rồ
 
 Import kiểm toàn bộ file hashes, tar checksum, load images và so image ID với
 `image-manifest.json`. Nếu publish registry, dùng immutable digest; không dùng `latest` làm evidence.
+
+Publish tạo create-only `registry-manifest.json` chứa digest bất biến cho từng runtime/eval image:
+
+```powershell
+./scripts/week5_offline_handoff.ps1 -Action Publish `
+  -BundleDirectory <transferred-bundle-directory> `
+  -Registry registry.internal.example/team
+```
+
+K8s chỉ deploy các `immutable_reference` trong manifest này, không deploy `pushed_tag`.
 
 ## Acceptance
 

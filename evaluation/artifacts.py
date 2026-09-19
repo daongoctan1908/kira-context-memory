@@ -16,7 +16,12 @@ from uuid import UUID, uuid4
 from pydantic import Field, TypeAdapter, field_validator, model_validator
 
 from evaluation.audit import AuditBatch, HumanAuditDecision
-from evaluation.isolation import IsolationLedger
+from evaluation.isolation import (
+    IsolationLedger,
+    IsolationPlan,
+    allocate_case_resources,
+    isolation_plan_sha256,
+)
 from evaluation.models import (
     BENCHMARK_CONTRACT_ID,
     BenchmarkVariant,
@@ -522,7 +527,7 @@ class ArtifactStore:
         judgment_key_set = set(judgment_keys)
 
         batches: dict[str, AuditBatch] = {}
-        decision_keys: list[tuple[str, str, str]] = []
+        decision_keys: list[tuple[str, str, str, str]] = []
         for artifact in self._audits:
             if isinstance(artifact, AuditBatchArtifact):
                 if artifact.batch_id in batches:
@@ -541,6 +546,7 @@ class ArtifactStore:
                     item
                     for item in batch.selections
                     if item.case_id == artifact.decision.case_id
+                    and item.subject == artifact.decision.subject
                     and item.output_sha256 == artifact.decision.output_sha256
                 ),
                 None,
@@ -548,7 +554,12 @@ class ArtifactStore:
             if selection is None:
                 raise ValueError("audit decision is not bound to a batch selection")
             decision_keys.append(
-                (artifact.batch_id, artifact.decision.case_id, artifact.decision.output_sha256)
+                (
+                    artifact.batch_id,
+                    artifact.decision.case_id,
+                    artifact.decision.subject,
+                    artifact.decision.output_sha256,
+                )
             )
         if len(decision_keys) != len(set(decision_keys)):
             raise ValueError("audit selection has duplicate human decisions")
@@ -632,18 +643,62 @@ class ArtifactStore:
         path = self.root / "diagnostics" / "isolation-ledger.json"
         if path.exists():
             existing = IsolationLedger.model_validate_json(path.read_text(encoding="utf-8"))
+            plan = self.load_isolation_plan()
             updated = {(item.case_id, item.attempt): item for item in ledger.resources}
             for owned in existing.resources:
                 replacement = updated.get((owned.case_id, owned.attempt))
-                if replacement is None or (
-                    replacement.model_copy(update={"memory_ids": ()})
-                    != owned.model_copy(update={"memory_ids": ()})
-                ):
+                if replacement is None:
                     raise ValueError("persisted resource ownership cannot be removed or reassigned")
+                identities_match = replacement.model_copy(
+                    update={"memory_ids": ()}
+                ) == owned.model_copy(update={"memory_ids": ()})
+                if not identities_match:
+                    allocation = allocate_case_resources(
+                        plan,
+                        case_id=owned.case_id,
+                        attempt=owned.attempt,
+                    )
+                    if owned != allocation or replacement.memory_ids:
+                        raise ValueError(
+                            "persisted resource ownership cannot be removed or reassigned"
+                        )
                 if not set(owned.memory_ids).issubset(replacement.memory_ids):
                     raise ValueError("persisted memory ownership cannot be removed")
         _replace(path, _canonical_json(ledger) + "\n")
         return path
+
+    def write_isolation_plan(self, plan: IsolationPlan) -> Path:
+        """Persist the secret-free run owner required to reconstruct a safe resume."""
+
+        identity = self.manifest.identity
+        if (
+            identity.isolation_sha256 is None
+            or plan.run_id != identity.run_id
+            or isolation_plan_sha256(plan) != identity.isolation_sha256
+        ):
+            raise ValueError("isolation plan does not match the artifact run")
+        path = self.root / "diagnostics" / "isolation-plan.json"
+        contents = _canonical_json(plan) + "\n"
+        if path.exists():
+            existing = IsolationPlan.model_validate_json(path.read_text(encoding="utf-8"))
+            if existing != plan:
+                raise ValueError("persisted isolation plan cannot be replaced")
+            return path
+        _write_new(path, contents)
+        return path
+
+    def load_isolation_plan(self) -> IsolationPlan:
+        plan = IsolationPlan.model_validate_json(
+            (self.root / "diagnostics" / "isolation-plan.json").read_text(encoding="utf-8")
+        )
+        identity = self.manifest.identity
+        if (
+            identity.isolation_sha256 is None
+            or plan.run_id != identity.run_id
+            or isolation_plan_sha256(plan) != identity.isolation_sha256
+        ):
+            raise ValueError("persisted isolation plan does not match the artifact run")
+        return plan
 
     def write_formed_corpus(self, corpus: FormedCorpusArtifact) -> Path:
         """Persist the provenance-bound corpus consumed by formation-produced retrieval."""

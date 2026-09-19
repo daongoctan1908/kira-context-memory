@@ -55,6 +55,7 @@ b256a0f  KiRa materialization preflight
 a658a55  technical PC acceptance gate
 2e41695  full-corpus mock runner + fail-closed live profile
 b184601  T4.6 handoff evidence/bundle + tài liệu PC này
+7911a8f  đồng bộ tài liệu handoff theo revision Phase 4 gần nhất
 ```
 
 Nếu remote chưa có commit mới nhất, dừng và yêu cầu chuyển/push đúng commit. Không tự tái tạo thay đổi
@@ -97,23 +98,56 @@ thật và human review hoàn tất trên PC.
 - T4.4 sanitized provider/preflight freeze contract;
 - T4.5 technical acceptance checker;
 - T4.6 hash-bound handoff evidence/export/import logic;
-- mock runner đủ bốn suites và không claim quality.
+- mock runner đủ bốn suites và không claim quality;
+- native runner in-process cho formation/retrieval/rewrite/cross-session;
+- run-owned PostgreSQL/Mem0 isolation, owner marker, exact cleanup và crash resume;
+- unit tests cho provider binding, suite dispatch, ownership ledger và interrupted attempt.
+- global human-audit budget `ceil(10% × semantic PASS/FAIL)` stratified theo
+  variant/suite/verdict/bundle, cộng toàn bộ `UNCERTAIN` và deterministic conflicts;
+- offline official-release tooling: internal run scorecard, three-pair confirmation gate,
+  performance reviewer verdict và promotion/keep-control evidence;
+- canonical production plan đã tách rõ PC technical acceptance khỏi K8s official benchmark.
 
-Docker engine trên laptop đã tắt lúc hoàn tất nên chưa build image thật. Không có live KiRa/OpenAI PC
-artifact nào được tạo trên laptop.
+Checkpoint này chỉ chạy validation offline, chưa build image thật và chưa tạo live KiRa/OpenAI PC
+artifact nào trên laptop.
 
-### Khoảng trống phải nhìn thấy ngay
+> Trước khi chuyển sang PC phải push và ghi lại exact handoff SHA. Clean checkout chỉ hợp lệ khi
+> commit đó có đủ các file native runner/audit/release tooling liệt kê bên dưới; không dùng riêng
+> revision cũ `7911a8f` để chạy.
 
-Lệnh `scripts.run_week5_benchmark run` hiện chỉ chạy profile `mock`. Với
-`pc_openai_acceptance`/`internal_test`, nó cố ý trả:
+### Validation snapshot trên laptop (2026-09-19)
 
-```json
-{"outcome":"NOT_RUN","reason":"native_benchmark_executor_not_configured"}
+Checkout bàn giao phải chứa đủ bốn file native mới sau; nếu thiếu thì revision đang dùng chưa phải
+revision Phase 4 hoàn chỉnh:
+
+```text
+evaluation/native_executor.py
+evaluation/native_runtime.py
+tests/unit/evaluation/test_native_executor.py
+tests/unit/evaluation/test_native_runtime.py
 ```
 
-Đây là fail-closed, không phải PASS. Trước full PC run, phải hoàn thiện native executor wiring theo
-mục 8. Không được xóa guard rồi sinh artifact giả. Các preflight, materialization, review, image,
-acceptance và handoff checker đã sẵn; live full-corpus executor là phần implementation còn thiếu.
+Kết quả gate cuối trên laptop:
+
+```text
+uv run ruff check .                 PASS
+uv run ruff format --check .        PASS (334 files formatted)
+uv run pytest -q                    PASS (1099 passed, 78 skipped)
+coverage                            90.02% (gate >= 90%)
+git diff --check                    PASS
+Docker live integration             NOT_RUN — không thuộc checkpoint offline này
+KiRa/OpenAI/PostgreSQL live run      NOT_RUN — chỉ thực hiện trên PC công ty
+```
+
+Các test skip không được tự diễn giải là PASS. Trên PC, chạy lại full suite khi Docker đã bật để các
+integration test có dependency thật được thực thi; sau đó mới làm materialization/preflight/live run.
+
+### Khoảng trống còn lại là live evidence, không còn là wiring giả
+
+Native runner đã được nối vào `pc_openai_acceptance` và `internal_test`. Nó bắt buộc đủ đúng bốn
+suite, `formation_mode=persistent`, explicit providers, run-owned schema và Worker ngoài phải dừng.
+Laptop chỉ xác minh được code/tests; chưa có KiRa thật, provider PC, image build hay full-corpus
+artifact. Vì vậy mọi live checkpoint ở các mục sau vẫn là `NOT_RUN` cho tới khi thực hiện trên PC.
 
 ## 3. Kiến trúc cần giữ nguyên
 
@@ -333,21 +367,10 @@ postgres-dependency
 Không hard-code “4 images”: số benchmark variant images là `2 + 2 × candidate_count`; cộng một
 PostgreSQL dependency image trong archive.
 
-## 8. Việc code còn thiếu trước full PC run — native benchmark executor
+## 8. Native benchmark executor đã có — audit trước khi chạy live
 
-Đầu tiên xác nhận khoảng trống vẫn tồn tại:
-
-```powershell
-uv run python -m scripts.run_week5_benchmark run `
-  --profile pc_openai_acceptance `
-  --suite rewrite `
-  --artifact-root artifacts/week5/probe-do-not-use
-```
-
-Nếu trả `native_benchmark_executor_not_configured`, phải implement. Nếu revision mới đã có executor,
-audit test và semantics trước khi dùng.
-
-### Yêu cầu implementation, không được giảm chuẩn
+Không dùng lệnh probe một suite: native runner cố ý từ chối partial run. Audit các boundary sau trên
+revision thực tế trước khi build image:
 
 Tái sử dụng các module đã có:
 
@@ -359,7 +382,7 @@ Tái sử dụng các module đã có:
 - `evaluation/isolation.py`: run/case-owned resources và cleanup authorization;
 - `evaluation/judge.py`: một OpenAI-compatible semantic call, zero automatic retry.
 
-Native executor phải:
+Native executor hiện phải giữ các invariants:
 
 1. validate/compile trước network call;
 2. dùng exact `RunProvenance` của image;
@@ -404,7 +427,8 @@ uv run ruff format --check .
 uv run pytest -q
 ```
 
-Commit executor riêng trước build image. Không chạy full corpus nếu chỉ có mock executor.
+Không chạy full corpus từ source tree dirty. Build eval image từ commit chứa executor rồi chạy
+network-disabled mock acceptance trước live provider calls.
 
 ## 9. T4.3 — build exact images sau dataset freeze và executor commit
 
@@ -503,6 +527,27 @@ Required probes: extraction JSON, embedding dimension, rewrite, judge schema, pg
 conversation DB, Gateway, Worker. KiRa real evidence lấy từ complete materialization checkpoint, không
 dùng mock `/_test/requests`.
 
+Sau khi preflight của variant đó PASS, **dừng đúng Worker của variant trước native benchmark**. Runner
+tự claim/process job cross-session trong eval-controller để dùng đúng run-owned Mem0 schema; để
+Worker thường chạy song song sẽ tạo race và làm artifact vô hiệu.
+
+Control:
+
+```powershell
+docker compose --env-file .env.week5.pc.local -f compose.week5.benchmark.yaml `
+  --profile control stop control-worker
+```
+
+Candidate:
+
+```powershell
+docker compose --env-file .env.week5.pc.local -f compose.week5.benchmark.yaml `
+  --profile candidate stop candidate-worker
+```
+
+Xác minh container Worker đã stopped. Không dừng PostgreSQL. Gateway có thể giữ chạy nhưng native
+runner không phụ thuộc Gateway cho case execution.
+
 Freeze preflight dùng một run-set provider artifact đã xác minh đồng nhất (hoặc mở rộng freeze để
 hash tất cả variant preflights nếu native executor implementation yêu cầu):
 
@@ -521,21 +566,25 @@ sanitize.
 
 ## 12. T4.5 — full PC OpenAI acceptance
 
-Sau khi native executor hoàn chỉnh, chạy control rồi candidates tuần tự, cùng dataset/config/seed:
+Chạy control rồi candidates tuần tự, cùng dataset/config/seed. Chạy **bên trong exact eval image** để
+hostname PostgreSQL nội bộ và harness provenance đều đúng. Không truyền `--env-file-only`: Compose đã
+nạp file local và inject `WEEK5_DATABASE_URL`/`WEEK5_MEMORY_DATABASE_URL` đúng variant.
 
 ```powershell
-python -m scripts.run_week5_benchmark run `
+docker compose --env-file .env.week5.pc.local -f compose.week5.benchmark.yaml `
+  --profile tools run --rm eval-controller run `
   --profile pc_openai_acceptance `
   --suite formation --suite retrieval --suite rewrite --suite cross_session `
   --formation-mode persistent `
-  --env-file .env.week5.pc.local --env-file-only `
-  --provenance-file artifacts/week5/offline-handoff/provenance/<variant>.json `
-  --dataset-root dataset/kira_ltm_v1 `
-  --artifact-root artifacts/week5/pc-openai/<run-set-id>/<variant> `
+  --provenance-file /materialization/offline-handoff/provenance/<variant>.json `
+  --dataset-root /app/dataset/kira_ltm_v1 `
+  --artifact-root /artifacts/pc-openai/<run-set-id>/<variant> `
   --seed 742
 ```
 
-Resume dùng đúng command/artifact root; manifest giữ run ID và case ledger. Không overwrite run khác.
+`<variant>` là `control`, `candidate-a` hoặc `candidate-b` đúng image đang chạy. Resume dùng nguyên
+command/artifact root; manifest + isolation plan giữ run/owner ID, attempt dang dở được đóng bằng
+`benchmark_attempt_interrupted`, rồi attempt mới dùng state riêng. Không overwrite run khác.
 
 Metrics cần report nhưng chỉ diagnostic:
 
@@ -623,7 +672,10 @@ worktrees. Lưu thêm SHA-256 của toàn bundle theo cơ chế chuyển file n�
 ```
 
 Import kiểm checksum từng file, tar, load images và so image ID với manifest. Nếu dùng internal
-registry, publish immutable digest; không retag `latest` làm evidence.
+registry, chạy `-Action Publish`; script tạo create-only `registry-manifest.json` có
+`repository@sha256:...` cho từng runtime/eval image. K8s chỉ dùng immutable reference, không dùng
+tag hoặc `latest` làm evidence. Quy trình Phase 5 đầy đủ nằm trong
+`K8S-RUNBOOK.md` của bundle và `docs/week5-internal-k8s-acceptance.md` trong repo.
 
 ### K8s preflight
 
@@ -651,12 +703,27 @@ Tối đa hai declared candidate revisions. Chỉ freeze best candidate trước
 - cùng exact dataset/config/order/seed policy;
 - không tune sau khi bắt đầu confirmation;
 - audit toàn bộ semantic `UNCERTAIN`/bất đồng;
-- audit khoảng 10% semantic PASS/FAIL, stratified theo verdict;
+- audit một global budget `ceil(10% × tổng semantic PASS/FAIL)`, stratified theo
+  variant/suite/verdict/bundle;
 - deterministic scorer không cần random manual audit;
 - safety là hard fail;
 - không gộp mọi metric thành một score tổng.
 
+Khi điền audit decisions, copy nguyên `case_id`, `subject` và `output_sha256` từ batch. Không bỏ
+`subject`: một cross-session case có thể có semantic output riêng cho No-LTM/With-LTM và
+rewrite/final answer.
+
 Sau confirmation mới chạy late performance guardrail và promotion/keep-control decision.
+
+Các command `release scorecard|confirm|performance|promote` đã được triển khai và unit-test trên
+laptop. Chúng chỉ tổng hợp/validate artifact, không gọi provider. `release scorecard` cố ý chỉ nhận
+`internal_test`, nên PC/OpenAI không được dùng command này để tạo official evidence. PC phải hoàn
+thành materialization, review/freeze, technical acceptance và exact-image handoff; K8s mới chạy
+scorecard/confirmation chính thức theo `docs/week5-internal-k8s-acceptance.md`.
+
+Nếu reviewer đổi verdict của một formation match, không sửa tay scorecard: phải re-score/rerun để
+TP/FP/FN và audit artifact cùng nhất quán. Tool sẽ fail-closed với
+`formation_audit_override_requires_rescore`.
 
 ## 16. Security và các điều tuyệt đối không làm
 
@@ -700,6 +767,7 @@ artifacts/week5/
     compose.week5.benchmark.yaml
     week5.internal.env.example
     RUNBOOK.md
+    K8S-RUNBOOK.md
     COMPANY-PC-AI-HANDOFF.md
     bundle-manifest.json
 ```

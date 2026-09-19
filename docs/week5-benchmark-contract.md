@@ -9,7 +9,9 @@ acceptance dataset chạy toàn bộ, không phải bằng chứng generalizatio
 Control source không đổi.
 Đây là đặc tả cho implementation tiếp theo, chưa phải harness hoặc benchmark result.
 
-Liên quan: [Week 5 plan](week5-plan.md), [control manifest](week5-baseline.json),
+Liên quan: [control manifest](week5-baseline.json),
+[PC/VDI handoff](company-pc-ai-handoff.md),
+[internal K8s acceptance](week5-internal-k8s-acceptance.md) và
 [Week 4 release evidence](week4-t4.23-release-evidence.md).
 
 ## 1. Control và phạm vi so sánh
@@ -143,8 +145,12 @@ Không dùng cleanup rộng lên DB ứng dụng, không dùng memory để auth
 Auto checks xử lý cấu trúc, exact-normalized match và ràng buộc deterministic. Chỉ internal
 LLM-as-a-judge xử lý semantic equivalence; canonical dataset không được fallback sang external
 provider. Judge chạy temperature 0, bị blind với variant và ghi model/deployment cùng hash của
-prompt/schema. `UNCERTAIN`, xung đột với deterministic checks và sample 10% cố định được human
-audit. Judgment/audit record phải gắn output hash và case ID; output đổi thì record cũ hết hiệu lực.
+prompt/schema. Human audit lấy toàn bộ `UNCERTAIN`, toàn bộ xung đột với deterministic checks và
+một ngân sách toàn cục `ceil(10% × tổng semantic PASS/FAIL)`, stratified theo
+variant/suite/verdict/bundle. Judgment/audit record phải gắn output hash và case ID; output đổi thì
+record cũ hết hiệu lực. Một case có nhiều semantic output phải có `subject` riêng (ví dụ
+`rewrite`, `final_no_ltm`, `final_with_ltm`); reviewer decision phải copy đúng cả `case_id`,
+`subject` và `output_sha256` từ audit batch.
 Langfuse/OTel chỉ trace/debug, không cung cấp verdict hoặc denominator.
 
 Report luôn có total eligible, attempted, từng outcome count và số case thực sự được chấm.
@@ -186,31 +192,31 @@ task success là `N/A` khi không có structured action/API evidence. Bounded wa
 
 ## 6. Candidate selection và late performance guardrail
 
-T5.10 chạy control trước, thử tối đa hai declared candidate trên cùng full corpus. T5.13 grid
-là diagnostic trên corpus đó; tổ hợp cuối được chọn bằng metric/guardrail đã khóa trước, sau đó
-freeze thành một candidate cho ba paired repetitions. Không mở thêm candidate bằng cách cherry-pick
-case, đổi gold hoặc đổi luật sau khi xem kết quả.
+T5.3 chạy control trước, thử tối đa hai declared candidate trên cùng full corpus; diagnostic grid
+chỉ hỗ trợ discovery. Tổ hợp cuối được chọn bằng metric/guardrail đã khóa trước, sau đó freeze thành
+một candidate cho ba paired repetitions T5.5. Không mở thêm candidate bằng cách cherry-pick case,
+đổi gold hoặc đổi luật sau khi xem kết quả.
 
 | Thành phần được tune | Primary metric | Guardrails |
 | --- | --- | --- |
 | Formation | F1 tăng | Precision và Recall không giảm |
-| Retrieval | MRR@10 tăng | Recall@3 không giảm |
+| Retrieval | Recall@3 tăng | MRR@10 không giảm |
 | Rewrite | Semantic judge pass rate tăng | Constraint pass rate không giảm; không thêm safety regression |
-| Final QA | Semantic judge pass hoặc task success tăng | Metric còn lại không giảm; không thêm safety regression |
+| Final QA | Semantic judge pass rate tăng | Task success không giảm khi observable; không thêm safety regression |
 
 Chọn candidate trên paired, reviewed case set cùng profile; không promote từ mock. Candidate cuối
-phải cải thiện primary metric và ít nhất một scenario family; component không đổi vẫn phải không
-regress. Không dùng weighted aggregate để che cross-user leak hoặc formula failure. Tie giữ control;
-không đủ evidence cũng giữ control. Nếu hai candidate cùng tốt, ưu tiên ít thay đổi hơn; nếu vẫn
-hòa thì giữ control. Performance chạy sau semantic confirmation và không được dùng để cứu một
-candidate không có semantic gain.
+phải cải thiện primary aggregate và ít nhất 2/3 paired repetitions cùng hướng; component không đổi
+vẫn phải không regress. Không dùng weighted aggregate để che cross-user leak hoặc formula failure.
+Tie giữ control; không đủ evidence cũng giữ control. Nếu hai candidate cùng tốt, ưu tiên ít thay đổi
+hơn; nếu vẫn hòa thì giữ control. Performance chạy sau semantic confirmation và không được dùng để
+cứu một candidate không có semantic gain.
 
-Semantic confirmation chạy ba independent repetitions cho control và candidate với fresh state, case order seed
-cố định theo từng paired repetition; không cherry-pick lần tốt nhất. Báo từng run + tổng hợp,
-per-family deltas và failure counts. Promotion yêu cầu cả ba run đáp ứng guardrails, primary gain
-ở kết quả tổng hợp, và cùng một family có gain lặp lại ít nhất hai run. Cả hai phía phải được
-review đầy đủ trên toàn bộ case đủ điều kiện; dependency/protocol gaps cần rerun paired hoặc giữ trạng thái chưa đủ
-evidence, không promote trên subset bị thiếu dữ liệu. Human chỉ audit các case theo policy chọn mẫu,
+Semantic confirmation chạy ba independent repetitions cho control và candidate với fresh state,
+case-order seed cố định theo từng paired repetition; không cherry-pick lần tốt nhất. Báo từng run +
+tổng hợp và failure counts. Promotion yêu cầu primary aggregate tăng, ít nhất 2/3 repetitions cùng
+hướng, guardrail không giảm, With-LTM tốt hơn No-LTM, task success không giảm khi observable và zero
+safety hard fail. Cả hai phía phải đủ evidence; dependency/protocol/audit gaps là
+`INSUFFICIENT_EVIDENCE`, không promote trên subset bị thiếu dữ liệu. Human chỉ audit theo policy,
 không chấm tay toàn bộ output.
 
 Hard gates trên corpus được chạy: zero observed cross-user leak, secret memory, inferred

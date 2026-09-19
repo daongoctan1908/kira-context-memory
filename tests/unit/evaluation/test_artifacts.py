@@ -378,6 +378,7 @@ def test_isolation_ledger_is_atomically_bound_to_artifact_run(tmp_path: Path):
     )
     ledger = new_isolation_ledger(plan)
 
+    store.write_isolation_plan(plan)
     path = store.write_isolation_ledger(ledger)
 
     assert path.name == "isolation-ledger.json"
@@ -386,8 +387,41 @@ def test_isolation_ledger_is_atomically_bound_to_artifact_run(tmp_path: Path):
         update={"resources": (allocate_case_resources(plan, case_id="conv01:case-1", attempt=1),)}
     )
     store.write_isolation_ledger(expanded)
+    claimed_resource = expanded.resources[0].model_copy(
+        update={"conversation_id": UUID(int=50), "event_id": UUID(int=51)}
+    )
+    claimed = expanded.model_copy(update={"resources": (claimed_resource,)})
+    store.write_isolation_ledger(claimed)
+    reassigned = claimed.model_copy(
+        update={"resources": (claimed_resource.model_copy(update={"event_id": UUID(int=52)}),)}
+    )
+    with pytest.raises(ValueError, match="cannot be removed or reassigned"):
+        store.write_isolation_ledger(reassigned)
     with pytest.raises(ValueError, match="cannot be removed"):
         store.write_isolation_ledger(ledger)
     wrong = ledger.model_copy(update={"plan_sha256": "0" * 64})
     with pytest.raises(ValueError, match="another artifact run"):
         store.write_isolation_ledger(wrong)
+
+
+def test_isolation_plan_is_immutable_and_hash_bound(tmp_path: Path):
+    plan = create_isolation_plan(
+        run_id=_RUN_ID,
+        owner_token=UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+        conversation_database_url="postgresql://eval:secret@localhost/eval",
+        memory_database_url="postgresql://eval:secret@localhost/eval",
+    )
+    store = ArtifactStore.create(
+        tmp_path / "run",
+        identity=_identity(isolation_sha256=isolation_plan_sha256(plan)),
+        created_at=_NOW,
+    )
+
+    path = store.write_isolation_plan(plan)
+    assert path.name == "isolation-plan.json"
+    assert store.load_isolation_plan() == plan
+    assert store.write_isolation_plan(plan) == path
+
+    other = plan.model_copy(update={"owner_token": UUID(int=999)})
+    with pytest.raises(ValueError, match="does not match"):
+        store.write_isolation_plan(other)

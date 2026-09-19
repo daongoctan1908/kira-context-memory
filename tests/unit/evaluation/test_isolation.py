@@ -11,6 +11,7 @@ from evaluation.isolation import (
     allocate_case_resources,
     apply_isolation,
     authorize_cleanup,
+    claim_case_resources,
     create_isolation_plan,
     database_fingerprint,
     isolation_plan_sha256,
@@ -107,14 +108,29 @@ def test_case_resource_allocation_is_retry_stable_and_attempt_isolated():
         allocate_case_resources(plan, case_id="conv01:formation:M01", attempt=0)
 
 
-def test_ledger_registration_is_idempotent_but_cannot_reassign_resources():
+def test_ledger_allocation_can_be_claimed_once_but_cannot_be_reassigned():
     plan = _plan()
     ledger = new_isolation_ledger(plan)
     resource = allocate_case_resources(plan, case_id="conv01:formation:M01", attempt=1)
 
     registered = register_case_resources(ledger, plan, resource)
     assert register_case_resources(registered, plan, resource) == registered
-    forged = resource.model_copy(update={"event_id": UUID(int=123)})
+    observed = claim_case_resources(
+        plan,
+        case_id=resource.case_id,
+        attempt=resource.attempt,
+        conversation_id=UUID(int=122),
+        event_id=UUID(int=123),
+    )
+    assert observed.user_id == resource.user_id
+    assert observed.session_id == resource.session_id
+    claimed = register_case_resources(registered, plan, observed)
+    assert claimed.resources == (observed,)
+    reassigned = observed.model_copy(update={"event_id": UUID(int=124)})
+    with pytest.raises(ValueError, match="cannot be reassigned"):
+        register_case_resources(claimed, plan, reassigned)
+
+    forged = resource.model_copy(update={"user_id": "eval:aaaaaaaaaaaa:u:forged"})
     with pytest.raises(ValueError, match="not allocated"):
         register_case_resources(registered, plan, forged)
 

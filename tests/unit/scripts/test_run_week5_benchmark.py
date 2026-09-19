@@ -5,18 +5,36 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
+import pytest
+
 from evaluation.artifacts import ArtifactRunIdentity, ArtifactStore, CaseAttemptArtifact
+from evaluation.audit import AuditCandidate, AuditReconciliation
 from evaluation.dataset import default_dataset_root
 from evaluation.models import (
     BenchmarkVariant,
     GitSource,
     Outcome,
+    PerformanceReviewVerdict,
     Profile,
     RunProvenance,
     Suite,
 )
+from evaluation.release_evidence import (
+    CleanupEvidence,
+    ExactImageSet,
+    PerformanceEvidence,
+    PerformanceSample,
+    QualityMetric,
+    QualityMetricName,
+    RunQualityEvidence,
+)
 from evaluation.scoring import output_sha256
-from scripts.run_week5_benchmark import main
+from evaluation.timing import TimingOutcome, TimingStage
+from scripts.run_week5_benchmark import (
+    _load_application_settings,
+    _require_native_run_contract,
+    main,
+)
 
 _HASH = "a" * 64
 
@@ -206,7 +224,36 @@ def test_audit_export_and_import_are_deterministic_and_hash_bound(tmp_path: Path
     status = json.loads(capsys.readouterr().out)
     result = json.loads(result_path.read_text(encoding="utf-8"))
     assert status["reconciled_count"] == 2
-    assert result["pending_audit_case_ids"] == []
+    assert result["pending_audit_ids"] == []
+
+
+def test_audit_candidates_cli_writes_content_free_jsonl(tmp_path: Path, capsys, monkeypatch):
+    candidate = AuditCandidate.model_validate(_candidate("conv01:case-1", "1" * 64))
+    monkeypatch.setattr(
+        "scripts.run_week5_benchmark.build_audit_candidates",
+        lambda **_kwargs: (candidate,),
+    )
+    output = tmp_path / "audit-candidates.jsonl"
+
+    assert (
+        main(
+            [
+                "audit",
+                "candidates",
+                "--run-root",
+                str(tmp_path / "native-run"),
+                "--output",
+                str(output),
+            ]
+        )
+        == 0
+    )
+
+    status = json.loads(capsys.readouterr().out)
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert status["candidate_count"] == 1
+    assert payload["case_id"] == "conv01:case-1"
+    assert "content" not in payload
 
 
 def test_offline_cli_errors_are_sanitized(tmp_path: Path, capsys):
@@ -269,7 +316,7 @@ def test_run_cli_executes_and_resumes_the_mock_case_ledger(tmp_path: Path, capsy
     assert (root / "cases.jsonl").read_text(encoding="utf-8").splitlines() == case_lines
 
 
-def test_run_cli_refuses_to_fake_a_live_native_executor(tmp_path: Path, capsys):
+def test_native_run_requires_the_complete_persistent_suite_contract(tmp_path: Path, capsys):
     result = main(
         [
             "run",
@@ -284,9 +331,201 @@ def test_run_cli_refuses_to_fake_a_live_native_executor(tmp_path: Path, capsys):
 
     assert result == 2
     output = json.loads(capsys.readouterr().out)
-    assert output == {
-        "outcome": "NOT_RUN",
-        "profile": "pc_openai_acceptance",
-        "reason": "native_benchmark_executor_not_configured",
-    }
+    assert output == {"outcome": "NOT_RUN", "reason": "offline_command_error"}
     assert not (tmp_path / "pc-run").exists()
+
+    with pytest.raises(ValueError, match="persistent"):
+        _require_native_run_contract(
+            Profile.PC_OPENAI_ACCEPTANCE,
+            tuple(Suite),
+            "write_free",
+        )
+
+
+def test_file_only_application_settings_ignore_ambient_values(tmp_path: Path, monkeypatch):
+    env = tmp_path / "pc.env"
+    env.write_text(
+        "KIRA_BASE_URL=https://file-kira.invalid\n"
+        "KIRA_USERNAME=file-user\n"
+        "KIRA_BASIC_AUTH=file-secret\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("KIRA_USERNAME", "ambient-user")
+
+    settings = _load_application_settings(env, file_only=True)
+
+    assert settings.kira_username == "file-user"
+    assert settings.kira_basic_auth.get_secret_value() == "file-secret"
+
+
+def _quality_evidence(variant: BenchmarkVariant, number: int, value: float) -> RunQualityEvidence:
+    metrics = {name: QualityMetric(value=0.8, denominator=10) for name in QualityMetricName}
+    metrics[QualityMetricName.FORMATION_F1] = QualityMetric(value=value, denominator=10)
+    metrics[QualityMetricName.FINAL_QA_SEMANTIC_PASS_RATE] = QualityMetric(
+        value=value, denominator=10
+    )
+    metrics[QualityMetricName.NO_LTM_FINAL_QA_SEMANTIC_PASS_RATE] = QualityMetric(
+        value=0.4, denominator=10
+    )
+    return RunQualityEvidence(
+        run_id=UUID(int=number + (100 if variant is BenchmarkVariant.RELEASE_CANDIDATE else 0)),
+        variant=variant,
+        candidate_id="candidate-a" if variant is BenchmarkVariant.RELEASE_CANDIDATE else None,
+        dataset_sha256="1" * 64,
+        compilation_sha256="2" * 64,
+        selected_case_ids_sha256="3" * 64,
+        seed=number,
+        runtime_sha=("4" if variant is BenchmarkVariant.HISTORICAL_CONTROL else "5") * 40,
+        harness_sha="6" * 40,
+        config_sha256=("7" if variant is BenchmarkVariant.HISTORICAL_CONTROL else "8") * 64,
+        metrics=metrics,
+        families=(),
+        evidence_complete=True,
+    )
+
+
+def test_release_cli_builds_scorecard_confirmation_performance_and_promotion(
+    tmp_path: Path, capsys, monkeypatch
+):
+    control_paths = []
+    candidate_paths = []
+    for index, candidate_value in enumerate((0.7, 0.5, 0.8), 1):
+        control = _quality_evidence(BenchmarkVariant.HISTORICAL_CONTROL, index, 0.6)
+        candidate = _quality_evidence(BenchmarkVariant.RELEASE_CANDIDATE, index, candidate_value)
+        control_path = tmp_path / f"control-{index}.json"
+        candidate_path = tmp_path / f"candidate-{index}.json"
+        control_path.write_text(control.model_dump_json(), encoding="utf-8")
+        candidate_path.write_text(candidate.model_dump_json(), encoding="utf-8")
+        control_paths.append(control_path)
+        candidate_paths.append(candidate_path)
+
+    reconciliation = AuditReconciliation(
+        candidate_set_sha256="a" * 64,
+        cases=(),
+        expansion=(),
+        pending_audit_ids=(),
+        insufficient_evidence_suites=(),
+        dataset_revision_case_ids=(),
+    )
+    reconciliation_path = tmp_path / "reconciliation.json"
+    reconciliation_path.write_text(reconciliation.model_dump_json(), encoding="utf-8")
+    monkeypatch.setattr(
+        "scripts.run_week5_benchmark.build_run_quality_evidence",
+        lambda **_kwargs: _quality_evidence(BenchmarkVariant.HISTORICAL_CONTROL, 1, 0.6),
+    )
+    scorecard_path = tmp_path / "scorecard.json"
+    assert (
+        main(
+            [
+                "release",
+                "scorecard",
+                "--run-root",
+                str(tmp_path / "run"),
+                "--audit-reconciliation",
+                str(reconciliation_path),
+                "--output",
+                str(scorecard_path),
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    confirmation_path = tmp_path / "confirmation.json"
+    confirm_args = ["release", "confirm", "--component", "formation"]
+    for path in control_paths:
+        confirm_args.extend(("--control", str(path)))
+    for path in candidate_paths:
+        confirm_args.extend(("--candidate", str(path)))
+    confirm_args.extend(("--output", str(confirmation_path)))
+    assert main(confirm_args) == 0
+    assert json.loads(capsys.readouterr().out)["outcome"] == "pass"
+
+    samples = tuple(
+        PerformanceSample(
+            variant=variant,
+            ordinal=ordinal,
+            warmup=ordinal <= 5,
+            duration_ms=float(ordinal),
+            outcome=TimingOutcome.SUCCESS,
+        )
+        for variant in (
+            BenchmarkVariant.HISTORICAL_CONTROL,
+            BenchmarkVariant.RELEASE_CANDIDATE,
+        )
+        for ordinal in range(1, 36)
+    )
+    performance_evidence = PerformanceEvidence(
+        stage=TimingStage.KIRA_COMPLETION,
+        workload_sha256="b" * 64,
+        environment_sha256="c" * 64,
+        samples=samples,
+    )
+    evidence_path = tmp_path / "performance-evidence.json"
+    evidence_path.write_text(performance_evidence.model_dump_json(), encoding="utf-8")
+    performance_path = tmp_path / "performance.json"
+    assert (
+        main(
+            [
+                "release",
+                "performance",
+                "--confirmation",
+                str(confirmation_path),
+                "--evidence",
+                str(evidence_path),
+                "--verdict",
+                PerformanceReviewVerdict.ACCEPTABLE,
+                "--reviewer",
+                "reviewer-1",
+                "--rationale",
+                "Bounded workload is acceptable.",
+                "--output",
+                str(performance_path),
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    images = ExactImageSet(
+        images={
+            "control-runtime": f"registry/control-runtime@sha256:{'1' * 64}",
+            "control-eval": f"registry/control-eval@sha256:{'2' * 64}",
+            "candidate-runtime": f"registry/candidate-runtime@sha256:{'3' * 64}",
+            "candidate-eval": f"registry/candidate-eval@sha256:{'4' * 64}",
+        }
+    )
+    images_path = tmp_path / "images.json"
+    images_path.write_text(images.model_dump_json(), encoding="utf-8")
+    cleanup = CleanupEvidence(
+        run_ids=tuple(UUID(int=index) for index in range(1, 7)), completed=True
+    )
+    cleanup_path = tmp_path / "cleanup.json"
+    cleanup_path.write_text(cleanup.model_dump_json(), encoding="utf-8")
+    promotion_path = tmp_path / "promotion.json"
+    assert (
+        main(
+            [
+                "release",
+                "promote",
+                "--confirmation",
+                str(confirmation_path),
+                "--performance",
+                str(performance_path),
+                "--images",
+                str(images_path),
+                "--cleanup",
+                str(cleanup_path),
+                "--decision",
+                "promote_candidate",
+                "--reviewer",
+                "reviewer-1",
+                "--rationale",
+                "All release evidence passed.",
+                "--output",
+                str(promotion_path),
+            ]
+        )
+        == 0
+    )
+    assert json.loads(capsys.readouterr().out)["outcome"] == "promote_candidate"
