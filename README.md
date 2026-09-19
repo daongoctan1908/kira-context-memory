@@ -202,6 +202,8 @@ Nghiệm thu với endpoint nội bộ thật vẫn là gate riêng, xem
 
 - Python 3.11
 - [uv](https://docs.astral.sh/uv/)
+- Node.js 22.12 trở lên
+- pnpm 10 qua Corepack
 
 ## Thiết lập local
 
@@ -220,6 +222,24 @@ uv run ruff check .
 uv run ruff format --check .
 uv run pytest
 ```
+
+Frontend React nằm trong `frontend/`. Cài dependency và chạy các gate T9.1:
+
+```powershell
+Set-Location frontend
+corepack pnpm install --frozen-lockfile
+corepack pnpm lint
+corepack pnpm typecheck
+corepack pnpm test
+corepack pnpm build
+corepack pnpm exec playwright install chromium
+corepack pnpm test:e2e
+Set-Location ..
+```
+
+Chạy local bằng `corepack pnpm dev` trong thư mục `frontend/`, sau đó mở
+`http://127.0.0.1:4173/chat/new`. Scaffold hiện chỉ khóa route `/login`, `/chat/new` và
+`/chat/:sessionId`; auth, API conversation và streaming lần lượt thuộc T9.2-T9.4.
 
 Khởi động PostgreSQL local, apply migration và chạy integration test thật:
 
