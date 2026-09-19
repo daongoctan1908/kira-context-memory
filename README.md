@@ -223,7 +223,7 @@ uv run ruff format --check .
 uv run pytest
 ```
 
-Frontend React nằm trong `frontend/`. Cài dependency và chạy các gate T9.1-T9.4:
+Frontend React nằm trong `frontend/`. Cài dependency và chạy các gate T9.1-T9.5:
 
 ```powershell
 Set-Location frontend
@@ -243,6 +243,20 @@ Chạy local bằng `corepack pnpm dev` trong thư mục `frontend/`, sau đó m
 `frontend/.env.local`. Auth, danh sách conversation, cursor history, create/delete và retry
 `deletion_pending` đã hoàn thành. Chat dùng POST-SSE, hỗ trợ dừng, retry cùng
 `client_message_id`, completed replay và cảnh báo câu trả lời chưa được lưu.
+
+Build và chạy production image của frontend:
+
+```powershell
+docker build --file frontend/Dockerfile --tag kira-chat-frontend:local frontend
+docker run --rm --publish 8080:8080 `
+  --env GATEWAY_UPSTREAM=host.docker.internal:8000 `
+  kira-chat-frontend:local
+```
+
+`GATEWAY_UPSTREAM` là `host:port`, không kèm scheme. Nginx phục vụ SPA và chuyển tiếp `/api`
+cùng origin; nếu thiếu biến này container sẽ dừng thay vì chạy với backend mặc định ẩn. Có thể chạy
+browser smoke trên image đang mở ở cổng 8080 bằng cách đặt
+`PLAYWRIGHT_BASE_URL=http://127.0.0.1:8080` rồi chạy `corepack pnpm test:e2e` trong `frontend/`.
 
 Khởi động PostgreSQL local, apply migration và chạy integration test thật:
 

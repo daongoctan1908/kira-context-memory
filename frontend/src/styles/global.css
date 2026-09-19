@@ -523,6 +523,37 @@ textarea:focus-visible {
   white-space: pre-wrap;
 }
 
+.message-markdown {
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.message-markdown > :first-child {
+  margin-top: 0;
+}
+
+.message-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.message-markdown pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+
+.message-markdown code {
+  font-family: "Cascadia Code", ui-monospace, monospace;
+  font-size: 0.9em;
+}
+
+.message-markdown a {
+  color: var(--accent-strong);
+  text-underline-offset: 3px;
+}
+
 .message-bubble time {
   display: block;
   margin-top: 9px;

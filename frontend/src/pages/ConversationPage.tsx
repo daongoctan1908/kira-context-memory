@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { ApiError } from "../api/http";
 import { ChatComposer } from "../chat/ChatComposer";
+import { SafeMarkdown } from "../chat/SafeMarkdown";
 import { useChatStream, type LiveTurn } from "../chat/useChatStream";
 import { FormError } from "../components/FormError";
 import {
@@ -167,7 +168,11 @@ function ConversationSession({ sessionId }: { sessionId: string }) {
                   <span className="message-role">
                     {message.role === "user" ? "Bạn" : "KiRa"}
                   </span>
-                  <p>{message.content}</p>
+                  {message.role === "assistant" ? (
+                    <SafeMarkdown content={message.content} />
+                  ) : (
+                    <p>{message.content}</p>
+                  )}
                   <time dateTime={message.timestamp}>{formatMessageTime(message.timestamp)}</time>
                 </article>
               </li>
@@ -214,7 +219,7 @@ function LiveTurnMessages({
         <article className="message-bubble live-message-bubble">
           <span className="message-role">KiRa</span>
           {turn.assistantText.length > 0 ? (
-            <p>{turn.assistantText}</p>
+            <SafeMarkdown content={turn.assistantText} />
           ) : (
             <p className="stream-placeholder">
               {active ? "Đang nhận phản hồi..." : "Chưa nhận được câu trả lời."}

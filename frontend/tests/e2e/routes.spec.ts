@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 const USER = { user_id: "user-01", username: "alice" };
+const APP_URL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:4173";
 const CONVERSATION = {
   conversation_id: "11111111-1111-4111-8111-111111111111",
   session_id: "company-session-01",
@@ -132,7 +133,7 @@ test("password change sends CSRF and revokes the current frontend session", asyn
     {
       name: "kira_csrf_dev",
       value: "csrf-e2e",
-      url: "http://127.0.0.1:4173",
+      url: APP_URL,
     },
   ]);
   let csrfHeader: string | undefined;
@@ -200,7 +201,7 @@ test("pending deletion remains visible and can be retried", async ({ context, pa
     {
       name: "kira_csrf_dev",
       value: "csrf-delete",
-      url: "http://127.0.0.1:4173",
+      url: APP_URL,
     },
   ]);
   await page.route("**/api/v1/auth/me", async (route) => {
@@ -250,7 +251,7 @@ test("conversation streams one durable turn without duplicate bubbles", async ({
     {
       name: "kira_csrf_dev",
       value: "csrf-stream",
-      url: "http://127.0.0.1:4173",
+      url: APP_URL,
     },
   ]);
   await page.route("**/api/v1/auth/me", async (route) => {
