@@ -145,6 +145,20 @@ def test_worker_settings_validate_memory_pool_bounds() -> None:
         )
 
 
+def test_worker_requires_queue_and_memory_storage_in_same_database() -> None:
+    settings = make_settings(
+        database_url="postgresql+asyncpg://queue:secret@postgres.test:5432/kira",
+        memory_database_url="postgresql://memory:other@postgres.test/kira",
+    )
+    assert settings.database_url != settings.memory_database_url
+
+    with pytest.raises(ValidationError, match="same PostgreSQL database"):
+        make_settings(memory_database_url="postgresql://memory:other@postgres.test/other")
+
+    with pytest.raises(ValidationError, match="memory admin and runtime"):
+        make_settings(memory_admin_database_url="postgresql://admin:other@postgres.test/other")
+
+
 def test_worker_otel_export_batch_must_fit_in_queue() -> None:
     with pytest.raises(ValidationError, match="batch size"):
         make_settings(

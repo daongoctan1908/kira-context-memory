@@ -14,6 +14,8 @@ from pydantic import (
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.config.runtime_contracts import postgres_database_identity
+
 
 class WorkerSettings(BaseSettings):
     """Worker-only configuration with no KiRa or query-rewriter dependency."""
@@ -101,6 +103,16 @@ class WorkerSettings(BaseSettings):
             raise ValueError("OTel Collector endpoint must not contain credentials or query data")
         if self.memory_postgres_max_connections < self.memory_postgres_min_connections:
             raise ValueError("memory PostgreSQL max connections must be at least min connections")
+        if postgres_database_identity(self.database_url) != postgres_database_identity(
+            self.memory_database_url
+        ):
+            raise ValueError("queue and memory storage must use the same PostgreSQL database")
+        if self.memory_admin_database_url is not None and postgres_database_identity(
+            self.memory_admin_database_url
+        ) != postgres_database_identity(self.memory_database_url):
+            raise ValueError(
+                "memory admin and runtime storage must use the same PostgreSQL database"
+            )
         if len(self.memory_job_retry_delays_seconds) != self.memory_job_max_attempts - 1:
             raise ValueError("memory job retry delays must define one delay before each retry")
         if any(

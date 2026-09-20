@@ -9,6 +9,11 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+from app.infrastructure.postgres.migration_lock import (
+    acquire_migration_lock,
+    migration_lock_timeout_seconds,
+    release_migration_lock,
+)
 from app.infrastructure.postgres.schema import metadata
 
 config = context.config
@@ -62,10 +67,24 @@ async def run_async_migrations() -> None:
         poolclass=pool.NullPool,
     )
 
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-
-    await connectable.dispose()
+    try:
+        async with connectable.connect() as connection:
+            await acquire_migration_lock(
+                connection,
+                timeout_seconds=migration_lock_timeout_seconds(),
+            )
+            # The lock is session-scoped, so commit the SELECT transaction before Alembic
+            # starts and owns its migration transaction on this same connection.
+            await connection.commit()
+            try:
+                await connection.run_sync(do_run_migrations)
+            finally:
+                if connection.in_transaction():
+                    await connection.rollback()
+                await release_migration_lock(connection)
+                await connection.commit()
+    finally:
+        await connectable.dispose()
 
 
 def run_migrations_online() -> None:

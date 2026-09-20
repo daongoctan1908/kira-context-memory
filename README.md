@@ -17,7 +17,9 @@ crash-safe artifacts và native bốn-suite runner đã có. Control vẫn khóa
 human-review trên PC công ty trước khi freeze. Quy trình đầy đủ nằm trong
 [PC AI handoff](docs/company-pc-ai-handoff.md). Sau PC acceptance, dùng
 [Phase 5 internal K8s runbook](docs/week5-internal-k8s-acceptance.md) cho immutable registry publish,
-internal preflight, discovery, three-pair confirmation và late performance. Chưa có semantic
+internal preflight, discovery, three-pair confirmation và late performance; dùng
+[Phase 11 production deployment handoff](docs/phase11-production-deployment.md) cho manifest,
+managed PostgreSQL/TLS, restore, observability và company pilot. Chưa có semantic
 benchmark chính thức; mọi KiRa/OpenAI/internal live gate chưa chạy vẫn là `NOT_RUN`.
 
 [T5.2 provider preflight](docs/week5-t5.2-preflight.md) giữ evidence lịch sử cho OpenAI và local

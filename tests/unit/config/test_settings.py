@@ -285,6 +285,19 @@ def test_product_ltm_requires_same_postgres_database_but_allows_separate_roles()
             **memory_runtime,
         )
 
+    with pytest.raises(ValidationError, match="memory admin and runtime"):
+        Settings(
+            _env_file=None,
+            kira_base_url="http://kira.test",
+            kira_username="service-account",
+            kira_basic_auth="secret",
+            database_url="postgresql://gateway:password@db:5432/kira",
+            ltm_enabled=True,
+            memory_database_url="postgresql://memory:other-password@db:5432/kira",
+            memory_admin_database_url="postgresql://admin:password@db:5432/other",
+            **memory_runtime,
+        )
+
 
 @pytest.mark.parametrize(
     ("ltm_enabled", "memory_formation_enabled"),

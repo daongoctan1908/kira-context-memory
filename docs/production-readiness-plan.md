@@ -332,6 +332,13 @@ Prometheus/Grafana và Langfuse chạy độc lập theo nhu cầu test; không 
 | **T11.3 — Observability wiring** | Message request v1 → event ID → Worker attempt → Mem0; Collector export fail-open, structured stdout, masking. | Search được correlation/turn/event/origin-trace IDs; backend telemetry outage không làm business/readiness fail. | T11.1 | M |
 | **T11.4 — Company pilot** | Real KiRa/model/embedding, browser acceptance, user isolation, deletion races, restart, backup/restore, image rollback và resource observation. | Production gate bên dưới đạt; runtime SHA/config khớp evidence. Benchmark chỉ rerun khi product change ảnh hưởng formation/retrieval/rewrite/memory semantics. | T5.7, T10.3, T11.2–T11.3 | L |
 
+Laptop preparation for Phase 11 is documented in
+[phase11-production-deployment.md](/C:/Code/kira-context-memory/docs/phase11-production-deployment.md).
+The repository serializes migrations with a bounded PostgreSQL advisory lock, enforces a shared
+application/memory database in both runtime processes and exposes read-only memory schema validation.
+This preparation does **not** mark T11 complete: platform manifests, managed TLS, real restore,
+Collector/backend search and company pilot evidence remain environment-bound `NOT_RUN` work.
+
 PostgreSQL và Langfuse được vận hành như dependency riêng, không nhét toàn bộ vào application chart.
 
 Rollback app image chỉ được thực hiện khi schema tương thích ngược. Không tự downgrade production schema. Giữ Prometheus compatibility trong giai đoạn chuyển tiếp; chỉ bỏ khi đã xác nhận OTel metric parity và không còn consumer phụ thuộc.

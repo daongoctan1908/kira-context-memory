@@ -5,6 +5,13 @@ from typing import Protocol
 from pydantic import AnyHttpUrl, PostgresDsn, Secret, SecretStr
 
 
+def postgres_database_identity(value: Secret[PostgresDsn]) -> tuple[object, ...]:
+    """Compare a PostgreSQL database independently of credentials or driver scheme."""
+    dsn = value.get_secret_value()
+    hosts = tuple((str(host["host"]).lower(), host["port"] or 5432) for host in dsn.hosts())
+    return hosts, dsn.path
+
+
 class PostgresRuntimeSettings(Protocol):
     """Settings required to construct the shared async PostgreSQL engine."""
 

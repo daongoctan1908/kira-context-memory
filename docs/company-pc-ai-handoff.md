@@ -890,3 +890,28 @@ khác nhau. Không chạy acceptance nếu hai cấu hình trỏ sang database k
    xóa đúng pending rows và chạy lại cho `purged=0`.
 7. Kiểm tra log/error không chứa message, memory content, raw exception hoặc credential. Đây là
    technical acceptance; không thay official benchmark.
+
+## 23. Phase 11 production deployment handoff
+
+Sau Phase 4/5 và product acceptance, đọc toàn bộ
+[`phase11-production-deployment.md`](phase11-production-deployment.md). Laptop đã chuẩn bị phần không
+phụ thuộc platform; không được diễn giải thành Phase 11 PASS.
+
+AI trên PC phải:
+
+1. Thu thập tám quyết định platform ở đầu runbook trước khi tạo manifest. Không tự chọn Helm/Kustomize,
+   Ingress, secret provider hoặc PostgreSQL topology khi công ty đã có contract khác.
+2. Dùng exact runtime/frontend digests đã qua acceptance. Gateway, Worker, migration và memory-init
+   phải cùng backend digest.
+3. Render/validate manifest, chạy install mới và upgrade trong namespace pilot; lưu sanitized output.
+4. Cấu hình managed PostgreSQL TLS với application/memory/admin roles cùng một database; chạy
+   migration lock, memory init rồi `python -m worker.memory_admin validate`.
+5. Backup database đã quiesce, restore sang database khác và đối chiếu revision, memory metadata cùng
+   aggregate counts theo runbook. Không commit dump hoặc DSN.
+6. Nối Gateway/Worker tới company Collector, tìm real trace bằng `correlation_id`, `turn_id`,
+   `event_id`, `origin_trace_id`, rồi chứng minh Collector/backend outage vẫn fail-open.
+7. Chạy toàn bộ pilot checklist bằng frontend, KiRa và internal providers thật, gồm deletion race,
+   restart, restore và image rollback.
+
+Mọi bước chưa có artifact thật phải ghi `NOT_RUN` kèm blocker. Manifest chỉ được commit sau khi format
+platform, registry, namespace, Ingress/TLS, secrets, database và Collector contracts đã được xác nhận.

@@ -14,6 +14,8 @@ from pydantic import (
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.config.runtime_contracts import postgres_database_identity
+
 
 class Settings(BaseSettings):
     """Runtime configuration loaded from environment variables or a local ``.env``."""
@@ -163,12 +165,21 @@ class Settings(BaseSettings):
             if missing:
                 raise ValueError(f"LTM configuration is incomplete: {', '.join(missing)}")
             if self.database_url is not None and self.memory_database_url is not None:
-                if _postgres_database_identity(self.database_url) != _postgres_database_identity(
+                if postgres_database_identity(self.database_url) != postgres_database_identity(
                     self.memory_database_url
                 ):
                     raise ValueError(
                         "conversation and memory storage must use the same PostgreSQL database"
                     )
+            if (
+                self.memory_admin_database_url is not None
+                and self.memory_database_url is not None
+                and postgres_database_identity(self.memory_admin_database_url)
+                != postgres_database_identity(self.memory_database_url)
+            ):
+                raise ValueError(
+                    "memory admin and runtime storage must use the same PostgreSQL database"
+                )
         return self
 
     @property
@@ -200,9 +211,3 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Return the process-wide immutable settings instance."""
     return Settings()  # type: ignore[call-arg]
-
-
-def _postgres_database_identity(value: Secret[PostgresDsn]) -> tuple[object, ...]:
-    dsn = value.get_secret_value()
-    hosts = tuple((str(host["host"]).lower(), host["port"] or 5432) for host in dsn.hosts())
-    return hosts, dsn.path
