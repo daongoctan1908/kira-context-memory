@@ -111,7 +111,7 @@ the command was deliberately capped:
 uv run python -m scripts.benchmark.materialize_dataset collect `
   --root dataset/kira_ltm_v1 `
   --env-file .env.kira.local --env-file-only `
-  --checkpoint artifacts/week5/kira-materialization.json `
+  --checkpoint artifacts/benchmark/kira-materialization.json `
   --max-requests 1
 ```
 
@@ -121,7 +121,7 @@ Resume the checkpoint and collect the remaining responses sequentially:
 uv run python -m scripts.benchmark.materialize_dataset collect `
   --root dataset/kira_ltm_v1 `
   --env-file .env.kira.local --env-file-only `
-  --checkpoint artifacts/week5/kira-materialization.json `
+  --checkpoint artifacts/benchmark/kira-materialization.json `
   --resume
 ```
 
@@ -135,9 +135,9 @@ Preview a fully validated materialized copy before changing the canonical source
 ```powershell
 uv run python -m scripts.benchmark.materialize_dataset apply `
   --root dataset/kira_ltm_v1 `
-  --checkpoint artifacts/week5/kira-materialization.json `
+  --checkpoint artifacts/benchmark/kira-materialization.json `
   --dataset-version 1.0.0-materialized.1 `
-  --output-root artifacts/week5/kira_ltm_v1_materialized
+  --output-root artifacts/benchmark/kira_ltm_v1_materialized
 ```
 
 After reviewing that copy, apply the same validated checkpoint to the canonical dataset:
@@ -145,7 +145,7 @@ After reviewing that copy, apply the same validated checkpoint to the canonical 
 ```powershell
 uv run python -m scripts.benchmark.materialize_dataset apply `
   --root dataset/kira_ltm_v1 `
-  --checkpoint artifacts/week5/kira-materialization.json `
+  --checkpoint artifacts/benchmark/kira-materialization.json `
   --dataset-version 1.0.0-materialized.1 `
   --in-place
 

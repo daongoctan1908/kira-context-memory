@@ -115,8 +115,8 @@ async def run_mock_acceptance(
         "case_count": len(compilation.cases),
         "suite_outcomes": suite_outcomes,
         "seed": seed,
-        "materialization_checkpoint": "artifacts/week5/kira-materialization.json",
-        "benchmark_artifact_root": "artifacts/week5/benchmark",
+        "materialization_checkpoint": "artifacts/benchmark/kira-materialization.json",
+        "benchmark_artifact_root": "artifacts/benchmark/benchmark",
     }
     _write_new(
         resolved / "mock-acceptance.json",
@@ -132,7 +132,7 @@ async def run_mock_acceptance(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=Path("artifacts/week5/mock-acceptance"))
+    parser.add_argument("--output", type=Path, default=Path("artifacts/benchmark/mock-acceptance"))
     parser.add_argument("--root", type=Path, default=default_dataset_root())
     parser.add_argument("--seed", type=int, default=742)
     args = parser.parse_args(argv)

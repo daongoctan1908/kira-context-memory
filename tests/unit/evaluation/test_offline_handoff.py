@@ -35,7 +35,7 @@ async def test_mock_acceptance_builds_complete_offline_bundle(tmp_path: Path):
     assert summary["contract_id"] == "kira-week5-benchmark-v4"
     assert summary["network_required"] is False
     assert summary["quality_claim"] is False
-    assert summary["materialization_checkpoint"] == ("artifacts/week5/kira-materialization.json")
+    assert summary["materialization_checkpoint"] == "artifacts/benchmark/kira-materialization.json"
 
     serialized = "\n".join(path.read_text(encoding="utf-8") for path in output.iterdir())
     for forbidden in ("api_key", "password", "Authorization", "Bearer ", "sk-"):
@@ -79,9 +79,9 @@ def test_internal_compose_uses_only_prebuilt_images_and_fixed_handoff_mounts():
 
     assert "build:" not in compose
     assert compose.count("pull_policy: never") == 11
-    assert "WEEK5_MATERIALIZATION_ROOT" in compose
+    assert "BENCHMARK_MATERIALIZATION_ROOT" in compose
     assert ":/materialization" in compose
-    assert "WEEK5_DATASET_ROOT" in compose
+    assert "BENCHMARK_DATASET_ROOT" in compose
     assert ":/app/dataset/kira_ltm_v1" in compose
     assert 'OTEL_ENABLED: "false"' in compose
 
@@ -149,9 +149,9 @@ def test_internal_env_template_contains_placeholders_not_populated_credentials()
     )
 
     assert "replace_me" in template
-    assert "WEEK5_CONTROL_IMAGE=" in template
-    assert "WEEK5_CANDIDATE_IMAGE=" in template
-    assert "WEEK5_EVAL_IMAGE=" in template
+    assert "BENCHMARK_CONTROL_IMAGE=" in template
+    assert "BENCHMARK_CANDIDATE_IMAGE=" in template
+    assert "BENCHMARK_EVAL_IMAGE=" in template
     assert "OPENAI_API_KEY=" not in template
     assert "sk-" not in template
 
@@ -160,14 +160,14 @@ def test_pc_env_template_requires_explicit_provider_and_kira_configuration():
     template = (REPOSITORY_ROOT / "evaluation/benchmark.pc.env.example").read_text(encoding="utf-8")
 
     for name in (
-        "WEEK5_EXTRACTION_BASE_URL",
-        "WEEK5_REWRITE_BASE_URL",
-        "WEEK5_EMBEDDING_BASE_URL",
-        "WEEK5_JUDGE_BASE_URL",
+        "BENCHMARK_EXTRACTION_BASE_URL",
+        "BENCHMARK_REWRITE_BASE_URL",
+        "BENCHMARK_EMBEDDING_BASE_URL",
+        "BENCHMARK_JUDGE_BASE_URL",
         "KIRA_BASE_URL",
         "KIRA_BASIC_AUTH",
     ):
         assert f"{name}=" in template
-    assert "WEEK5_OPENAI_BASE_URL=" not in template
+    assert "BENCHMARK_OPENAI_BASE_URL=" not in template
     assert "OPENAI_API_KEY=" not in template
     assert "sk-" not in template

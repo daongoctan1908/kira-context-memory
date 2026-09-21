@@ -10,10 +10,10 @@ param(
     [string]$CandidateSummary = "Declared benchmark candidate.",
     [ValidatePattern('^candidate-[ab]$')]
     [string]$VariantId = "candidate-a",
-    [string]$BundleDirectory = "artifacts/week5/offline-handoff",
-    [string]$EnvFile = ".env.week5.internal.local",
-    [string]$PcPreflightPath = "artifacts/week5/pc-preflight/freeze.json",
-    [string]$PcAcceptancePath = "artifacts/week5/pc-openai/pc-acceptance.json",
+    [string]$BundleDirectory = "artifacts/benchmark/offline-handoff",
+    [string]$EnvFile = ".env.benchmark.internal.local",
+    [string]$PcPreflightPath = "artifacts/benchmark/pc-preflight/freeze.json",
+    [string]$PcAcceptancePath = "artifacts/benchmark/pc-openai/pc-acceptance.json",
     [string]$Registry = ""
 )
 
@@ -175,7 +175,7 @@ function Invoke-Compose {
     if (-not (Test-Path -LiteralPath $ResolvedEnvFile -PathType Leaf)) {
         throw "Missing populated internal environment file"
     }
-    $env:WEEK5_ENV_FILE = $ResolvedEnvFile
+    $env:BENCHMARK_ENV_FILE = $ResolvedEnvFile
     $dockerArguments = @(
         "compose", "--env-file", $ResolvedEnvFile, "-f", $ComposeFile
     ) + $Arguments
@@ -324,8 +324,8 @@ switch ($Action) {
                 [ordered]@{ variant_id = $_.variant_id; runtime_revision = $_.revision }
             })
             variants = $variants
-            materialization_checkpoint = "artifacts/week5/kira-materialization.json"
-            benchmark_artifact_root = "artifacts/week5/benchmark"
+            materialization_checkpoint = "artifacts/benchmark/kira-materialization.json"
+            benchmark_artifact_root = "artifacts/benchmark/benchmark"
             images = $images
         }
         $manifestJson = $manifest | ConvertTo-Json -Depth 8
@@ -471,8 +471,8 @@ switch ($Action) {
     }
     "StartControl" {
         $manifest = Read-Manifest
-        $env:WEEK5_CONTROL_IMAGE = ($manifest.images | Where-Object { $_.role -eq "control-runtime" }).reference
-        $env:WEEK5_EVAL_IMAGE = ($manifest.images | Where-Object { $_.role -eq "control-eval" }).reference
+        $env:BENCHMARK_CONTROL_IMAGE = ($manifest.images | Where-Object { $_.role -eq "control-runtime" }).reference
+        $env:BENCHMARK_EVAL_IMAGE = ($manifest.images | Where-Object { $_.role -eq "control-eval" }).reference
         Invoke-Compose @("--profile", "control", "up", "-d", "control-postgres")
         Invoke-Compose @("--profile", "control", "run", "--rm", "control-migrate")
         Invoke-Compose @("--profile", "control", "run", "--rm", "control-memory-init")
@@ -485,8 +485,8 @@ switch ($Action) {
         if ($variant.Count -ne 1 -or $variant[0].benchmark_variant -ne "release_candidate") {
             throw "Requested candidate is not declared in the image manifest"
         }
-        $env:WEEK5_CANDIDATE_IMAGE = ($manifest.images | Where-Object { $_.role -eq "$VariantId-runtime" }).reference
-        $env:WEEK5_EVAL_IMAGE = ($manifest.images | Where-Object { $_.role -eq "$VariantId-eval" }).reference
+        $env:BENCHMARK_CANDIDATE_IMAGE = ($manifest.images | Where-Object { $_.role -eq "$VariantId-runtime" }).reference
+        $env:BENCHMARK_EVAL_IMAGE = ($manifest.images | Where-Object { $_.role -eq "$VariantId-eval" }).reference
         Invoke-Compose @("--profile", "candidate", "up", "-d", "candidate-postgres")
         Invoke-Compose @("--profile", "candidate", "run", "--rm", "candidate-migrate")
         Invoke-Compose @("--profile", "candidate", "run", "--rm", "candidate-memory-init")

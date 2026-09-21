@@ -165,12 +165,12 @@ def test_cli_accepts_strict_historical_runtime_provenance(tmp_path, capsys):
 
 def test_cli_missing_config_and_bad_secret_are_safe(tmp_path, monkeypatch, capsys):
     for key in list(__import__("os").environ):
-        if key.startswith("WEEK5_") or key == "OPENAI_API_KEY":
+        if key.startswith("BENCHMARK_") or key == "OPENAI_API_KEY":
             monkeypatch.delenv(key)
     assert main(["preflight", "--profile", "internal_test", "--suite", "rewrite"]) == 1
     assert "NOT_RUN" in capsys.readouterr().out
     path = tmp_path / "bad.env"
-    path.write_text("WEEK5_READ_TIMEOUT_SECONDS=sk-synthetic-key\n", encoding="utf-8")
+    path.write_text("BENCHMARK_READ_TIMEOUT_SECONDS=sk-synthetic-key\n", encoding="utf-8")
     assert (
         main(
             [
@@ -200,8 +200,8 @@ def test_cli_unexpected_runtime_error_is_sanitized(monkeypatch, capsys):
 
 def test_file_only_ignores_inherited_credentials(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-unwanted-ambient")
-    monkeypatch.setenv("WEEK5_OPENAI_BASE_URL", "https://unwanted.test/v1")
-    monkeypatch.setenv("WEEK5_OPENAI_CHAT_MODEL", "unwanted-model")
+    monkeypatch.setenv("BENCHMARK_OPENAI_BASE_URL", "https://unwanted.test/v1")
+    monkeypatch.setenv("BENCHMARK_OPENAI_CHAT_MODEL", "unwanted-model")
     path = tmp_path / ".env.eval"
     path.write_text("# Intentionally no provider configured\n", encoding="utf-8")
     assert (

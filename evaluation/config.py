@@ -145,12 +145,12 @@ def load_config(
             Profile.EXTERNAL_SYNTHETIC,
             Profile.PC_OPENAI_ACCEPTANCE,
         }
-        base = get(f"WEEK5_{kind}_BASE_URL")
-        model = get(f"WEEK5_{kind}_MODEL")
-        key = get(f"WEEK5_{kind}_API_KEY")
+        base = get(f"BENCHMARK_{kind}_BASE_URL")
+        model = get(f"BENCHMARK_{kind}_MODEL")
+        key = get(f"BENCHMARK_{kind}_API_KEY")
         # Shared credentials are used only with the shared endpoint, never a custom override.
         if profile is Profile.EXTERNAL_SYNTHETIC and allow_shared_external and not base:
-            base = get("WEEK5_OPENAI_BASE_URL")
+            base = get("BENCHMARK_OPENAI_BASE_URL")
             model = model or get(shared_model)
             key = key or get("OPENAI_API_KEY")
         return ProviderConfig(
@@ -162,36 +162,36 @@ def load_config(
 
     numeric: dict[str, int | float] = {}
     for suffix in ("CONNECT_TIMEOUT_SECONDS", "READ_TIMEOUT_SECONDS", "TOTAL_TIMEOUT_SECONDS"):
-        if value := get(f"WEEK5_{suffix}"):
+        if value := get(f"BENCHMARK_{suffix}"):
             numeric[suffix.lower()] = float(value)
-    if value := get("WEEK5_EMBEDDING_DIMENSIONS"):
+    if value := get("BENCHMARK_EMBEDDING_DIMENSIONS"):
         numeric["embedding_dimensions"] = int(value)
-    if value := get("WEEK5_RETRIEVAL_TOP_K"):
+    if value := get("BENCHMARK_RETRIEVAL_TOP_K"):
         numeric["retrieval_top_k"] = int(value)
-    if value := get("WEEK5_RETRIEVAL_THRESHOLD"):
+    if value := get("BENCHMARK_RETRIEVAL_THRESHOLD"):
         numeric["retrieval_threshold"] = float(value)
-    if value := get("WEEK5_JUDGE_MAX_TOKENS"):
+    if value := get("BENCHMARK_JUDGE_MAX_TOKENS"):
         numeric["judge_max_tokens"] = int(value)
     secrets = {
-        name: SecretStr(value) if (value := get(f"WEEK5_{name.upper()}")) else None
+        name: SecretStr(value) if (value := get(f"BENCHMARK_{name.upper()}")) else None
         for name in ("database_url", "memory_database_url")
     }
     return EvalConfig(
         profile=profile,
         suites=suites,
         formation_mode=formation_mode,
-        extraction=provider("EXTRACTION", "WEEK5_OPENAI_CHAT_MODEL"),
-        rewrite=provider("REWRITE", "WEEK5_OPENAI_CHAT_MODEL"),
-        embedding=provider("EMBEDDING", "WEEK5_OPENAI_EMBEDDING_MODEL"),
+        extraction=provider("EXTRACTION", "BENCHMARK_OPENAI_CHAT_MODEL"),
+        rewrite=provider("REWRITE", "BENCHMARK_OPENAI_CHAT_MODEL"),
+        embedding=provider("EMBEDDING", "BENCHMARK_OPENAI_EMBEDDING_MODEL"),
         # Canonical judgments must never inherit a shared external provider implicitly.
-        judge=provider("JUDGE", "WEEK5_OPENAI_CHAT_MODEL", allow_shared_external=False),
-        judge_deployment=get("WEEK5_JUDGE_DEPLOYMENT"),
-        extraction_json_mode=get("WEEK5_EXTRACTION_JSON_MODE") or "json_object",
-        gateway_url=get("WEEK5_GATEWAY_URL"),
-        worker_url=get("WEEK5_WORKER_URL"),
-        kira_mock_url=get("WEEK5_KIRA_MOCK_URL"),
-        memory_schema=get("WEEK5_MEMORY_SCHEMA") or "memory",
-        memory_collection=get("WEEK5_MEMORY_COLLECTION") or "memories",
+        judge=provider("JUDGE", "BENCHMARK_OPENAI_CHAT_MODEL", allow_shared_external=False),
+        judge_deployment=get("BENCHMARK_JUDGE_DEPLOYMENT"),
+        extraction_json_mode=get("BENCHMARK_EXTRACTION_JSON_MODE") or "json_object",
+        gateway_url=get("BENCHMARK_GATEWAY_URL"),
+        worker_url=get("BENCHMARK_WORKER_URL"),
+        kira_mock_url=get("BENCHMARK_KIRA_MOCK_URL"),
+        memory_schema=get("BENCHMARK_MEMORY_SCHEMA") or "memory",
+        memory_collection=get("BENCHMARK_MEMORY_COLLECTION") or "memories",
         **secrets,
         **numeric,
     )

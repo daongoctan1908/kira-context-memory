@@ -2,7 +2,7 @@
 name: kira-context-benchmark
 
 x-env-file: &env-file
-  - ${WEEK5_ENV_FILE:-.env.week5.internal.local}
+  - ${BENCHMARK_ENV_FILE:-.env.benchmark.internal.local}
 
 x-provider-runtime: &provider-runtime
   APP_ENVIRONMENT: test
@@ -16,8 +16,8 @@ x-provider-runtime: &provider-runtime
   MEMORY_POSTGRES_MAX_CONNECTIONS: "5"
   MEMORY_LLM_TEMPERATURE: "0"
   MEMORY_LLM_MAX_TOKENS: "1000"
-  MEMORY_SEARCH_TOP_K: ${WEEK5_RETRIEVAL_TOP_K:-10}
-  MEMORY_SEARCH_THRESHOLD: ${WEEK5_RETRIEVAL_THRESHOLD:-0.1}
+  MEMORY_SEARCH_TOP_K: ${BENCHMARK_RETRIEVAL_TOP_K:-10}
+  MEMORY_SEARCH_THRESHOLD: ${BENCHMARK_RETRIEVAL_THRESHOLD:-0.1}
   MEMORY_SEARCH_TIMEOUT_SECONDS: "10"
   MEMORY_OPERATION_TIMEOUT_SECONDS: "60"
   OTEL_ENABLED: "false"
@@ -50,12 +50,12 @@ x-app-health: &app-health
 services:
   control-postgres:
     profiles: [control]
-    image: ${WEEK5_POSTGRES_IMAGE:?set WEEK5_POSTGRES_IMAGE}
+    image: ${BENCHMARK_POSTGRES_IMAGE:?set BENCHMARK_POSTGRES_IMAGE}
     pull_policy: never
     environment:
       POSTGRES_DB: kira_control
       POSTGRES_USER: kira
-      POSTGRES_PASSWORD: ${WEEK5_POSTGRES_PASSWORD:?set WEEK5_POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${BENCHMARK_POSTGRES_PASSWORD:?set BENCHMARK_POSTGRES_PASSWORD}
     volumes:
       - benchmark-control-postgres:/var/lib/postgresql/data
     healthcheck:
@@ -64,12 +64,12 @@ services:
 
   control-migrate:
     profiles: [control]
-    image: ${WEEK5_CONTROL_IMAGE:?set WEEK5_CONTROL_IMAGE}
+    image: ${BENCHMARK_CONTROL_IMAGE:?set BENCHMARK_CONTROL_IMAGE}
     pull_policy: never
     command: ["alembic", "upgrade", "head"]
     env_file: *env-file
     environment:
-      DATABASE_URL: postgresql+asyncpg://kira:${WEEK5_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
+      DATABASE_URL: postgresql+asyncpg://kira:${BENCHMARK_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
     depends_on:
       control-postgres:
         condition: service_healthy
@@ -78,15 +78,15 @@ services:
 
   control-memory-init:
     profiles: [control]
-    image: ${WEEK5_CONTROL_IMAGE:?set WEEK5_CONTROL_IMAGE}
+    image: ${BENCHMARK_CONTROL_IMAGE:?set BENCHMARK_CONTROL_IMAGE}
     pull_policy: never
     command: ["python", "-m", "worker.memory_admin", "init"]
     env_file: *env-file
     environment:
       <<: *provider-runtime
-      DATABASE_URL: postgresql+asyncpg://kira:${WEEK5_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
-      MEMORY_DATABASE_URL: postgresql://kira:${WEEK5_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
-      MEMORY_ADMIN_DATABASE_URL: postgresql://kira:${WEEK5_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
+      DATABASE_URL: postgresql+asyncpg://kira:${BENCHMARK_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
+      MEMORY_DATABASE_URL: postgresql://kira:${BENCHMARK_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
+      MEMORY_ADMIN_DATABASE_URL: postgresql://kira:${BENCHMARK_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
     depends_on:
       control-migrate:
         condition: service_completed_successfully
@@ -95,14 +95,14 @@ services:
 
   control-gateway:
     profiles: [control]
-    image: ${WEEK5_CONTROL_IMAGE:?set WEEK5_CONTROL_IMAGE}
+    image: ${BENCHMARK_CONTROL_IMAGE:?set BENCHMARK_CONTROL_IMAGE}
     pull_policy: never
     init: true
     env_file: *env-file
     environment:
       <<: *provider-runtime
-      DATABASE_URL: postgresql+asyncpg://kira:${WEEK5_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
-      MEMORY_DATABASE_URL: postgresql://kira:${WEEK5_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
+      DATABASE_URL: postgresql+asyncpg://kira:${BENCHMARK_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
+      MEMORY_DATABASE_URL: postgresql://kira:${BENCHMARK_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
       HEALTH_PORT: "8000"
     ports:
       - "127.0.0.1:28000:8000"
@@ -115,15 +115,15 @@ services:
 
   control-worker:
     profiles: [control]
-    image: ${WEEK5_CONTROL_IMAGE:?set WEEK5_CONTROL_IMAGE}
+    image: ${BENCHMARK_CONTROL_IMAGE:?set BENCHMARK_CONTROL_IMAGE}
     pull_policy: never
     init: true
     command: ["python", "-m", "worker.main"]
     env_file: *env-file
     environment:
       <<: [*provider-runtime, *worker-runtime]
-      DATABASE_URL: postgresql+asyncpg://kira:${WEEK5_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
-      MEMORY_DATABASE_URL: postgresql://kira:${WEEK5_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
+      DATABASE_URL: postgresql+asyncpg://kira:${BENCHMARK_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
+      MEMORY_DATABASE_URL: postgresql://kira:${BENCHMARK_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
     ports:
       - "127.0.0.1:28001:8001"
     depends_on:
@@ -135,12 +135,12 @@ services:
 
   candidate-postgres:
     profiles: [candidate]
-    image: ${WEEK5_POSTGRES_IMAGE:?set WEEK5_POSTGRES_IMAGE}
+    image: ${BENCHMARK_POSTGRES_IMAGE:?set BENCHMARK_POSTGRES_IMAGE}
     pull_policy: never
     environment:
       POSTGRES_DB: kira_candidate
       POSTGRES_USER: kira
-      POSTGRES_PASSWORD: ${WEEK5_POSTGRES_PASSWORD:?set WEEK5_POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${BENCHMARK_POSTGRES_PASSWORD:?set BENCHMARK_POSTGRES_PASSWORD}
     volumes:
       - benchmark-candidate-postgres:/var/lib/postgresql/data
     healthcheck:
@@ -149,12 +149,12 @@ services:
 
   candidate-migrate:
     profiles: [candidate]
-    image: ${WEEK5_CANDIDATE_IMAGE:?set WEEK5_CANDIDATE_IMAGE}
+    image: ${BENCHMARK_CANDIDATE_IMAGE:?set BENCHMARK_CANDIDATE_IMAGE}
     pull_policy: never
     command: ["alembic", "upgrade", "head"]
     env_file: *env-file
     environment:
-      DATABASE_URL: postgresql+asyncpg://kira:${WEEK5_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
+      DATABASE_URL: postgresql+asyncpg://kira:${BENCHMARK_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
     depends_on:
       candidate-postgres:
         condition: service_healthy
@@ -163,15 +163,15 @@ services:
 
   candidate-memory-init:
     profiles: [candidate]
-    image: ${WEEK5_CANDIDATE_IMAGE:?set WEEK5_CANDIDATE_IMAGE}
+    image: ${BENCHMARK_CANDIDATE_IMAGE:?set BENCHMARK_CANDIDATE_IMAGE}
     pull_policy: never
     command: ["python", "-m", "worker.memory_admin", "init"]
     env_file: *env-file
     environment:
       <<: *provider-runtime
-      DATABASE_URL: postgresql+asyncpg://kira:${WEEK5_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
-      MEMORY_DATABASE_URL: postgresql://kira:${WEEK5_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
-      MEMORY_ADMIN_DATABASE_URL: postgresql://kira:${WEEK5_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
+      DATABASE_URL: postgresql+asyncpg://kira:${BENCHMARK_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
+      MEMORY_DATABASE_URL: postgresql://kira:${BENCHMARK_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
+      MEMORY_ADMIN_DATABASE_URL: postgresql://kira:${BENCHMARK_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
     depends_on:
       candidate-migrate:
         condition: service_completed_successfully
@@ -180,14 +180,14 @@ services:
 
   candidate-gateway:
     profiles: [candidate]
-    image: ${WEEK5_CANDIDATE_IMAGE:?set WEEK5_CANDIDATE_IMAGE}
+    image: ${BENCHMARK_CANDIDATE_IMAGE:?set BENCHMARK_CANDIDATE_IMAGE}
     pull_policy: never
     init: true
     env_file: *env-file
     environment:
       <<: *provider-runtime
-      DATABASE_URL: postgresql+asyncpg://kira:${WEEK5_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
-      MEMORY_DATABASE_URL: postgresql://kira:${WEEK5_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
+      DATABASE_URL: postgresql+asyncpg://kira:${BENCHMARK_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
+      MEMORY_DATABASE_URL: postgresql://kira:${BENCHMARK_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
       HEALTH_PORT: "8000"
     ports:
       - "127.0.0.1:38000:8000"
@@ -200,15 +200,15 @@ services:
 
   candidate-worker:
     profiles: [candidate]
-    image: ${WEEK5_CANDIDATE_IMAGE:?set WEEK5_CANDIDATE_IMAGE}
+    image: ${BENCHMARK_CANDIDATE_IMAGE:?set BENCHMARK_CANDIDATE_IMAGE}
     pull_policy: never
     init: true
     command: ["python", "-m", "worker.main"]
     env_file: *env-file
     environment:
       <<: [*provider-runtime, *worker-runtime]
-      DATABASE_URL: postgresql+asyncpg://kira:${WEEK5_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
-      MEMORY_DATABASE_URL: postgresql://kira:${WEEK5_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
+      DATABASE_URL: postgresql+asyncpg://kira:${BENCHMARK_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
+      MEMORY_DATABASE_URL: postgresql://kira:${BENCHMARK_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
     ports:
       - "127.0.0.1:38001:8001"
     depends_on:
@@ -220,7 +220,7 @@ services:
 
   eval-controller:
     profiles: [tools]
-    image: ${WEEK5_EVAL_IMAGE:?set WEEK5_EVAL_IMAGE}
+    image: ${BENCHMARK_EVAL_IMAGE:?set BENCHMARK_EVAL_IMAGE}
     pull_policy: never
     init: true
     env_file: *env-file
@@ -228,14 +228,14 @@ services:
       # The operator selects one running variant at a time. These non-secret selectors override
       # the generic values in the env file; the password is interpolated without being placed on
       # a command line.
-      WEEK5_GATEWAY_URL: http://${WEEK5_BENCHMARK_GATEWAY_HOST:-candidate-gateway}:8000
-      WEEK5_WORKER_URL: http://${WEEK5_BENCHMARK_WORKER_HOST:-candidate-worker}:8001
-      WEEK5_DATABASE_URL: postgresql://kira:${WEEK5_POSTGRES_PASSWORD}@${WEEK5_BENCHMARK_POSTGRES_HOST:-candidate-postgres}:5432/${WEEK5_BENCHMARK_DATABASE:-kira_candidate}
-      WEEK5_MEMORY_DATABASE_URL: postgresql://kira:${WEEK5_POSTGRES_PASSWORD}@${WEEK5_BENCHMARK_POSTGRES_HOST:-candidate-postgres}:5432/${WEEK5_BENCHMARK_DATABASE:-kira_candidate}
+      BENCHMARK_GATEWAY_URL: http://${BENCHMARK_BENCHMARK_GATEWAY_HOST:-candidate-gateway}:8000
+      BENCHMARK_WORKER_URL: http://${BENCHMARK_BENCHMARK_WORKER_HOST:-candidate-worker}:8001
+      BENCHMARK_DATABASE_URL: postgresql://kira:${BENCHMARK_POSTGRES_PASSWORD}@${BENCHMARK_BENCHMARK_POSTGRES_HOST:-candidate-postgres}:5432/${BENCHMARK_BENCHMARK_DATABASE:-kira_candidate}
+      BENCHMARK_MEMORY_DATABASE_URL: postgresql://kira:${BENCHMARK_POSTGRES_PASSWORD}@${BENCHMARK_BENCHMARK_POSTGRES_HOST:-candidate-postgres}:5432/${BENCHMARK_BENCHMARK_DATABASE:-kira_candidate}
     volumes:
-      - ${WEEK5_ARTIFACT_ROOT:-./artifacts/week5}:/artifacts
-      - ${WEEK5_MATERIALIZATION_ROOT:-./artifacts/week5}:/materialization
-      - ${WEEK5_DATASET_ROOT:-./dataset/kira_ltm_v1}:/app/dataset/kira_ltm_v1
+      - ${BENCHMARK_ARTIFACT_ROOT:-./artifacts/benchmark}:/artifacts
+      - ${BENCHMARK_MATERIALIZATION_ROOT:-./artifacts/benchmark}:/materialization
+      - ${BENCHMARK_DATASET_ROOT:-./dataset/kira_ltm_v1}:/app/dataset/kira_ltm_v1
     command: ["validate"]
 
 volumes:

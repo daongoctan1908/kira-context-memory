@@ -196,16 +196,16 @@ def test_credentials_cannot_hide_in_endpoint_url(url):
 def test_secret_exclusion_and_no_ambient_env(tmp_path):
     path = tmp_path / ".env.eval"
     path.write_text(
-        "OPENAI_API_KEY=sk-synthetic-only\nWEEK5_OPENAI_BASE_URL=https://example.test/v1\n"
-        "WEEK5_OPENAI_CHAT_MODEL=file-model\nWEEK5_OPENAI_EMBEDDING_MODEL=embed-model\n"
-        "WEEK5_DATABASE_URL=postgresql://u:db-secret@localhost/eval\n",
+        "OPENAI_API_KEY=sk-synthetic-only\nBENCHMARK_OPENAI_BASE_URL=https://example.test/v1\n"
+        "BENCHMARK_OPENAI_CHAT_MODEL=file-model\nBENCHMARK_OPENAI_EMBEDDING_MODEL=embed-model\n"
+        "BENCHMARK_DATABASE_URL=postgresql://u:db-secret@localhost/eval\n",
         encoding="utf-8",
     )
     config = load_config(
         profile=Profile.EXTERNAL_SYNTHETIC,
         suites=(Suite.REWRITE,),
         env_file=path,
-        environment={"WEEK5_OPENAI_CHAT_MODEL": "env-model"},
+        environment={"BENCHMARK_OPENAI_CHAT_MODEL": "env-model"},
     )
     assert config.rewrite.model == "env-model"
     assert config.embedding.model == "embed-model"
@@ -228,8 +228,8 @@ def test_retrieval_settings_load_and_are_fingerprinted():
         profile=Profile.INTERNAL_TEST,
         suites=(Suite.RETRIEVAL,),
         environment={
-            "WEEK5_RETRIEVAL_TOP_K": "7",
-            "WEEK5_RETRIEVAL_THRESHOLD": "0.25",
+            "BENCHMARK_RETRIEVAL_TOP_K": "7",
+            "BENCHMARK_RETRIEVAL_THRESHOLD": "0.25",
         },
     )
 
@@ -248,8 +248,8 @@ def test_internal_profile_does_not_inherit_openai_and_missing_is_not_config_erro
         suites=(Suite.FORMATION,),
         environment={
             "OPENAI_API_KEY": "sk-synthetic-only",
-            "WEEK5_OPENAI_CHAT_MODEL": "external-model",
-            "WEEK5_OPENAI_BASE_URL": "https://api.openai.com/v1",
+            "BENCHMARK_OPENAI_CHAT_MODEL": "external-model",
+            "BENCHMARK_OPENAI_BASE_URL": "https://api.openai.com/v1",
         },
     )
     assert not config.extraction.configured
@@ -265,8 +265,8 @@ def test_judge_never_inherits_shared_external_provider():
         suites=(Suite.REWRITE,),
         environment={
             "OPENAI_API_KEY": "sk-synthetic-only",
-            "WEEK5_OPENAI_CHAT_MODEL": "external-model",
-            "WEEK5_OPENAI_BASE_URL": "https://api.openai.com/v1",
+            "BENCHMARK_OPENAI_CHAT_MODEL": "external-model",
+            "BENCHMARK_OPENAI_BASE_URL": "https://api.openai.com/v1",
         },
     )
     assert not config.judge.configured
@@ -281,17 +281,17 @@ def test_pc_acceptance_requires_explicit_provider_settings():
         suites=(Suite.FORMATION, Suite.REWRITE),
         environment={
             "OPENAI_API_KEY": "sk-shared-must-not-leak",
-            "WEEK5_OPENAI_BASE_URL": "https://api.openai.com/v1",
-            "WEEK5_OPENAI_CHAT_MODEL": "shared-model",
-            "WEEK5_EXTRACTION_BASE_URL": "https://api.openai.com/v1",
-            "WEEK5_EXTRACTION_MODEL": "explicit-extraction",
-            "WEEK5_EXTRACTION_API_KEY": "sk-explicit-extraction",
-            "WEEK5_REWRITE_BASE_URL": "https://api.openai.com/v1",
-            "WEEK5_REWRITE_MODEL": "explicit-rewrite",
-            "WEEK5_REWRITE_API_KEY": "sk-explicit-rewrite",
-            "WEEK5_JUDGE_BASE_URL": "https://api.openai.com/v1",
-            "WEEK5_JUDGE_MODEL": "explicit-judge",
-            "WEEK5_JUDGE_API_KEY": "sk-explicit-judge",
+            "BENCHMARK_OPENAI_BASE_URL": "https://api.openai.com/v1",
+            "BENCHMARK_OPENAI_CHAT_MODEL": "shared-model",
+            "BENCHMARK_EXTRACTION_BASE_URL": "https://api.openai.com/v1",
+            "BENCHMARK_EXTRACTION_MODEL": "explicit-extraction",
+            "BENCHMARK_EXTRACTION_API_KEY": "sk-explicit-extraction",
+            "BENCHMARK_REWRITE_BASE_URL": "https://api.openai.com/v1",
+            "BENCHMARK_REWRITE_MODEL": "explicit-rewrite",
+            "BENCHMARK_REWRITE_API_KEY": "sk-explicit-rewrite",
+            "BENCHMARK_JUDGE_BASE_URL": "https://api.openai.com/v1",
+            "BENCHMARK_JUDGE_MODEL": "explicit-judge",
+            "BENCHMARK_JUDGE_API_KEY": "sk-explicit-judge",
         },
     )
 
@@ -309,18 +309,18 @@ def test_explicit_internal_provider_and_config_knobs():
         profile=Profile.INTERNAL_TEST,
         suites=(Suite.RETRIEVAL,),
         environment={
-            "WEEK5_EMBEDDING_BASE_URL": "http://internal.test/v1",
-            "WEEK5_EMBEDDING_MODEL": "internal-embedding",
-            "WEEK5_EMBEDDING_DIMENSIONS": "32",
-            "WEEK5_EXTRACTION_JSON_MODE": "prompt_only",
-            "WEEK5_READ_TIMEOUT_SECONDS": "12",
-            "WEEK5_CONNECT_TIMEOUT_SECONDS": "3",
-            "WEEK5_TOTAL_TIMEOUT_SECONDS": "20",
-            "WEEK5_JUDGE_BASE_URL": "http://judge.internal/v1",
-            "WEEK5_JUDGE_MODEL": "internal-judge",
-            "WEEK5_JUDGE_DEPLOYMENT": "judge-test",
-            "WEEK5_JUDGE_API_KEY": "internal-secret",
-            "WEEK5_JUDGE_MAX_TOKENS": "640",
+            "BENCHMARK_EMBEDDING_BASE_URL": "http://internal.test/v1",
+            "BENCHMARK_EMBEDDING_MODEL": "internal-embedding",
+            "BENCHMARK_EMBEDDING_DIMENSIONS": "32",
+            "BENCHMARK_EXTRACTION_JSON_MODE": "prompt_only",
+            "BENCHMARK_READ_TIMEOUT_SECONDS": "12",
+            "BENCHMARK_CONNECT_TIMEOUT_SECONDS": "3",
+            "BENCHMARK_TOTAL_TIMEOUT_SECONDS": "20",
+            "BENCHMARK_JUDGE_BASE_URL": "http://judge.internal/v1",
+            "BENCHMARK_JUDGE_MODEL": "internal-judge",
+            "BENCHMARK_JUDGE_DEPLOYMENT": "judge-test",
+            "BENCHMARK_JUDGE_API_KEY": "internal-secret",
+            "BENCHMARK_JUDGE_MAX_TOKENS": "640",
         },
     )
     assert config.embedding.configured
@@ -341,9 +341,9 @@ def test_custom_endpoint_does_not_receive_shared_openai_key():
         suites=(Suite.FORMATION,),
         environment={
             "OPENAI_API_KEY": "sk-synthetic-only",
-            "WEEK5_OPENAI_BASE_URL": "https://api.openai.com/v1",
-            "WEEK5_EXTRACTION_BASE_URL": "https://another.test/v1",
-            "WEEK5_EXTRACTION_MODEL": "custom",
+            "BENCHMARK_OPENAI_BASE_URL": "https://api.openai.com/v1",
+            "BENCHMARK_EXTRACTION_BASE_URL": "https://another.test/v1",
+            "BENCHMARK_EXTRACTION_MODEL": "custom",
         },
     )
     assert config.extraction.api_key is None

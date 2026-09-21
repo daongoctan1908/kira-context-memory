@@ -28,7 +28,7 @@ from evaluation.materialization import (
     write_materialization_checkpoint,
 )
 
-DEFAULT_CHECKPOINT = Path("artifacts/week5/kira-materialization.json")
+DEFAULT_CHECKPOINT = Path("artifacts/benchmark/kira-materialization.json")
 
 
 @dataclass(frozen=True, slots=True)
