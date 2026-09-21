@@ -115,7 +115,7 @@ artifact nào trên laptop.
 > commit đó có đủ các file native runner/audit/release tooling liệt kê bên dưới; không dùng riêng
 > revision cũ `7911a8f` để chạy.
 
-### Validation snapshot trên laptop (2026-09-19)
+### Validation snapshot trên laptop (2026-09-21)
 
 Checkout bàn giao phải chứa đủ bốn file native mới sau; nếu thiếu thì revision đang dùng chưa phải
 revision Phase 4 hoàn chỉnh:
@@ -127,20 +127,25 @@ tests/unit/evaluation/test_native_executor.py
 tests/unit/evaluation/test_native_runtime.py
 ```
 
-Kết quả gate cuối trên laptop:
+Kết quả kiểm tra gần nhất trên `main` (`3be5cb0c82b9305532948a85699be5acdb6d0213`):
 
 ```text
 uv run ruff check .                 PASS
-uv run ruff format --check .        PASS (334 files formatted)
-uv run pytest -q                    PASS (1099 passed, 78 skipped)
-coverage                            90.02% (gate >= 90%)
+frontend: pnpm test                 PASS (30 tests)
+frontend: pnpm build                PASS
+uv run pytest -q                    1207 passed, 99 skipped; exit 1
+coverage                            88.47% (configured gate >= 90%)
 git diff --check                    PASS
 Docker live integration             NOT_RUN — không thuộc checkpoint offline này
 KiRa/OpenAI/PostgreSQL live run      NOT_RUN — chỉ thực hiện trên PC công ty
 ```
 
-Các test skip không được tự diễn giải là PASS. Trên PC, chạy lại full suite khi Docker đã bật để các
-integration test có dependency thật được thực thi; sau đó mới làm materialization/preflight/live run.
+`pytest` không có test functional fail, nhưng **coverage gate đang FAIL** do product code mới tăng
+phạm vi đo. Đây là blocker chất lượng còn mở, không được viết thành PASS trên PC. Có thể dùng
+`uv run pytest -q --no-cov` chỉ để tách lỗi functional khỏi lỗi coverage khi điều tra; lệnh đó không
+thay thế gate 90% và không là acceptance evidence. Các test skip cũng không được tự diễn giải là PASS.
+Trên PC, chạy lại full suite khi Docker đã bật để các integration test có dependency thật được thực
+thi; ghi outcome thật trước materialization/preflight/live run.
 
 ### Khoảng trống còn lại là live evidence, không còn là wiring giả
 
@@ -168,12 +173,47 @@ trace_id, correlation_id, turn_id, event_id, origin_trace_id
 Không sửa sâu vendored Mem0 nếu chưa có benchmark chứng minh. Không thêm expiration, validity,
 supersession hoặc temporal reasoning engine vào scope này.
 
-## 4. Chuẩn bị PC từ clean checkout
+## 4. Bootstrap repository và chuẩn bị PC
+
+### 4.1 Chọn đúng một nguồn source
+
+Ưu tiên clone/pull từ `origin`. Nếu mạng công ty không truy cập được GitHub, dùng Git bundle đã được
+tạo từ đúng handoff commit. Không copy lẻ source folder, `.venv`, `artifacts/`, Docker volume hoặc
+`.env` giữa hai máy.
+
+**Từ origin:**
 
 ```powershell
-git checkout main
+git clone https://github.com/daongoctan1908/kira-context-memory.git C:\Code\kira-context-memory
+Set-Location C:\Code\kira-context-memory
+git switch main
 git pull --ff-only origin main
+```
+
+**Từ bundle:**
+
+```powershell
+git bundle verify C:\Transfer\kira-context-memory.bundle
+git clone C:\Transfer\kira-context-memory.bundle C:\Code\kira-context-memory
+Set-Location C:\Code\kira-context-memory
+git switch main
+git remote set-url origin https://github.com/daongoctan1908/kira-context-memory.git
+```
+
+Ở thời điểm bàn giao này, HEAD tối thiểu phải chứa commit
+`3be5cb0c82b9305532948a85699be5acdb6d0213`. Nếu dùng revision khác, dừng và đối chiếu với chủ dự án
+trước khi materialize; không ghép code bằng tay từ tài liệu.
+
+```powershell
+git rev-parse HEAD
 git status --short
+git branch --show-current
+git remote -v
+```
+
+### 4.2 Cài dependency và kiểm tra baseline
+
+```powershell
 uv sync --frozen
 uv run python -m scripts.benchmark.validate_dataset dataset/kira_ltm_v1
 uv run pytest -q
@@ -182,16 +222,19 @@ uv run pytest -q
 Điều kiện:
 
 - working tree sạch trước materialization commit và image build;
-- Python/uv đúng lock file;
+- Python 3.11/uv đúng lock file;
 - Docker Desktop chạy;
 - PC truy cập được KiRa Test và OpenAI theo policy công ty;
 - đủ disk để giữ 4 hoặc 6 benchmark images + tar;
 - không bật Langfuse/Prometheus/Grafana cho benchmark nếu không cần debug.
 
+Node.js 22.12+, Corepack/pnpm và Playwright chỉ là prerequisite nếu nhận thêm product frontend
+acceptance ở mục 19; benchmark Phase 4 thuần backend không cần chúng.
+
 Tạo file local từ template, không commit:
 
 ```powershell
-Copy-Item evaluation/benchmark.pc.env.example .env.week5.pc.local
+Copy-Item evaluation/benchmark.pc.env.example .env.benchmark.pc.local
 ```
 
 Điền tất cả placeholder. Không dùng shared `OPENAI_*` fallback. Bốn provider phải explicit:
@@ -208,8 +251,20 @@ Kiểm tra không lộ secret:
 
 ```powershell
 git status --short
-git check-ignore .env.week5.pc.local
+git check-ignore .env.benchmark.pc.local
 ```
+
+### 4.3 Checklist quyết định trước bất kỳ provider call nào
+
+Ghi tên người xác nhận hoặc blocker cho từng mục; thiếu một mục thì chỉ chạy offline validation,
+không gọi KiRa/OpenAI.
+
+- KiRa Test endpoint, account/service credential và giới hạn lưu raw response đã được chủ hệ thống phê duyệt.
+- Canonical dataset chỉ được gửi OpenAI sau T4.2, human review và `external_provider_allowed=true`.
+- Người thực hiện human review và người có quyền chốt candidate đã được xác định.
+- Cách chuyển bundle PC → VDI (file share/registry) và nơi lưu checksum đã được xác định.
+- Dung lượng Docker đủ exact image set; không dùng shared volume/database làm benchmark target.
+- Nếu có làm product UI real-KiRa ngoài benchmark, approved runtime overlay theo mục 19 đã tồn tại.
 
 ## 5. T4.1 — materialize canonical dataset bằng KiRa thật
 
@@ -227,7 +282,7 @@ Xác nhận 80 unique requests, 140 fills, 54 answers. Nếu counts khác, dừn
 ```powershell
 uv run python -m scripts.benchmark.materialize_dataset preflight `
   --root dataset/kira_ltm_v1 `
-  --env-file .env.week5.pc.local --env-file-only `
+  --env-file .env.benchmark.pc.local --env-file-only `
   --checkpoint artifacts/week5/kira-materialization.json
 ```
 
@@ -239,7 +294,7 @@ checkpoint chính thức. Không tạo checkpoint thử riêng rồi gọi lại
 ```powershell
 uv run python -m scripts.benchmark.materialize_dataset collect `
   --root dataset/kira_ltm_v1 `
-  --env-file .env.week5.pc.local --env-file-only `
+  --env-file .env.benchmark.pc.local --env-file-only `
   --checkpoint artifacts/week5/kira-materialization.json `
   --resume
 ```
@@ -351,9 +406,21 @@ Control runtime cố định:
 75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00
 ```
 
-Chọn một hoặc tối đa hai committed candidate revisions. Không dùng dirty tree. Candidate declaration
-phải ghi scope thay đổi (prompt/config/runtime/dependency/schema/lifecycle) và summary. Runtime SHA và
-harness SHA là hai khái niệm riêng.
+### Quyết định còn cần chủ dự án chốt: candidate
+
+Candidate benchmark **chưa được khai báo bằng SHA trong repository ở thời điểm handoff**. AI trên PC
+được phép hoàn tất T4.1/T4.2, nhưng phải dừng trước T4.3 nếu bảng sau chưa được chủ dự án điền và
+xác nhận. Không tự dùng `HEAD`, một dirty worktree, hay một commit có vẻ mới nhất làm candidate.
+
+| Variant | Runtime revision | Trạng thái | Change scope và lý do |
+| --- | --- | --- | --- |
+| `control` | `75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00` | fixed | historical control |
+| `candidate-a` | `<owner-declared full SHA>` | required before T4.3 | `<prompt/config/runtime/dependency/schema/lifecycle + summary>` |
+| `candidate-b` | `<owner-declared full SHA>` | optional | `<scope + summary>` |
+
+Chỉ dùng một hoặc tối đa hai committed candidate revisions. Runtime SHA và harness SHA là hai khái
+niệm riêng. Candidate declaration phải ghi scope thay đổi (prompt/config/runtime/dependency/schema/
+lifecycle) và summary; nếu không chắc scope, dùng `runtime_code` bảo thủ thay vì giả là prompt-only.
 
 Exact image set:
 
@@ -471,24 +538,24 @@ Kiểm Compose mà không in resolved secret:
 
 ```powershell
 ./scripts/benchmark/offline_handoff.ps1 -Action Validate `
-  -EnvFile .env.week5.pc.local
+  -EnvFile .env.benchmark.pc.local
 ```
 
 Control:
 
 ```powershell
 ./scripts/benchmark/offline_handoff.ps1 -Action StartControl `
-  -EnvFile .env.week5.pc.local
+  -EnvFile .env.benchmark.pc.local
 ```
 
 Sau khi xong control:
 
 ```powershell
 ./scripts/benchmark/offline_handoff.ps1 -Action Stop `
-  -EnvFile .env.week5.pc.local
+  -EnvFile .env.benchmark.pc.local
 ./scripts/benchmark/offline_handoff.ps1 -Action StartCandidate `
   -VariantId candidate-a `
-  -EnvFile .env.week5.pc.local
+  -EnvFile .env.benchmark.pc.local
 ```
 
 Lặp candidate-b nếu declared. `Stop` giữ volumes. Mỗi variant full acceptance cần fresh DB volume hoặc
@@ -498,7 +565,7 @@ evidence và được xác nhận.
 ## 11. T4.4 — OpenAI/KiRa/DB/Gateway/Worker preflight
 
 Tạo provenance JSON từ exact image metadata; không tự gõ SHA/package versions bằng trí nhớ. Chọn đúng
-4 target selectors trong `.env.week5.pc.local` cho stack đang chạy.
+4 target selectors trong `.env.benchmark.pc.local` cho stack đang chạy.
 
 Control selectors:
 
@@ -514,7 +581,7 @@ Candidate selectors dùng `candidate-*`/`kira_candidate`.
 Preflight từng exact variant:
 
 ```powershell
-docker compose --env-file .env.week5.pc.local -f compose.benchmark.yaml `
+docker compose --env-file .env.benchmark.pc.local -f compose.benchmark.yaml `
   --profile tools run --rm eval-controller preflight `
   --profile pc_openai_acceptance `
   --suite formation --suite retrieval --suite rewrite --suite cross_session `
@@ -534,14 +601,14 @@ Worker thường chạy song song sẽ tạo race và làm artifact vô hiệu.
 Control:
 
 ```powershell
-docker compose --env-file .env.week5.pc.local -f compose.benchmark.yaml `
+docker compose --env-file .env.benchmark.pc.local -f compose.benchmark.yaml `
   --profile control stop control-worker
 ```
 
 Candidate:
 
 ```powershell
-docker compose --env-file .env.week5.pc.local -f compose.benchmark.yaml `
+docker compose --env-file .env.benchmark.pc.local -f compose.benchmark.yaml `
   --profile candidate stop candidate-worker
 ```
 
@@ -552,7 +619,7 @@ Freeze preflight dùng một run-set provider artifact đã xác minh đồng nh
 hash tất cả variant preflights nếu native executor implementation yêu cầu):
 
 ```powershell
-docker compose --env-file .env.week5.pc.local -f compose.benchmark.yaml `
+docker compose --env-file .env.benchmark.pc.local -f compose.benchmark.yaml `
   --profile tools run --rm --entrypoint python eval-controller `
   -m scripts.benchmark.freeze_pc_preflight `
   --provider-preflight /artifacts/pc-preflight/candidate-a-provider-preflight.json `
@@ -571,7 +638,7 @@ hostname PostgreSQL nội bộ và harness provenance đều đúng. Không truy
 nạp file local và inject `WEEK5_DATABASE_URL`/`WEEK5_MEMORY_DATABASE_URL` đúng variant.
 
 ```powershell
-docker compose --env-file .env.week5.pc.local -f compose.benchmark.yaml `
+docker compose --env-file .env.benchmark.pc.local -f compose.benchmark.yaml `
   --profile tools run --rm eval-controller run `
   --profile pc_openai_acceptance `
   --suite formation --suite retrieval --suite rewrite --suite cross_session `
@@ -790,10 +857,31 @@ Chỉ báo Phase 4 complete khi có bằng chứng thật:
 Nếu một mục chưa có artifact, ghi `NOT_RUN` hoặc blocker cụ thể. Không hạ acceptance criteria để kết
 thúc nhanh.
 
-## 19. Product chat acceptance với KiRa thật (sau khi pull Phase 7)
+## 19. Product chat acceptance với KiRa thật
 
-Phase 7 được implement và kiểm thử trên laptop bằng KiRa mock + PostgreSQL thật. Trên PC công ty phải
-chạy thêm acceptance dưới đây; đây là kiểm tra product API, không thay thế benchmark Phase 4/5.
+Product MVP đã được implement và kiểm thử trên laptop bằng KiRa mock + PostgreSQL thật. Đây là kiểm
+tra product API/UI, không thay thế benchmark Phase 4/5.
+
+### Trạng thái launcher hiện tại — không được suy diễn là real-KiRa E2E
+
+`compose.product.yaml` và `compose.openai.yaml` đều cố ý chạy `mock-kira`; chúng hữu ích cho local
+product acceptance/OpenAI runtime smoke nhưng **không có Compose overlay đã được phê duyệt để chạy
+frontend + Gateway + Worker với KiRa thật trên PC**. Vì vậy không được chỉ thay một biến môi trường
+rồi tuyên bố real-KiRa product acceptance PASS.
+
+Real-KiRa product acceptance là việc riêng sau T4 benchmark hoặc trong Phase 11 pilot. Trước khi chạy,
+AI trên PC phải có một cấu hình do chủ dự án/platform phê duyệt, nêu rõ:
+
+1. image digest Gateway/Worker/frontend và database disposable hoặc database pilot;
+2. secret injection cho KiRa, extraction/rewrite/embedding mà không viết secret vào file tracked;
+3. `AUTH_ENABLED=true`, origin frontend thật, HTTPS/cookie contract phù hợp môi trường;
+4. endpoint frontend/Gateway, cách apply migration và khởi tạo memory schema;
+5. cách dừng/cleanup chính xác resources của run, không đụng DB/volume dùng chung.
+
+Nếu chưa có cấu hình này, ghi product real-KiRa acceptance là `NOT_RUN — approved company runtime
+overlay missing`; vẫn có thể hoàn thành T4 benchmark độc lập.
+
+Khi launcher đã tồn tại và được phê duyệt, chạy acceptance dưới đây:
 
 1. Chạy `alembic upgrade head`, xác nhận schema có `chat_requests` và revision đúng runtime.
 2. Cấu hình `AUTH_*`, `DATABASE_URL`, KiRa thật và provider retrieval/rewrite cần thiết; không ghi
