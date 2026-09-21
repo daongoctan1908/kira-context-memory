@@ -570,10 +570,10 @@ Tạo provenance JSON từ exact image metadata; không tự gõ SHA/package ver
 Control selectors:
 
 ```ini
-BENCHMARK_BENCHMARK_GATEWAY_HOST=control-gateway
-BENCHMARK_BENCHMARK_WORKER_HOST=control-worker
-BENCHMARK_BENCHMARK_POSTGRES_HOST=control-postgres
-BENCHMARK_BENCHMARK_DATABASE=kira_control
+BENCHMARK_GATEWAY_HOST=control-gateway
+BENCHMARK_WORKER_HOST=control-worker
+BENCHMARK_POSTGRES_HOST=control-postgres
+BENCHMARK_DATABASE=kira_control
 ```
 
 Candidate selectors dùng `candidate-*`/`kira_candidate`.

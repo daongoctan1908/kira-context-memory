@@ -228,10 +228,10 @@ services:
       # The operator selects one running variant at a time. These non-secret selectors override
       # the generic values in the env file; the password is interpolated without being placed on
       # a command line.
-      BENCHMARK_GATEWAY_URL: http://${BENCHMARK_BENCHMARK_GATEWAY_HOST:-candidate-gateway}:8000
-      BENCHMARK_WORKER_URL: http://${BENCHMARK_BENCHMARK_WORKER_HOST:-candidate-worker}:8001
-      BENCHMARK_DATABASE_URL: postgresql://kira:${BENCHMARK_POSTGRES_PASSWORD}@${BENCHMARK_BENCHMARK_POSTGRES_HOST:-candidate-postgres}:5432/${BENCHMARK_BENCHMARK_DATABASE:-kira_candidate}
-      BENCHMARK_MEMORY_DATABASE_URL: postgresql://kira:${BENCHMARK_POSTGRES_PASSWORD}@${BENCHMARK_BENCHMARK_POSTGRES_HOST:-candidate-postgres}:5432/${BENCHMARK_BENCHMARK_DATABASE:-kira_candidate}
+      BENCHMARK_GATEWAY_URL: http://${BENCHMARK_GATEWAY_HOST:-candidate-gateway}:8000
+      BENCHMARK_WORKER_URL: http://${BENCHMARK_WORKER_HOST:-candidate-worker}:8001
+      BENCHMARK_DATABASE_URL: postgresql://kira:${BENCHMARK_POSTGRES_PASSWORD}@${BENCHMARK_POSTGRES_HOST:-candidate-postgres}:5432/${BENCHMARK_DATABASE:-kira_candidate}
+      BENCHMARK_MEMORY_DATABASE_URL: postgresql://kira:${BENCHMARK_POSTGRES_PASSWORD}@${BENCHMARK_POSTGRES_HOST:-candidate-postgres}:5432/${BENCHMARK_DATABASE:-kira_candidate}
     volumes:
       - ${BENCHMARK_ARTIFACT_ROOT:-./artifacts/benchmark}:/artifacts
       - ${BENCHMARK_MATERIALIZATION_ROOT:-./artifacts/benchmark}:/materialization
