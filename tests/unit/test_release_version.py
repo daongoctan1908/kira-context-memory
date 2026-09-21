@@ -4,7 +4,7 @@ from app.presentation.api.main import app as gateway_app
 from worker.main import app as worker_app
 
 
-def test_week4_service_versions_match_distribution_release() -> None:
+def test_service_versions_match_distribution_release() -> None:
     expected = "0.4.1"
 
     assert version("kira-context-memory") == expected

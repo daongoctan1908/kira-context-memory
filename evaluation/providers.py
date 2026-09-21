@@ -320,6 +320,6 @@ class ProviderProbes:
 
     async def kira_mock(self, url: str) -> dict:
         response = await self.request("GET", url.rstrip("/") + "/_test/requests")
-        if not isinstance(response, dict) or response.get("stub") != "kira-week2-local-only":
+        if not isinstance(response, dict) or response.get("stub") != "kira-synthetic-local-only":
             raise ProtocolError(Reason.INVALID_HEALTH)
         return {}

@@ -22,6 +22,7 @@ from app.domain.models.conversation import (
     ConversationMessage,
     ConversationRole,
     ConversationStatus,
+    MessageFeedbackRating,
 )
 from app.infrastructure.postgres.conversation_store import (
     PostgresConversationStoreAdapter,
@@ -216,17 +217,15 @@ async def test_create_conversation_generates_public_id_and_normalizes_title() ->
     assert params["session_id"] != "public-session"
 
 
-async def test_chat_reservations_require_current_schema_and_management_input_is_bounded() -> None:
+async def test_feedback_requires_current_schema_and_management_input_is_bounded() -> None:
     store = adapter(FakeConnection(scalar=PREVIOUS_SCHEMA_REVISION))
     await store.validate_schema()
     with pytest.raises(ConversationStoreConfigurationError):
-        await store.reserve_chat_request(
+        await store.set_message_feedback(
             USER_ID,
             "public-session",
-            uuid4(),
-            b"h" * 32,
-            now=datetime(2026, 9, 19, tzinfo=UTC),
-            lease_seconds=120,
+            "turn-1",
+            MessageFeedbackRating.UP,
         )
 
     current = adapter(FakeConnection())

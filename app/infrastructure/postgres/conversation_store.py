@@ -39,6 +39,7 @@ from app.domain.models.conversation import (
     ConversationRole,
     ConversationStatus,
     ConversationSummary,
+    MessageFeedbackRating,
 )
 from app.domain.models.memory_job import MEMORY_JOB_SCHEMA_VERSION
 from app.domain.models.telemetry_context import (
@@ -47,10 +48,12 @@ from app.domain.models.telemetry_context import (
 )
 from app.infrastructure.postgres.schema import (
     CHAT_REQUEST_SCHEMA_REVISIONS,
+    CONVERSATION_FEEDBACK_SCHEMA_REVISIONS,
     CONVERSATION_MANAGEMENT_SCHEMA_REVISIONS,
     SUPPORTED_SCHEMA_REVISIONS,
     TELEMETRY_CONTEXT_SCHEMA_REVISIONS,
     chat_requests,
+    conversation_feedback,
     conversation_messages,
     conversations,
     memory_jobs,
@@ -140,6 +143,7 @@ class PostgresConversationStoreAdapter:
         *,
         limit: int,
         cursor: ConversationListCursor | None = None,
+        query: str | None = None,
     ) -> ConversationPage:
         """List owned conversations with stable descending keyset pagination."""
         self._require_conversation_management_schema()
@@ -148,6 +152,7 @@ class PostgresConversationStoreAdapter:
         self._validate_page_limit(limit)
         if cursor is not None and not isinstance(cursor, ConversationListCursor):
             raise ValueError("cursor must be a conversation list cursor")
+        normalized_query = self._normalize_search_query(query)
 
         activity_at = func.coalesce(
             conversations.c.last_message_at,
@@ -156,6 +161,13 @@ class PostgresConversationStoreAdapter:
         statement = select(*self._conversation_summary_columns()).where(
             conversations.c.user_id == user_id
         )
+        if normalized_query is not None:
+            escaped_query = (
+                normalized_query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            )
+            statement = statement.where(
+                conversations.c.title.ilike(f"%{escaped_query}%", escape="\\")
+            )
         if cursor is not None:
             statement = statement.where(
                 or_(
@@ -186,6 +198,48 @@ class PostgresConversationStoreAdapter:
             next_cursor = ConversationListCursor(last.activity_at, last.conversation_id)
         return ConversationPage(items, next_cursor)
 
+    async def rename_conversation(
+        self,
+        user_id: str,
+        session_id: str,
+        title: str,
+    ) -> ConversationSummary | None:
+        """Rename one active conversation owned by the caller."""
+        self._require_conversation_management_schema()
+        if not user_id.strip():
+            raise ValueError("user_id must not be empty")
+        if not session_id.strip():
+            raise ValueError("session_id must not be empty")
+        normalized_title = self._normalize_title(title)
+        if normalized_title is None:
+            raise ValueError("title must not be empty")
+        try:
+            async with self._engine.begin() as connection:
+                row = (
+                    (
+                        await connection.execute(
+                            update(conversations)
+                            .where(
+                                conversations.c.user_id == user_id,
+                                conversations.c.session_id == session_id,
+                                conversations.c.status == ConversationStatus.ACTIVE.value,
+                            )
+                            .values(title=normalized_title, updated_at=func.now())
+                            .returning(*self._conversation_summary_columns())
+                        )
+                    )
+                    .mappings()
+                    .one_or_none()
+                )
+        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+            self._raise_mapped(error)
+        if row is None:
+            return None
+        try:
+            return self._to_conversation_summary(row)
+        except (KeyError, TypeError, ValueError) as error:
+            raise ConversationStoreProtocolError from error
+
     async def read_history(
         self,
         user_id: str,
@@ -213,16 +267,26 @@ class PostgresConversationStoreAdapter:
             conversations.c.session_id == session_id,
             conversations.c.status == ConversationStatus.ACTIVE.value,
         )
-        statement = select(
-            conversation_messages.c.message_id,
-            conversation_messages.c.turn_id,
-            conversation_messages.c.role,
-            conversation_messages.c.content,
-            conversation_messages.c.message_timestamp,
-            conversation_messages.c.schema_version,
-            conversation_messages.c.turn_sequence,
-            conversation_messages.c.message_index,
-        ).where(conversation_messages.c.conversation_id == owner_query.scalar_subquery())
+        message_source = conversation_messages.outerjoin(
+            conversation_feedback,
+            (conversation_feedback.c.conversation_id == conversation_messages.c.conversation_id)
+            & (conversation_feedback.c.turn_id == conversation_messages.c.turn_id),
+        )
+        statement = (
+            select(
+                conversation_messages.c.message_id,
+                conversation_messages.c.turn_id,
+                conversation_messages.c.role,
+                conversation_messages.c.content,
+                conversation_messages.c.message_timestamp,
+                conversation_messages.c.schema_version,
+                conversation_messages.c.turn_sequence,
+                conversation_messages.c.message_index,
+                conversation_feedback.c.rating.label("feedback"),
+            )
+            .select_from(message_source)
+            .where(conversation_messages.c.conversation_id == owner_query.scalar_subquery())
+        )
         if before_message_id is not None:
             statement = statement.where(conversation_messages.c.message_id < before_message_id)
         statement = statement.order_by(
@@ -252,6 +316,73 @@ class PostgresConversationStoreAdapter:
             return ConversationHistoryPage(messages, next_before_message_id)
         except (KeyError, TypeError, ValueError) as error:
             raise ConversationStoreProtocolError from error
+
+    async def set_message_feedback(
+        self,
+        user_id: str,
+        session_id: str,
+        turn_id: str,
+        rating: MessageFeedbackRating,
+    ) -> bool:
+        """Persist one rating only for a completed assistant turn owned by the caller."""
+        self._require_feedback_schema()
+        self._validate_feedback_input(user_id, session_id, turn_id)
+        if not isinstance(rating, MessageFeedbackRating):
+            raise ValueError("rating must be a supported feedback rating")
+        try:
+            async with self._engine.begin() as connection:
+                conversation_id = await self._owned_assistant_conversation_id(
+                    connection,
+                    user_id,
+                    session_id,
+                    turn_id,
+                )
+                if conversation_id is None:
+                    return False
+                statement = postgres_insert(conversation_feedback).values(
+                    feedback_id=uuid4(),
+                    conversation_id=conversation_id,
+                    turn_id=turn_id,
+                    rating=rating.value,
+                )
+                await connection.execute(
+                    statement.on_conflict_do_update(
+                        constraint="uq_conversation_feedback_turn",
+                        set_={"rating": rating.value, "updated_at": func.now()},
+                    )
+                )
+                return True
+        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+            self._raise_mapped(error)
+
+    async def clear_message_feedback(
+        self,
+        user_id: str,
+        session_id: str,
+        turn_id: str,
+    ) -> bool:
+        """Clear one rating while keeping repeated requests idempotent."""
+        self._require_feedback_schema()
+        self._validate_feedback_input(user_id, session_id, turn_id)
+        try:
+            async with self._engine.begin() as connection:
+                conversation_id = await self._owned_assistant_conversation_id(
+                    connection,
+                    user_id,
+                    session_id,
+                    turn_id,
+                )
+                if conversation_id is None:
+                    return False
+                await connection.execute(
+                    delete(conversation_feedback).where(
+                        conversation_feedback.c.conversation_id == conversation_id,
+                        conversation_feedback.c.turn_id == turn_id,
+                    )
+                )
+                return True
+        except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
+            self._raise_mapped(error)
 
     async def mark_deletion_pending(self, user_id: str, session_id: str) -> bool:
         """Idempotently move an owned conversation into deletion-pending state."""
@@ -1217,6 +1348,32 @@ class PostgresConversationStoreAdapter:
         if self._schema_revision not in CHAT_REQUEST_SCHEMA_REVISIONS:
             raise ConversationStoreConfigurationError
 
+    def _require_feedback_schema(self) -> None:
+        if self._schema_revision not in CONVERSATION_FEEDBACK_SCHEMA_REVISIONS:
+            raise ConversationStoreConfigurationError
+
+    @staticmethod
+    async def _owned_assistant_conversation_id(
+        connection: AsyncConnection,
+        user_id: str,
+        session_id: str,
+        turn_id: str,
+    ) -> UUID | None:
+        return await connection.scalar(
+            select(conversations.c.conversation_id)
+            .join(
+                conversation_messages,
+                conversation_messages.c.conversation_id == conversations.c.conversation_id,
+            )
+            .where(
+                conversations.c.user_id == user_id,
+                conversations.c.session_id == session_id,
+                conversations.c.status == ConversationStatus.ACTIVE.value,
+                conversation_messages.c.turn_id == turn_id,
+                conversation_messages.c.role == ConversationRole.ASSISTANT.value,
+            )
+        )
+
     @staticmethod
     async def _reclaim_chat_request(
         connection: AsyncConnection,
@@ -1367,6 +1524,26 @@ class PostgresConversationStoreAdapter:
         return normalized
 
     @staticmethod
+    def _normalize_search_query(query: str | None) -> str | None:
+        if query is None:
+            return None
+        if not isinstance(query, str):
+            raise ValueError("query must be a string")
+        normalized = query.strip()
+        if len(normalized) > 100:
+            raise ValueError("query must not exceed 100 characters")
+        return normalized or None
+
+    @staticmethod
+    def _validate_feedback_input(user_id: str, session_id: str, turn_id: str) -> None:
+        if not user_id.strip():
+            raise ValueError("user_id must not be empty")
+        if not session_id.strip():
+            raise ValueError("session_id must not be empty")
+        if not turn_id.strip():
+            raise ValueError("turn_id must not be empty")
+
+    @staticmethod
     def _validate_page_limit(limit: int) -> None:
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
             raise ValueError("page limit must be between 1 and 100")
@@ -1458,6 +1635,12 @@ class PostgresConversationStoreAdapter:
             content=row["content"],
             timestamp=timestamp,
             schema_version=row["schema_version"],
+            feedback=(
+                MessageFeedbackRating(row["feedback"])
+                if row.get("feedback") is not None
+                and row["role"] == ConversationRole.ASSISTANT.value
+                else None
+            ),
         )
 
     @staticmethod

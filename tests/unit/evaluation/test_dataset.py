@@ -17,7 +17,7 @@ from evaluation.dataset import (
     load_manifest,
     namespace_id,
 )
-from scripts.validate_dataset import main, validate_dataset
+from scripts.benchmark.validate_dataset import main, validate_dataset
 
 
 def test_canonical_dataset_loads_with_namespaced_deterministic_messages():

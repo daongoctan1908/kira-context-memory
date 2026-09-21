@@ -38,7 +38,7 @@ from evaluation.formation import (
     PostgresFormationInspector,
 )
 from evaluation.models import FormationInput, Message, Outcome
-from scripts.check_live_memory_policy import score_case
+from scripts.local.check_memory_policy import score_case
 from tests.support.memory_policy_cases import CASES, MemoryPolicyCase
 
 pytestmark = pytest.mark.postgres_integration

@@ -1,7 +1,8 @@
 # Unified observability architecture
 
-Status: Phase 0 contract and Phase 1 shared runtime complete on 2026-09-15. Business-stage spans,
-OTel metric migration, Langfuse, Loki, Grafana, and Kubernetes deployment remain later phases.
+Status: Phases 0-5 application instrumentation, fail-open OTLP export, metric mapping and local
+Langfuse acceptance are complete. Kubernetes deployment, centralized logs/Loki and production
+retention/access controls remain pending.
 
 ## Goals
 
@@ -18,10 +19,11 @@ slow, unavailable, misconfigured after startup, or rejecting data. Telemetry may
 bounded buffering; it must never control business retry, fallback, lease, idempotency, readiness,
 or persistence decisions.
 
-## Current-state audit
+## Historical pre-integration audit
 
-This table records the pre-integration baseline at checkpoint `9e007ee`; Phase 1 closes the shared
-runtime and logging gaps described below, while stage instrumentation remains intentionally open.
+This table records the gaps at checkpoint `9e007ee`; it is baseline evidence, not the current
+implementation status. Phases 1-5 close the application/runtime gaps below. Kubernetes backend
+deployment remains governed by the production plan.
 
 | Area | Existing support | Gap to close |
 | --- | --- | --- |
@@ -130,7 +132,7 @@ headers are sent only to explicitly allowlisted internal hosts.
 
 ## Durable asynchronous boundary
 
-The `memory_jobs` table receives one nullable `telemetry_context JSONB` column in Phase 3. The
+The `memory_jobs` table carries one nullable `telemetry_context JSONB` column. The
 version 1 carrier has this logical shape:
 
 ```json
@@ -239,7 +241,7 @@ Collector or any telemetry backend. Shutdown attempts a bounded flush only after
 Loss of telemetry after queue exhaustion is an accepted pilot failure mode and must be measurable.
 It is preferable to delayed chat responses, expired leases, or duplicated memory formation.
 
-## Phase 1 runtime boundary
+## Implemented runtime boundary
 
 Gateway and Worker each own one `ObservabilityRuntime` for their FastAPI process lifespan. The
 runtime creates a private `TracerProvider` and `MeterProvider` rather than replacing process-global
@@ -255,13 +257,14 @@ tracing is disabled, unsampled, or unavailable.
 
 The local Compose overlay starts the pinned Collector with OTLP gRPC/HTTP receivers, a memory
 limiter, bounded batches, debug trace output, and a Prometheus endpoint for received OTel metrics.
-It is a development transport test, not the Phase 6 Langfuse/Loki/Grafana deployment.
+A separate local overlay validates Langfuse ingestion. Neither overlay is the pending Kubernetes
+deployment or centralized Loki pipeline.
 
 ## Version compatibility baseline
 
-Versions below are the current reviewed pins, not floating “latest” references. Phase 1 and Phase 6
-must lock them in `uv.lock`, image digests, and Helm lock files and run compatibility tests before
-promotion.
+Versions below are the current reviewed pins, not floating “latest” references. The application and
+local stack are locked in `uv.lock` and image references; the pending Kubernetes deployment must
+also lock its image digests and Helm dependencies before promotion.
 
 | Component | Current pin | Reason/constraint |
 | --- | --- | --- |
@@ -297,7 +300,7 @@ p50=412.609ms p95=452.215ms min=366.384ms max=526.112ms
 Worker in-process mock, 50 claim/process/stop samples:
 p50=1.196ms p95=1.737ms min=1.053ms max=3.043ms
 
-Docker Compose/PostgreSQL Week 4 happy-path smoke:
+Docker Compose/PostgreSQL asynchronous-memory happy-path smoke:
 PASS session_a_response_before_memory_model_release seconds=1.340 blocked_requests=1
 PASS worker_completed_job durable_memory_count=1
 PASS session_b_ltm_rewrite_to_kira recent_messages=0
@@ -313,6 +316,94 @@ after success. The reported 1.340 seconds is one functional smoke observation, n
 distribution; before/after overhead remains anchored to the repeatable 50-sample in-process
 measurements above.
 
+## Data handling contract
+
+Status: application redaction/export và local Langfuse acceptance đã enforce contract này. K8s
+retention, access và network-control evidence vẫn phải hoàn tất trước internal pilot.
+
+| Signal | Destination | Pilot retention | Content policy |
+| --- | --- | --- | --- |
+| Traces/AI observations | Internal Langfuse | 14 ngày | Chỉ masked, bounded content. |
+| Metrics | Prometheus | 30 ngày | Chỉ numeric, low-cardinality. |
+| Logs | Platform logging/Loki nếu có | 14 ngày | Không chat, prompt, response hoặc provider body. |
+| Collector queue/WAL | Encrypted persistent volume | Tối đa 24 giờ | Cùng classification với destination. |
+
+Được export không cần masking: random application IDs (`correlation_id`, `turn_id`, `event_id`,
+`conversation_id`, `boundary_message_id`), trace/span IDs, bounded opaque KiRa IDs, service/version,
+environment, stage/outcome/error class, counts/durations, model name, prompt-policy hash và provider
+token usage. `correlation_id`, `trace_id`, `turn_id` và `event_id` luôn là bốn concept riêng.
+
+`user_id` và Langfuse session identity phải được pseudonymize bằng keyed HMAC-SHA256. Cấm export
+authorization headers, cookies, credentials, keys, tokens, passwords, DSNs, environment dumps, raw
+SQL bind values, embedding vectors, arbitrary provider bodies/exception text, raw user/session IDs,
+W3C baggage và client-supplied tracing attributes.
+
+Các reviewed AI fields được phép capture sau masking gồm current query/recent window, retrieved
+memory được xét, rewrite input/output, query/final KiRa text và Mem0 formation/extraction fields.
+Masking phải chạy trước khi giá trị vào span/export queue; Collector chỉ là lớp lọc thứ hai. Masker
+bao phủ email, phone/MSISDN, IMSI/ICCID, identity/account/subscriber/payment identifiers, IP/MAC,
+JWT/auth/API-key/private-key/password/DSN patterns và fixture confidential markers. Mỗi field có
+limit; truncation ghi `truncated=true`. Masking lỗi thì bỏ content field và ghi bounded
+`content_omitted`, tuyệt đối không fallback raw. Business flow vẫn tiếp tục.
+
+Operational logs chỉ có static message, IDs và outcomes; không interpolate dynamic provider hoặc
+exception text. Metric attributes chỉ được dùng các enum bounded như service/environment,
+stage/operation/dependency, outcome/status và claim/cleanup kind. Mọi request, trace, user, session,
+conversation, turn, memory và event ID đều bị cấm làm metric attribute hoặc log index label.
+
+Pilot sample 100% business traces nhưng loại health/readiness/metrics, empty queue polls, unchanged
+cached snapshots và exporter self-scrapes. Metrics không bị trace sampling. Retention cleanup phải
+bounded, idempotent, có dry-run/allowlist và dùng supported API; không xóa trực tiếp bảng Langfuse.
+Telemetry UI/ingestion chỉ được expose nội bộ/TLS, secrets nằm trong secret manager và application
+chỉ biết Collector endpoint.
+
+Telemetry luôn fail-open và resource-bounded: không request/Worker attempt nào chờ remote export;
+outage không đổi typed errors, retry/lease/queue state, receipt, HTTP/SSE, readiness hay liveness;
+queue đầy thì drop telemetry; shutdown flush có deadline. Privacy regression phải chứng minh secret
+không xuất hiện, pseudonym ổn định/rotate được, không cross-user leak, masking/truncation fail-safe,
+metric không có high-cardinality ID và backend outage không đổi business behavior.
+
+## Metric semantics
+
+Trong giai đoạn dual-write, process-local Prometheus metrics và OTel equivalents cùng tồn tại để
+so parity. Prometheus/Grafana scrape Collector endpoints; legacy `/metrics` không phải nguồn của
+dashboard mới. Alert chỉ được evaluate một lần ở Prometheus.
+
+| Legacy metric | OTel instrument | Collector export |
+| --- | --- | --- |
+| `kira_context_recent_messages` | `kira.context.recent_messages` | `kira_context_recent_messages` |
+| `kira_context_estimated_recent_tokens` | `kira.context.estimated_recent_tokens` | `kira_context_estimated_recent_tokens` |
+| `kira_memory_search_total` | `kira.memory.search.count` | `kira_memory_search_count_total` |
+| `kira_memory_search_duration_seconds` | `kira.memory.search.duration` (`s`) | `kira_memory_search_duration_seconds` |
+| `kira_memory_search_results` | `kira.memory.search.result_count` | `kira_memory_search_result_count` |
+| `kira_memory_job_schedule_total` | `kira.memory.job.schedule.count` | `kira_memory_job_schedule_count_total` |
+| `kira_context_rewrite_total` | `kira.context.rewrite.count` | `kira_context_rewrite_count_total` |
+| `kira_context_rewrite_duration_seconds` | `kira.context.rewrite.duration` (`s`) | `kira_context_rewrite_duration_seconds` |
+| `kira_context_degraded_total` | `kira.context.degraded.count` | `kira_context_degraded_count_total` |
+| `kira_conversation_write_total` | `kira.conversation.write.count` | `kira_conversation_write_count_total` |
+| `kira_memory_job_queue_depth` | `kira.memory.job.queue.depth` | `kira_memory_job_queue_depth` |
+| `kira_memory_job_oldest_pending_age_seconds` | `kira.memory.job.oldest_pending.age` (`s`) | `kira_memory_job_oldest_pending_age_seconds` |
+| `kira_memory_job_claim_total` | `kira.memory.job.claim.count` | `kira_memory_job_claim_count_total` |
+| `kira_memory_job_processing_total` | `kira.memory.job.process.count` | `kira_memory_job_process_count_total` |
+| `kira_memory_job_processing_duration_seconds` | `kira.memory.job.process.duration` (`s`) | `kira_memory_job_process_duration_seconds` |
+| `kira_memory_job_attempt_count` | `kira.memory.job.attempt.number` | `kira_memory_job_attempt_number` |
+| `kira_memory_job_lifecycle_event_count` | `kira.memory.lifecycle_event.count` | `kira_memory_lifecycle_event_count` |
+| `kira_memory_job_cleanup_total` | `kira.memory.job.cleanup.count` | `kira_memory_job_cleanup_count_total` |
+| `kira_memory_worker_runner_active` | `kira.memory.worker.runner.active` (`1`) | `kira_memory_worker_runner_active_ratio` |
+| `kira_memory_job_queue_database_available` | `kira.memory.job.queue.database.available` (`1`) | `kira_memory_job_queue_database_available_ratio` |
+| `kira_memory_job_in_flight` | `kira.memory.job.in_flight` | `kira_memory_job_in_flight` |
+| `kira_memory_job_database_backoff_seconds` | `kira.memory.job.database_backoff` (`s`) | `kira_memory_job_database_backoff_seconds` |
+
+OTel additions gồm `kira.chat.request.duration`, generic `kira.stage.duration`,
+`kira.stream.duration`, `kira.stream.first_event.duration`,
+`kira.stream.first_content.duration` và `kira.memory.job.queue_wait.duration`, đều dùng unit `s`.
+Generic stage histogram dùng bounded `stage`, không chứa ID/content. Collector refused/failed point
+self-metrics theo dõi exporter health.
+
+OTel Worker outcome chuẩn là `completed` dù legacy label còn `success`. Boolean observable gauges
+dùng unit `1`; callback chỉ đọc lock-protected in-process snapshot, không query DB. Queue depth và
+oldest pending age là shared PostgreSQL queue nên aggregate replica bằng `max`, không dùng `sum`.
+
 ## References
 
 - [OpenTelemetry messaging span conventions](https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/)
@@ -320,3 +411,5 @@ measurements above.
 - [Langfuse native OpenTelemetry ingestion](https://langfuse.com/integrations/native/opentelemetry)
 - [Prometheus OTLP ingestion](https://prometheus.io/docs/guides/opentelemetry/)
 - [Langfuse Kubernetes Helm deployment](https://langfuse.com/self-hosting/deployment/kubernetes-helm)
+- [Langfuse masking guidance](https://langfuse.com/docs/observability/sdk/advanced-features)
+- [Langfuse data deletion](https://langfuse.com/docs/administration/data-deletion)

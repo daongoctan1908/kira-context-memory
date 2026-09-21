@@ -13,6 +13,7 @@ from app.domain.models.conversation import (
     ConversationMessage,
     ConversationPage,
     ConversationSummary,
+    MessageFeedbackRating,
 )
 from app.domain.models.telemetry_context import TelemetryContext
 
@@ -35,8 +36,18 @@ class ConversationStorePort(Protocol):
         *,
         limit: int,
         cursor: ConversationListCursor | None = None,
+        query: str | None = None,
     ) -> ConversationPage:
         """List owned conversations in stable descending activity order."""
+        ...
+
+    async def rename_conversation(
+        self,
+        user_id: str,
+        session_id: str,
+        title: str,
+    ) -> ConversationSummary | None:
+        """Rename one active owned conversation, or return ``None`` when unavailable."""
         ...
 
     async def read_history(
@@ -48,6 +59,25 @@ class ConversationStorePort(Protocol):
         before_message_id: int | None = None,
     ) -> ConversationHistoryPage | None:
         """Read an active owned conversation, or return ``None`` when unavailable."""
+        ...
+
+    async def set_message_feedback(
+        self,
+        user_id: str,
+        session_id: str,
+        turn_id: str,
+        rating: MessageFeedbackRating,
+    ) -> bool:
+        """Upsert feedback for one persisted assistant turn, returning false when absent."""
+        ...
+
+    async def clear_message_feedback(
+        self,
+        user_id: str,
+        session_id: str,
+        turn_id: str,
+    ) -> bool:
+        """Idempotently clear feedback, returning false only when the turn is unavailable."""
         ...
 
     async def mark_deletion_pending(self, user_id: str, session_id: str) -> bool:

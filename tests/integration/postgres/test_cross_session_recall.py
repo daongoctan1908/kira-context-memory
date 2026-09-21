@@ -32,7 +32,7 @@ from app.infrastructure.memory.postgres_admin import (
 from app.infrastructure.postgres.conversation_store import PostgresConversationStoreAdapter
 from app.infrastructure.postgres.schema import conversations
 from app.presentation.api.main import create_app
-from scripts.check_live_memory_policy import score_case
+from scripts.local.check_memory_policy import score_case
 from tests.integration.test_gateway_api import FakeKiraClient, kira_event
 from tests.support.memory_policy_cases import CASES
 

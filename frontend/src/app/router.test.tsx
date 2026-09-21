@@ -128,7 +128,8 @@ describe("application authentication routes", () => {
       credentials: "include",
       method: "POST",
     });
-    expect(localStorage).toHaveLength(0);
+    expect(localStorage.getItem("access_token")).toBeNull();
+    expect(localStorage.getItem("refresh_token")).toBeNull();
     expect(sessionStorage).toHaveLength(0);
   });
 
@@ -138,11 +139,12 @@ describe("application authentication routes", () => {
     renderRoute("/chat/new");
 
     expect(await screen.findByText("alice")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Đổi mật khẩu/ })).toHaveAttribute(
+    await userEvent.setup().click(screen.getByRole("button", { name: "Mở menu tài khoản" }));
+    expect(screen.getByRole("menuitem", { name: /Đổi mật khẩu/ })).toHaveAttribute(
       "href",
       "/account/password",
     );
-    expect(screen.getByRole("button", { name: "Đăng xuất" })).toBeEnabled();
+    expect(screen.getByRole("menuitem", { name: "Đăng xuất" })).toBeEnabled();
   });
 
   it("shows dependency failure separately and can retry rehydration", async () => {
@@ -165,7 +167,9 @@ describe("application authentication routes", () => {
     renderRoute("/chat/new");
     await user.click(await screen.findByRole("button", { name: "Thử lại" }));
 
-    expect(await screen.findByRole("heading", { name: "Bạn muốn hỏi gì?" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Hôm nay tôi có thể giúp gì cho bạn?" }),
+    ).toBeInTheDocument();
   });
 
   it("sends CSRF on password change and requires login again", async () => {
@@ -216,10 +220,13 @@ describe("application authentication routes", () => {
     const user = userEvent.setup();
 
     renderRoute("/chat/new");
-    await user.click(await screen.findByRole("button", { name: "Đăng xuất" }));
+    await user.click(await screen.findByRole("button", { name: "Mở menu tài khoản" }));
+    await user.click(screen.getByRole("menuitem", { name: "Đăng xuất" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Không thể kết nối tới máy chủ");
-    expect(screen.getByRole("heading", { name: "Bạn muốn hỏi gì?" })).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Hôm nay tôi có thể giúp gì cho bạn?" }),
+    ).toBeVisible();
   });
 
   it("sends CSRF on logout and returns to the login screen", async () => {
@@ -238,7 +245,8 @@ describe("application authentication routes", () => {
     const user = userEvent.setup();
 
     renderRoute("/chat/new");
-    await user.click(await screen.findByRole("button", { name: "Đăng xuất" }));
+    await user.click(await screen.findByRole("button", { name: "Mở menu tài khoản" }));
+    await user.click(screen.getByRole("menuitem", { name: "Đăng xuất" }));
 
     expect(await screen.findByText("Bạn đã đăng xuất an toàn.")).toBeVisible();
     const logoutCall = fetchMock.mock.calls.find(([input]) =>
@@ -252,7 +260,9 @@ describe("application authentication routes", () => {
     mockAuthenticatedFetch();
 
     renderRoute("/chat/new");
-    expect(await screen.findByRole("heading", { name: "Bạn muốn hỏi gì?" })).toBeVisible();
+    expect(
+      await screen.findByRole("heading", { name: "Hôm nay tôi có thể giúp gì cho bạn?" }),
+    ).toBeVisible();
 
     act(() => {
       window.dispatchEvent(new Event(AUTH_SESSION_INVALID_EVENT));

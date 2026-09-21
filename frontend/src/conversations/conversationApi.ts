@@ -2,6 +2,7 @@ import { apiRequest } from "../api/http";
 
 export type ConversationStatus = "active" | "deletion_pending";
 export type ConversationRole = "user" | "assistant";
+export type MessageFeedbackRating = "up" | "down";
 
 export interface ConversationSummary {
   conversation_id: string;
@@ -23,6 +24,7 @@ export interface ConversationMessage {
   role: ConversationRole;
   content: string;
   timestamp: string;
+  feedback: MessageFeedbackRating | null;
 }
 
 export interface ConversationHistoryPage {
@@ -31,15 +33,32 @@ export interface ConversationHistoryPage {
 }
 
 export function listConversations(
-  options: { limit?: number; cursor?: string; signal?: AbortSignal } = {},
+  options: { limit?: number; cursor?: string; query?: string; signal?: AbortSignal } = {},
 ): Promise<ConversationListPage> {
   const search = new URLSearchParams({ limit: String(options.limit ?? 20) });
   if (options.cursor !== undefined) {
     search.set("cursor", options.cursor);
   }
+  if (options.query !== undefined && options.query.trim().length > 0) {
+    search.set("q", options.query.trim());
+  }
   return apiRequest<ConversationListPage>(
     `/api/v1/conversations?${search.toString()}`,
     options.signal === undefined ? {} : { signal: options.signal },
+  );
+}
+
+export function renameConversation(
+  sessionId: string,
+  title: string,
+): Promise<ConversationSummary> {
+  return apiRequest<ConversationSummary>(
+    `/api/v1/conversations/${encodeURIComponent(sessionId)}`,
+    {
+      method: "PATCH",
+      body: { title },
+      csrf: true,
+    },
   );
 }
 
@@ -70,4 +89,29 @@ export async function deleteConversation(sessionId: string): Promise<void> {
     method: "DELETE",
     csrf: true,
   });
+}
+
+export function setMessageFeedback(
+  sessionId: string,
+  turnId: string,
+  rating: MessageFeedbackRating,
+): Promise<{ turn_id: string; rating: MessageFeedbackRating }> {
+  return apiRequest(
+    `/api/v1/conversations/${encodeURIComponent(sessionId)}/messages/${encodeURIComponent(turnId)}/feedback`,
+    {
+      method: "PUT",
+      body: { rating },
+      csrf: true,
+    },
+  );
+}
+
+export async function clearMessageFeedback(sessionId: string, turnId: string): Promise<void> {
+  await apiRequest<undefined>(
+    `/api/v1/conversations/${encodeURIComponent(sessionId)}/messages/${encodeURIComponent(turnId)}/feedback`,
+    {
+      method: "DELETE",
+      csrf: true,
+    },
+  );
 }

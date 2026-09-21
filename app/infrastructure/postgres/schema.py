@@ -21,12 +21,13 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import BYTEA, JSONB
 
-PREVIOUS_SCHEMA_REVISION = "20260919_0006"
-EXPECTED_SCHEMA_REVISION = "20260919_0007"
+PREVIOUS_SCHEMA_REVISION = "20260919_0007"
+EXPECTED_SCHEMA_REVISION = "20260920_0008"
 SUPPORTED_SCHEMA_REVISIONS = frozenset({PREVIOUS_SCHEMA_REVISION, EXPECTED_SCHEMA_REVISION})
 TELEMETRY_CONTEXT_SCHEMA_REVISIONS = SUPPORTED_SCHEMA_REVISIONS
 CONVERSATION_MANAGEMENT_SCHEMA_REVISIONS = SUPPORTED_SCHEMA_REVISIONS
-CHAT_REQUEST_SCHEMA_REVISIONS = frozenset({EXPECTED_SCHEMA_REVISION})
+CHAT_REQUEST_SCHEMA_REVISIONS = SUPPORTED_SCHEMA_REVISIONS
+CONVERSATION_FEEDBACK_SCHEMA_REVISIONS = frozenset({EXPECTED_SCHEMA_REVISION})
 
 metadata = MetaData()
 
@@ -94,6 +95,7 @@ Index(
     auth_sessions.c.absolute_expires_at,
     postgresql_where=auth_sessions.c.revoked_at.is_(None),
 )
+
 Index(
     "ix_auth_sessions_expired_cleanup",
     auth_sessions.c.absolute_expires_at,
@@ -235,6 +237,33 @@ Index(
     conversation_messages.c.conversation_id,
     conversation_messages.c.turn_sequence.desc(),
     conversation_messages.c.message_index.desc(),
+)
+
+conversation_feedback = Table(
+    "conversation_feedback",
+    metadata,
+    Column("feedback_id", Uuid(as_uuid=True), primary_key=True),
+    Column(
+        "conversation_id",
+        Uuid(as_uuid=True),
+        ForeignKey(
+            "conversations.conversation_id",
+            name="fk_conversation_feedback_conversation",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+    ),
+    Column("turn_id", Text, nullable=False),
+    Column("rating", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    CheckConstraint("length(turn_id) > 0", name="ck_conversation_feedback_turn_nonempty"),
+    CheckConstraint("rating IN ('up', 'down')", name="ck_conversation_feedback_rating"),
+    UniqueConstraint(
+        "conversation_id",
+        "turn_id",
+        name="uq_conversation_feedback_turn",
+    ),
 )
 
 memory_jobs = Table(

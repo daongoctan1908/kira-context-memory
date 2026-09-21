@@ -53,7 +53,7 @@ def mock_response(request: httpx.Request) -> httpx.Response:
     if request.url.path == "/ready":
         return httpx.Response(200, json={"status": "ready"})
     if request.url.path == "/_test/requests":
-        return httpx.Response(200, json={"stub": "kira-week2-local-only"})
+        return httpx.Response(200, json={"stub": "kira-synthetic-local-only"})
     return httpx.Response(404)
 
 

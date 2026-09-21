@@ -5,12 +5,13 @@ from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint
 from app.infrastructure.postgres.schema import (
     CHAT_REQUEST_SCHEMA_REVISIONS,
     EXPECTED_SCHEMA_REVISION,
+    PREVIOUS_SCHEMA_REVISION,
     chat_requests,
 )
 
 
-def test_chat_request_schema_is_available_only_at_current_revision() -> None:
-    assert CHAT_REQUEST_SCHEMA_REVISIONS == {EXPECTED_SCHEMA_REVISION}
+def test_chat_request_schema_remains_available_across_bridge_revision() -> None:
+    assert CHAT_REQUEST_SCHEMA_REVISIONS == {PREVIOUS_SCHEMA_REVISION, EXPECTED_SCHEMA_REVISION}
     assert list(chat_requests.c.keys()) == [
         "request_id",
         "conversation_id",

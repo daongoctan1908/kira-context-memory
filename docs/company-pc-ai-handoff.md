@@ -175,7 +175,7 @@ git checkout main
 git pull --ff-only origin main
 git status --short
 uv sync --frozen
-uv run python -m scripts.validate_dataset dataset/kira_ltm_v1
+uv run python -m scripts.benchmark.validate_dataset dataset/kira_ltm_v1
 uv run pytest -q
 ```
 
@@ -191,7 +191,7 @@ uv run pytest -q
 Tạo file local từ template, không commit:
 
 ```powershell
-Copy-Item evaluation/week5.pc.env.example .env.week5.pc.local
+Copy-Item evaluation/benchmark.pc.env.example .env.week5.pc.local
 ```
 
 Điền tất cả placeholder. Không dùng shared `OPENAI_*` fallback. Bốn provider phải explicit:
@@ -216,7 +216,7 @@ git check-ignore .env.week5.pc.local
 ### 5.1 Lập plan, chưa network
 
 ```powershell
-uv run python -m scripts.materialize_dataset plan `
+uv run python -m scripts.benchmark.materialize_dataset plan `
   --root dataset/kira_ltm_v1
 ```
 
@@ -225,7 +225,7 @@ Xác nhận 80 unique requests, 140 fills, 54 answers. Nếu counts khác, dừn
 ### 5.2 Một request preflight vào checkpoint chính thức
 
 ```powershell
-uv run python -m scripts.materialize_dataset preflight `
+uv run python -m scripts.benchmark.materialize_dataset preflight `
   --root dataset/kira_ltm_v1 `
   --env-file .env.week5.pc.local --env-file-only `
   --checkpoint artifacts/week5/kira-materialization.json
@@ -237,7 +237,7 @@ checkpoint chính thức. Không tạo checkpoint thử riêng rồi gọi lại
 ### 5.3 Resume đủ 80/80
 
 ```powershell
-uv run python -m scripts.materialize_dataset collect `
+uv run python -m scripts.benchmark.materialize_dataset collect `
   --root dataset/kira_ltm_v1 `
   --env-file .env.week5.pc.local --env-file-only `
   --checkpoint artifacts/week5/kira-materialization.json `
@@ -250,26 +250,26 @@ checkpoint. Không commit checkpoint vì nó chứa query và KiRa response.
 ### 5.4 Preview rồi apply
 
 ```powershell
-uv run python -m scripts.materialize_dataset apply `
+uv run python -m scripts.benchmark.materialize_dataset apply `
   --root dataset/kira_ltm_v1 `
   --checkpoint artifacts/week5/kira-materialization.json `
   --dataset-version 1.0.0-materialized.1 `
   --output-root artifacts/week5/kira_ltm_v1_materialized
 
-uv run python -m scripts.validate_dataset `
+uv run python -m scripts.benchmark.validate_dataset `
   artifacts/week5/kira_ltm_v1_materialized
 ```
 
 Review diff preview. Nếu đúng, apply cùng checkpoint vào canonical:
 
 ```powershell
-uv run python -m scripts.materialize_dataset apply `
+uv run python -m scripts.benchmark.materialize_dataset apply `
   --root dataset/kira_ltm_v1 `
   --checkpoint artifacts/week5/kira-materialization.json `
   --dataset-version 1.0.0-materialized.1 `
   --in-place
 
-uv run python -m scripts.validate_dataset dataset/kira_ltm_v1
+uv run python -m scripts.benchmark.validate_dataset dataset/kira_ltm_v1
 ```
 
 Acceptance T4.1:
@@ -285,7 +285,7 @@ Acceptance T4.1:
 Xuất packet/decision template mới, create-only:
 
 ```powershell
-uv run python -m scripts.review_dataset export `
+uv run python -m scripts.benchmark.review_dataset export `
   --root dataset/kira_ltm_v1 `
   --packet artifacts/week5/dataset-review-packet.json `
   --decisions artifacts/week5/dataset-review-decisions.json
@@ -306,7 +306,7 @@ Human phải review:
 Điền mọi placeholder trong decisions bằng cùng reviewer/revision. Freeze preview trước:
 
 ```powershell
-uv run python -m scripts.review_dataset freeze `
+uv run python -m scripts.benchmark.review_dataset freeze `
   --root dataset/kira_ltm_v1 `
   --packet artifacts/week5/dataset-review-packet.json `
   --decisions artifacts/week5/dataset-review-decisions.json `
@@ -314,13 +314,13 @@ uv run python -m scripts.review_dataset freeze `
   --allow-pc-openai `
   --output-root artifacts/week5/kira_ltm_v1_reviewed
 
-uv run python -m scripts.validate_dataset artifacts/week5/kira_ltm_v1_reviewed
+uv run python -m scripts.benchmark.validate_dataset artifacts/week5/kira_ltm_v1_reviewed
 ```
 
 Sau khi human chấp thuận preview:
 
 ```powershell
-uv run python -m scripts.review_dataset freeze `
+uv run python -m scripts.benchmark.review_dataset freeze `
   --root dataset/kira_ltm_v1 `
   --packet artifacts/week5/dataset-review-packet.json `
   --decisions artifacts/week5/dataset-review-decisions.json `
@@ -328,7 +328,7 @@ uv run python -m scripts.review_dataset freeze `
   --allow-pc-openai `
   --in-place
 
-uv run python -m scripts.validate_dataset dataset/kira_ltm_v1
+uv run python -m scripts.benchmark.validate_dataset dataset/kira_ltm_v1
 git diff -- dataset/kira_ltm_v1
 ```
 
@@ -437,7 +437,7 @@ network-disabled mock acceptance trước live provider calls.
 ```powershell
 docker pull pgvector/pgvector:0.8.6-pg16-bookworm
 git status --short
-./scripts/week5_offline_handoff.ps1 -Action Build `
+./scripts/benchmark/offline_handoff.ps1 -Action Build `
   -CandidateRevision @("<candidate-a-full-sha>") `
   -CandidateChangeScope @("prompt", "config") `
   -CandidateSummary "Mô tả ngắn thay đổi thực sự của candidate."
@@ -446,7 +446,7 @@ git status --short
 Hai candidates:
 
 ```powershell
-./scripts/week5_offline_handoff.ps1 -Action Build `
+./scripts/benchmark/offline_handoff.ps1 -Action Build `
   -CandidateRevision @("<candidate-a-full-sha>", "<candidate-b-full-sha>")
 ```
 
@@ -460,7 +460,7 @@ Build đồng thời sinh strict provenance files tại
 Chạy network-disabled acceptance trên **mọi** eval image:
 
 ```powershell
-./scripts/week5_offline_handoff.ps1 -Action MockAcceptance
+./scripts/benchmark/offline_handoff.ps1 -Action MockAcceptance
 ```
 
 Không coi mock acceptance là quality result.
@@ -470,23 +470,23 @@ Không coi mock acceptance là quality result.
 Kiểm Compose mà không in resolved secret:
 
 ```powershell
-./scripts/week5_offline_handoff.ps1 -Action Validate `
+./scripts/benchmark/offline_handoff.ps1 -Action Validate `
   -EnvFile .env.week5.pc.local
 ```
 
 Control:
 
 ```powershell
-./scripts/week5_offline_handoff.ps1 -Action StartControl `
+./scripts/benchmark/offline_handoff.ps1 -Action StartControl `
   -EnvFile .env.week5.pc.local
 ```
 
 Sau khi xong control:
 
 ```powershell
-./scripts/week5_offline_handoff.ps1 -Action Stop `
+./scripts/benchmark/offline_handoff.ps1 -Action Stop `
   -EnvFile .env.week5.pc.local
-./scripts/week5_offline_handoff.ps1 -Action StartCandidate `
+./scripts/benchmark/offline_handoff.ps1 -Action StartCandidate `
   -VariantId candidate-a `
   -EnvFile .env.week5.pc.local
 ```
@@ -514,7 +514,7 @@ Candidate selectors dùng `candidate-*`/`kira_candidate`.
 Preflight từng exact variant:
 
 ```powershell
-docker compose --env-file .env.week5.pc.local -f compose.week5.benchmark.yaml `
+docker compose --env-file .env.week5.pc.local -f compose.benchmark.yaml `
   --profile tools run --rm eval-controller preflight `
   --profile pc_openai_acceptance `
   --suite formation --suite retrieval --suite rewrite --suite cross_session `
@@ -534,14 +534,14 @@ Worker thường chạy song song sẽ tạo race và làm artifact vô hiệu.
 Control:
 
 ```powershell
-docker compose --env-file .env.week5.pc.local -f compose.week5.benchmark.yaml `
+docker compose --env-file .env.week5.pc.local -f compose.benchmark.yaml `
   --profile control stop control-worker
 ```
 
 Candidate:
 
 ```powershell
-docker compose --env-file .env.week5.pc.local -f compose.week5.benchmark.yaml `
+docker compose --env-file .env.week5.pc.local -f compose.benchmark.yaml `
   --profile candidate stop candidate-worker
 ```
 
@@ -552,9 +552,9 @@ Freeze preflight dùng một run-set provider artifact đã xác minh đồng nh
 hash tất cả variant preflights nếu native executor implementation yêu cầu):
 
 ```powershell
-docker compose --env-file .env.week5.pc.local -f compose.week5.benchmark.yaml `
+docker compose --env-file .env.week5.pc.local -f compose.benchmark.yaml `
   --profile tools run --rm --entrypoint python eval-controller `
-  -m scripts.freeze_pc_preflight `
+  -m scripts.benchmark.freeze_pc_preflight `
   --provider-preflight /artifacts/pc-preflight/candidate-a-provider-preflight.json `
   --materialization-checkpoint /materialization/kira-materialization.json `
   --dataset-root /app/dataset/kira_ltm_v1 `
@@ -571,7 +571,7 @@ hostname PostgreSQL nội bộ và harness provenance đều đúng. Không truy
 nạp file local và inject `WEEK5_DATABASE_URL`/`WEEK5_MEMORY_DATABASE_URL` đúng variant.
 
 ```powershell
-docker compose --env-file .env.week5.pc.local -f compose.week5.benchmark.yaml `
+docker compose --env-file .env.week5.pc.local -f compose.benchmark.yaml `
   --profile tools run --rm eval-controller run `
   --profile pc_openai_acceptance `
   --suite formation --suite retrieval --suite rewrite --suite cross_session `
@@ -605,7 +605,7 @@ Hard gates duy nhất:
 Kiểm gate:
 
 ```powershell
-uv run python -m scripts.check_pc_acceptance `
+uv run python -m scripts.benchmark.check_pc_acceptance `
   --run control=artifacts/week5/pc-openai/<run-set-id>/control `
   --run candidate-a=artifacts/week5/pc-openai/<run-set-id>/candidate-a `
   --dataset-root dataset/kira_ltm_v1 `
@@ -636,7 +636,7 @@ không phải safety/blocking error.
 Export phải trỏ đúng final acceptance artifact:
 
 ```powershell
-./scripts/week5_offline_handoff.ps1 -Action Export `
+./scripts/benchmark/offline_handoff.ps1 -Action Export `
   -PcPreflightPath artifacts/week5/pc-preflight/freeze.json `
   -PcAcceptancePath artifacts/week5/pc-openai/<run-set-id>/pc-acceptance.json
 ```
@@ -667,7 +667,7 @@ worktrees. Lưu thêm SHA-256 của toàn bundle theo cơ chế chuyển file n�
 ### VDI
 
 ```powershell
-./scripts/week5_offline_handoff.ps1 -Action Import `
+./scripts/benchmark/offline_handoff.ps1 -Action Import `
   -BundleDirectory <path-to-transferred-bundle>
 ```
 
@@ -675,7 +675,7 @@ Import kiểm checksum từng file, tar, load images và so image ID với manif
 registry, chạy `-Action Publish`; script tạo create-only `registry-manifest.json` có
 `repository@sha256:...` cho từng runtime/eval image. K8s chỉ dùng immutable reference, không dùng
 tag hoặc `latest` làm evidence. Quy trình Phase 5 đầy đủ nằm trong
-`K8S-RUNBOOK.md` của bundle và `docs/week5-internal-k8s-acceptance.md` trong repo.
+`K8S-RUNBOOK.md` của bundle và `docs/benchmark-k8s-acceptance.md` trong repo.
 
 ### K8s preflight
 
@@ -719,7 +719,7 @@ Các command `release scorecard|confirm|performance|promote` đã được tri�
 laptop. Chúng chỉ tổng hợp/validate artifact, không gọi provider. `release scorecard` cố ý chỉ nhận
 `internal_test`, nên PC/OpenAI không được dùng command này để tạo official evidence. PC phải hoàn
 thành materialization, review/freeze, technical acceptance và exact-image handoff; K8s mới chạy
-scorecard/confirmation chính thức theo `docs/week5-internal-k8s-acceptance.md`.
+scorecard/confirmation chính thức theo `docs/benchmark-k8s-acceptance.md`.
 
 Nếu reviewer đổi verdict của một formation match, không sửa tay scorecard: phải re-score/rerun để
 TP/FP/FN và audit artifact cùng nhất quán. Tool sẽ fail-closed với
@@ -762,13 +762,12 @@ artifacts/week5/
     pc-preflight.json
     pc-acceptance.json
     dataset-manifest.json
-    kira-week5-images.tar
-    kira-week5-images.tar.sha256
-    compose.week5.benchmark.yaml
-    week5.internal.env.example
-    RUNBOOK.md
-    K8S-RUNBOOK.md
-    COMPANY-PC-AI-HANDOFF.md
+    kira-benchmark-images.tar
+    kira-benchmark-images.tar.sha256
+    compose.benchmark.yaml
+    benchmark.internal.env.example
+    RUNBOOK.md                  # tài liệu này
+    K8S-RUNBOOK.md              # benchmark-k8s-acceptance.md
     bundle-manifest.json
 ```
 
@@ -894,7 +893,7 @@ khác nhau. Không chạy acceptance nếu hai cấu hình trỏ sang database k
 ## 23. Phase 11 production deployment handoff
 
 Sau Phase 4/5 và product acceptance, đọc toàn bộ
-[`phase11-production-deployment.md`](phase11-production-deployment.md). Laptop đã chuẩn bị phần không
+[`production-deployment.md`](production-deployment.md). Laptop đã chuẩn bị phần không
 phụ thuộc platform; không được diễn giải thành Phase 11 PASS.
 
 AI trên PC phải:

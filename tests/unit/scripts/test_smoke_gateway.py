@@ -3,7 +3,7 @@ import json
 
 import httpx
 
-from scripts.smoke_gateway import SmokeOptions, SseEvent, iter_sse_events, run_smoke
+from scripts.local.smoke_gateway import SmokeOptions, SseEvent, iter_sse_events, run_smoke
 
 
 def options() -> SmokeOptions:

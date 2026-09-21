@@ -4,7 +4,7 @@ from uuid import uuid4
 import httpx
 import pytest
 
-from scripts.smoke_product_e2e import (
+from scripts.local.smoke_product_e2e import (
     ProductApi,
     ProductE2EError,
     _assert_safe_kira_outage,

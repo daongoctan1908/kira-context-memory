@@ -21,7 +21,8 @@ COPY --from=variant_source app ./app
 COPY --from=variant_source worker ./worker
 COPY evaluation ./evaluation
 COPY dataset ./dataset
-COPY scripts/run_week5_benchmark.py scripts/validate_dataset.py scripts/materialize_dataset.py scripts/review_dataset.py scripts/week5_mock_acceptance.py scripts/benchmark_image_metadata.py scripts/freeze_pc_preflight.py scripts/check_pc_acceptance.py scripts/freeze_handoff.py ./scripts/
+COPY scripts/__init__.py ./scripts/
+COPY scripts/benchmark ./scripts/benchmark
 
 RUN uv sync --frozen --no-dev --no-editable
 
@@ -48,6 +49,8 @@ ENV APP_VERSION=${APP_VERSION} \
     BENCHMARK_RUNTIME_REVISION=${RUNTIME_REVISION} \
     BENCHMARK_HARNESS_REVISION=${HARNESS_REVISION} \
     BENCHMARK_VARIANT=${BENCHMARK_VARIANT} \
+    MEM0_DIR=/tmp/kira-mem0 \
+    MEM0_TELEMETRY=False \
     PATH="/app/.venv/bin:${PATH}" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
@@ -71,5 +74,5 @@ COPY --from=builder --chown=kira:kira /app/scripts ./scripts
 
 USER kira
 
-ENTRYPOINT ["python", "-m", "scripts.run_week5_benchmark"]
+ENTRYPOINT ["python", "-m", "scripts.benchmark.run"]
 CMD ["validate"]

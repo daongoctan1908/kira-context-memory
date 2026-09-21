@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from scripts.check_live_memory_policy import evaluate_cases, options_from_environment
+from scripts.local.check_memory_policy import evaluate_cases, options_from_environment
 from tests.support.memory_policy_cases import CASES
 
 

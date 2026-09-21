@@ -1,4 +1,4 @@
-"""End-to-end PostgreSQL acceptance for the Week 4 memory Worker runtime."""
+"""End-to-end PostgreSQL acceptance for the memory Worker runtime."""
 
 import asyncio
 import os

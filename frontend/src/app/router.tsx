@@ -8,13 +8,16 @@ import { ConversationPage } from "../pages/ConversationPage";
 import { LoginPage } from "../pages/LoginPage";
 import { NewChatPage } from "../pages/NewChatPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
+import { ThemeProvider } from "../theme/ThemeProvider";
 
 export const appRoutes = [
   {
     element: (
-      <AuthProvider>
-        <Outlet />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <Outlet />
+        </AuthProvider>
+      </ThemeProvider>
     ),
     children: [
       {

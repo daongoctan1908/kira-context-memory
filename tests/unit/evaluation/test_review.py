@@ -19,7 +19,7 @@ from evaluation.review import (
     build_review_packet,
     freeze_reviewed_dataset,
 )
-from scripts.validate_dataset import validate_dataset
+from scripts.benchmark.validate_dataset import validate_dataset
 
 
 def _materialized_dataset(tmp_path: Path) -> Path:

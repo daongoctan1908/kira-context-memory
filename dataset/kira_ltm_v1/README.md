@@ -68,7 +68,7 @@ independent holdout must use a separately collected corpus rather than hiding pa
 Run the deterministic validator before any benchmark or commit:
 
 ```powershell
-uv run python -m scripts.validate_dataset dataset/kira_ltm_v1
+uv run python -m scripts.benchmark.validate_dataset dataset/kira_ltm_v1
 ```
 
 The validator checks the manifest and checksums, full-corpus scope, counts, IDs, references, fill
@@ -101,14 +101,14 @@ the prefix itself in this file, and never commit the file.
 Inspect the workload without network access or writes:
 
 ```powershell
-uv run python -m scripts.materialize_dataset plan --root dataset/kira_ltm_v1
+uv run python -m scripts.benchmark.materialize_dataset plan --root dataset/kira_ltm_v1
 ```
 
 Use one request as the connectivity smoke. `INCOMPLETE` and exit code 1 are expected here because
 the command was deliberately capped:
 
 ```powershell
-uv run python -m scripts.materialize_dataset collect `
+uv run python -m scripts.benchmark.materialize_dataset collect `
   --root dataset/kira_ltm_v1 `
   --env-file .env.kira.local --env-file-only `
   --checkpoint artifacts/week5/kira-materialization.json `
@@ -118,7 +118,7 @@ uv run python -m scripts.materialize_dataset collect `
 Resume the checkpoint and collect the remaining responses sequentially:
 
 ```powershell
-uv run python -m scripts.materialize_dataset collect `
+uv run python -m scripts.benchmark.materialize_dataset collect `
   --root dataset/kira_ltm_v1 `
   --env-file .env.kira.local --env-file-only `
   --checkpoint artifacts/week5/kira-materialization.json `
@@ -133,7 +133,7 @@ KiRa responses and lives under the Git-ignored `artifacts/` directory.
 Preview a fully validated materialized copy before changing the canonical source:
 
 ```powershell
-uv run python -m scripts.materialize_dataset apply `
+uv run python -m scripts.benchmark.materialize_dataset apply `
   --root dataset/kira_ltm_v1 `
   --checkpoint artifacts/week5/kira-materialization.json `
   --dataset-version 1.0.0-materialized.1 `
@@ -143,13 +143,13 @@ uv run python -m scripts.materialize_dataset apply `
 After reviewing that copy, apply the same validated checkpoint to the canonical dataset:
 
 ```powershell
-uv run python -m scripts.materialize_dataset apply `
+uv run python -m scripts.benchmark.materialize_dataset apply `
   --root dataset/kira_ltm_v1 `
   --checkpoint artifacts/week5/kira-materialization.json `
   --dataset-version 1.0.0-materialized.1 `
   --in-place
 
-uv run python -m scripts.validate_dataset dataset/kira_ltm_v1
+uv run python -m scripts.benchmark.validate_dataset dataset/kira_ltm_v1
 git diff -- dataset/kira_ltm_v1
 ```
 

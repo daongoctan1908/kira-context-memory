@@ -1,5 +1,5 @@
 > Đây là contract kế hoạch canonical. Tiến độ/live evidence nằm trong
-> `company-pc-ai-handoff.md` và `week5-internal-k8s-acceptance.md`; không suy ra task đã PASS chỉ
+> `company-pc-ai-handoff.md` và `benchmark-k8s-acceptance.md`; không suy ra task đã PASS chỉ
 > từ việc task xuất hiện trong plan.
 
 # Implementation plan v4: hoàn thiện benchmark, xây chatbot và đưa lên production tối thiểu
@@ -24,9 +24,9 @@ thay đổi contract, gate hoặc thứ tự dependency trong file này.
 
 Ba chỗ triển khai chính:
 
-- Hợp đồng benchmark: [week5-benchmark-contract.md](/C:/Code/kira-context-memory/docs/week5-benchmark-contract.md).
-- Boundary giữa ứng dụng và Mem0: [mem0_adapter.py](/C:/Code/kira-context-memory/app/infrastructure/memory/mem0_adapter.py).
-- Schema ứng dụng: [schema.py](/C:/Code/kira-context-memory/app/infrastructure/postgres/schema.py).
+- Hợp đồng benchmark: [benchmark-contract.md](benchmark-contract.md).
+- Boundary giữa ứng dụng và Mem0: [mem0_adapter.py](../app/infrastructure/memory/mem0_adapter.py).
+- Schema ứng dụng: [schema.py](../app/infrastructure/postgres/schema.py).
 
 Effort mỗi task: **S** khoảng nửa ngày; **M** khoảng 1 ngày; **L** khoảng 2–3 ngày. Chưa tính chờ provider, human review hoặc sửa lỗi phát hiện trong acceptance.
 
@@ -333,7 +333,7 @@ Prometheus/Grafana và Langfuse chạy độc lập theo nhu cầu test; không 
 | **T11.4 — Company pilot** | Real KiRa/model/embedding, browser acceptance, user isolation, deletion races, restart, backup/restore, image rollback và resource observation. | Production gate bên dưới đạt; runtime SHA/config khớp evidence. Benchmark chỉ rerun khi product change ảnh hưởng formation/retrieval/rewrite/memory semantics. | T5.7, T10.3, T11.2–T11.3 | L |
 
 Laptop preparation for Phase 11 is documented in
-[phase11-production-deployment.md](/C:/Code/kira-context-memory/docs/phase11-production-deployment.md).
+[production-deployment.md](production-deployment.md).
 The repository serializes migrations with a bounded PostgreSQL advisory lock, enforces a shared
 application/memory database in both runtime processes and exposes read-only memory schema validation.
 This preparation does **not** mark T11 complete: platform manifests, managed TLS, real restore,

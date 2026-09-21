@@ -19,7 +19,7 @@ from evaluation.materialization import (
     verify_checkpoint_source,
     write_materialization_checkpoint,
 )
-from scripts.validate_dataset import validate_dataset
+from scripts.benchmark.validate_dataset import validate_dataset
 
 
 def _copy_dataset(tmp_path: Path) -> Path:

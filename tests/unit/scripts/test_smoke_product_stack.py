@@ -1,6 +1,6 @@
 import pytest
 
-from scripts.smoke_product_stack import (
+from scripts.local.smoke_product_stack import (
     ProductSmokeError,
     _parse_product_events,
     parse_args,

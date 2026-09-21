@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { ChatComposer } from "./ChatComposer";
+import { CopyMessageButton } from "./CopyMessageButton";
 import { useChatStream } from "./useChatStream";
 
 const CLIENT_MESSAGE_ID = "55555555-5555-4555-8555-555555555555";
@@ -76,7 +77,7 @@ describe("chat composer", () => {
     const onStop = vi.fn();
     const user = userEvent.setup();
     const { rerender } = render(
-      <ChatComposer streaming={false} onSend={onSend} onStop={onStop} />,
+      <ChatComposer sessionId="test-session" streaming={false} onSend={onSend} onStop={onStop} />,
     );
 
     const input = screen.getByLabelText("Nội dung tin nhắn");
@@ -86,9 +87,24 @@ describe("chat composer", () => {
     expect(onSend).toHaveBeenCalledWith("Dòng một\nDòng hai");
     expect(input).toHaveValue("");
 
-    rerender(<ChatComposer streaming onSend={onSend} onStop={onStop} />);
+    rerender(<ChatComposer sessionId="test-session" streaming onSend={onSend} onStop={onStop} />);
     await user.click(screen.getByRole("button", { name: "Dừng" }));
     expect(onStop).toHaveBeenCalledOnce();
+  });
+
+  it("copies an assistant answer without exposing it elsewhere", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    render(<CopyMessageButton content="Nội dung cần sao chép" />);
+
+    await user.click(screen.getByRole("button", { name: "Sao chép" }));
+
+    expect(writeText).toHaveBeenCalledWith("Nội dung cần sao chép");
+    expect(screen.getByRole("button", { name: "Đã sao chép" })).toBeVisible();
   });
 });
 

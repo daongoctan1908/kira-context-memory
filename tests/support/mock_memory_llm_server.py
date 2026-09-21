@@ -6,7 +6,7 @@ import json
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from tests.support.week4_cases import MEMORY_MARKER
+from tests.support.product_cases import MEMORY_MARKER
 
 MODEL = "local-memory-stub"
 _NEW_MESSAGES_HEADING = "## New Messages\n"

@@ -59,8 +59,8 @@ jobs:
 
       - name: Validate dataset and deterministic harness
         run: |
-          uv run python -m scripts.validate_dataset dataset/kira_ltm_v1 --json
-          uv run python -m scripts.week5_mock_acceptance --output "$RUNNER_TEMP/week5-mock-acceptance"
+          uv run python -m scripts.benchmark.validate_dataset dataset/kira_ltm_v1 --json
+          uv run python -m scripts.benchmark.mock_acceptance --output "$RUNNER_TEMP/benchmark-mock-acceptance"
 
       - name: Run full backend suite with coverage and PostgreSQL integration
         run: uv run pytest
@@ -136,7 +136,7 @@ jobs:
         run: docker compose -f compose.product.yaml up -d --build --wait
 
       - name: Run product E2E
-        run: uv run python -m scripts.smoke_product_e2e
+        run: uv run python -m scripts.local.smoke_product_e2e
 
       - name: Remove disposable product stack
         if: always()

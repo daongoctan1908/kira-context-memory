@@ -20,12 +20,14 @@ from app.domain.models.conversation import (
     ConversationMessage,
     ConversationRole,
     ConversationStatus,
+    MessageFeedbackRating,
 )
 from app.domain.models.telemetry_context import TelemetryContext
 from app.infrastructure.postgres import conversation_store as conversation_store_module
 from app.infrastructure.postgres.conversation_store import PostgresConversationStoreAdapter
 from app.infrastructure.postgres.schema import (
     EXPECTED_SCHEMA_REVISION,
+    conversation_feedback,
     conversation_messages,
     conversations,
     memory_jobs,
@@ -36,7 +38,7 @@ from tests.support.context_fakes import FakeRewriter
 from tests.support.mock_kira_server import app as mock_kira_app
 from tests.support.mock_kira_server import query_hashes
 from tests.support.mock_vllm_server import app as mock_vllm_app
-from tests.support.week2_cases import CASES
+from tests.support.rewrite_cases import CASES
 
 pytestmark = pytest.mark.postgres_integration
 USER_ID = "test-user"
@@ -239,6 +241,31 @@ async def test_conversation_management_is_owned_paginated_and_hides_pending_hist
             item.conversation_id
             for item in (await adapter.list_conversations(other_owner, limit=10)).items
         ] == [other.conversation_id]
+        renamed = await adapter.rename_conversation(
+            owner,
+            second.session_id,
+            "  Plan %_ nội bộ  ",
+        )
+        assert renamed is not None
+        assert renamed.title == "Plan %_ nội bộ"
+        assert (
+            await adapter.rename_conversation(
+                other_owner,
+                second.session_id,
+                "Không được phép",
+            )
+            is None
+        )
+        literal_match = await adapter.list_conversations(owner, limit=10, query=" %_ ")
+        assert [item.conversation_id for item in literal_match.items] == [second.conversation_id]
+        case_insensitive_match = await adapter.list_conversations(
+            owner,
+            limit=10,
+            query="PLAN",
+        )
+        assert [item.conversation_id for item in case_insensitive_match.items] == [
+            second.conversation_id
+        ]
         empty_history = await adapter.read_history(owner, second.session_id, limit=10)
         assert empty_history is not None
         assert empty_history.messages == ()
@@ -318,6 +345,81 @@ async def test_conversation_management_is_owned_paginated_and_hides_pending_hist
         async with engine.begin() as connection:
             await connection.execute(
                 delete(conversations).where(conversations.c.conversation_id.in_(created_ids))
+            )
+
+
+async def test_feedback_is_owned_idempotent_and_cascades_with_conversation(
+    engine: AsyncEngine,
+) -> None:
+    adapter = PostgresConversationStoreAdapter(engine)
+    await adapter.validate_schema()
+    owner = f"feedback-owner-{uuid4()}"
+    other_owner = f"feedback-owner-{uuid4()}"
+    created = await adapter.create_conversation(owner, title="Feedback test")
+    turn_id = f"feedback-turn-{uuid4()}"
+    try:
+        result = await adapter.append_turn(
+            owner,
+            _message(created.session_id, turn_id, ConversationRole.USER, "question", 1),
+            _message(created.session_id, turn_id, ConversationRole.ASSISTANT, "answer", 2),
+        )
+        assert result.inserted
+        assert not await adapter.set_message_feedback(
+            other_owner,
+            created.session_id,
+            turn_id,
+            MessageFeedbackRating.UP,
+        )
+        assert await adapter.set_message_feedback(
+            owner,
+            created.session_id,
+            turn_id,
+            MessageFeedbackRating.UP,
+        )
+        assert await adapter.set_message_feedback(
+            owner,
+            created.session_id,
+            turn_id,
+            MessageFeedbackRating.DOWN,
+        )
+        history = await adapter.read_history(owner, created.session_id, limit=10)
+        assert history is not None
+        assert [message.feedback for message in history.messages] == [
+            None,
+            MessageFeedbackRating.DOWN,
+        ]
+        async with engine.connect() as connection:
+            assert (
+                await connection.scalar(
+                    select(func.count())
+                    .select_from(conversation_feedback)
+                    .where(conversation_feedback.c.conversation_id == created.conversation_id)
+                )
+                == 1
+            )
+        assert await adapter.clear_message_feedback(owner, created.session_id, turn_id)
+        assert await adapter.clear_message_feedback(owner, created.session_id, turn_id)
+        assert await adapter.set_message_feedback(
+            owner,
+            created.session_id,
+            turn_id,
+            MessageFeedbackRating.UP,
+        )
+    finally:
+        async with engine.begin() as connection:
+            await connection.execute(
+                delete(conversations).where(
+                    conversations.c.conversation_id == created.conversation_id
+                )
+            )
+        async with engine.connect() as connection:
+            assert (
+                await connection.scalar(
+                    select(func.count())
+                    .select_from(conversation_feedback)
+                    .where(conversation_feedback.c.conversation_id == created.conversation_id)
+                )
+                == 0
             )
 
 

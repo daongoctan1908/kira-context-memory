@@ -9,7 +9,7 @@ from app.application.services.memory_policy import (
     MEMORY_EXTRACTION_INSTRUCTIONS,
     MEMORY_POLICY_VERSION,
 )
-from scripts.check_live_memory_policy import (
+from scripts.local.check_memory_policy import (
     MemoryPolicyEvalClient,
     PolicyEvalOptions,
     PolicyEvalProtocolError,

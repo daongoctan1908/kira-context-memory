@@ -10,7 +10,7 @@ from evaluation.config import EvalConfig
 from evaluation.errors import PreflightError
 from evaluation.models import HISTORICAL_CONTROL_SHA, Probe, Reason
 from evaluation.postgres import probe_database
-from scripts.run_week5_benchmark import main
+from scripts.benchmark.run import main
 
 
 def install_connection(monkeypatch, *, ones=((1,), ("0.8.6",)), many=()):
@@ -191,7 +191,7 @@ def test_cli_missing_config_and_bad_secret_are_safe(tmp_path, monkeypatch, capsy
 
 def test_cli_unexpected_runtime_error_is_sanitized(monkeypatch, capsys):
     monkeypatch.setattr(
-        "scripts.run_week5_benchmark.run_preflight",
+        "scripts.benchmark.run.run_preflight",
         AsyncMock(side_effect=RuntimeError("sk-synthetic-key")),
     )
     assert main(["preflight", "--profile", "mock", "--suite", "formation"]) == 2

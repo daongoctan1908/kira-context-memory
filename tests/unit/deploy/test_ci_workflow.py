@@ -14,8 +14,8 @@ def test_ci_keeps_backend_coverage_postgres_and_offline_harness_gates() -> None:
     assert "--cov-fail-under=90" in project
     assert "POSTGRES_TEST_URL:" in workflow
     assert "pgvector/pgvector:0.8.6-pg16-bookworm" in workflow
-    assert "scripts.validate_dataset dataset/kira_ltm_v1 --json" in workflow
-    assert "scripts.week5_mock_acceptance" in workflow
+    assert "scripts.benchmark.validate_dataset dataset/kira_ltm_v1 --json" in workflow
+    assert "scripts.benchmark.mock_acceptance" in workflow
 
 
 def test_ci_never_enables_live_or_external_quality_evaluation() -> None:
@@ -28,7 +28,7 @@ def test_ci_never_enables_live_or_external_quality_evaluation() -> None:
         "KIRA_BASE_URL",
         "VLLM_BASE_URL",
         "MEMORY_LLM_BASE_URL",
-        "run_week5_benchmark",
+        "run_benchmark",
     ):
         assert forbidden not in workflow
 
@@ -45,7 +45,7 @@ def test_ci_checks_frontend_browser_product_images_and_e2e() -> None:
         "playwright install --with-deps chromium",
         "pnpm test:e2e",
         "docker compose -f compose.product.yaml up -d --build --wait",
-        "uv run python -m scripts.smoke_product_e2e",
+        "uv run python -m scripts.local.smoke_product_e2e",
         "down --volumes --remove-orphans",
     ):
         assert command in workflow

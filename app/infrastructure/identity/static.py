@@ -1,4 +1,4 @@
-"""Week 3 identity adapters; real chatbot JWT authentication is deferred."""
+"""Static trusted-identity adapter for development and synthetic tests."""
 
 from app.domain.models.identity import AuthenticatedPrincipal
 

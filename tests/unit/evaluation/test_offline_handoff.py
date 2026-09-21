@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from scripts.benchmark_image_metadata import image_metadata
-from scripts.week5_mock_acceptance import run_mock_acceptance
+from scripts.benchmark.image_metadata import image_metadata
+from scripts.benchmark.mock_acceptance import run_mock_acceptance
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
@@ -67,13 +67,15 @@ def test_eval_runtime_is_locked_and_does_not_install_or_download_at_startup():
     assert 'test -n "${HARNESS_REVISION}"' in runtime
     assert "COPY --from=variant_source app ./app" in dockerfile
     assert "COPY --from=variant_source packages/viettel-mem0/mem0" in dockerfile
-    assert "scripts/review_dataset.py" in dockerfile
+    assert "COPY scripts/benchmark ./scripts/benchmark" in dockerfile
+    assert "MEM0_DIR=/tmp/kira-mem0" in runtime
+    assert "MEM0_TELEMETRY=False" in runtime
     for forbidden in ("pip install", "uv sync", "curl ", "wget ", "model download"):
         assert forbidden not in runtime
 
 
 def test_internal_compose_uses_only_prebuilt_images_and_fixed_handoff_mounts():
-    compose = (REPOSITORY_ROOT / "compose.week5.benchmark.yaml").read_text(encoding="utf-8")
+    compose = (REPOSITORY_ROOT / "compose.benchmark.yaml").read_text(encoding="utf-8")
 
     assert "build:" not in compose
     assert compose.count("pull_policy: never") == 11
@@ -85,7 +87,9 @@ def test_internal_compose_uses_only_prebuilt_images_and_fixed_handoff_mounts():
 
 
 def test_handoff_script_pins_control_and_verifies_offline_bundle():
-    script = (REPOSITORY_ROOT / "scripts/week5_offline_handoff.ps1").read_text(encoding="utf-8-sig")
+    script = (REPOSITORY_ROOT / "scripts/benchmark/offline_handoff.ps1").read_text(
+        encoding="utf-8-sig"
+    )
 
     assert "75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00" in script
     assert '"--pull=false"' in script
@@ -103,7 +107,7 @@ def test_handoff_script_pins_control_and_verifies_offline_bundle():
     assert '"--build-context", "variant_source=$controlPath"' in script
     assert "Get-EvalMetadata" in script
     assert "foreach ($variant in $manifest.variants)" in script
-    assert '"-m", "scripts.freeze_handoff"' in script
+    assert '"-m", "scripts.benchmark.freeze_handoff"' in script
     assert "Assert-ManifestImagesUnchanged" in script
     assert "Assert-BundleFileHashes" in script
     assert "PcAcceptancePath" in script
@@ -140,7 +144,7 @@ def test_image_metadata_binds_dataset_prompts_packages_and_exact_revisions(monke
 
 
 def test_internal_env_template_contains_placeholders_not_populated_credentials():
-    template = (REPOSITORY_ROOT / "evaluation/week5.internal.env.example").read_text(
+    template = (REPOSITORY_ROOT / "evaluation/benchmark.internal.env.example").read_text(
         encoding="utf-8"
     )
 
@@ -153,7 +157,7 @@ def test_internal_env_template_contains_placeholders_not_populated_credentials()
 
 
 def test_pc_env_template_requires_explicit_provider_and_kira_configuration():
-    template = (REPOSITORY_ROOT / "evaluation/week5.pc.env.example").read_text(encoding="utf-8")
+    template = (REPOSITORY_ROOT / "evaluation/benchmark.pc.env.example").read_text(encoding="utf-8")
 
     for name in (
         "WEEK5_EXTRACTION_BASE_URL",

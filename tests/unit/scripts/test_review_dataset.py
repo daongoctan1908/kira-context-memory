@@ -1,7 +1,7 @@
 """Review CLI refuses draft input and never leaks validation details."""
 
 from evaluation.dataset import default_dataset_root
-from scripts.review_dataset import main
+from scripts.benchmark.review_dataset import main
 
 
 def test_export_rejects_nonmaterialized_dataset_without_content(tmp_path, capsys):

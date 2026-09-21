@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 
@@ -49,11 +49,31 @@ function gatewayError(code: string, status: number): Response {
   );
 }
 
+function streamFrame(name: string, payload: Record<string, unknown>): string {
+  return `event: ${name}\ndata: ${JSON.stringify(payload)}\n\n`;
+}
+
+function streamResponse(chunks: string[]): Response {
+  const encoder = new TextEncoder();
+  return new Response(
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const chunk of chunks) {
+          controller.enqueue(encoder.encode(chunk));
+        }
+        controller.close();
+      },
+    }),
+    { headers: { "Content-Type": "text/event-stream" } },
+  );
+}
+
 beforeEach(() => {
   document.cookie = "kira_csrf_dev=csrf-conversation; Path=/";
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -118,12 +138,147 @@ describe("conversation management UI", () => {
     const user = userEvent.setup();
 
     renderRoute("/chat/new");
-    await user.type(await screen.findByLabelText("Tên cuộc trò chuyện"), "Hỗ trợ chuyển vùng");
+    await user.type(await screen.findByLabelText("Tin nhắn đầu tiên"), "Hỗ trợ chuyển vùng");
     await user.click(screen.getByRole("button", { name: "Bắt đầu trò chuyện" }));
 
     expect(await screen.findByRole("heading", { name: "Hỗ trợ chuyển vùng" })).toBeVisible();
     expect(createCsrf).toBe("csrf-conversation");
     expect(createBody).toEqual({ title: "Hỗ trợ chuyển vùng" });
+  });
+
+  it("creates a conversation from the first prompt and sends it once", async () => {
+    const clientMessageId = "33333333-3333-4333-8333-333333333333";
+    const prompt = "Hướng dẫn bật chuyển vùng quốc tế";
+    let createBody: unknown;
+    let sentBody: unknown;
+    vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue(clientMessageId);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const path = pathOf(input);
+        if (path.endsWith("/me")) {
+          return Promise.resolve(jsonResponse(USER));
+        }
+        if (path.endsWith("/api/v1/conversations") && init?.method === "POST") {
+          createBody = typeof init.body === "string" ? JSON.parse(init.body) as unknown : null;
+          return Promise.resolve(jsonResponse({ ...ACTIVE_CONVERSATION, title: prompt }, 201));
+        }
+        if (path.endsWith("/session-one/messages") && init?.method === "POST") {
+          sentBody = typeof init.body === "string" ? JSON.parse(init.body) as unknown : null;
+          const identity = { turn_id: "turn-initial", client_message_id: clientMessageId };
+          return Promise.resolve(
+            streamResponse([
+              streamFrame("message.started", identity),
+              streamFrame("message.delta", { ...identity, text: "Bạn hãy mở phần chuyển vùng." }),
+              streamFrame("message.completed", { ...identity, replayed: false }),
+            ]),
+          );
+        }
+        if (path.includes("/session-one/messages?")) {
+          return Promise.resolve(jsonResponse({ items: [], next_before_message_id: null }));
+        }
+        if (path.includes("/api/v1/conversations?")) {
+          return Promise.resolve(jsonResponse({ items: [], next_cursor: null }));
+        }
+        return Promise.reject(new Error(`Unexpected request: ${path}`));
+      }),
+    );
+    const user = userEvent.setup();
+
+    renderRoute("/chat/new");
+    await user.type(await screen.findByLabelText("Tin nhắn đầu tiên"), prompt);
+    await user.click(screen.getByRole("button", { name: "Bắt đầu trò chuyện" }));
+
+    expect(await screen.findByText("Bạn hãy mở phần chuyển vùng.")).toBeVisible();
+    expect(createBody).toEqual({ title: prompt });
+    expect(sentBody).toEqual({ message: prompt, client_message_id: clientMessageId });
+    expect(screen.getAllByText(prompt).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("keeps new messages in view and promotes the active conversation", async () => {
+    const clientMessageId = "44444444-4444-4444-8444-444444444444";
+    const newerConversation = {
+      ...ACTIVE_CONVERSATION,
+      conversation_id: "22222222-2222-4222-8222-222222222222",
+      session_id: "session-two",
+      title: "Cuộc trò chuyện đang ở đầu",
+      updated_at: "2026-09-19T08:00:00Z",
+      last_message_at: "2026-09-19T09:00:00Z",
+    };
+    const identity = {
+      turn_id: "turn-live",
+      client_message_id: clientMessageId,
+    };
+    vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue(clientMessageId);
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(900);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const path = pathOf(input);
+        if (path.endsWith("/me")) {
+          return Promise.resolve(jsonResponse(USER));
+        }
+        if (path.endsWith("/session-one/messages") && init?.method === "POST") {
+          return Promise.resolve(
+            streamResponse([
+              streamFrame("message.started", identity),
+              streamFrame("message.delta", { ...identity, text: "Đã trả lời" }),
+              streamFrame("message.completed", { ...identity, replayed: false }),
+            ]),
+          );
+        }
+        if (path.includes("/session-one/messages?")) {
+          return Promise.resolve(jsonResponse({ items: [], next_before_message_id: null }));
+        }
+        if (path.includes("/api/v1/conversations?")) {
+          return Promise.resolve(
+            jsonResponse({
+              items: [newerConversation, ACTIVE_CONVERSATION],
+              next_cursor: null,
+            }),
+          );
+        }
+        return Promise.reject(new Error(`Unexpected request: ${path}`));
+      }),
+    );
+    const user = userEvent.setup();
+
+    const rendered = renderRoute("/chat/session-one");
+    await screen.findByText("Cuộc trò chuyện đang ở đầu");
+    const conversationList = rendered.container.querySelector<HTMLElement>(".conversation-history");
+    expect(conversationList).not.toBeNull();
+    if (conversationList === null) {
+      return;
+    }
+    expect(within(conversationList).getAllByRole("link")[0]).toHaveTextContent(
+      "Cuộc trò chuyện đang ở đầu",
+    );
+    const viewport = rendered.container.querySelector<HTMLElement>(".conversation-scroll");
+    expect(viewport).not.toBeNull();
+    if (viewport === null) {
+      return;
+    }
+    Object.defineProperty(viewport, "clientHeight", { configurable: true, value: 300 });
+    const scrollTo = vi.fn();
+    viewport.scrollTo = scrollTo;
+    await waitFor(() => {
+      expect(viewport.scrollTop).toBe(900);
+    });
+    viewport.scrollTop = 0;
+    fireEvent.scroll(viewport);
+    await user.click(screen.getByRole("button", { name: "Cuộn xuống tin nhắn mới nhất" }));
+    expect(scrollTo).toHaveBeenCalledWith({ top: 900, behavior: "smooth" });
+
+    await user.type(screen.getByLabelText("Nội dung tin nhắn"), "Câu hỏi mới");
+    await user.click(screen.getByRole("button", { name: "Gửi" }));
+
+    expect(await screen.findByText("Đã trả lời")).toBeVisible();
+    await waitFor(() => {
+      expect(viewport.scrollTop).toBe(900);
+      expect(within(conversationList).getAllByRole("link")[0]).toHaveTextContent(
+        "Hỗ trợ chuyển vùng",
+      );
+    });
   });
 
   it("confirms deletion and removes only the selected conversation", async () => {
@@ -156,12 +311,11 @@ describe("conversation management UI", () => {
     const user = userEvent.setup();
 
     renderRoute("/chat/new");
-    await user.click(await screen.findByRole("button", { name: "Xóa Hỗ trợ chuyển vùng" }));
-    expect(screen.getByRole("alertdialog")).toBeVisible();
-    await user.keyboard("{Escape}");
-    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Xóa Hỗ trợ chuyển vùng" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Tùy chọn cho Hỗ trợ chuyển vùng" }),
+    );
+    await user.click(screen.getByRole("menuitem", { name: "Xóa" }));
+    expect(screen.getByRole("dialog", { name: "Xóa cuộc trò chuyện?" })).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Xóa vĩnh viễn" }));
 
     await waitFor(() => {
@@ -198,9 +352,9 @@ describe("conversation management UI", () => {
     const user = userEvent.setup();
 
     renderRoute("/chat/new");
-    await user.click(await screen.findByRole("button", { name: "Thử lại" }));
+    await user.click(await screen.findByRole("button", { name: "Thử xóa lại" }));
     expect(await screen.findByText("Chưa thể xóa. Hãy thử lại.")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Thử lại" }));
+    await user.click(screen.getByRole("button", { name: "Thử xóa lại" }));
 
     await waitFor(() => {
       expect(screen.queryByText("Hỗ trợ chuyển vùng")).not.toBeInTheDocument();

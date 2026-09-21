@@ -15,6 +15,8 @@ export interface ConversationContextValue {
   refresh: () => Promise<void>;
   loadMore: () => Promise<void>;
   create: (title?: string) => Promise<ConversationSummary>;
+  rename: (sessionId: string, title: string) => Promise<ConversationSummary>;
+  touch: (sessionId: string) => void;
   remove: (sessionId: string) => Promise<void>;
 }
 

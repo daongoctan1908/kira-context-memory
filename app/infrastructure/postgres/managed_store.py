@@ -21,6 +21,7 @@ from app.domain.models.conversation import (
     ConversationMessage,
     ConversationPage,
     ConversationSummary,
+    MessageFeedbackRating,
 )
 from app.domain.models.telemetry_context import TelemetryContext
 from app.infrastructure.postgres.conversation_store import PostgresConversationStoreAdapter
@@ -74,6 +75,7 @@ class ManagedPostgresConversationStore:
         *,
         limit: int,
         cursor: ConversationListCursor | None = None,
+        query: str | None = None,
     ) -> ConversationPage:
         async with self._operation():
             await self.validate_schema()
@@ -81,7 +83,18 @@ class ManagedPostgresConversationStore:
                 user_id,
                 limit=limit,
                 cursor=cursor,
+                query=query,
             )
+
+    async def rename_conversation(
+        self,
+        user_id: str,
+        session_id: str,
+        title: str,
+    ) -> ConversationSummary | None:
+        async with self._operation():
+            await self.validate_schema()
+            return await self._adapter.rename_conversation(user_id, session_id, title)
 
     async def read_history(
         self,
@@ -99,6 +112,32 @@ class ManagedPostgresConversationStore:
                 limit=limit,
                 before_message_id=before_message_id,
             )
+
+    async def set_message_feedback(
+        self,
+        user_id: str,
+        session_id: str,
+        turn_id: str,
+        rating: MessageFeedbackRating,
+    ) -> bool:
+        async with self._operation():
+            await self.validate_schema()
+            return await self._adapter.set_message_feedback(
+                user_id,
+                session_id,
+                turn_id,
+                rating,
+            )
+
+    async def clear_message_feedback(
+        self,
+        user_id: str,
+        session_id: str,
+        turn_id: str,
+    ) -> bool:
+        async with self._operation():
+            await self.validate_schema()
+            return await self._adapter.clear_message_feedback(user_id, session_id, turn_id)
 
     async def mark_deletion_pending(self, user_id: str, session_id: str) -> bool:
         async with self._operation():

@@ -29,9 +29,11 @@ export interface LiveTurn {
 
 export function useChatStream({
   sessionId,
+  onActivity,
   onCompleted,
 }: {
   sessionId: string;
+  onActivity?: () => void;
   onCompleted?: (event: MessageCompletedEvent) => void;
 }) {
   const [turns, setTurns] = useState<LiveTurn[]>([]);
@@ -68,6 +70,7 @@ export function useChatStream({
     const controller = new AbortController();
     activeController.current = controller;
     setActiveClientMessageId(clientMessageId);
+    onActivity?.();
     let assistantText = "";
     const completion = { received: false };
 
@@ -134,7 +137,7 @@ export function useChatStream({
         }
       }
     }
-  }, [onCompleted, sessionId, updateTurn]);
+  }, [onActivity, onCompleted, sessionId, updateTurn]);
 
   const send = useCallback((text: string) => {
     const userText = text.trim();

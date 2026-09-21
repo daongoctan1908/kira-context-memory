@@ -19,7 +19,7 @@ Clock = Callable[[], float]
 class KiraTokenManager:
     """Reuse a token while the configured TTL interpretation considers it valid.
 
-    Week 1 deliberately treats ``tokenExpirationTime`` as a TTL in seconds. The cache
+    The KiRa contract treats ``tokenExpirationTime`` as a TTL in seconds. The cache
     uses monotonic time and refreshes early by ``expiry_skew_seconds``.
     """
 

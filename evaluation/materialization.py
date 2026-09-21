@@ -322,7 +322,7 @@ def apply_materialization(
             checkpoint,
             dataset_version=dataset_version,
         )
-        from scripts.validate_dataset import validate_dataset
+        from scripts.benchmark.validate_dataset import validate_dataset
 
         validation = validate_dataset(staged_root)
         if not validation.valid:

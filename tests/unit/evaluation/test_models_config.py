@@ -157,7 +157,7 @@ def test_candidate_and_historical_control_declarations_fail_closed():
 
 def test_contract_v4_does_not_rewrite_the_historical_control_runtime():
     root = Path(__file__).resolve().parents[3]
-    manifest = json.loads((root / "docs/week5-baseline.json").read_text(encoding="utf-8"))
+    manifest = json.loads((root / "docs/benchmark-baseline.json").read_text(encoding="utf-8"))
     assert manifest["contract_id"] == BENCHMARK_CONTRACT_ID
     assert manifest["variant"] == BenchmarkVariant.HISTORICAL_CONTROL
     assert manifest["source"]["commit"] == HISTORICAL_CONTROL_SHA
@@ -223,7 +223,7 @@ def test_secret_exclusion_and_no_ambient_env(tmp_path):
     assert config.model_copy(update={"temperature": 1.0}).fingerprint() != config.fingerprint()
 
 
-def test_retrieval_contract_settings_load_and_are_fingerprinted():
+def test_retrieval_settings_load_and_are_fingerprinted():
     config = load_config(
         profile=Profile.INTERNAL_TEST,
         suites=(Suite.RETRIEVAL,),

@@ -30,7 +30,7 @@ async def health() -> dict[str, str]:
 async def observed_requests() -> dict[str, object]:
     """Test-only evidence, hashes of synthetic input instead of raw conversation text."""
     return {
-        "stub": "kira-week2-local-only",
+        "stub": "kira-synthetic-local-only",
         "query_hashes": list(query_hashes),
         "request_count": _request_count,
         "failure_count": _failure_count,

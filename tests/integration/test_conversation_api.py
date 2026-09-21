@@ -19,6 +19,7 @@ from app.domain.models.conversation import (
     ConversationRole,
     ConversationStatus,
     ConversationSummary,
+    MessageFeedbackRating,
 )
 from app.domain.models.identity import AuthenticatedPrincipal
 from app.domain.models.kira import KiraStreamEvent
@@ -81,6 +82,8 @@ class FakeConversationStore:
         self.purged = False
         self.purge_error = purge_error
         self.list_cursors: list[ConversationListCursor | None] = []
+        self.list_queries: list[str | None] = []
+        self.feedback: MessageFeedbackRating | None = None
 
     async def create_conversation(self, user_id, *, title=None):
         assert user_id == self.owner
@@ -94,9 +97,10 @@ class FakeConversationStore:
             self.summary.last_message_at,
         )
 
-    async def list_conversations(self, user_id, *, limit, cursor=None):
+    async def list_conversations(self, user_id, *, limit, cursor=None, query=None):
         assert limit <= 100
         self.list_cursors.append(cursor)
+        self.list_queries.append(query)
         if user_id != self.owner:
             return ConversationPage((), None)
         if cursor is not None:
@@ -105,6 +109,20 @@ class FakeConversationStore:
             (self.summary,),
             ConversationListCursor(self.summary.activity_at, self.summary.conversation_id),
         )
+
+    async def rename_conversation(self, user_id, session_id, title):
+        if user_id != self.owner or session_id != self.summary.session_id or self.deleted:
+            return None
+        self.summary = ConversationSummary(
+            self.summary.conversation_id,
+            self.summary.session_id,
+            title,
+            self.summary.status,
+            self.summary.created_at,
+            self.summary.updated_at,
+            self.summary.last_message_at,
+        )
+        return self.summary
 
     async def read_history(self, user_id, session_id, *, limit, before_message_id=None):
         assert limit <= 100
@@ -119,9 +137,39 @@ class FakeConversationStore:
                     "hello",
                     _NOW,
                 ),
+                ConversationMessage(
+                    session_id,
+                    "turn-1",
+                    ConversationRole.ASSISTANT,
+                    "xin chao",
+                    _NOW,
+                    feedback=self.feedback,
+                ),
             ),
             41 if before_message_id is None else None,
         )
+
+    async def set_message_feedback(self, user_id, session_id, turn_id, rating):
+        if (
+            user_id != self.owner
+            or session_id != self.summary.session_id
+            or turn_id != "turn-1"
+            or self.deleted
+        ):
+            return False
+        self.feedback = rating
+        return True
+
+    async def clear_message_feedback(self, user_id, session_id, turn_id):
+        if (
+            user_id != self.owner
+            or session_id != self.summary.session_id
+            or turn_id != "turn-1"
+            or self.deleted
+        ):
+            return False
+        self.feedback = None
+        return True
 
     async def mark_deletion_pending(self, user_id, session_id):
         if user_id != self.owner or session_id != self.summary.session_id:
@@ -260,6 +308,13 @@ async def test_two_user_isolation_invalid_cursor_and_pending_delete() -> None:
             await client.get("/api/v1/conversations/public-session/messages")
         ).status_code == 404
         assert (
+            await client.patch(
+                "/api/v1/conversations/public-session",
+                headers=_unsafe_headers(),
+                json={"title": "Not mine"},
+            )
+        ).status_code == 404
+        assert (
             await client.delete("/api/v1/conversations/public-session", headers=_unsafe_headers())
         ).status_code == 204
 
@@ -314,6 +369,58 @@ async def test_conversation_request_validation_is_bounded() -> None:
             )
         ).status_code == 422
         assert (await client.get("/api/v1/conversations?limit=101")).status_code == 422
+        oversized_search = await client.get(
+            "/api/v1/conversations",
+            params={"q": "x" * 101},
+        )
+        assert oversized_search.status_code == 422
         assert (
             await client.get("/api/v1/conversations/public-session/messages?before_message_id=0")
         ).status_code == 422
+
+
+async def test_rename_search_and_feedback_are_owned_csrf_protected_contracts() -> None:
+    async with _client() as (client, store):
+        await _login(client)
+
+        searched = await client.get("/api/v1/conversations", params={"q": "  Support  "})
+        assert searched.status_code == 200
+        assert store.list_queries[-1] == "  Support  "
+
+        assert (
+            await client.patch(
+                "/api/v1/conversations/public-session",
+                json={"title": "Renamed"},
+            )
+        ).status_code == 403
+        renamed = await client.patch(
+            "/api/v1/conversations/public-session",
+            headers=_unsafe_headers(),
+            json={"title": "  Renamed support  "},
+        )
+        assert renamed.status_code == 200
+        assert renamed.json()["title"] == "Renamed support"
+
+        rated = await client.put(
+            "/api/v1/conversations/public-session/messages/turn-1/feedback",
+            headers=_unsafe_headers(),
+            json={"rating": "up"},
+        )
+        assert rated.status_code == 200
+        assert rated.json() == {"turn_id": "turn-1", "rating": "up"}
+        assert store.feedback is MessageFeedbackRating.UP
+        history = await client.get("/api/v1/conversations/public-session/messages")
+        assert history.json()["items"][1]["feedback"] == "up"
+
+        cleared = await client.delete(
+            "/api/v1/conversations/public-session/messages/turn-1/feedback",
+            headers=_unsafe_headers(),
+        )
+        assert cleared.status_code == 204
+        assert store.feedback is None
+        missing = await client.put(
+            "/api/v1/conversations/public-session/messages/missing/feedback",
+            headers=_unsafe_headers(),
+            json={"rating": "down"},
+        )
+        assert missing.status_code == 404

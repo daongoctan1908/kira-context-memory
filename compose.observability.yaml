@@ -1,4 +1,4 @@
-# Optional local OTel overlay for compose.week4.yaml or compose.product.yaml.
+# Optional local OTel overlay for compose.product.yaml.
 # Add --profile metrics only when Prometheus/Grafana are also needed.
 services:
   otel-collector:

@@ -187,7 +187,12 @@ async def test_conversation_management_operations_are_validated_and_forwarded() 
 
     adapter.validate_schema.assert_awaited_once()
     adapter.create_conversation.assert_awaited_once_with(USER_ID, title="Support")
-    adapter.list_conversations.assert_awaited_once_with(USER_ID, limit=20, cursor=cursor)
+    adapter.list_conversations.assert_awaited_once_with(
+        USER_ID,
+        limit=20,
+        cursor=cursor,
+        query=None,
+    )
     adapter.read_history.assert_awaited_once_with(
         USER_ID,
         "public-session",

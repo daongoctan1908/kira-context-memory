@@ -1,0 +1,159 @@
+# Disposable OpenAI runtime smoke with synthetic KiRa traffic.
+# Values in .env.openai.local override the shell; never commit real credentials.
+name: kira-context-openai
+
+x-runtime: &runtime
+  image: kira-context:openai-local
+  pull_policy: never
+  init: true
+
+x-app-database: &app-database
+  DATABASE_URL: postgresql+asyncpg://kira:local-openai-only@postgres:5432/kira_openai
+
+x-memory-runtime: &memory-runtime
+  MEMORY_DATABASE_URL: postgresql://kira:local-openai-only@postgres:5432/kira_openai
+  MEMORY_SCHEMA: memory
+  MEMORY_COLLECTION_NAME: memories
+  MEMORY_POSTGRES_MIN_CONNECTIONS: "1"
+  MEMORY_POSTGRES_MAX_CONNECTIONS: "5"
+  MEMORY_EMBEDDING_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+  MEMORY_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:?set OPENAI_EMBEDDING_MODEL}
+  MEMORY_EMBEDDING_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY}
+  MEMORY_EMBEDDING_DIMS: ${OPENAI_EMBEDDING_DIMENSIONS:-1536}
+  MEMORY_EMBEDDING_CONNECT_TIMEOUT_SECONDS: "5"
+  MEMORY_EMBEDDING_READ_TIMEOUT_SECONDS: "30"
+  MEMORY_LLM_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+  MEMORY_LLM_MODEL: ${OPENAI_CHAT_MODEL:?set OPENAI_CHAT_MODEL}
+  MEMORY_LLM_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY}
+  MEMORY_LLM_TEMPERATURE: "0"
+  MEMORY_LLM_MAX_TOKENS: "1000"
+  MEMORY_SEARCH_TIMEOUT_SECONDS: "30"
+  MEMORY_OPERATION_TIMEOUT_SECONDS: "60"
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.6-pg16-bookworm
+    environment:
+      POSTGRES_DB: kira_openai
+      POSTGRES_USER: kira
+      POSTGRES_PASSWORD: local-openai-only
+    ports:
+      - "127.0.0.1:${OPENAI_POSTGRES_PORT:-15433}:5432"
+    volumes:
+      - openai-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kira -d kira_openai"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+      start_period: 3s
+
+  migrate:
+    <<: *runtime
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      <<: *app-database
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+
+  mock-kira:
+    <<: *runtime
+    command:
+      ["uvicorn", "tests.support.mock_kira_server:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+    volumes:
+      - ./tests:/app/tests:ro
+    ports:
+      - "127.0.0.1:${OPENAI_MOCK_KIRA_PORT:-18122}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+      start_period: 2s
+
+  memory-init:
+    <<: *runtime
+    command: ["python", "-m", "worker.memory_admin", "init"]
+    environment:
+      <<: [*app-database, *memory-runtime]
+      MEMORY_ADMIN_DATABASE_URL: postgresql://kira:local-openai-only@postgres:5432/kira_openai
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      disable: true
+
+  gateway:
+    <<: *runtime
+    build:
+      context: .
+      args:
+        APP_VERSION: 0.4.1
+    environment:
+      <<: [*app-database, *memory-runtime]
+      APP_ENVIRONMENT: test
+      DEV_STATIC_IDENTITY_ENABLED: "true"
+      DEV_STATIC_USER_ID: local-openai-user
+      KIRA_BASE_URL: http://mock-kira:8000
+      KIRA_USERNAME: local-smoke
+      KIRA_DOMAIN: VBI
+      KIRA_BASIC_AUTH: local-stub-credential
+      VLLM_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      VLLM_MODEL: ${OPENAI_CHAT_MODEL:?set OPENAI_CHAT_MODEL}
+      VLLM_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY}
+      VLLM_CONNECT_TIMEOUT_SECONDS: "5"
+      VLLM_READ_TIMEOUT_SECONDS: "30"
+      LTM_ENABLED: "true"
+      MEMORY_FORMATION_ENABLED: "true"
+      HEALTH_PORT: "8000"
+    ports:
+      - "127.0.0.1:${OPENAI_GATEWAY_PORT:-18000}:8000"
+    depends_on:
+      memory-init:
+        condition: service_completed_successfully
+      mock-kira:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=2).read()"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    stop_grace_period: 10s
+
+  worker:
+    <<: *runtime
+    command: ["python", "-m", "worker.main"]
+    environment:
+      <<: [*app-database, *memory-runtime]
+      APP_ENVIRONMENT: test
+      MEMORY_JOB_POLL_INTERVAL_SECONDS: "0.25"
+      MEMORY_JOB_BATCH_SIZE: "10"
+      MEMORY_JOB_CONCURRENCY: "2"
+      MEMORY_JOB_LEASE_SECONDS: "120"
+      MEMORY_JOB_MAX_ATTEMPTS: "5"
+      MEMORY_JOB_RETRY_DELAYS_SECONDS: "[0.25,0.25,0.25,0.25]"
+      MEMORY_JOB_DB_TIMEOUT_SECONDS: "5"
+      MEMORY_JOB_SHUTDOWN_GRACE_SECONDS: "30"
+      MEMORY_JOB_METRICS_REFRESH_SECONDS: "1"
+      WORKER_HOST: 0.0.0.0
+      WORKER_PORT: "8001"
+      HEALTH_PORT: "8001"
+    ports:
+      - "127.0.0.1:${OPENAI_WORKER_PORT:-18001}:8001"
+    depends_on:
+      memory-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/ready', timeout=2).read()"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    stop_grace_period: 35s
+
+volumes:
+  openai-postgres-data:

@@ -1,7 +1,7 @@
 """Public conversation management request and response contracts."""
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, StringConstraints
@@ -11,6 +11,7 @@ from app.domain.models.conversation import (
     ConversationHistoryPage,
     ConversationPage,
     ConversationSummary,
+    MessageFeedbackRating,
 )
 
 ConversationTitle = Annotated[
@@ -23,6 +24,28 @@ class CreateConversationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     title: ConversationTitle | None = None
+
+
+class RenameConversationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    title: ConversationTitle
+
+
+class MessageFeedbackRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    rating: Literal["up", "down"]
+
+    def to_domain(self) -> MessageFeedbackRating:
+        return MessageFeedbackRating(self.rating)
+
+
+class MessageFeedbackResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    turn_id: str
+    rating: Literal["up", "down"]
 
 
 class SendConversationMessageRequest(BaseModel):
@@ -91,6 +114,7 @@ class ConversationMessageResponse(BaseModel):
     role: str
     content: str
     timestamp: datetime
+    feedback: Literal["up", "down"] | None = None
 
 
 class ConversationHistoryResponse(BaseModel):
@@ -108,6 +132,7 @@ class ConversationHistoryResponse(BaseModel):
                     role=message.role.value,
                     content=message.content,
                     timestamp=message.timestamp,
+                    feedback=(message.feedback.value if message.feedback is not None else None),
                 )
                 for message in value.messages
             ),

@@ -7,8 +7,8 @@ import pytest
 from app.domain.models.kira import KiraEventKind, KiraStreamEvent
 from evaluation.dataset import default_dataset_root
 from evaluation.materialization import completed_task, replace_checkpoint_task
-from scripts import materialize_dataset
-from scripts.materialize_dataset import collect_kira_text, main
+from scripts.benchmark import materialize_dataset
+from scripts.benchmark.materialize_dataset import collect_kira_text, main
 
 
 class FakeKiraAdapter:

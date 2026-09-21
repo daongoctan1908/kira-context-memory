@@ -24,6 +24,13 @@ class ConversationStatus(StrEnum):
     DELETION_PENDING = "deletion_pending"
 
 
+class MessageFeedbackRating(StrEnum):
+    """One user's persisted verdict for an assistant answer."""
+
+    UP = "up"
+    DOWN = "down"
+
+
 class ChatRequestStatus(StrEnum):
     """Durable processing state for one idempotent client message."""
 
@@ -196,6 +203,7 @@ class ConversationMessage:
     content: str
     timestamp: datetime
     schema_version: int = CONVERSATION_MESSAGE_SCHEMA_VERSION
+    feedback: MessageFeedbackRating | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.role, ConversationRole):
@@ -218,6 +226,10 @@ class ConversationMessage:
             or self.schema_version != CONVERSATION_MESSAGE_SCHEMA_VERSION
         ):
             raise ValueError("unsupported conversation message schema version")
+        if self.feedback is not None and not isinstance(self.feedback, MessageFeedbackRating):
+            raise ValueError("feedback must be a supported rating")
+        if self.role is ConversationRole.USER and self.feedback is not None:
+            raise ValueError("user messages cannot carry assistant feedback")
 
 
 @dataclass(frozen=True, slots=True)

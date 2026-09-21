@@ -30,6 +30,9 @@ from app.presentation.schemas.conversation import (
     ConversationListResponse,
     ConversationSummaryResponse,
     CreateConversationRequest,
+    MessageFeedbackRequest,
+    MessageFeedbackResponse,
+    RenameConversationRequest,
     SendConversationMessageRequest,
 )
 
@@ -56,6 +59,7 @@ async def list_conversations(
     request: Request,
     limit: int = Query(default=20, ge=1, le=100),
     cursor: str | None = Query(default=None, max_length=256),
+    q: str | None = Query(default=None, max_length=100),
 ) -> ConversationListResponse:
     session = await resolve_auth_session(request, require_csrf=False)
     store: ConversationStorePort = request.app.state.conversation_store
@@ -63,9 +67,28 @@ async def list_conversations(
         session.principal.user_id,
         limit=limit,
         cursor=_decode_cursor(cursor) if cursor is not None else None,
+        query=q,
     )
     next_cursor = _encode_cursor(page.next_cursor) if page.next_cursor is not None else None
     return ConversationListResponse.from_domain(page, next_cursor=next_cursor)
+
+
+@router.patch("/{session_id}", response_model=ConversationSummaryResponse)
+async def rename_conversation(
+    session_id: str,
+    body: RenameConversationRequest,
+    request: Request,
+) -> ConversationSummaryResponse:
+    session = await resolve_auth_session(request, require_csrf=True)
+    store: ConversationStorePort = request.app.state.conversation_store
+    renamed = await store.rename_conversation(
+        session.principal.user_id,
+        session_id,
+        body.title,
+    )
+    if renamed is None:
+        raise ProductApiError(404, "CONVERSATION_NOT_FOUND", "Conversation not found")
+    return ConversationSummaryResponse.from_domain(renamed)
 
 
 @router.get("/{session_id}/messages", response_model=ConversationHistoryResponse)
@@ -86,6 +109,51 @@ async def read_conversation_history(
     if page is None:
         raise ProductApiError(404, "CONVERSATION_NOT_FOUND", "Conversation not found")
     return ConversationHistoryResponse.from_domain(page)
+
+
+@router.put(
+    "/{session_id}/messages/{turn_id}/feedback",
+    response_model=MessageFeedbackResponse,
+)
+async def set_message_feedback(
+    session_id: str,
+    turn_id: str,
+    body: MessageFeedbackRequest,
+    request: Request,
+) -> MessageFeedbackResponse:
+    session = await resolve_auth_session(request, require_csrf=True)
+    store: ConversationStorePort = request.app.state.conversation_store
+    rating = body.to_domain()
+    found = await store.set_message_feedback(
+        session.principal.user_id,
+        session_id,
+        turn_id,
+        rating,
+    )
+    if not found:
+        raise ProductApiError(404, "MESSAGE_NOT_FOUND", "Assistant message not found")
+    return MessageFeedbackResponse(turn_id=turn_id, rating=rating.value)
+
+
+@router.delete(
+    "/{session_id}/messages/{turn_id}/feedback",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def clear_message_feedback(
+    session_id: str,
+    turn_id: str,
+    request: Request,
+) -> Response:
+    session = await resolve_auth_session(request, require_csrf=True)
+    store: ConversationStorePort = request.app.state.conversation_store
+    found = await store.clear_message_feedback(
+        session.principal.user_id,
+        session_id,
+        turn_id,
+    )
+    if not found:
+        raise ProductApiError(404, "MESSAGE_NOT_FOUND", "Assistant message not found")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(

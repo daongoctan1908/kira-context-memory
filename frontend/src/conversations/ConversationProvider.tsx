@@ -11,6 +11,7 @@ import {
   createConversation,
   deleteConversation,
   listConversations,
+  renameConversation,
   type ConversationSummary,
 } from "./conversationApi";
 import {
@@ -83,6 +84,21 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     return created;
   }, []);
 
+  const rename = useCallback(async (sessionId: string, title: string) => {
+    const renamed = await renameConversation(sessionId, title);
+    setConversations((current) =>
+      current.map((conversation) =>
+        conversation.session_id === sessionId ? renamed : conversation,
+      ),
+    );
+    return renamed;
+  }, []);
+
+  const touch = useCallback((sessionId: string) => {
+    const activityAt = new Date().toISOString();
+    setConversations((current) => promoteConversation(current, sessionId, activityAt));
+  }, []);
+
   const remove = useCallback(async (sessionId: string) => {
     setDeleting((current) => new Set(current).add(sessionId));
     setDeletionErrors((current) => withoutMapKey(current, sessionId));
@@ -119,6 +135,8 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
       refresh,
       loadMore,
       create,
+      rename,
+      touch,
       remove,
     }),
     [
@@ -132,6 +150,8 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
       refresh,
       loadMore,
       create,
+      rename,
+      touch,
       remove,
     ],
   );
@@ -151,6 +171,27 @@ function mergeConversations(
     seen.add(conversation.session_id);
     return true;
   });
+}
+
+function promoteConversation(
+  conversations: ConversationSummary[],
+  sessionId: string,
+  activityAt: string,
+): ConversationSummary[] {
+  const index = conversations.findIndex((conversation) => conversation.session_id === sessionId);
+  if (index < 0) {
+    return conversations;
+  }
+  const selected = conversations[index];
+  if (selected === undefined) {
+    return conversations;
+  }
+  const promoted = {
+    ...selected,
+    updated_at: activityAt,
+    last_message_at: activityAt,
+  };
+  return [promoted, ...conversations.slice(0, index), ...conversations.slice(index + 1)];
 }
 
 function withoutSetValue(values: ReadonlySet<string>, value: string): ReadonlySet<string> {
