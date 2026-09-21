@@ -271,7 +271,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Doanh thu dịch vụ (VTT+VTS+VDS) của Toàn quốc lũy kế tháng 08/2026 là **7.295,35 tỷ đồng**.\n\n* **Kế hoạch:** 7.048,46 tỷ đồng.\n* **Tỷ lệ hoàn thành kế hoạch:** 103,5%.\n* **Tăng trưởng so với cùng kỳ tháng trước:** 2,93% (tăng 203,37 tỷ đồng).\n* **Tăng trưởng so với cùng kỳ năm trước:** 9,75% (tăng 634,08 tỷ đồng).",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -296,7 +296,7 @@
         "condition": []
       },
       "gold_rewrite": "Doanh thu dịch vụ (VTT+VTS+VDS) của Toàn quốc tháng 08/2026 là bao nhiêu?",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Doanh thu dịch vụ (VTT+VTS+VDS) của Toàn quốc lũy kế tháng 08/2026 là **7.295,35 tỷ đồng**.\n\n* **Kế hoạch:** 7.048,46 tỷ đồng.\n* **Tỷ lệ hoàn thành kế hoạch:** 103,5%.\n* **Tăng trưởng so với cùng kỳ tháng trước:** 2,93% (tăng 203,37 tỷ đồng).\n* **Tăng trưởng so với cùng kỳ năm trước:** 9,75% (tăng 634,08 tỷ đồng)."
     },
     {
       "question_id": "Q_SINGLE_HOP_009",
@@ -312,7 +312,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Biểu đồ dưới đây minh họa trực quan doanh thu của Top 3 địa bàn dẫn đầu:\n\n*(Biểu đồ sẽ hiển thị tự động bên dưới)*",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -339,7 +339,7 @@
         "condition": []
       },
       "gold_rewrite": "Top 3 tỉnh xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) tháng 08/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Biểu đồ dưới đây minh họa trực quan doanh thu của Top 3 địa bàn dẫn đầu:\n\n*(Biểu đồ sẽ hiển thị tự động bên dưới)*"
     },
     {
       "question_id": "Q_SINGLE_HOP_010",
@@ -355,7 +355,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Doanh thu dịch vụ IOT của Toàn quốc lũy kế tháng 08/2026 là **79,62 tỷ**.\n\n* **Kế hoạch:** 84,7 tỷ (hoàn thành **94%**).\n* **Tăng trưởng so với cùng kỳ tháng trước:** <span style='color:green'>10,4%</span> (<span style='color:green'>7,5 tỷ</span>).\n* **Tăng trưởng so với cùng kỳ năm trước:** <span style='color:green'>53,99%</span> (<span style='color:green'>27,91 tỷ</span>).",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -380,7 +380,7 @@
         "condition": []
       },
       "gold_rewrite": "Doanh thu dịch vụ IOT của Toàn quốc tháng 08/2026 là bao nhiêu?",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Doanh thu dịch vụ IOT của Toàn quốc lũy kế tháng 08/2026 là **79,62 tỷ**.\n\n* **Kế hoạch:** 84,7 tỷ (hoàn thành **94%**).\n* **Tăng trưởng so với cùng kỳ tháng trước:** <span style='color:green'>10,4%</span> (<span style='color:green'>7,5 tỷ</span>).\n* **Tăng trưởng so với cùng kỳ năm trước:** <span style='color:green'>53,99%</span> (<span style='color:green'>27,91 tỷ</span>)."
     },
     {
       "question_id": "Q_SINGLE_HOP_011",
@@ -422,7 +422,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Biểu đồ dưới đây minh họa trực quan Top 5 cụm có doanh thu dịch vụ cao nhất tại Hà Nội trong tháng 08/2026.",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -449,7 +449,7 @@
         "condition": []
       },
       "gold_rewrite": "Top 5 cụm xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) tại tỉnh Hà Nội tháng 08/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Biểu đồ dưới đây minh họa trực quan Top 5 cụm có doanh thu dịch vụ cao nhất tại Hà Nội trong tháng 08/2026."
     },
     {
       "question_id": "Q_SINGLE_HOP_013",
@@ -465,7 +465,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dưới đây là số liệu so sánh **Doanh thu dịch vụ (VTT+VTS+VDS)** của tỉnh Phú Thọ và thành phố Đà Nẵng ngày 06/09/2026:\n\n| Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Tỉnh Phú Thọ** | **7,43 tỷ** | **<span style='color:green'>0,83%</span> (<span style='color:green'>0,06 tỷ</span>)** | **5** |\n| **Thành phố Đà Nẵng** | **4,9 tỷ** | **<span style='color:green'>2,32%</span> (<span style='color:green'>0,11 tỷ</span>)** | **18** |\n\n**Nhận xét:**\n* **Tỉnh Phú Thọ** đạt doanh thu cao hơn (**7,43 tỷ** so với **4,9 tỷ**) và có thứ hạng thực hiện tốt hơn (hạng **5** so với hạng **18**).\n* Tuy nhiên, **Thành phố Đà Nẵng** lại có tốc độ tăng trưởng so với cùng kỳ tháng trước cao hơn (**2,32%** so với **0,83%**).",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -490,7 +490,7 @@
         "condition": []
       },
       "gold_rewrite": "So sánh Doanh thu dịch vụ (VTT+VTS+VDS) của tỉnh Phú Thọ và tỉnh Đà Nẵng ngày 06/09/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Dưới đây là số liệu so sánh **Doanh thu dịch vụ (VTT+VTS+VDS)** của tỉnh Phú Thọ và thành phố Đà Nẵng ngày 06/09/2026:\n\n| Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Tỉnh Phú Thọ** | **7,43 tỷ** | **<span style='color:green'>0,83%</span> (<span style='color:green'>0,06 tỷ</span>)** | **5** |\n| **Thành phố Đà Nẵng** | **4,9 tỷ** | **<span style='color:green'>2,32%</span> (<span style='color:green'>0,11 tỷ</span>)** | **18** |\n\n**Nhận xét:**\n* **Tỉnh Phú Thọ** đạt doanh thu cao hơn (**7,43 tỷ** so với **4,9 tỷ**) và có thứ hạng thực hiện tốt hơn (hạng **5** so với hạng **18**).\n* Tuy nhiên, **Thành phố Đà Nẵng** lại có tốc độ tăng trưởng so với cùng kỳ tháng trước cao hơn (**2,32%** so với **0,83%**)."
     },
     {
       "question_id": "Q_SINGLE_HOP_014",
@@ -562,7 +562,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Biểu đồ dưới đây minh họa trực quan doanh thu của Top 3 địa bàn dẫn đầu:\n\n*(Biểu đồ sẽ hiển thị tự động bên dưới)*",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -590,7 +590,7 @@
         "condition": []
       },
       "gold_rewrite": "Top 3 tỉnh xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) tháng 08/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Biểu đồ dưới đây minh họa trực quan doanh thu của Top 3 địa bàn dẫn đầu:\n\n*(Biểu đồ sẽ hiển thị tự động bên dưới)*"
     },
     {
       "question_id": "Q_MULTI_HOP_002",
@@ -637,7 +637,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dưới đây là số liệu so sánh **Doanh thu dịch vụ (VTT+VTS+VDS)** của tỉnh Phú Thọ và thành phố Đà Nẵng ngày 06/09/2026:\n\n| Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Tỉnh Phú Thọ** | **7,43 tỷ** | **<span style='color:green'>0,83%</span> (<span style='color:green'>0,06 tỷ</span>)** | **5** |\n| **Thành phố Đà Nẵng** | **4,9 tỷ** | **<span style='color:green'>2,32%</span> (<span style='color:green'>0,11 tỷ</span>)** | **18** |\n\n**Nhận xét:**\n* **Tỉnh Phú Thọ** đạt doanh thu cao hơn (**7,43 tỷ** so với **4,9 tỷ**) và có thứ hạng thực hiện tốt hơn (hạng **5** so với hạng **18**).\n* Tuy nhiên, **Thành phố Đà Nẵng** lại có tốc độ tăng trưởng so với cùng kỳ tháng trước cao hơn (**2,32%** so với **0,83%**).",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -663,7 +663,7 @@
         "condition": []
       },
       "gold_rewrite": "So sánh Doanh thu dịch vụ (VTT+VTS+VDS) của tỉnh Phú Thọ và tỉnh Đà Nẵng ngày 06/09/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Dưới đây là số liệu so sánh **Doanh thu dịch vụ (VTT+VTS+VDS)** của tỉnh Phú Thọ và thành phố Đà Nẵng ngày 06/09/2026:\n\n| Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Tỉnh Phú Thọ** | **7,43 tỷ** | **<span style='color:green'>0,83%</span> (<span style='color:green'>0,06 tỷ</span>)** | **5** |\n| **Thành phố Đà Nẵng** | **4,9 tỷ** | **<span style='color:green'>2,32%</span> (<span style='color:green'>0,11 tỷ</span>)** | **18** |\n\n**Nhận xét:**\n* **Tỉnh Phú Thọ** đạt doanh thu cao hơn (**7,43 tỷ** so với **4,9 tỷ**) và có thứ hạng thực hiện tốt hơn (hạng **5** so với hạng **18**).\n* Tuy nhiên, **Thành phố Đà Nẵng** lại có tốc độ tăng trưởng so với cùng kỳ tháng trước cao hơn (**2,32%** so với **0,83%**)."
     },
     {
       "question_id": "Q_MULTI_HOP_004",
@@ -1202,7 +1202,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Biểu đồ dưới đây minh họa trực quan Top 5 cụm có doanh thu dịch vụ cao nhất tại Hà Nội trong tháng 08/2026.",
       "notes": "",
       "evaluation_tier": "diagnostic_history",
       "hard_gate": false,
@@ -1230,7 +1230,7 @@
         "condition": []
       },
       "gold_rewrite": "Top 5 cụm xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) tại tỉnh Hà Nội tháng 08/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Biểu đồ dưới đây minh họa trực quan Top 5 cụm có doanh thu dịch vụ cao nhất tại Hà Nội trong tháng 08/2026."
     },
     {
       "question_id": "Q_TEMPORAL_BUSINESS_ACTION_002",
@@ -1246,7 +1246,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Chỉ tiêu tra cứu được là **thuê bao ftth phát triển thực lũy kế** — khớp với yêu cầu của Anh/chị.\n\nDưới đây là số liệu thuê bao FTTH phát triển thực lũy kế của Toàn quốc tại thời điểm chốt tháng 08/2026:\n\n| Chỉ tiêu | Giá trị |\n| :--- | :--- |\n| **Thuê bao FTTH phát triển thực LK** | **9.521.622 TB** |\n| Kế hoạch | 9.516.549 TB |\n| Hoàn thành kế hoạch | 100,05% |\n| Tăng trưởng so với cùng kỳ tháng trước | <span style='color:green'>0,41%</span> (<span style='color:green'>39.337 TB</span>) |\n| Tăng trưởng so với cùng kỳ năm trước | <span style='color:green'>4,83%</span> (<span style='color:green'>438.620 TB</span>) |\n\n**Tổng quan:**\n* Tại thời điểm lũy kế tháng 08/2026, toàn quốc đạt **9.521.622 thuê bao** FTTH phát triển thực.\n* Vượt kế hoạch đề ra với tỷ lệ hoàn thành **100,05%**.\n* Duy trì đà tăng trưởng dương so với cả tháng trước và cùng kỳ năm trước.",
       "notes": "",
       "evaluation_tier": "diagnostic_history",
       "hard_gate": false,
@@ -1271,7 +1271,7 @@
         "condition": []
       },
       "gold_rewrite": "Thuê bao FTTH phát triển thực LK của Toàn quốc tháng 08/2026 là bao nhiêu?",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Chỉ tiêu tra cứu được là **thuê bao ftth phát triển thực lũy kế** — khớp với yêu cầu của Anh/chị.\n\nDưới đây là số liệu thuê bao FTTH phát triển thực lũy kế của Toàn quốc tại thời điểm chốt tháng 08/2026:\n\n| Chỉ tiêu | Giá trị |\n| :--- | :--- |\n| **Thuê bao FTTH phát triển thực LK** | **9.521.622 TB** |\n| Kế hoạch | 9.516.549 TB |\n| Hoàn thành kế hoạch | 100,05% |\n| Tăng trưởng so với cùng kỳ tháng trước | <span style='color:green'>0,41%</span> (<span style='color:green'>39.337 TB</span>) |\n| Tăng trưởng so với cùng kỳ năm trước | <span style='color:green'>4,83%</span> (<span style='color:green'>438.620 TB</span>) |\n\n**Tổng quan:**\n* Tại thời điểm lũy kế tháng 08/2026, toàn quốc đạt **9.521.622 thuê bao** FTTH phát triển thực.\n* Vượt kế hoạch đề ra với tỷ lệ hoàn thành **100,05%**.\n* Duy trì đà tăng trưởng dương so với cả tháng trước và cùng kỳ năm trước."
     },
     {
       "question_id": "Q_TEMPORAL_BUSINESS_ACTION_003",
@@ -1287,7 +1287,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Doanh thu dịch vụ IOT của Toàn quốc lũy kế tháng 08/2026 là **79,62 tỷ**.\n\n* **Kế hoạch:** 84,7 tỷ (hoàn thành **94%**).\n* **Tăng trưởng so với cùng kỳ tháng trước:** <span style='color:green'>10,4%</span> (<span style='color:green'>7,5 tỷ</span>).\n* **Tăng trưởng so với cùng kỳ năm trước:** <span style='color:green'>53,99%</span> (<span style='color:green'>27,91 tỷ</span>).",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -1312,7 +1312,7 @@
         "condition": []
       },
       "gold_rewrite": "Doanh thu dịch vụ IOT của Toàn quốc tháng 08/2026 là bao nhiêu?",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Doanh thu dịch vụ IOT của Toàn quốc lũy kế tháng 08/2026 là **79,62 tỷ**.\n\n* **Kế hoạch:** 84,7 tỷ (hoàn thành **94%**).\n* **Tăng trưởng so với cùng kỳ tháng trước:** <span style='color:green'>10,4%</span> (<span style='color:green'>7,5 tỷ</span>).\n* **Tăng trưởng so với cùng kỳ năm trước:** <span style='color:green'>53,99%</span> (<span style='color:green'>27,91 tỷ</span>)."
     },
     {
       "question_id": "Q_TEMPORAL_BUSINESS_ACTION_004",
@@ -1331,7 +1331,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Biểu đồ dưới đây minh họa trực quan Top 5 cụm có doanh thu dịch vụ cao nhất tại Hà Nội trong tháng 08/2026.",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -1359,7 +1359,7 @@
         "condition": []
       },
       "gold_rewrite": "Top 5 cụm xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) tại tỉnh Hà Nội tháng 08/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "final_answer": "Biểu đồ dưới đây minh họa trực quan Top 5 cụm có doanh thu dịch vụ cao nhất tại Hà Nội trong tháng 08/2026.",
       "capability_tags": [
         "partial_policy_overlap",
         "explicit_limit_precedence"
@@ -1412,7 +1412,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dưới đây là số liệu so sánh **Doanh thu dịch vụ (VTT+VTS+VDS)** của tỉnh Phú Thọ và thành phố Đà Nẵng ngày 06/09/2026:\n\n| Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Tỉnh Phú Thọ** | **7,43 tỷ** | **<span style='color:green'>0,83%</span> (<span style='color:green'>0,06 tỷ</span>)** | **5** |\n| **Thành phố Đà Nẵng** | **4,9 tỷ** | **<span style='color:green'>2,32%</span> (<span style='color:green'>0,11 tỷ</span>)** | **18** |\n\n**Nhận xét:**\n* **Tỉnh Phú Thọ** đạt doanh thu cao hơn (**7,43 tỷ** so với **4,9 tỷ**) và có thứ hạng thực hiện tốt hơn (hạng **5** so với hạng **18**).\n* Tuy nhiên, **Thành phố Đà Nẵng** lại có tốc độ tăng trưởng so với cùng kỳ tháng trước cao hơn (**2,32%** so với **0,83%**).",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -1438,7 +1438,7 @@
         "condition": []
       },
       "gold_rewrite": "So sánh Doanh thu dịch vụ (VTT+VTS+VDS) của tỉnh Phú Thọ và tỉnh Đà Nẵng ngày 06/09/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Dưới đây là số liệu so sánh **Doanh thu dịch vụ (VTT+VTS+VDS)** của tỉnh Phú Thọ và thành phố Đà Nẵng ngày 06/09/2026:\n\n| Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Tỉnh Phú Thọ** | **7,43 tỷ** | **<span style='color:green'>0,83%</span> (<span style='color:green'>0,06 tỷ</span>)** | **5** |\n| **Thành phố Đà Nẵng** | **4,9 tỷ** | **<span style='color:green'>2,32%</span> (<span style='color:green'>0,11 tỷ</span>)** | **18** |\n\n**Nhận xét:**\n* **Tỉnh Phú Thọ** đạt doanh thu cao hơn (**7,43 tỷ** so với **4,9 tỷ**) và có thứ hạng thực hiện tốt hơn (hạng **5** so với hạng **18**).\n* Tuy nhiên, **Thành phố Đà Nẵng** lại có tốc độ tăng trưởng so với cùng kỳ tháng trước cao hơn (**2,32%** so với **0,83%**)."
     },
     {
       "question_id": "Q_FALSE_PREMISE_001",

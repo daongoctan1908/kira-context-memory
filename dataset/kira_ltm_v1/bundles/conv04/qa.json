@@ -442,7 +442,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dữ liệu **Thuê bao Di động 5G thực Lũy kế** tại tỉnh Phú Thọ và thành phố Đà Nẵng tính đến ngày 06/09/2026 như sau:\n\n| Địa bàn | Lũy kế tháng 09/2026 (01/09 - 06/09) | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- | :--- |\n| **Tỉnh Phú Thọ** | **437.913 TB** | **<span style='color:green'>7,98%</span> (<span style='color:green'>32.376 TB</span>)** | **<span style='color:green'>119,87%</span> (<span style='color:green'>238.745 TB</span>)** | **6** |\n| **Thành phố Đà Nẵng** | **214.015 TB** | **<span style='color:green'>1,08%</span> (<span style='color:green'>2.282 TB</span>)** | **<span style='color:green'>80,51%</span> (<span style='color:green'>95.453 TB</span>)** | **16** |\n\n**Nhận xét:**\n* Về số lượng thuê bao lũy kế trong tháng 09/2026, tỉnh Phú Thọ đạt **437.913 TB**, cao hơn gấp đôi so với thành phố Đà Nẵng (**214.015 TB**).\n* Về tốc độ tăng trưởng, Phú Thọ cũng dẫn trước Đà Nẵng cả so với cùng kỳ tháng trước (7,98% so với 1,08%) và cùng kỳ năm trước (119,87% so với 80,51%).\n* Về xếp hạng thực hiện, Phú Thọ đứng thứ **6**, trong khi Đà Nẵng đứng thứ **16**.\n\n*Lưu ý: Dữ liệu lũy kế tháng và lũy kế năm tại thời điểm chốt ngày 06/09/2026 có giá trị trùng nhau do chưa có dữ liệu mới phát sinh sau ngày này trong kỳ báo cáo.*",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -467,7 +467,7 @@
         "condition": []
       },
       "gold_rewrite": "So sánh TB Di động 5G thực Lũy kế của tỉnh Phú Thọ và tỉnh Đà Nẵng ngày 06/09/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Dữ liệu **Thuê bao Di động 5G thực Lũy kế** tại tỉnh Phú Thọ và thành phố Đà Nẵng tính đến ngày 06/09/2026 như sau:\n\n| Địa bàn | Lũy kế tháng 09/2026 (01/09 - 06/09) | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- | :--- |\n| **Tỉnh Phú Thọ** | **437.913 TB** | **<span style='color:green'>7,98%</span> (<span style='color:green'>32.376 TB</span>)** | **<span style='color:green'>119,87%</span> (<span style='color:green'>238.745 TB</span>)** | **6** |\n| **Thành phố Đà Nẵng** | **214.015 TB** | **<span style='color:green'>1,08%</span> (<span style='color:green'>2.282 TB</span>)** | **<span style='color:green'>80,51%</span> (<span style='color:green'>95.453 TB</span>)** | **16** |\n\n**Nhận xét:**\n* Về số lượng thuê bao lũy kế trong tháng 09/2026, tỉnh Phú Thọ đạt **437.913 TB**, cao hơn gấp đôi so với thành phố Đà Nẵng (**214.015 TB**).\n* Về tốc độ tăng trưởng, Phú Thọ cũng dẫn trước Đà Nẵng cả so với cùng kỳ tháng trước (7,98% so với 1,08%) và cùng kỳ năm trước (119,87% so với 80,51%).\n* Về xếp hạng thực hiện, Phú Thọ đứng thứ **6**, trong khi Đà Nẵng đứng thứ **16**.\n\n*Lưu ý: Dữ liệu lũy kế tháng và lũy kế năm tại thời điểm chốt ngày 06/09/2026 có giá trị trùng nhau do chưa có dữ liệu mới phát sinh sau ngày này trong kỳ báo cáo.*"
     },
     {
       "question_id": "Q_SINGLE_HOP_013",
@@ -483,7 +483,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Chỉ tiêu Em tra cứu được là **thuê bao di động 5g thực lũy kế tăng giảm** — có vẻ khác yêu cầu của Anh/chị (câu hỏi nhấn mạnh \"Tăng trưởng\" như một chỉ tiêu riêng, trong khi hệ thống nhận diện đây là chỉ tiêu \"TB Di động 5G thực Lũy kế Tăng Giảm\" bao gồm cả giá trị thực và tăng trưởng). Anh/chị muốn Em tiếp tục với chỉ tiêu này hay điều chỉnh lại yêu cầu?",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -508,7 +508,7 @@
         "condition": []
       },
       "gold_rewrite": "Tăng trưởng TB Di động 5G thực Lũy kế Tăng Giảm của tỉnh Hà Nội lũy kế đến tháng 08/2026 là bao nhiêu?",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Chỉ tiêu Em tra cứu được là **thuê bao di động 5g thực lũy kế tăng giảm** — có vẻ khác yêu cầu của Anh/chị (câu hỏi nhấn mạnh \"Tăng trưởng\" như một chỉ tiêu riêng, trong khi hệ thống nhận diện đây là chỉ tiêu \"TB Di động 5G thực Lũy kế Tăng Giảm\" bao gồm cả giá trị thực và tăng trưởng). Anh/chị muốn Em tiếp tục với chỉ tiêu này hay điều chỉnh lại yêu cầu?"
     },
     {
       "question_id": "Q_SINGLE_HOP_014",
@@ -527,7 +527,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dưới đây là **Top 3 tỉnh xếp hạng đầu về Thuê bao FTTH rời mạng lũy kế tháng 08/2026**:\n\n| Xếp hạng | Địa bàn | Số thuê bao rời mạng | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước |\n|----------|---------|----------------------|----------------------------------------|--------------------------------------|\n| **1** | **Thành phố Hồ Chí Minh** | **12.504 TB** | **<span style='color:green'>5,96%</span> (<span style='color:green'>703 TB</span>)** | **<span style='color:red'>-10,47%</span> (<span style='color:red'>-1.463 TB</span>)** |\n| **2** | **Thành phố Hà Nội** | **6.254 TB** | **<span style='color:red'>-0,02%</span> (<span style='color:red'>-1 TB</span>)** | **<span style='color:red'>-5,43%</span> (<span style='color:red'>-359 TB</span>)** |\n| **3** | **Tỉnh Đồng Nai** | **2.849 TB** | **<span style='color:green'>6,35%</span> (<span style='color:green'>170 TB</span>)** | **<span style='color:green'>2,74%</span> (<span style='color:green'>76 TB</span>)** |\n\n**Nhận xét:**\n- **TP. Hồ Chí Minh** dẫn đầu với 12.504 thuê bao FTTH rời mạng, tăng 5,96% so với cùng kỳ tháng trước nhưng giảm 10,47% so với cùng kỳ năm trước.\n- **TP. Hà Nội** xếp thứ 2 với 6.254 thuê bao, gần như không đổi so với tháng trước (-0,02%) và giảm 5,43% so với cùng kỳ năm trước.\n- **Đồng Nai** đứng thứ 3 với 2.849 thuê bao, tăng trưởng dương cả so với tháng trước (6,35%) và cùng kỳ năm trước (2,74%).",
       "notes": "M07 is strictly required to resolve the semantic role 'dòng ra FTTH' to the churn KPI. M09 is relevant durable polarity context but is overridden by the explicit current-query direction.",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -555,7 +555,7 @@
         "condition": []
       },
       "gold_rewrite": "Top 3 tỉnh xếp hạng đầu về Thuê bao FTTH rời mạng tháng 08/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "final_answer": "Dưới đây là **Top 3 tỉnh xếp hạng đầu về Thuê bao FTTH rời mạng lũy kế tháng 08/2026**:\n\n| Xếp hạng | Địa bàn | Số thuê bao rời mạng | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước |\n|----------|---------|----------------------|----------------------------------------|--------------------------------------|\n| **1** | **Thành phố Hồ Chí Minh** | **12.504 TB** | **<span style='color:green'>5,96%</span> (<span style='color:green'>703 TB</span>)** | **<span style='color:red'>-10,47%</span> (<span style='color:red'>-1.463 TB</span>)** |\n| **2** | **Thành phố Hà Nội** | **6.254 TB** | **<span style='color:red'>-0,02%</span> (<span style='color:red'>-1 TB</span>)** | **<span style='color:red'>-5,43%</span> (<span style='color:red'>-359 TB</span>)** |\n| **3** | **Tỉnh Đồng Nai** | **2.849 TB** | **<span style='color:green'>6,35%</span> (<span style='color:green'>170 TB</span>)** | **<span style='color:green'>2,74%</span> (<span style='color:green'>76 TB</span>)** |\n\n**Nhận xét:**\n- **TP. Hồ Chí Minh** dẫn đầu với 12.504 thuê bao FTTH rời mạng, tăng 5,96% so với cùng kỳ tháng trước nhưng giảm 10,47% so với cùng kỳ năm trước.\n- **TP. Hà Nội** xếp thứ 2 với 6.254 thuê bao, gần như không đổi so với tháng trước (-0,02%) và giảm 5,43% so với cùng kỳ năm trước.\n- **Đồng Nai** đứng thứ 3 với 2.849 thuê bao, tăng trưởng dương cả so với tháng trước (6,35%) và cùng kỳ năm trước (2,74%).",
       "retrieval_scoring_contract": {
         "strict_required_memory_ids": [
           "M07"
@@ -730,7 +730,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Đã hoàn thành truy vấn và trực quan hóa dữ liệu. Biểu đồ cột ngang sẽ hiển thị bên dưới để minh họa rõ hơn sự chênh lệch về số lượng thuê bao FTTH phát triển mới giữa 3 địa bàn dẫn đầu.",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -758,7 +758,7 @@
         "condition": []
       },
       "gold_rewrite": "Top 3 tỉnh xếp hạng đầu về Thuê bao FTTH phát triển mới tháng 08/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Đã hoàn thành truy vấn và trực quan hóa dữ liệu. Biểu đồ cột ngang sẽ hiển thị bên dưới để minh họa rõ hơn sự chênh lệch về số lượng thuê bao FTTH phát triển mới giữa 3 địa bàn dẫn đầu."
     },
     {
       "question_id": "Q_MULTI_HOP_007",
@@ -776,7 +776,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dưới đây là biểu đồ minh họa số liệu thuê bao FTTH rời mạng của Top 3 địa bàn nêu trên:\n\n![Biểu đồ Top 3 tỉnh/thành có thuê bao FTTH rời mạng cao nhất](chart_image_url)",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -804,7 +804,7 @@
         "condition": []
       },
       "gold_rewrite": "Top 3 tỉnh đứng cuối về Thuê bao FTTH rời mạng tháng 08/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Dưới đây là biểu đồ minh họa số liệu thuê bao FTTH rời mạng của Top 3 địa bàn nêu trên:\n\n![Biểu đồ Top 3 tỉnh/thành có thuê bao FTTH rời mạng cao nhất](chart_image_url)"
     },
     {
       "question_id": "Q_MULTI_HOP_008",
@@ -822,7 +822,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dưới đây là **Top 3 tỉnh xếp hạng đầu về Thuê bao FTTH rời mạng lũy kế tháng 08/2026**:\n\n| Xếp hạng | Địa bàn | Số thuê bao rời mạng | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước |\n|----------|---------|----------------------|----------------------------------------|--------------------------------------|\n| **1** | **Thành phố Hồ Chí Minh** | **12.504 TB** | **<span style='color:green'>5,96%</span> (<span style='color:green'>703 TB</span>)** | **<span style='color:red'>-10,47%</span> (<span style='color:red'>-1.463 TB</span>)** |\n| **2** | **Thành phố Hà Nội** | **6.254 TB** | **<span style='color:red'>-0,02%</span> (<span style='color:red'>-1 TB</span>)** | **<span style='color:red'>-5,43%</span> (<span style='color:red'>-359 TB</span>)** |\n| **3** | **Tỉnh Đồng Nai** | **2.849 TB** | **<span style='color:green'>6,35%</span> (<span style='color:green'>170 TB</span>)** | **<span style='color:green'>2,74%</span> (<span style='color:green'>76 TB</span>)** |\n\n**Nhận xét:**\n- **TP. Hồ Chí Minh** dẫn đầu với 12.504 thuê bao FTTH rời mạng, tăng 5,96% so với cùng kỳ tháng trước nhưng giảm 10,47% so với cùng kỳ năm trước.\n- **TP. Hà Nội** xếp thứ 2 với 6.254 thuê bao, gần như không đổi so với tháng trước (-0,02%) và giảm 5,43% so với cùng kỳ năm trước.\n- **Đồng Nai** đứng thứ 3 với 2.849 thuê bao, tăng trưởng dương cả so với tháng trước (6,35%) và cùng kỳ năm trước (2,74%).",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -850,7 +850,7 @@
         "condition": []
       },
       "gold_rewrite": "Top 3 tỉnh xếp hạng đầu về Thuê bao FTTH rời mạng tháng 08/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Dưới đây là **Top 3 tỉnh xếp hạng đầu về Thuê bao FTTH rời mạng lũy kế tháng 08/2026**:\n\n| Xếp hạng | Địa bàn | Số thuê bao rời mạng | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước |\n|----------|---------|----------------------|----------------------------------------|--------------------------------------|\n| **1** | **Thành phố Hồ Chí Minh** | **12.504 TB** | **<span style='color:green'>5,96%</span> (<span style='color:green'>703 TB</span>)** | **<span style='color:red'>-10,47%</span> (<span style='color:red'>-1.463 TB</span>)** |\n| **2** | **Thành phố Hà Nội** | **6.254 TB** | **<span style='color:red'>-0,02%</span> (<span style='color:red'>-1 TB</span>)** | **<span style='color:red'>-5,43%</span> (<span style='color:red'>-359 TB</span>)** |\n| **3** | **Tỉnh Đồng Nai** | **2.849 TB** | **<span style='color:green'>6,35%</span> (<span style='color:green'>170 TB</span>)** | **<span style='color:green'>2,74%</span> (<span style='color:green'>76 TB</span>)** |\n\n**Nhận xét:**\n- **TP. Hồ Chí Minh** dẫn đầu với 12.504 thuê bao FTTH rời mạng, tăng 5,96% so với cùng kỳ tháng trước nhưng giảm 10,47% so với cùng kỳ năm trước.\n- **TP. Hà Nội** xếp thứ 2 với 6.254 thuê bao, gần như không đổi so với tháng trước (-0,02%) và giảm 5,43% so với cùng kỳ năm trước.\n- **Đồng Nai** đứng thứ 3 với 2.849 thuê bao, tăng trưởng dương cả so với tháng trước (6,35%) và cùng kỳ năm trước (2,74%)."
     },
     {
       "question_id": "Q_MULTI_HOP_009",
@@ -1330,7 +1330,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Top 3 tỉnh có số lượng **Thuê bao Register 5G lũy kế** cao nhất tại thời điểm tháng 08/2026 như sau:\n\n| STT | Địa bàn | Số lượng (TB) | Xếp hạng thực hiện | Tăng trưởng so với tháng trước | Tăng trưởng so với cùng kỳ năm trước |\n|:---:|:---|:---|:---:|:---|:---|\n| 1 | Thành phố Hồ Chí Minh | **3.223.607 TB** | 1 | **<span style='color:green'>1,5%</span> (<span style='color:green'>47.557 TB</span>)** | **<span style='color:green'>70,84%</span> (<span style='color:green'>1.336.746 TB</span>)** |\n| 2 | Thành phố Hà Nội | **3.025.287 TB** | 2 | **<span style='color:green'>6,77%</span> (<span style='color:green'>191.909 TB</span>)** | **<span style='color:green'>73,92%</span> (<span style='color:green'>1.285.788 TB</span>)** |\n| 3 | Tỉnh Đồng Nai | **980.819 TB** | 3 | **<span style='color:green'>2,25%</span> (<span style='color:green'>21.538 TB</span>)** | **<span style='color:green'>152,48%</span> (<span style='color:green'>592.345 TB</span>)** |\n\n**Tổng kết:**\nHai thành phố lớn là Hồ Chí Minh và Hà Nội dẫn đầu với hơn 3 triệu thuê bao mỗi nơi, trong khi Đồng Nai đứng thứ 3 với gần 1 triệu thuê bao. Cả ba địa bàn đều ghi nhận mức tăng trưởng dương so với tháng trước và tăng trưởng rất mạnh so với cùng kỳ năm trước, đặc biệt là Đồng Nai với mức tăng 152,48%.\n\nBiểu đồ dưới đây minh họa số lượng thuê bao của 3 tỉnh dẫn đầu:\n\n![Top 3 tỉnh về Thuê bao Register 5G lũy kế tháng 08/2026](https://via.placeholder.com/600x400?text=Chart+Top+3+Tinh+5G)",
       "notes": "",
       "evaluation_tier": "diagnostic_history",
       "hard_gate": false,
@@ -1357,7 +1357,7 @@
         "condition": []
       },
       "gold_rewrite": "Top 3 tỉnh xếp hạng đầu về Thuê bao Register 5G lũy kế tháng 08/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Top 3 tỉnh có số lượng **Thuê bao Register 5G lũy kế** cao nhất tại thời điểm tháng 08/2026 như sau:\n\n| STT | Địa bàn | Số lượng (TB) | Xếp hạng thực hiện | Tăng trưởng so với tháng trước | Tăng trưởng so với cùng kỳ năm trước |\n|:---:|:---|:---|:---:|:---|:---|\n| 1 | Thành phố Hồ Chí Minh | **3.223.607 TB** | 1 | **<span style='color:green'>1,5%</span> (<span style='color:green'>47.557 TB</span>)** | **<span style='color:green'>70,84%</span> (<span style='color:green'>1.336.746 TB</span>)** |\n| 2 | Thành phố Hà Nội | **3.025.287 TB** | 2 | **<span style='color:green'>6,77%</span> (<span style='color:green'>191.909 TB</span>)** | **<span style='color:green'>73,92%</span> (<span style='color:green'>1.285.788 TB</span>)** |\n| 3 | Tỉnh Đồng Nai | **980.819 TB** | 3 | **<span style='color:green'>2,25%</span> (<span style='color:green'>21.538 TB</span>)** | **<span style='color:green'>152,48%</span> (<span style='color:green'>592.345 TB</span>)** |\n\n**Tổng kết:**\nHai thành phố lớn là Hồ Chí Minh và Hà Nội dẫn đầu với hơn 3 triệu thuê bao mỗi nơi, trong khi Đồng Nai đứng thứ 3 với gần 1 triệu thuê bao. Cả ba địa bàn đều ghi nhận mức tăng trưởng dương so với tháng trước và tăng trưởng rất mạnh so với cùng kỳ năm trước, đặc biệt là Đồng Nai với mức tăng 152,48%.\n\nBiểu đồ dưới đây minh họa số lượng thuê bao của 3 tỉnh dẫn đầu:\n\n![Top 3 tỉnh về Thuê bao Register 5G lũy kế tháng 08/2026](https://via.placeholder.com/600x400?text=Chart+Top+3+Tinh+5G)"
     },
     {
       "question_id": "Q_TEMPORAL_BUSINESS_ACTION_002",
@@ -1373,7 +1373,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "**Thuê bao Register 5G lũy kế** của **Toàn quốc** tính đến **lũy kế tháng 08/2026** là:\n\n* **Giá trị thực hiện:** **18.804.176 TB**\n* **Kế hoạch:** 3.759.477 TB (Hoàn thành **500,18%**)\n* **Tăng trưởng so với cùng kỳ tháng trước:** <span style='color:green'>4,76%</span> (<span style='color:green'>854.730 TB</span>)\n* **Tăng trưởng so với cùng kỳ năm trước:** <span style='color:green'>128,29%</span> (<span style='color:green'>10.567.040 TB</span>)",
       "notes": "",
       "evaluation_tier": "diagnostic_history",
       "hard_gate": false,
@@ -1398,7 +1398,7 @@
         "condition": []
       },
       "gold_rewrite": "Thuê bao Register 5G lũy kế của Toàn quốc tháng 08/2026 là bao nhiêu?",
-      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "final_answer": "**Thuê bao Register 5G lũy kế** của **Toàn quốc** tính đến **lũy kế tháng 08/2026** là:\n\n* **Giá trị thực hiện:** **18.804.176 TB**\n* **Kế hoạch:** 3.759.477 TB (Hoàn thành **500,18%**)\n* **Tăng trưởng so với cùng kỳ tháng trước:** <span style='color:green'>4,76%</span> (<span style='color:green'>854.730 TB</span>)\n* **Tăng trưởng so với cùng kỳ năm trước:** <span style='color:green'>128,29%</span> (<span style='color:green'>10.567.040 TB</span>)",
       "diagnostic_source_scope": "transcript_oracle_or_formation_event",
       "memory_history_not_required": true
     },
@@ -1416,7 +1416,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Chỉ tiêu Em tra cứu được là **thuê bao di động 5g thực lũy kế tăng giảm** — có vẻ khác yêu cầu của bạn (câu hỏi nhấn mạnh \"Tăng trưởng TB Di động 5G thực Lũy kế\", trong khi chỉ tiêu hệ thống là \"TB Di động 5G thực Lũy kế Tăng Giảm\" — có thể hiểu là số lượng tăng giảm thực tế chứ không phải tỷ lệ tăng trưởng). Tiếp tục với chỉ tiêu này hay hỏi lại?\n\nDữ liệu hiện có cho thấy:\n- **Chỉ tiêu**: TB Di động 5G thực Lũy kế Tăng Giảm\n- **Địa bàn**: Thành phố Hà Nội\n- **Kỳ báo cáo**: Lũy kế năm 2026 (từ ngày 01/01/2026 đến ngày 31/08/2026)\n- **Giá trị**: **752.322 TB**\n- **Tăng trưởng so với cùng kỳ năm trước**: **<span style='color:red'>-6,77%</span> (<span style='color:red'>-54.672 TB</span>)**\n- **Xếp hạng thực hiện**: **1**\n- **Xếp hạng tăng trưởng cùng kỳ năm**: **32**\n\nAnh/chị muốn Em tiếp tục với chỉ tiêu này hay điều chỉnh lại yêu cầu?",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -1441,7 +1441,7 @@
         "condition": []
       },
       "gold_rewrite": "Tăng trưởng TB Di động 5G thực Lũy kế của tỉnh Hà Nội lũy kế đến tháng 08/2026 là bao nhiêu?",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Chỉ tiêu Em tra cứu được là **thuê bao di động 5g thực lũy kế tăng giảm** — có vẻ khác yêu cầu của bạn (câu hỏi nhấn mạnh \"Tăng trưởng TB Di động 5G thực Lũy kế\", trong khi chỉ tiêu hệ thống là \"TB Di động 5G thực Lũy kế Tăng Giảm\" — có thể hiểu là số lượng tăng giảm thực tế chứ không phải tỷ lệ tăng trưởng). Tiếp tục với chỉ tiêu này hay hỏi lại?\n\nDữ liệu hiện có cho thấy:\n- **Chỉ tiêu**: TB Di động 5G thực Lũy kế Tăng Giảm\n- **Địa bàn**: Thành phố Hà Nội\n- **Kỳ báo cáo**: Lũy kế năm 2026 (từ ngày 01/01/2026 đến ngày 31/08/2026)\n- **Giá trị**: **752.322 TB**\n- **Tăng trưởng so với cùng kỳ năm trước**: **<span style='color:red'>-6,77%</span> (<span style='color:red'>-54.672 TB</span>)**\n- **Xếp hạng thực hiện**: **1**\n- **Xếp hạng tăng trưởng cùng kỳ năm**: **32**\n\nAnh/chị muốn Em tiếp tục với chỉ tiêu này hay điều chỉnh lại yêu cầu?"
     },
     {
       "question_id": "Q_TEMPORAL_BUSINESS_ACTION_004",
@@ -1457,7 +1457,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Top 3 tỉnh có số lượng **Thuê bao Register 5G lũy kế** cao nhất tại thời điểm tháng 08/2026 như sau:\n\n| STT | Địa bàn | Số lượng (TB) | Xếp hạng thực hiện | Tăng trưởng so với tháng trước | Tăng trưởng so với cùng kỳ năm trước |\n|:---:|:---|:---|:---:|:---|:---|\n| 1 | Thành phố Hồ Chí Minh | **3.223.607 TB** | 1 | **<span style='color:green'>1,5%</span> (<span style='color:green'>47.557 TB</span>)** | **<span style='color:green'>70,84%</span> (<span style='color:green'>1.336.746 TB</span>)** |\n| 2 | Thành phố Hà Nội | **3.025.287 TB** | 2 | **<span style='color:green'>6,77%</span> (<span style='color:green'>191.909 TB</span>)** | **<span style='color:green'>73,92%</span> (<span style='color:green'>1.285.788 TB</span>)** |\n| 3 | Tỉnh Đồng Nai | **980.819 TB** | 3 | **<span style='color:green'>2,25%</span> (<span style='color:green'>21.538 TB</span>)** | **<span style='color:green'>152,48%</span> (<span style='color:green'>592.345 TB</span>)** |\n\n**Tổng kết:**\nHai thành phố lớn là Hồ Chí Minh và Hà Nội dẫn đầu với hơn 3 triệu thuê bao mỗi nơi, trong khi Đồng Nai đứng thứ 3 với gần 1 triệu thuê bao. Cả ba địa bàn đều ghi nhận mức tăng trưởng dương so với tháng trước và tăng trưởng rất mạnh so với cùng kỳ năm trước, đặc biệt là Đồng Nai với mức tăng 152,48%.\n\nBiểu đồ dưới đây minh họa số lượng thuê bao của 3 tỉnh dẫn đầu:\n\n![Top 3 tỉnh về Thuê bao Register 5G lũy kế tháng 08/2026](https://via.placeholder.com/600x400?text=Chart+Top+3+Tinh+5G)",
       "notes": "The query intentionally omits 'Register'; M12 is strictly needed to resolve 'chỉ số đối chiếu' to Thuê bao Register 5G lũy kế.",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -1484,7 +1484,7 @@
         "condition": []
       },
       "gold_rewrite": "Top 3 tỉnh xếp hạng đầu về Thuê bao Register 5G lũy kế tháng 08/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Top 3 tỉnh có số lượng **Thuê bao Register 5G lũy kế** cao nhất tại thời điểm tháng 08/2026 như sau:\n\n| STT | Địa bàn | Số lượng (TB) | Xếp hạng thực hiện | Tăng trưởng so với tháng trước | Tăng trưởng so với cùng kỳ năm trước |\n|:---:|:---|:---|:---:|:---|:---|\n| 1 | Thành phố Hồ Chí Minh | **3.223.607 TB** | 1 | **<span style='color:green'>1,5%</span> (<span style='color:green'>47.557 TB</span>)** | **<span style='color:green'>70,84%</span> (<span style='color:green'>1.336.746 TB</span>)** |\n| 2 | Thành phố Hà Nội | **3.025.287 TB** | 2 | **<span style='color:green'>6,77%</span> (<span style='color:green'>191.909 TB</span>)** | **<span style='color:green'>73,92%</span> (<span style='color:green'>1.285.788 TB</span>)** |\n| 3 | Tỉnh Đồng Nai | **980.819 TB** | 3 | **<span style='color:green'>2,25%</span> (<span style='color:green'>21.538 TB</span>)** | **<span style='color:green'>152,48%</span> (<span style='color:green'>592.345 TB</span>)** |\n\n**Tổng kết:**\nHai thành phố lớn là Hồ Chí Minh và Hà Nội dẫn đầu với hơn 3 triệu thuê bao mỗi nơi, trong khi Đồng Nai đứng thứ 3 với gần 1 triệu thuê bao. Cả ba địa bàn đều ghi nhận mức tăng trưởng dương so với tháng trước và tăng trưởng rất mạnh so với cùng kỳ năm trước, đặc biệt là Đồng Nai với mức tăng 152,48%.\n\nBiểu đồ dưới đây minh họa số lượng thuê bao của 3 tỉnh dẫn đầu:\n\n![Top 3 tỉnh về Thuê bao Register 5G lũy kế tháng 08/2026](https://via.placeholder.com/600x400?text=Chart+Top+3+Tinh+5G)"
     },
     {
       "question_id": "Q_TEMPORAL_BUSINESS_ACTION_005",
@@ -1500,7 +1500,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "**Thuê bao Register 5G lũy kế** của **Toàn quốc** tính đến **lũy kế tháng 08/2026** là:\n\n* **Giá trị thực hiện:** **18.804.176 TB**\n* **Kế hoạch:** 3.759.477 TB (Hoàn thành **500,18%**)\n* **Tăng trưởng so với cùng kỳ tháng trước:** <span style='color:green'>4,76%</span> (<span style='color:green'>854.730 TB</span>)\n* **Tăng trưởng so với cùng kỳ năm trước:** <span style='color:green'>128,29%</span> (<span style='color:green'>10.567.040 TB</span>)",
       "notes": "",
       "evaluation_tier": "diagnostic_history",
       "hard_gate": false,
@@ -1525,7 +1525,7 @@
         "condition": []
       },
       "gold_rewrite": "Thuê bao Register 5G lũy kế của Toàn quốc tháng 08/2026 là bao nhiêu?",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "**Thuê bao Register 5G lũy kế** của **Toàn quốc** tính đến **lũy kế tháng 08/2026** là:\n\n* **Giá trị thực hiện:** **18.804.176 TB**\n* **Kế hoạch:** 3.759.477 TB (Hoàn thành **500,18%**)\n* **Tăng trưởng so với cùng kỳ tháng trước:** <span style='color:green'>4,76%</span> (<span style='color:green'>854.730 TB</span>)\n* **Tăng trưởng so với cùng kỳ năm trước:** <span style='color:green'>128,29%</span> (<span style='color:green'>10.567.040 TB</span>)"
     },
     {
       "question_id": "Q_FALSE_PREMISE_001",

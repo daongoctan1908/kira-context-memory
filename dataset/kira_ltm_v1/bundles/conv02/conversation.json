@@ -79,7 +79,7 @@
       {
         "role": "assistant",
         "dia_id": "D1:6",
-        "text": "",
+        "text": "Doanh thu dịch vụ (VTT+VTS+VDS) của Toàn quốc lũy kế tháng 08/2026 là **7.295,35 tỷ đồng**.\n\n* **Kế hoạch:** 7.048,46 tỷ đồng.\n* **Tỷ lệ hoàn thành kế hoạch:** 103,5%.\n* **Tăng trưởng so với cùng kỳ tháng trước:** 2,93% (tăng 203,37 tỷ đồng).\n* **Tăng trưởng so với cùng kỳ năm trước:** 9,75% (tăng 634,08 tỷ đồng).",
         "fill_id": "CONV02_FILL_001",
         "needs_kira_fill": true
       },
@@ -92,7 +92,7 @@
       {
         "role": "assistant",
         "dia_id": "D1:8",
-        "text": "",
+        "text": "Chỉ tiêu tra cứu được là **thuê bao ftth phát triển thực lũy kế** — khớp với yêu cầu của Anh/chị.\n\nDưới đây là số liệu thuê bao FTTH phát triển thực lũy kế của Toàn quốc tại thời điểm chốt tháng 08/2026:\n\n| Chỉ tiêu | Giá trị |\n| :--- | :--- |\n| **Thuê bao FTTH phát triển thực LK** | **9.521.622 TB** |\n| Kế hoạch | 9.516.549 TB |\n| Hoàn thành kế hoạch | 100,05% |\n| Tăng trưởng so với cùng kỳ tháng trước | <span style='color:green'>0,41%</span> (<span style='color:green'>39.337 TB</span>) |\n| Tăng trưởng so với cùng kỳ năm trước | <span style='color:green'>4,83%</span> (<span style='color:green'>438.620 TB</span>) |\n\n**Tổng quan:**\n* Tại thời điểm lũy kế tháng 08/2026, toàn quốc đạt **9.521.622 thuê bao** FTTH phát triển thực.\n* Vượt kế hoạch đề ra với tỷ lệ hoàn thành **100,05%**.\n* Duy trì đà tăng trưởng dương so với cả tháng trước và cùng kỳ năm trước.",
         "fill_id": "CONV02_FILL_002",
         "needs_kira_fill": true
       }
@@ -120,7 +120,7 @@
       {
         "role": "assistant",
         "dia_id": "D2:4",
-        "text": "",
+        "text": "Biểu đồ dưới đây minh họa trực quan doanh thu của Top 3 địa bàn dẫn đầu:\n\n*(Biểu đồ sẽ hiển thị tự động bên dưới)*",
         "fill_id": "CONV02_FILL_003",
         "needs_kira_fill": true
       },
@@ -133,7 +133,7 @@
       {
         "role": "assistant",
         "dia_id": "D2:6",
-        "text": "",
+        "text": "Dưới đây là Top 3 tỉnh xếp hạng đầu về **Thuê bao FTTH phát triển thực lũy kế** tại thời điểm **tháng 08/2026**:\n\n| STT | Địa bàn | Thuê bao FTTH phát triển thực LK | Xếp hạng thực hiện |\n|:---:|:---|:---:|:---:|\n| 1 | Thành phố Hồ Chí Minh | **1.381.943 TB** | **1** |\n| 2 | Thành phố Hà Nội | **604.151 TB** | **2** |\n| 3 | Tỉnh Đồng Nai | **499.244 TB** | **3** |\n\n**Chi tiết tăng trưởng:**\n- **Thành phố Hồ Chí Minh**: Tăng trưởng so với cùng kỳ tháng trước là **<span style='color:red'>-0,05%</span> (<span style='color:red'>-646 TB</span>)**, so với cùng kỳ năm trước là **<span style='color:green'>0,17%</span> (<span style='color:green'>2.367 TB</span>)**.\n- **Thành phố Hà Nội**: Tăng trưởng so với cùng kỳ tháng trước là **<span style='color:green'>0,39%</span> (<span style='color:green'>2.367 TB</span>)**, so với cùng kỳ năm trước là **<span style='color:green'>3,89%</span> (<span style='color:green'>22.594 TB</span>)**.\n- **Tỉnh Đồng Nai**: Tăng trưởng so với cùng kỳ tháng trước là **<span style='color:green'>0,22%</span> (<span style='color:green'>1.119 TB</span>)**, so với cùng kỳ năm trước là **<span style='color:green'>3,25%</span> (<span style='color:green'>15.697 TB</span>)**.\n\nBiểu đồ dưới đây minh họa số liệu thuê bao của 3 tỉnh này:",
         "fill_id": "CONV02_FILL_004",
         "needs_kira_fill": true
       }
@@ -161,7 +161,7 @@
       {
         "role": "assistant",
         "dia_id": "D3:4",
-        "text": "",
+        "text": "Biểu đồ dưới đây minh họa trực quan Top 5 cụm có doanh thu dịch vụ cao nhất tại Hà Nội trong tháng 08/2026.",
         "fill_id": "CONV02_FILL_005",
         "needs_kira_fill": true
       },
@@ -174,7 +174,7 @@
       {
         "role": "assistant",
         "dia_id": "D3:6",
-        "text": "",
+        "text": "Biểu đồ dưới đây minh họa trực quan Top 5 cụm có số lượng thuê bao FTTH phát triển thực lũy kế cao nhất tại Hà Nội:\n\n![Biểu đồ Top 5 cụm thuê bao FTTH phát triển thực LK - Hà Nội (T08/2026)](chart_url_placeholder)\n\n*(Lưu ý: Biểu đồ sẽ hiển thị tự động bên dưới câu trả lời này trong giao diện thực tế)*",
         "fill_id": "CONV02_FILL_006",
         "needs_kira_fill": true
       }
@@ -202,7 +202,7 @@
       {
         "role": "assistant",
         "dia_id": "D4:4",
-        "text": "",
+        "text": "Dưới đây là số liệu so sánh **Doanh thu dịch vụ (VTT+VTS+VDS)** của tỉnh Phú Thọ và thành phố Đà Nẵng ngày 06/09/2026:\n\n| Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Tỉnh Phú Thọ** | **7,43 tỷ** | **<span style='color:green'>0,83%</span> (<span style='color:green'>0,06 tỷ</span>)** | **5** |\n| **Thành phố Đà Nẵng** | **4,9 tỷ** | **<span style='color:green'>2,32%</span> (<span style='color:green'>0,11 tỷ</span>)** | **18** |\n\n**Nhận xét:**\n* **Tỉnh Phú Thọ** đạt doanh thu cao hơn (**7,43 tỷ** so với **4,9 tỷ**) và có thứ hạng thực hiện tốt hơn (hạng **5** so với hạng **18**).\n* Tuy nhiên, **Thành phố Đà Nẵng** lại có tốc độ tăng trưởng so với cùng kỳ tháng trước cao hơn (**2,32%** so với **0,83%**).",
         "fill_id": "CONV02_FILL_007",
         "needs_kira_fill": true
       },
@@ -215,7 +215,7 @@
       {
         "role": "assistant",
         "dia_id": "D4:6",
-        "text": "",
+        "text": "Dưới đây là số liệu so sánh **Thuê bao FTTH phát triển thực lũy kế** của tỉnh Phú Thọ và thành phố Đà Nẵng tại ngày 06/09/2026:\n\n| Địa bàn | Giá trị | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Tỉnh Phú Thọ** | **360.111 TB** | **<span style='color:green'>0,64%</span> (<span style='color:green'>2.292 TB</span>)** | **7** |\n| **Thành phố Đà Nẵng** | **282.881 TB** | **<span style='color:green'>0,36%</span> (<span style='color:green'>1.011 TB</span>)** | **16** |\n\n**Nhận xét:**\n* Tại ngày 06/09/2026, tỉnh Phú Thọ có số lượng thuê bao FTTH phát triển thực lũy kế cao hơn thành phố Đà Nẵng với **360.111 TB** so với **282.881 TB**.\n* Về tốc độ tăng trưởng so với cùng kỳ tháng trước, Phú Thọ cũng ghi nhận mức tăng cao hơn (**0,64%**) so với Đà Nẵng (**0,36%**).\n* Trong bảng xếp hạng thực hiện, Phú Thọ đang đứng ở vị trí thứ **7**, trong khi Đà Nẵng đứng thứ **16**.",
         "fill_id": "CONV02_FILL_008",
         "needs_kira_fill": true
       }
@@ -243,7 +243,7 @@
       {
         "role": "assistant",
         "dia_id": "D5:4",
-        "text": "",
+        "text": "Doanh thu dịch vụ VTT của Toàn quốc lũy kế tháng 08/2026 là **7.295,35 tỷ**.\n\nChỉ tiêu này đã hoàn thành **103,5%** kế hoạch (7.048,46 tỷ).\n- Tăng trưởng so với cùng kỳ tháng trước: **<span style='color:green'>2,93%</span> (<span style='color:green'>203,37 tỷ</span>)**.\n- Tăng trưởng so với cùng kỳ năm trước: **<span style='color:green'>9,75%</span> (<span style='color:green'>634,08 tỷ</span>)**.",
         "fill_id": "CONV02_FILL_009",
         "needs_kira_fill": true
       },
@@ -256,7 +256,7 @@
       {
         "role": "assistant",
         "dia_id": "D5:6",
-        "text": "",
+        "text": "Doanh thu nhóm VTS của Toàn quốc lũy kế tháng 08/2026 là **14,11 tỷ**.\n\n* **Tăng trưởng so với cùng kỳ tháng trước:** <span style='color:green'>8,87%</span> (<span style='color:green'>1,15 tỷ</span>)\n* **Tăng trưởng so với cùng kỳ năm trước:** <span style='color:green'>15,23%</span> (<span style='color:green'>1,87 tỷ</span>)",
         "fill_id": "CONV02_FILL_010",
         "needs_kira_fill": true
       },
@@ -269,7 +269,7 @@
       {
         "role": "assistant",
         "dia_id": "D5:8",
-        "text": "",
+        "text": "Chỉ tiêu **Doanh thu nhóm VDS** hiện chỉ có dữ liệu ở mức **tỉnh, cụm và xã**, không có số liệu tổng hợp cho **Toàn quốc**.\n\nAnh/chị vui lòng chọn một địa bàn cụ thể (tỉnh/thành phố) để Em tra cứu nhé.",
         "fill_id": "CONV02_FILL_011",
         "needs_kira_fill": true
       }
@@ -297,7 +297,7 @@
       {
         "role": "assistant",
         "dia_id": "D6:4",
-        "text": "",
+        "text": "Chỉ tiêu Em tra cứu được là **doanh thu dịch vụ (vtt+vts+vds)** — có vẻ khác yêu cầu của bạn (câu hỏi yêu cầu **Tăng trưởng Doanh thu dịch vụ**, trong khi chỉ tiêu nhận diện là **Doanh thu dịch vụ** và bundle trả về giá trị doanh thu kèm tăng trưởng). Tiếp tục với chỉ tiêu này hay hỏi lại?\n\nDữ liệu bundle hiện có cho thấy:\n- **Doanh thu dịch vụ (VTT+VTS+VDS)** lũy kế đến tháng 08/2026 của Hà Nội: **7.352,99 tỷ**\n- **Tăng trưởng so với cùng kỳ năm trước**: **<span style='color:green'>4,92%</span> (<span style='color:green'>344,59 tỷ</span>)**\n\nAnh/chị muốn Em tiếp tục với chỉ tiêu \"Doanh thu dịch vụ (VTT+VTS+VDS)\" này để lấy số liệu tăng trưởng như trên, hay cần điều chỉnh lại yêu cầu để tìm đúng chỉ tiêu \"Tăng trưởng Doanh thu dịch vụ\"?",
         "fill_id": "CONV02_FILL_012",
         "needs_kira_fill": true
       },
@@ -310,7 +310,7 @@
       {
         "role": "assistant",
         "dia_id": "D6:6",
-        "text": "",
+        "text": "Chỉ tiêu Em tra cứu được là **thuê bao ftth phát triển thực lũy kế** — có vẻ khác yêu cầu của bạn (câu hỏi nhấn mạnh **tăng trưởng**, trong khi chỉ tiêu này là số lượng thuê bao phát triển thực lũy kế kèm thông tin tăng trưởng). Tiếp tục với chỉ tiêu này hay hỏi lại?\n\nTuy nhiên, bundle đã trả về dữ liệu hợp lệ cho tỉnh Hà Nội lũy kế đến tháng 08/2026, bao gồm cả thông tin tăng trưởng:\n\n**Thuê bao FTTH phát triển thực lũy kế** của **Thành phố Hà Nội** lũy kế đến tháng 08/2026:\n\n| Chỉ tiêu | Giá trị |\n|----------|---------|\n| Số thuê bao phát triển thực LK | **604.151 TB** |\n| Tăng trưởng so với cùng kỳ năm trước | **<span style='color:green'>3,89%</span> (<span style='color:green'>22.594 TB</span>)** |\n| Xếp hạng thực hiện | **2** |\n| Xếp hạng tăng trưởng cùng kỳ năm | **26** |\n\nNhư vậy, **tăng trưởng thuê bao FTTH phát triển thực lũy kế** của Hà Nội lũy kế đến tháng 08/2026 là **<span style='color:green'>3,89%</span>**, tương ứng tăng **<span style='color:green'>22.594 thuê bao</span>** so với cùng kỳ năm trước.",
         "fill_id": "CONV02_FILL_013",
         "needs_kira_fill": true
       }
@@ -338,7 +338,7 @@
       {
         "role": "assistant",
         "dia_id": "D7:4",
-        "text": "",
+        "text": "Doanh thu dịch vụ IOT của Toàn quốc lũy kế tháng 08/2026 là **79,62 tỷ**.\n\n* **Kế hoạch:** 84,7 tỷ (hoàn thành **94%**).\n* **Tăng trưởng so với cùng kỳ tháng trước:** <span style='color:green'>10,4%</span> (<span style='color:green'>7,5 tỷ</span>).\n* **Tăng trưởng so với cùng kỳ năm trước:** <span style='color:green'>53,99%</span> (<span style='color:green'>27,91 tỷ</span>).",
         "fill_id": "CONV02_FILL_014",
         "needs_kira_fill": true
       },
@@ -351,7 +351,7 @@
       {
         "role": "assistant",
         "dia_id": "D7:6",
-        "text": "",
+        "text": "Doanh thu dịch vụ SME của Toàn quốc lũy kế tháng 08/2026 là **124,38 tỷ**, hoàn thành **102,61%** kế hoạch (121,22 tỷ).\n\n- Tăng trưởng so với cùng kỳ tháng trước: **<span style='color:green'>4,7%</span> (<span style='color:green'>5,58 tỷ</span>)**\n- Tăng trưởng so với cùng kỳ năm trước: **<span style='color:green'>58,41%</span> (<span style='color:green'>45,86 tỷ</span>)**",
         "fill_id": "CONV02_FILL_015",
         "needs_kira_fill": true
       }
@@ -379,7 +379,7 @@
       {
         "role": "assistant",
         "dia_id": "D8:4",
-        "text": "",
+        "text": "Doanh thu dịch vụ (VTT+VTS+VDS) của Toàn quốc lũy kế tháng 08/2026 là **7.295,35 tỷ đồng**.\n\n* **Kế hoạch:** 7.048,46 tỷ đồng.\n* **Tỷ lệ hoàn thành kế hoạch:** 103,5%.\n* **Tăng trưởng so với cùng kỳ tháng trước:** 2,93% (tăng 203,37 tỷ đồng).\n* **Tăng trưởng so với cùng kỳ năm trước:** 9,75% (tăng 634,08 tỷ đồng).",
         "fill_id": "CONV02_FILL_016",
         "needs_kira_fill": true
       },
@@ -392,7 +392,7 @@
       {
         "role": "assistant",
         "dia_id": "D8:6",
-        "text": "",
+        "text": "Chỉ tiêu tra cứu được là **thuê bao ftth phát triển thực lũy kế** — khớp với yêu cầu của Anh/chị.\n\nDưới đây là số liệu thuê bao FTTH phát triển thực lũy kế của Toàn quốc tại thời điểm chốt tháng 08/2026:\n\n| Chỉ tiêu | Giá trị |\n| :--- | :--- |\n| **Thuê bao FTTH phát triển thực LK** | **9.521.622 TB** |\n| Kế hoạch | 9.516.549 TB |\n| Hoàn thành kế hoạch | 100,05% |\n| Tăng trưởng so với cùng kỳ tháng trước | <span style='color:green'>0,41%</span> (<span style='color:green'>39.337 TB</span>) |\n| Tăng trưởng so với cùng kỳ năm trước | <span style='color:green'>4,83%</span> (<span style='color:green'>438.620 TB</span>) |\n\n**Tổng quan:**\n* Tại thời điểm lũy kế tháng 08/2026, toàn quốc đạt **9.521.622 thuê bao** FTTH phát triển thực.\n* Vượt kế hoạch đề ra với tỷ lệ hoàn thành **100,05%**.\n* Duy trì đà tăng trưởng dương so với cả tháng trước và cùng kỳ năm trước.",
         "fill_id": "CONV02_FILL_017",
         "needs_kira_fill": true
       }
@@ -420,7 +420,7 @@
       {
         "role": "assistant",
         "dia_id": "D9:4",
-        "text": "",
+        "text": "**Thuê bao truyền hình phát triển thực lũy kế** của **Toàn quốc** tính đến **lũy kế tháng 08/2026** là:\n\n* **Giá trị thực hiện:** **3.013.148 TB**\n* **Kế hoạch:** 3.079.824 TB (hoàn thành **97,84%**)\n* **Tăng trưởng so với cùng kỳ tháng trước:** <span style='color:red'>-1,73%</span> (<span style='color:red'>-52.995 TB</span>)\n* **Tăng trưởng so với cùng kỳ năm trước:** <span style='color:green'>4,43%</span> (<span style='color:green'>127.772 TB</span>)",
         "fill_id": "CONV02_FILL_018",
         "needs_kira_fill": true
       },
@@ -433,7 +433,7 @@
       {
         "role": "assistant",
         "dia_id": "D9:6",
-        "text": "",
+        "text": "Chỉ tiêu tra cứu được là **thuê bao dcom thực** — khớp với yêu cầu của bạn.\n\n**Thuê bao Dcom thực** của **Toàn quốc** tại thời điểm **lũy kế tháng 08/2026** là:\n\n* Giá trị: **1.959.059 TB**\n* Tăng trưởng so với cùng kỳ tháng trước: **<span style='color:green'>1,25%</span> (<span style='color:green'>24.227 TB</span>)**\n* Tăng trưởng so với cùng kỳ năm trước: **<span style='color:green'>15,83%</span> (<span style='color:green'>267.696 TB</span>)**",
         "fill_id": "CONV02_FILL_019",
         "needs_kira_fill": true
       }
@@ -461,7 +461,7 @@
       {
         "role": "assistant",
         "dia_id": "D10:4",
-        "text": "",
+        "text": "Dưới đây là **Top 5 cụm** có doanh thu dịch vụ IOT cao nhất tại **Thành phố Hà Nội** trong **lũy kế tháng 08/2026**:\n\n| Xếp hạng | Cụm | Doanh thu dịch vụ IOT | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước |\n|:---:|:---|:---:|:---:|:---:|\n| **1** | **Cụm Hoàn Kiếm** | **567.864.044,35** | **<span style='color:green'>55,54%</span> (<span style='color:green'>202.766.127,9</span>)** | **<span style='color:green'>746,96%</span> (<span style='color:green'>500.816.333,56</span>)** |\n| **2** | **Cụm Hà Đông** | **531.667.516,06** | **<span style='color:green'>27,91%</span> (<span style='color:green'>116.011.408,46</span>)** | **<span style='color:green'>105,02%</span> (<span style='color:green'>272.343.009,95</span>)** |\n| **3** | **Cụm Nam Từ Liêm** | **466.135.452,62** | **<span style='color:green'>30,06%</span> (<span style='color:green'>107.747.601,23</span>)** | **<span style='color:green'>97,12%</span> (<span style='color:green'>229.665.235,27</span>)** |\n| **4** | **Cụm Thanh Xuân** | **378.699.435,17** | **<span style='color:green'>21,11%</span> (<span style='color:green'>66.013.020,44</span>)** | **<span style='color:green'>130,23%</span> (<span style='color:green'>214.208.721,66</span>)** |\n| **5** | **Cụm Bắc Từ Liêm** | **357.295.594,63** | **<span style='color:green'>16,61%</span> (<span style='color:green'>50.895.661,82</span>)** | **<span style='color:green'>119,56%</span> (<span style='color:green'>194.564.563,42</span>)** |\n\n**Tổng quan toàn Thành phố Hà Nội:**\n* **Doanh thu lũy kế:** **7.151.754.453,68**\n* **Tăng trưởng so với cùng kỳ tháng trước:** **<span style='color:green'>21,18%</span> (<span style='color:green'>1.250.184.744,81</span>)**\n* **Tăng trưởng so với cùng kỳ năm trước:** **<span style='color:green'>102,92%</span> (<span style='color:green'>3.627.325.466,44</span>)**\n* **Xếp hạng thực hiện (tỉnh):** **1**",
         "fill_id": "CONV02_FILL_020",
         "needs_kira_fill": true
       },
@@ -474,7 +474,7 @@
       {
         "role": "assistant",
         "dia_id": "D10:6",
-        "text": "",
+        "text": "Biểu đồ dưới đây minh họa trực quan Top 5 cụm có doanh thu dịch vụ cao nhất tại Hà Nội trong tháng 08/2026.",
         "fill_id": "CONV02_FILL_021",
         "needs_kira_fill": true
       }
@@ -502,7 +502,7 @@
       {
         "role": "assistant",
         "dia_id": "D11:4",
-        "text": "",
+        "text": "**Thuê bao Di động thực Lũy kế** của **Toàn quốc** tính đến **lũy kế tháng 08/2026** là:\n\n* **Giá trị thực hiện:** **54.431.436 TB**\n* **Kế hoạch:** 54.835.129 TB (Hoàn thành **99,26%**)\n* **Tăng trưởng so với cùng kỳ tháng trước:** <span style='color:green'>0,37%</span> (<span style='color:green'>199.174 TB</span>)\n* **Tăng trưởng so với cùng kỳ năm trước:** <span style='color:green'>1,79%</span> (<span style='color:green'>956.694 TB</span>)",
         "fill_id": "CONV02_FILL_022",
         "needs_kira_fill": true
       },
@@ -515,7 +515,7 @@
       {
         "role": "assistant",
         "dia_id": "D11:6",
-        "text": "",
+        "text": "Tháng 08/2026, toàn quốc phát triển mới được **100.566 thuê bao FTTH**, đạt **109,31%** kế hoạch (vượt **7.216 thuê bao** so với tháng trước).\n\nSo với cùng kỳ năm trước, số thuê bao phát triển mới giảm **5,93%** (tương ứng giảm **6.338 thuê bao**).",
         "fill_id": "CONV02_FILL_023",
         "needs_kira_fill": true
       }
@@ -543,7 +543,7 @@
       {
         "role": "assistant",
         "dia_id": "D12:4",
-        "text": "",
+        "text": "Dưới đây là so sánh **Doanh thu dịch vụ (VTT+VTS+VDS)** của hai cụm ngày **06/09/2026**:\n\n| Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Cụm Vũng Tàu (TP.HCM)** | **0,9 tỷ** | <span style='color:red'>-6,71%</span> (<span style='color:red'>-0,06 tỷ</span>) | **18/40** |\n| **Cụm Núi Thành (Đà Nẵng)** | **0,32 tỷ** | <span style='color:green'>1,7%</span> (<span style='color:green'>5,33 triệu</span>) | **4/24** |\n\n**Nhận xét:**\n* **Cụm Vũng Tàu** có doanh thu tuyệt đối cao hơn (**0,9 tỷ** so với **0,32 tỷ**), nhưng đang ghi nhận mức **giảm 6,71%** so với cùng kỳ tháng trước.\n* **Cụm Núi Thành** có doanh thu thấp hơn nhưng duy trì đà **tăng trưởng dương 1,7%** và có thứ hạng thực hiện tốt hơn trong khu vực quản lý (hạng 4/24 so với hạng 18/40 của Vũng Tàu).",
         "fill_id": "CONV02_FILL_024",
         "needs_kira_fill": true
       },
@@ -556,7 +556,7 @@
       {
         "role": "assistant",
         "dia_id": "D12:6",
-        "text": "",
+        "text": "Dưới đây là số liệu so sánh **Thuê bao FTTH phát triển thực lũy kế** của hai cụm tại ngày 06/09/2026:\n\n| Địa bàn | Giá trị | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Cụm Vũng Tàu (TP.HCM)** | **36.401 TB** | **<span style='color:green'>0,13%</span> (<span style='color:green'>47 TB</span>)** | **17/40** |\n| **Cụm Núi Thành (Đà Nẵng)** | **18.449 TB** | **<span style='color:green'>0,07%</span> (<span style='color:green'>12 TB</span>)** | **6/24** |\n\n**Nhận xét:**\n* Cụm Vũng Tàu có quy mô thuê bao phát triển thực lũy kế cao hơn gần gấp đôi so với Cụm Núi Thành (36.401 TB so với 18.449 TB).\n* Về tốc độ tăng trưởng so với cùng kỳ tháng trước, Cụm Vũng Tàu cũng ghi nhận mức tăng cao hơn (0,13% so với 0,07%).",
         "fill_id": "CONV02_FILL_025",
         "needs_kira_fill": true
       }
@@ -584,7 +584,7 @@
       {
         "role": "assistant",
         "dia_id": "D13:4",
-        "text": "",
+        "text": "Biểu đồ dưới đây minh họa trực quan doanh thu của Top 3 địa bàn dẫn đầu:\n\n*(Biểu đồ sẽ hiển thị tự động bên dưới)*",
         "fill_id": "CONV02_FILL_026",
         "needs_kira_fill": true
       }
@@ -612,7 +612,7 @@
       {
         "role": "assistant",
         "dia_id": "D14:4",
-        "text": "",
+        "text": "Biểu đồ dưới đây minh họa trực quan Top 5 cụm có doanh thu dịch vụ cao nhất tại Hà Nội trong tháng 08/2026.",
         "fill_id": "CONV02_FILL_027",
         "needs_kira_fill": true
       },
@@ -625,7 +625,7 @@
       {
         "role": "assistant",
         "dia_id": "D14:6",
-        "text": "",
+        "text": "Dưới đây là Top 3 tỉnh xếp hạng đầu về **Thuê bao FTTH phát triển thực lũy kế** tại thời điểm **tháng 08/2026**:\n\n| STT | Địa bàn | Thuê bao FTTH phát triển thực LK | Xếp hạng thực hiện |\n|:---:|:---|:---:|:---:|\n| 1 | Thành phố Hồ Chí Minh | **1.381.943 TB** | **1** |\n| 2 | Thành phố Hà Nội | **604.151 TB** | **2** |\n| 3 | Tỉnh Đồng Nai | **499.244 TB** | **3** |\n\n**Chi tiết tăng trưởng:**\n- **Thành phố Hồ Chí Minh**: Tăng trưởng so với cùng kỳ tháng trước là **<span style='color:red'>-0,05%</span> (<span style='color:red'>-646 TB</span>)**, so với cùng kỳ năm trước là **<span style='color:green'>0,17%</span> (<span style='color:green'>2.367 TB</span>)**.\n- **Thành phố Hà Nội**: Tăng trưởng so với cùng kỳ tháng trước là **<span style='color:green'>0,39%</span> (<span style='color:green'>2.367 TB</span>)**, so với cùng kỳ năm trước là **<span style='color:green'>3,89%</span> (<span style='color:green'>22.594 TB</span>)**.\n- **Tỉnh Đồng Nai**: Tăng trưởng so với cùng kỳ tháng trước là **<span style='color:green'>0,22%</span> (<span style='color:green'>1.119 TB</span>)**, so với cùng kỳ năm trước là **<span style='color:green'>3,25%</span> (<span style='color:green'>15.697 TB</span>)**.\n\nBiểu đồ dưới đây minh họa số liệu thuê bao của 3 tỉnh này:",
         "fill_id": "CONV02_FILL_028",
         "needs_kira_fill": true
       }
@@ -653,7 +653,7 @@
       {
         "role": "assistant",
         "dia_id": "D15:4",
-        "text": "",
+        "text": "Doanh thu dịch vụ (VTT+VTS+VDS) của Toàn quốc lũy kế tháng 08/2026 là **7.295,35 tỷ đồng**.\n\n* **Kế hoạch:** 7.048,46 tỷ đồng.\n* **Tỷ lệ hoàn thành kế hoạch:** 103,5%.\n* **Tăng trưởng so với cùng kỳ tháng trước:** 2,93% (tăng 203,37 tỷ đồng).\n* **Tăng trưởng so với cùng kỳ năm trước:** 9,75% (tăng 634,08 tỷ đồng).",
         "fill_id": "CONV02_FILL_029",
         "needs_kira_fill": true
       }
@@ -681,7 +681,7 @@
       {
         "role": "assistant",
         "dia_id": "D16:4",
-        "text": "",
+        "text": "Doanh thu dịch vụ IOT của Toàn quốc lũy kế tháng 08/2026 là **79,62 tỷ**.\n\n* **Kế hoạch:** 84,7 tỷ (hoàn thành **94%**).\n* **Tăng trưởng so với cùng kỳ tháng trước:** <span style='color:green'>10,4%</span> (<span style='color:green'>7,5 tỷ</span>).\n* **Tăng trưởng so với cùng kỳ năm trước:** <span style='color:green'>53,99%</span> (<span style='color:green'>27,91 tỷ</span>).",
         "fill_id": "CONV02_FILL_030",
         "needs_kira_fill": true
       },
@@ -694,7 +694,7 @@
       {
         "role": "assistant",
         "dia_id": "D16:6",
-        "text": "",
+        "text": "Chỉ tiêu tra cứu được là **thuê bao ftth phát triển thực lũy kế** — khớp với yêu cầu của Anh/chị.\n\nDưới đây là số liệu thuê bao FTTH phát triển thực lũy kế của Toàn quốc tại thời điểm chốt tháng 08/2026:\n\n| Chỉ tiêu | Giá trị |\n| :--- | :--- |\n| **Thuê bao FTTH phát triển thực LK** | **9.521.622 TB** |\n| Kế hoạch | 9.516.549 TB |\n| Hoàn thành kế hoạch | 100,05% |\n| Tăng trưởng so với cùng kỳ tháng trước | <span style='color:green'>0,41%</span> (<span style='color:green'>39.337 TB</span>) |\n| Tăng trưởng so với cùng kỳ năm trước | <span style='color:green'>4,83%</span> (<span style='color:green'>438.620 TB</span>) |\n\n**Tổng quan:**\n* Tại thời điểm lũy kế tháng 08/2026, toàn quốc đạt **9.521.622 thuê bao** FTTH phát triển thực.\n* Vượt kế hoạch đề ra với tỷ lệ hoàn thành **100,05%**.\n* Duy trì đà tăng trưởng dương so với cả tháng trước và cùng kỳ năm trước.",
         "fill_id": "CONV02_FILL_031",
         "needs_kira_fill": true
       }
@@ -722,7 +722,7 @@
       {
         "role": "assistant",
         "dia_id": "D17:4",
-        "text": "",
+        "text": "Doanh thu dịch vụ (VTT+VTS+VDS) của Toàn quốc lũy kế tháng 08/2026 là **7.295,35 tỷ đồng**.\n\n* **Kế hoạch:** 7.048,46 tỷ đồng.\n* **Tỷ lệ hoàn thành kế hoạch:** 103,5%.\n* **Tăng trưởng so với cùng kỳ tháng trước:** 2,93% (tăng 203,37 tỷ đồng).\n* **Tăng trưởng so với cùng kỳ năm trước:** 9,75% (tăng 634,08 tỷ đồng).",
         "fill_id": "CONV02_FILL_032",
         "needs_kira_fill": true
       },
@@ -735,7 +735,7 @@
       {
         "role": "assistant",
         "dia_id": "D17:6",
-        "text": "",
+        "text": "Doanh thu dịch vụ IOT của Toàn quốc lũy kế tháng 08/2026 là **79,62 tỷ**.\n\n* **Kế hoạch:** 84,7 tỷ (hoàn thành **94%**).\n* **Tăng trưởng so với cùng kỳ tháng trước:** <span style='color:green'>10,4%</span> (<span style='color:green'>7,5 tỷ</span>).\n* **Tăng trưởng so với cùng kỳ năm trước:** <span style='color:green'>53,99%</span> (<span style='color:green'>27,91 tỷ</span>).",
         "fill_id": "CONV02_FILL_033",
         "needs_kira_fill": true
       }
@@ -763,7 +763,7 @@
       {
         "role": "assistant",
         "dia_id": "D18:4",
-        "text": "",
+        "text": "Doanh thu dịch vụ VTT của Toàn quốc lũy kế tháng 08/2026 là **7.295,35 tỷ**.\n\nChỉ tiêu này đã hoàn thành **103,5%** kế hoạch (7.048,46 tỷ).\n- Tăng trưởng so với cùng kỳ tháng trước: **<span style='color:green'>2,93%</span> (<span style='color:green'>203,37 tỷ</span>)**.\n- Tăng trưởng so với cùng kỳ năm trước: **<span style='color:green'>9,75%</span> (<span style='color:green'>634,08 tỷ</span>)**.",
         "fill_id": "CONV02_FILL_034",
         "needs_kira_fill": true
       }
@@ -791,7 +791,7 @@
       {
         "role": "assistant",
         "dia_id": "D19:4",
-        "text": "",
+        "text": "Chỉ tiêu Em tra cứu được là **doanh thu dịch vụ (vtt+vts+vds)** — có vẻ khác yêu cầu của bạn (câu hỏi yêu cầu **Tăng trưởng Doanh thu dịch vụ**, trong khi chỉ tiêu nhận diện là **Doanh thu dịch vụ** và bundle trả về giá trị doanh thu kèm tăng trưởng). Tiếp tục với chỉ tiêu này hay hỏi lại?\n\nDữ liệu bundle hiện có cho thấy:\n- **Doanh thu dịch vụ (VTT+VTS+VDS)** lũy kế đến tháng 08/2026 của Hà Nội: **7.352,99 tỷ**\n- **Tăng trưởng so với cùng kỳ năm trước**: **<span style='color:green'>4,92%</span> (<span style='color:green'>344,59 tỷ</span>)**\n\nAnh/chị muốn Em tiếp tục với chỉ tiêu \"Doanh thu dịch vụ (VTT+VTS+VDS)\" này để lấy số liệu tăng trưởng như trên, hay cần điều chỉnh lại yêu cầu để tìm đúng chỉ tiêu \"Tăng trưởng Doanh thu dịch vụ\"?",
         "fill_id": "CONV02_FILL_035",
         "needs_kira_fill": true
       }
@@ -830,7 +830,7 @@
       {
         "role": "assistant",
         "dia_id": "D20:6",
-        "text": "",
+        "text": "Biểu đồ dưới đây minh họa trực quan doanh thu của Top 3 địa bàn dẫn đầu:\n\n*(Biểu đồ sẽ hiển thị tự động bên dưới)*",
         "fill_id": "CONV02_FILL_036",
         "needs_kira_fill": true
       }
