@@ -263,7 +263,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dưới đây là số liệu so sánh doanh thu dịch vụ IOT của Cụm Núi Thành (Đà Nẵng) và Cụm Vũng Tàu (Hồ Chí Minh) tại thời điểm ngày 06/09/2026:\n\n| Địa bàn | Doanh thu dịch vụ IOT | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Cụm Vũng Tàu (TP. Hồ Chí Minh)** | **0,02 tỷ** | **<span style='color:green'>136,57%</span> (<span style='color:green'>0,01 tỷ</span>)** | **1/40** |\n| **Cụm Núi Thành (TP. Đà Nẵng)** | **3,99 triệu** | **<span style='color:green'>125,62%</span> (<span style='color:green'>2,22 triệu</span>)** | **7/24** |\n\n**Nhận xét:**\n* Cụm Vũng Tàu (TP. Hồ Chí Minh) có doanh thu cao hơn đáng kể (0,02 tỷ so với 3,99 triệu) và dẫn đầu về xếp hạng thực hiện (1/40).\n* Cả hai cụm đều ghi nhận mức tăng trưởng dương mạnh so với cùng kỳ tháng trước, trong đó Cụm Vũng Tàu có tốc độ tăng trưởng cao hơn (136,57% so với 125,62%).\n\n\n\nBiểu đồ dưới đây minh họa sự chênh lệch về doanh thu dịch vụ IOT giữa hai cụm:\n\n![Biểu đồ so sánh doanh thu dịch vụ IOT](https://via.placeholder.com/600x400?text=Chart+Data+Unavailable)\n\n*Lưu ý: Biểu đồ được tạo tự động từ dữ liệu đã tra cứu.*",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -288,7 +288,7 @@
         "condition": []
       },
       "gold_rewrite": "So sánh Doanh thu dịch vụ IOT của Cụm Núi Thành (Đà Nẵng) và Cụm Vũng Tàu (Hồ Chí Minh) ngày 06/09/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Dưới đây là số liệu so sánh doanh thu dịch vụ IOT của Cụm Núi Thành (Đà Nẵng) và Cụm Vũng Tàu (Hồ Chí Minh) tại thời điểm ngày 06/09/2026:\n\n| Địa bàn | Doanh thu dịch vụ IOT | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Cụm Vũng Tàu (TP. Hồ Chí Minh)** | **0,02 tỷ** | **<span style='color:green'>136,57%</span> (<span style='color:green'>0,01 tỷ</span>)** | **1/40** |\n| **Cụm Núi Thành (TP. Đà Nẵng)** | **3,99 triệu** | **<span style='color:green'>125,62%</span> (<span style='color:green'>2,22 triệu</span>)** | **7/24** |\n\n**Nhận xét:**\n* Cụm Vũng Tàu (TP. Hồ Chí Minh) có doanh thu cao hơn đáng kể (0,02 tỷ so với 3,99 triệu) và dẫn đầu về xếp hạng thực hiện (1/40).\n* Cả hai cụm đều ghi nhận mức tăng trưởng dương mạnh so với cùng kỳ tháng trước, trong đó Cụm Vũng Tàu có tốc độ tăng trưởng cao hơn (136,57% so với 125,62%).\n\n\n\nBiểu đồ dưới đây minh họa sự chênh lệch về doanh thu dịch vụ IOT giữa hai cụm:\n\n![Biểu đồ so sánh doanh thu dịch vụ IOT](https://via.placeholder.com/600x400?text=Chart+Data+Unavailable)\n\n*Lưu ý: Biểu đồ được tạo tự động từ dữ liệu đã tra cứu.*"
     },
     {
       "question_id": "Q_SINGLE_HOP_008",
@@ -304,7 +304,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dưới đây là **Top 8 xã** có doanh thu dịch vụ (VTT+VTS+VDS) cao nhất trong **Cụm Núi Thành, tỉnh Đà Nẵng** lũy kế tháng 08/2026 (Cụm chỉ có 8 xã trong dữ liệu):\n\n| STT | Xã | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước | Xếp hạng thực hiện (xã) |\n|:---:|:---|:---:|:---:|:---:|:---:|\n| 1 | Xã Núi Thành | **5,08 tỷ** | <span style='color:red'>-1,53%</span> (<span style='color:red'>-0,08 tỷ</span>) | <span style='color:green'>3,53%</span> (<span style='color:green'>0,17 tỷ</span>) | **7/94** |\n| 2 | Xã Tam Xuân | **2,21 tỷ** | <span style='color:red'>-0,34%</span> (<span style='color:red'>-7,41 triệu</span>) | <span style='color:green'>8,47%</span> (<span style='color:green'>0,17 tỷ</span>) | **21/94** |\n| 3 | Xã Tam Anh | **1,6 tỷ** | <span style='color:red'>-0,9%</span> (<span style='color:red'>-0,01 tỷ</span>) | <span style='color:green'>4,99%</span> (<span style='color:green'>0,07 tỷ</span>) | **33/94** |\n| 4 | Xã Tam Mỹ | **1,12 tỷ** | <span style='color:red'>-0,7%</span> (<span style='color:red'>-7,76 triệu</span>) | <span style='color:green'>6,81%</span> (<span style='color:green'>0,07 tỷ</span>) | **47/94** |\n| 5 | Xã Đức Phú | **0,64 tỷ** | <span style='color:red'>-0,35%</span> (<span style='color:red'>-2,22 triệu</span>) | <span style='color:green'>12,8%</span> (<span style='color:green'>0,07 tỷ</span>) | **67/94** |\n| 6 | Xã Tam Hải | **0,51 tỷ** | <span style='color:red'>-5,43%</span> (<span style='color:red'>-0,03 tỷ</span>) | <span style='color:green'>10,89%</span> (<span style='color:green'>0,05 tỷ</span>) | **75/94** |\n\n**Tổng doanh thu Cụm Núi Thành:** **11,18 tỷ** (Xếp hạng 5/24 cụm toàn thành phố).\n\n*Lưu ý: Cụm Núi Thành chỉ có 8 xã trong hệ thống dữ liệu, nên Em hiển thị đủ toàn bộ các xã của cụm thay vì top 10.*\n\n\n\nBiểu đồ dưới đây minh họa xếp hạng doanh thu dịch vụ của các xã trong Cụm Núi Thành:\n\n![Biểu đồ top xã theo doanh thu dịch vụ](chart_image_url)",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -331,7 +331,7 @@
         "condition": []
       },
       "gold_rewrite": "Top 10 xã xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) trong Cụm Núi Thành, tỉnh Đà Nẵng tháng 08/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Dưới đây là **Top 8 xã** có doanh thu dịch vụ (VTT+VTS+VDS) cao nhất trong **Cụm Núi Thành, tỉnh Đà Nẵng** lũy kế tháng 08/2026 (Cụm chỉ có 8 xã trong dữ liệu):\n\n| STT | Xã | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước | Xếp hạng thực hiện (xã) |\n|:---:|:---|:---:|:---:|:---:|:---:|\n| 1 | Xã Núi Thành | **5,08 tỷ** | <span style='color:red'>-1,53%</span> (<span style='color:red'>-0,08 tỷ</span>) | <span style='color:green'>3,53%</span> (<span style='color:green'>0,17 tỷ</span>) | **7/94** |\n| 2 | Xã Tam Xuân | **2,21 tỷ** | <span style='color:red'>-0,34%</span> (<span style='color:red'>-7,41 triệu</span>) | <span style='color:green'>8,47%</span> (<span style='color:green'>0,17 tỷ</span>) | **21/94** |\n| 3 | Xã Tam Anh | **1,6 tỷ** | <span style='color:red'>-0,9%</span> (<span style='color:red'>-0,01 tỷ</span>) | <span style='color:green'>4,99%</span> (<span style='color:green'>0,07 tỷ</span>) | **33/94** |\n| 4 | Xã Tam Mỹ | **1,12 tỷ** | <span style='color:red'>-0,7%</span> (<span style='color:red'>-7,76 triệu</span>) | <span style='color:green'>6,81%</span> (<span style='color:green'>0,07 tỷ</span>) | **47/94** |\n| 5 | Xã Đức Phú | **0,64 tỷ** | <span style='color:red'>-0,35%</span> (<span style='color:red'>-2,22 triệu</span>) | <span style='color:green'>12,8%</span> (<span style='color:green'>0,07 tỷ</span>) | **67/94** |\n| 6 | Xã Tam Hải | **0,51 tỷ** | <span style='color:red'>-5,43%</span> (<span style='color:red'>-0,03 tỷ</span>) | <span style='color:green'>10,89%</span> (<span style='color:green'>0,05 tỷ</span>) | **75/94** |\n\n**Tổng doanh thu Cụm Núi Thành:** **11,18 tỷ** (Xếp hạng 5/24 cụm toàn thành phố).\n\n*Lưu ý: Cụm Núi Thành chỉ có 8 xã trong hệ thống dữ liệu, nên Em hiển thị đủ toàn bộ các xã của cụm thay vì top 10.*\n\n\n\nBiểu đồ dưới đây minh họa xếp hạng doanh thu dịch vụ của các xã trong Cụm Núi Thành:\n\n![Biểu đồ top xã theo doanh thu dịch vụ](chart_image_url)"
     },
     {
       "question_id": "Q_SINGLE_HOP_009",
@@ -347,7 +347,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dưới đây là top 3 tỉnh đứng cuối về chỉ tiêu **Thuê bao FTTH phát triển thực lũy kế** tháng 08/2026:\n\n| Xếp hạng | Tỉnh | Số thuê bao (TB) | Tăng trưởng so với tháng trước | Tăng trưởng so với cùng kỳ năm trước |\n| :--- | :--- | :--- | :--- | :--- |\n| **34** | **Tỉnh Lai Châu** | **30.261 TB** | **<span style='color:green'>0,71%</span> (<span style='color:green'>214 TB</span>)** | **<span style='color:green'>12,01%</span> (<span style='color:green'>3.245 TB</span>)** |\n| **33** | **Tỉnh Điện Biên** | **39.701 TB** | **<span style='color:green'>1,45%</span> (<span style='color:green'>567 TB</span>)** | **<span style='color:green'>11,36%</span> (<span style='color:green'>4.050 TB</span>)** |\n| **32** | **Tỉnh Cao Bằng** | **44.326 TB** | **<span style='color:green'>1,21%</span> (<span style='color:green'>532 TB</span>)** | **<span style='color:green'>10,13%</span> (<span style='color:green'>4.077 TB</span>)** |\n\nCả 3 tỉnh đều ghi nhận mức tăng trưởng dương so với tháng trước và cùng kỳ năm trước.",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -374,7 +374,7 @@
         "condition": []
       },
       "gold_rewrite": "Top 3 tỉnh đứng cuối về Thuê bao FTTH phát triển thực LK tháng 08/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Dưới đây là top 3 tỉnh đứng cuối về chỉ tiêu **Thuê bao FTTH phát triển thực lũy kế** tháng 08/2026:\n\n| Xếp hạng | Tỉnh | Số thuê bao (TB) | Tăng trưởng so với tháng trước | Tăng trưởng so với cùng kỳ năm trước |\n| :--- | :--- | :--- | :--- | :--- |\n| **34** | **Tỉnh Lai Châu** | **30.261 TB** | **<span style='color:green'>0,71%</span> (<span style='color:green'>214 TB</span>)** | **<span style='color:green'>12,01%</span> (<span style='color:green'>3.245 TB</span>)** |\n| **33** | **Tỉnh Điện Biên** | **39.701 TB** | **<span style='color:green'>1,45%</span> (<span style='color:green'>567 TB</span>)** | **<span style='color:green'>11,36%</span> (<span style='color:green'>4.050 TB</span>)** |\n| **32** | **Tỉnh Cao Bằng** | **44.326 TB** | **<span style='color:green'>1,21%</span> (<span style='color:green'>532 TB</span>)** | **<span style='color:green'>10,13%</span> (<span style='color:green'>4.077 TB</span>)** |\n\nCả 3 tỉnh đều ghi nhận mức tăng trưởng dương so với tháng trước và cùng kỳ năm trước."
     },
     {
       "question_id": "Q_SINGLE_HOP_010",
@@ -470,7 +470,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Chỉ tiêu Em tra cứu được là **doanh thu dịch vụ (VTT+VTS+VDS)** — có vẻ khác yêu cầu của bạn (bạn hỏi **tăng trưởng** của chỉ tiêu này). Tiếp tục với chỉ tiêu này hay hỏi lại?\n\nTuy nhiên, bundle dữ liệu đã trả về thông tin **tăng trưởng** của chỉ tiêu doanh thu dịch vụ. Dưới đây là kết quả:\n\n**Tăng trưởng Doanh thu dịch vụ (VTT+VTS+VDS) của Hà Nội lũy kế đến tháng 08/2026:**\n\n* **Mức tăng trưởng:** **<span style='color:green'>4,92%</span>** tương ứng tăng **<span style='color:green'>344,59 tỷ</span>** đồng so với cùng kỳ năm trước.\n* **Doanh thu lũy kế:** **7.352,99 tỷ** đồng.\n* **Xếp hạng tăng trưởng:** Hạng **25** toàn quốc.",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -495,7 +495,7 @@
         "condition": []
       },
       "gold_rewrite": "Tăng trưởng Doanh thu dịch vụ (VTT+VTS+VDS) của tỉnh Hà Nội lũy kế đến tháng 08/2026 là bao nhiêu?",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Chỉ tiêu Em tra cứu được là **doanh thu dịch vụ (VTT+VTS+VDS)** — có vẻ khác yêu cầu của bạn (bạn hỏi **tăng trưởng** của chỉ tiêu này). Tiếp tục với chỉ tiêu này hay hỏi lại?\n\nTuy nhiên, bundle dữ liệu đã trả về thông tin **tăng trưởng** của chỉ tiêu doanh thu dịch vụ. Dưới đây là kết quả:\n\n**Tăng trưởng Doanh thu dịch vụ (VTT+VTS+VDS) của Hà Nội lũy kế đến tháng 08/2026:**\n\n* **Mức tăng trưởng:** **<span style='color:green'>4,92%</span>** tương ứng tăng **<span style='color:green'>344,59 tỷ</span>** đồng so với cùng kỳ năm trước.\n* **Doanh thu lũy kế:** **7.352,99 tỷ** đồng.\n* **Xếp hạng tăng trưởng:** Hạng **25** toàn quốc."
     },
     {
       "question_id": "Q_SINGLE_HOP_014",
@@ -539,7 +539,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dưới đây là số liệu so sánh doanh thu dịch vụ IOT của Cụm Núi Thành (Đà Nẵng) và Cụm Vũng Tàu (Hồ Chí Minh) tại thời điểm ngày 06/09/2026:\n\n| Địa bàn | Doanh thu dịch vụ IOT | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Cụm Vũng Tàu (TP. Hồ Chí Minh)** | **0,02 tỷ** | **<span style='color:green'>136,57%</span> (<span style='color:green'>0,01 tỷ</span>)** | **1/40** |\n| **Cụm Núi Thành (TP. Đà Nẵng)** | **3,99 triệu** | **<span style='color:green'>125,62%</span> (<span style='color:green'>2,22 triệu</span>)** | **7/24** |\n\n**Nhận xét:**\n* Cụm Vũng Tàu (TP. Hồ Chí Minh) có doanh thu cao hơn đáng kể (0,02 tỷ so với 3,99 triệu) và dẫn đầu về xếp hạng thực hiện (1/40).\n* Cả hai cụm đều ghi nhận mức tăng trưởng dương mạnh so với cùng kỳ tháng trước, trong đó Cụm Vũng Tàu có tốc độ tăng trưởng cao hơn (136,57% so với 125,62%).\n\n\n\nBiểu đồ dưới đây minh họa sự chênh lệch về doanh thu dịch vụ IOT giữa hai cụm:\n\n![Biểu đồ so sánh doanh thu dịch vụ IOT](https://via.placeholder.com/600x400?text=Chart+Data+Unavailable)\n\n*Lưu ý: Biểu đồ được tạo tự động từ dữ liệu đã tra cứu.*",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -565,7 +565,7 @@
         "condition": []
       },
       "gold_rewrite": "So sánh Doanh thu dịch vụ IOT của Cụm Núi Thành (Đà Nẵng) và Cụm Vũng Tàu (Hồ Chí Minh) ngày 06/09/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Dưới đây là số liệu so sánh doanh thu dịch vụ IOT của Cụm Núi Thành (Đà Nẵng) và Cụm Vũng Tàu (Hồ Chí Minh) tại thời điểm ngày 06/09/2026:\n\n| Địa bàn | Doanh thu dịch vụ IOT | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Cụm Vũng Tàu (TP. Hồ Chí Minh)** | **0,02 tỷ** | **<span style='color:green'>136,57%</span> (<span style='color:green'>0,01 tỷ</span>)** | **1/40** |\n| **Cụm Núi Thành (TP. Đà Nẵng)** | **3,99 triệu** | **<span style='color:green'>125,62%</span> (<span style='color:green'>2,22 triệu</span>)** | **7/24** |\n\n**Nhận xét:**\n* Cụm Vũng Tàu (TP. Hồ Chí Minh) có doanh thu cao hơn đáng kể (0,02 tỷ so với 3,99 triệu) và dẫn đầu về xếp hạng thực hiện (1/40).\n* Cả hai cụm đều ghi nhận mức tăng trưởng dương mạnh so với cùng kỳ tháng trước, trong đó Cụm Vũng Tàu có tốc độ tăng trưởng cao hơn (136,57% so với 125,62%).\n\n\n\nBiểu đồ dưới đây minh họa sự chênh lệch về doanh thu dịch vụ IOT giữa hai cụm:\n\n![Biểu đồ so sánh doanh thu dịch vụ IOT](https://via.placeholder.com/600x400?text=Chart+Data+Unavailable)\n\n*Lưu ý: Biểu đồ được tạo tự động từ dữ liệu đã tra cứu.*"
     },
     {
       "question_id": "Q_MULTI_HOP_002",
@@ -612,7 +612,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dưới đây là **Top 8 xã** có doanh thu dịch vụ (VTT+VTS+VDS) cao nhất trong **Cụm Núi Thành, tỉnh Đà Nẵng** lũy kế tháng 08/2026 (Cụm chỉ có 8 xã trong dữ liệu):\n\n| STT | Xã | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước | Xếp hạng thực hiện (xã) |\n|:---:|:---|:---:|:---:|:---:|:---:|\n| 1 | Xã Núi Thành | **5,08 tỷ** | <span style='color:red'>-1,53%</span> (<span style='color:red'>-0,08 tỷ</span>) | <span style='color:green'>3,53%</span> (<span style='color:green'>0,17 tỷ</span>) | **7/94** |\n| 2 | Xã Tam Xuân | **2,21 tỷ** | <span style='color:red'>-0,34%</span> (<span style='color:red'>-7,41 triệu</span>) | <span style='color:green'>8,47%</span> (<span style='color:green'>0,17 tỷ</span>) | **21/94** |\n| 3 | Xã Tam Anh | **1,6 tỷ** | <span style='color:red'>-0,9%</span> (<span style='color:red'>-0,01 tỷ</span>) | <span style='color:green'>4,99%</span> (<span style='color:green'>0,07 tỷ</span>) | **33/94** |\n| 4 | Xã Tam Mỹ | **1,12 tỷ** | <span style='color:red'>-0,7%</span> (<span style='color:red'>-7,76 triệu</span>) | <span style='color:green'>6,81%</span> (<span style='color:green'>0,07 tỷ</span>) | **47/94** |\n| 5 | Xã Đức Phú | **0,64 tỷ** | <span style='color:red'>-0,35%</span> (<span style='color:red'>-2,22 triệu</span>) | <span style='color:green'>12,8%</span> (<span style='color:green'>0,07 tỷ</span>) | **67/94** |\n| 6 | Xã Tam Hải | **0,51 tỷ** | <span style='color:red'>-5,43%</span> (<span style='color:red'>-0,03 tỷ</span>) | <span style='color:green'>10,89%</span> (<span style='color:green'>0,05 tỷ</span>) | **75/94** |\n\n**Tổng doanh thu Cụm Núi Thành:** **11,18 tỷ** (Xếp hạng 5/24 cụm toàn thành phố).\n\n*Lưu ý: Cụm Núi Thành chỉ có 8 xã trong hệ thống dữ liệu, nên Em hiển thị đủ toàn bộ các xã của cụm thay vì top 10.*\n\n\n\nBiểu đồ dưới đây minh họa xếp hạng doanh thu dịch vụ của các xã trong Cụm Núi Thành:\n\n![Biểu đồ top xã theo doanh thu dịch vụ](chart_image_url)",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -640,7 +640,7 @@
         "condition": []
       },
       "gold_rewrite": "Top 10 xã xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) trong Cụm Núi Thành, tỉnh Đà Nẵng tháng 08/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Dưới đây là **Top 8 xã** có doanh thu dịch vụ (VTT+VTS+VDS) cao nhất trong **Cụm Núi Thành, tỉnh Đà Nẵng** lũy kế tháng 08/2026 (Cụm chỉ có 8 xã trong dữ liệu):\n\n| STT | Xã | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước | Xếp hạng thực hiện (xã) |\n|:---:|:---|:---:|:---:|:---:|:---:|\n| 1 | Xã Núi Thành | **5,08 tỷ** | <span style='color:red'>-1,53%</span> (<span style='color:red'>-0,08 tỷ</span>) | <span style='color:green'>3,53%</span> (<span style='color:green'>0,17 tỷ</span>) | **7/94** |\n| 2 | Xã Tam Xuân | **2,21 tỷ** | <span style='color:red'>-0,34%</span> (<span style='color:red'>-7,41 triệu</span>) | <span style='color:green'>8,47%</span> (<span style='color:green'>0,17 tỷ</span>) | **21/94** |\n| 3 | Xã Tam Anh | **1,6 tỷ** | <span style='color:red'>-0,9%</span> (<span style='color:red'>-0,01 tỷ</span>) | <span style='color:green'>4,99%</span> (<span style='color:green'>0,07 tỷ</span>) | **33/94** |\n| 4 | Xã Tam Mỹ | **1,12 tỷ** | <span style='color:red'>-0,7%</span> (<span style='color:red'>-7,76 triệu</span>) | <span style='color:green'>6,81%</span> (<span style='color:green'>0,07 tỷ</span>) | **47/94** |\n| 5 | Xã Đức Phú | **0,64 tỷ** | <span style='color:red'>-0,35%</span> (<span style='color:red'>-2,22 triệu</span>) | <span style='color:green'>12,8%</span> (<span style='color:green'>0,07 tỷ</span>) | **67/94** |\n| 6 | Xã Tam Hải | **0,51 tỷ** | <span style='color:red'>-5,43%</span> (<span style='color:red'>-0,03 tỷ</span>) | <span style='color:green'>10,89%</span> (<span style='color:green'>0,05 tỷ</span>) | **75/94** |\n\n**Tổng doanh thu Cụm Núi Thành:** **11,18 tỷ** (Xếp hạng 5/24 cụm toàn thành phố).\n\n*Lưu ý: Cụm Núi Thành chỉ có 8 xã trong hệ thống dữ liệu, nên Em hiển thị đủ toàn bộ các xã của cụm thay vì top 10.*\n\n\n\nBiểu đồ dưới đây minh họa xếp hạng doanh thu dịch vụ của các xã trong Cụm Núi Thành:\n\n![Biểu đồ top xã theo doanh thu dịch vụ](chart_image_url)"
     },
     {
       "question_id": "Q_MULTI_HOP_004",
@@ -744,7 +744,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dưới đây là số liệu so sánh **Thuê bao truyền hình phát triển thực lũy kế** ngày 06/09/2026 của hai cụm:\n\n| Địa bàn | Số lượng thuê bao | Xếp hạng thực hiện | Tăng trưởng so với cùng kỳ tháng trước |\n| :--- | :--- | :--- | :--- |\n| **Cụm Vũng Tàu (TP.HCM)** | **16.860 TB** | **8/40** | - |\n| **Cụm Núi Thành (Đà Nẵng)** | **3.301 TB** | **11/24** | **<span style='color:green'>0,76%</span> (<span style='color:green'>25 TB</span>)** |\n\nCụm Vũng Tàu có số lượng thuê bao phát triển thực lũy kế cao hơn đáng kể so với Cụm Núi Thành tại thời điểm này.",
       "notes": "M11 resolves the temporary replacement KPI as television; M05 resolves the durable cluster pair as Núi Thành–Vũng Tàu.",
       "evaluation_tier": "diagnostic_history",
       "hard_gate": false,
@@ -755,7 +755,7 @@
       ],
       "ltm_attribution": "normal",
       "gold_rewrite": "So sánh Thuê bao truyền hình phát triển thực LK của Cụm Núi Thành (Đà Nẵng) và Cụm Vũng Tàu (Hồ Chí Minh) ngày 06/09/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "final_answer": "Dưới đây là số liệu so sánh **Thuê bao truyền hình phát triển thực lũy kế** ngày 06/09/2026 của hai cụm:\n\n| Địa bàn | Số lượng thuê bao | Xếp hạng thực hiện | Tăng trưởng so với cùng kỳ tháng trước |\n| :--- | :--- | :--- | :--- |\n| **Cụm Vũng Tàu (TP.HCM)** | **16.860 TB** | **8/40** | - |\n| **Cụm Núi Thành (Đà Nẵng)** | **3.301 TB** | **11/24** | **<span style='color:green'>0,76%</span> (<span style='color:green'>25 TB</span>)** |\n\nCụm Vũng Tàu có số lượng thuê bao phát triển thực lũy kế cao hơn đáng kể so với Cụm Núi Thành tại thời điểm này.",
       "diagnostic_source_scope": "transcript_oracle_or_formation_event",
       "memory_history_not_required": true,
       "source_indicator": "Thuê bao truyền hình phát triển thực LK",
@@ -1274,7 +1274,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dưới đây là kết quả so sánh **Doanh thu dịch vụ (VTT+VTS+VDS)** của tỉnh Phú Thọ và thành phố Đà Nẵng ngày 06/09/2026:\n\n| Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Tỉnh Phú Thọ** | **7,43 tỷ** | **<span style='color:green'>0,83%</span> (<span style='color:green'>0,06 tỷ</span>)** | **5** |\n| **Thành phố Đà Nẵng** | **4,9 tỷ** | **<span style='color:green'>2,32%</span> (<span style='color:green'>0,11 tỷ</span>)** | **18** |\n\nNgày 06/09/2026, doanh thu dịch vụ của **Phú Thọ (7,43 tỷ)** cao hơn **Đà Nẵng (4,9 tỷ)**. Tuy nhiên, Đà Nẵng có tốc độ tăng trưởng so với cùng kỳ tháng trước cao hơn (**2,32%** so với **0,83%** của Phú Thọ).",
       "notes": "",
       "evaluation_tier": "diagnostic_history",
       "hard_gate": false,
@@ -1300,7 +1300,7 @@
         "condition": []
       },
       "gold_rewrite": "So sánh Doanh thu dịch vụ (VTT+VTS+VDS) của tỉnh Phú Thọ và tỉnh Đà Nẵng ngày 06/09/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Dưới đây là kết quả so sánh **Doanh thu dịch vụ (VTT+VTS+VDS)** của tỉnh Phú Thọ và thành phố Đà Nẵng ngày 06/09/2026:\n\n| Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Tỉnh Phú Thọ** | **7,43 tỷ** | **<span style='color:green'>0,83%</span> (<span style='color:green'>0,06 tỷ</span>)** | **5** |\n| **Thành phố Đà Nẵng** | **4,9 tỷ** | **<span style='color:green'>2,32%</span> (<span style='color:green'>0,11 tỷ</span>)** | **18** |\n\nNgày 06/09/2026, doanh thu dịch vụ của **Phú Thọ (7,43 tỷ)** cao hơn **Đà Nẵng (4,9 tỷ)**. Tuy nhiên, Đà Nẵng có tốc độ tăng trưởng so với cùng kỳ tháng trước cao hơn (**2,32%** so với **0,83%** của Phú Thọ)."
     },
     {
       "question_id": "Q_TEMPORAL_BUSINESS_ACTION_002",
@@ -1318,7 +1318,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "**Doanh thu dịch vụ IOT ngày 06/09/2026:**\n\n| Địa bàn | Doanh thu | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng |\n| :--- | :--- | :--- | :--- |\n| **Tỉnh Phú Thọ** | **0,1 tỷ** | <span style='color:green'>**50,13%**</span> (<span style='color:green'>**0,03 tỷ**</span>) | **3** |\n| **Thành phố Đà Nẵng** | **0,06 tỷ** | <span style='color:green'>**93,24%**</span> (<span style='color:green'>**0,03 tỷ**</span>) | **10** |\n\nNgày 06/09/2026, doanh thu dịch vụ IOT của **Phú Thọ (0,1 tỷ)** cao hơn **Đà Nẵng (0,06 tỷ)**. Tuy nhiên, Đà Nẵng có tốc độ tăng trưởng so với cùng kỳ tháng trước cao hơn đáng kể (**93,24%** so với **50,13%** của Phú Thọ), dù mức tăng tuyệt đối của hai địa bàn là như nhau (**0,03 tỷ**).",
       "notes": "",
       "evaluation_tier": "diagnostic_history",
       "hard_gate": false,
@@ -1344,7 +1344,7 @@
         "condition": []
       },
       "gold_rewrite": "So sánh Doanh thu dịch vụ IOT của tỉnh Phú Thọ và tỉnh Đà Nẵng ngày 06/09/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "**Doanh thu dịch vụ IOT ngày 06/09/2026:**\n\n| Địa bàn | Doanh thu | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng |\n| :--- | :--- | :--- | :--- |\n| **Tỉnh Phú Thọ** | **0,1 tỷ** | <span style='color:green'>**50,13%**</span> (<span style='color:green'>**0,03 tỷ**</span>) | **3** |\n| **Thành phố Đà Nẵng** | **0,06 tỷ** | <span style='color:green'>**93,24%**</span> (<span style='color:green'>**0,03 tỷ**</span>) | **10** |\n\nNgày 06/09/2026, doanh thu dịch vụ IOT của **Phú Thọ (0,1 tỷ)** cao hơn **Đà Nẵng (0,06 tỷ)**. Tuy nhiên, Đà Nẵng có tốc độ tăng trưởng so với cùng kỳ tháng trước cao hơn đáng kể (**93,24%** so với **50,13%** của Phú Thọ), dù mức tăng tuyệt đối của hai địa bàn là như nhau (**0,03 tỷ**)."
     },
     {
       "question_id": "Q_TEMPORAL_BUSINESS_ACTION_003",
@@ -1362,7 +1362,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dưới đây là số liệu so sánh **Thuê bao FTTH phát triển thực LK** ngày 06/09/2026 của hai cụm:\n\n| Địa bàn | Thuê bao FTTH phát triển thực LK | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Cụm Vũng Tàu (TP. Hồ Chí Minh)** | **36.401 TB** | **<span style='color:green'>0,13%</span> (<span style='color:green'>47 TB</span>)** | **17/40** |\n| **Cụm Núi Thành (TP. Đà Nẵng)** | **18.449 TB** | **<span style='color:green'>0,07%</span> (<span style='color:green'>12 TB</span>)** | **6/24** |\n\n**Nhận xét:**\n* Cụm Vũng Tàu (TP. Hồ Chí Minh) có số lượng thuê bao phát triển thực lũy kế cao hơn gần gấp đôi so với Cụm Núi Thành (TP. Đà Nẵng) (36.401 TB so với 18.449 TB).\n* Tỷ lệ tăng trưởng của Cụm Vũng Tàu (0,13%) cũng cao hơn so với Cụm Núi Thành (0,07%).\n* Về xếp hạng thực hiện, Cụm Núi Thành đạt vị trí thứ 6/24, cao hơn so với vị trí 17/40 của Cụm Vũng Tàu.\n\n\n\nBiểu đồ dưới đây minh họa sự chênh lệch về số lượng thuê bao giữa hai cụm:\n\n*(Biểu đồ sẽ hiển thị bên dưới)*",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -1388,7 +1388,7 @@
         "condition": []
       },
       "gold_rewrite": "So sánh Thuê bao FTTH phát triển thực LK của Cụm Núi Thành (Đà Nẵng) và Cụm Vũng Tàu (Hồ Chí Minh) ngày 06/09/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Dưới đây là số liệu so sánh **Thuê bao FTTH phát triển thực LK** ngày 06/09/2026 của hai cụm:\n\n| Địa bàn | Thuê bao FTTH phát triển thực LK | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Cụm Vũng Tàu (TP. Hồ Chí Minh)** | **36.401 TB** | **<span style='color:green'>0,13%</span> (<span style='color:green'>47 TB</span>)** | **17/40** |\n| **Cụm Núi Thành (TP. Đà Nẵng)** | **18.449 TB** | **<span style='color:green'>0,07%</span> (<span style='color:green'>12 TB</span>)** | **6/24** |\n\n**Nhận xét:**\n* Cụm Vũng Tàu (TP. Hồ Chí Minh) có số lượng thuê bao phát triển thực lũy kế cao hơn gần gấp đôi so với Cụm Núi Thành (TP. Đà Nẵng) (36.401 TB so với 18.449 TB).\n* Tỷ lệ tăng trưởng của Cụm Vũng Tàu (0,13%) cũng cao hơn so với Cụm Núi Thành (0,07%).\n* Về xếp hạng thực hiện, Cụm Núi Thành đạt vị trí thứ 6/24, cao hơn so với vị trí 17/40 của Cụm Vũng Tàu.\n\n\n\nBiểu đồ dưới đây minh họa sự chênh lệch về số lượng thuê bao giữa hai cụm:\n\n*(Biểu đồ sẽ hiển thị bên dưới)*"
     },
     {
       "question_id": "Q_TEMPORAL_BUSINESS_ACTION_004",
@@ -1406,7 +1406,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dưới đây là top 3 tỉnh đứng cuối về chỉ tiêu **Thuê bao FTTH phát triển thực lũy kế** tháng 08/2026:\n\n| Xếp hạng | Tỉnh | Số thuê bao (TB) | Tăng trưởng so với tháng trước | Tăng trưởng so với cùng kỳ năm trước |\n| :--- | :--- | :--- | :--- | :--- |\n| **34** | **Tỉnh Lai Châu** | **30.261 TB** | **<span style='color:green'>0,71%</span> (<span style='color:green'>214 TB</span>)** | **<span style='color:green'>12,01%</span> (<span style='color:green'>3.245 TB</span>)** |\n| **33** | **Tỉnh Điện Biên** | **39.701 TB** | **<span style='color:green'>1,45%</span> (<span style='color:green'>567 TB</span>)** | **<span style='color:green'>11,36%</span> (<span style='color:green'>4.050 TB</span>)** |\n| **32** | **Tỉnh Cao Bằng** | **44.326 TB** | **<span style='color:green'>1,21%</span> (<span style='color:green'>532 TB</span>)** | **<span style='color:green'>10,13%</span> (<span style='color:green'>4.077 TB</span>)** |\n\nCả 3 tỉnh đều ghi nhận mức tăng trưởng dương so với tháng trước và cùng kỳ năm trước.",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -1434,7 +1434,7 @@
         "condition": []
       },
       "gold_rewrite": "Top 3 tỉnh đứng cuối về Thuê bao FTTH phát triển thực LK tháng 08/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Dưới đây là top 3 tỉnh đứng cuối về chỉ tiêu **Thuê bao FTTH phát triển thực lũy kế** tháng 08/2026:\n\n| Xếp hạng | Tỉnh | Số thuê bao (TB) | Tăng trưởng so với tháng trước | Tăng trưởng so với cùng kỳ năm trước |\n| :--- | :--- | :--- | :--- | :--- |\n| **34** | **Tỉnh Lai Châu** | **30.261 TB** | **<span style='color:green'>0,71%</span> (<span style='color:green'>214 TB</span>)** | **<span style='color:green'>12,01%</span> (<span style='color:green'>3.245 TB</span>)** |\n| **33** | **Tỉnh Điện Biên** | **39.701 TB** | **<span style='color:green'>1,45%</span> (<span style='color:green'>567 TB</span>)** | **<span style='color:green'>11,36%</span> (<span style='color:green'>4.050 TB</span>)** |\n| **32** | **Tỉnh Cao Bằng** | **44.326 TB** | **<span style='color:green'>1,21%</span> (<span style='color:green'>532 TB</span>)** | **<span style='color:green'>10,13%</span> (<span style='color:green'>4.077 TB</span>)** |\n\nCả 3 tỉnh đều ghi nhận mức tăng trưởng dương so với tháng trước và cùng kỳ năm trước."
     },
     {
       "question_id": "Q_TEMPORAL_BUSINESS_ACTION_005",
@@ -1452,7 +1452,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dưới đây là kết quả so sánh **Doanh thu dịch vụ (VTT+VTS+VDS)** ngày 06/09/2026:\n\n| Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Xã Minh Sơn** (Thanh Hóa) | **0,05 tỷ** | **<span style='color:green'>11,7%</span> (<span style='color:green'>4,97 triệu</span>)** | **35/166** |\n| **Xã Đông Thành** (Thanh Hóa) | **0,04 tỷ** | **<span style='color:green'>0,03%</span> (<span style='color:green'>0,01 triệu</span>)** | **70/166** |\n\n**Lưu ý:** Hệ thống trả về dữ liệu cho Xã Đông Thành thuộc tỉnh Thanh Hóa (Khu vực Hậu Lộc) thay vì Phú Thọ như yêu cầu.",
       "notes": "",
       "evaluation_tier": "diagnostic_history",
       "hard_gate": false,
@@ -1478,7 +1478,7 @@
         "condition": []
       },
       "gold_rewrite": "So sánh Doanh thu dịch vụ (VTT+VTS+VDS) của Xã Đông Thành (Phú Thọ) và Xã Minh Sơn (Thanh Hóa) ngày 06/09/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "final_answer": "Dưới đây là kết quả so sánh **Doanh thu dịch vụ (VTT+VTS+VDS)** ngày 06/09/2026:\n\n| Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Xã Minh Sơn** (Thanh Hóa) | **0,05 tỷ** | **<span style='color:green'>11,7%</span> (<span style='color:green'>4,97 triệu</span>)** | **35/166** |\n| **Xã Đông Thành** (Thanh Hóa) | **0,04 tỷ** | **<span style='color:green'>0,03%</span> (<span style='color:green'>0,01 triệu</span>)** | **70/166** |\n\n**Lưu ý:** Hệ thống trả về dữ liệu cho Xã Đông Thành thuộc tỉnh Thanh Hóa (Khu vực Hậu Lộc) thay vì Phú Thọ như yêu cầu.",
       "diagnostic_source_scope": "transcript_oracle_or_formation_event",
       "memory_history_not_required": true
     },

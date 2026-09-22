@@ -2,8 +2,8 @@
   "$schema": "schemas/manifest.schema.json",
   "schema_version": 1,
   "dataset_id": "kira_ltm_v1",
-  "dataset_version": "1.0.0-draft.3",
-  "status": "contract_frozen",
+  "dataset_version": "1.0.0-materialized.2",
+  "status": "materialized",
   "canonical_format": "json",
   "evaluation_scope": "full_corpus",
   "id_namespace": "{bundle_id}:{local_id}",
@@ -23,7 +23,7 @@
       "source_conversation_id": "conv_01_FREEZE_v11_FINAL",
       "revision": 11,
       "contract_status": "frozen",
-      "materialization_status": "pending",
+      "materialization_status": "materialized",
       "path": "bundles/conv01",
       "review": {
         "status": "draft",
@@ -38,12 +38,12 @@
         "qa": 55,
         "hard_gate": 36,
         "diagnostic_history": 19,
-        "pending_answers": 19
+        "pending_answers": 0
       },
       "files": {
         "conversation": {
           "name": "conversation.json",
-          "sha256": "5c35c6c8dfca21f0e9237aa79db5e26d74b2a54a85a81d054de17b1ea0307383"
+          "sha256": "121adbd74cc6c5104337ca42d2118a4e9beebca27cbf37b80a60026cb91b5796"
         },
         "fills": {
           "name": "fills.json",
@@ -55,7 +55,7 @@
         },
         "qa": {
           "name": "qa.json",
-          "sha256": "5dda2a5472133add073cea14b1c145e6334ed29c53c1026e8d308019f87b27ba"
+          "sha256": "1f765fff3528690135a144b02a1e63f100792fcfc662fe974d23f2083a590342"
         }
       }
     },
@@ -64,7 +64,7 @@
       "source_conversation_id": "conv_02_FREEZE_v5_FINAL",
       "revision": 5,
       "contract_status": "frozen",
-      "materialization_status": "pending",
+      "materialization_status": "materialized",
       "path": "bundles/conv02",
       "review": {
         "status": "draft",
@@ -79,12 +79,12 @@
         "qa": 50,
         "hard_gate": 35,
         "diagnostic_history": 15,
-        "pending_answers": 12
+        "pending_answers": 0
       },
       "files": {
         "conversation": {
           "name": "conversation.json",
-          "sha256": "57819563f6a05c1f8446bfc702559ce0213c3f29790839c7d50c72d2baf0ee42"
+          "sha256": "ba724cd45d0669c8ef35231e029888c44ad2718bd05ec1cb995bf1f6142fa6db"
         },
         "fills": {
           "name": "fills.json",
@@ -96,7 +96,7 @@
         },
         "qa": {
           "name": "qa.json",
-          "sha256": "b2000bd7a0ac6053a0cf8c4578e506a74a781ffcea3d6d7cc0a0d539a2a33fe5"
+          "sha256": "bfdb09f9c053aa87465e0c60e8d66ecb0f171e0f74fa314b47cf2860000d4c47"
         }
       }
     },
@@ -105,7 +105,7 @@
       "source_conversation_id": "conv_03_FREEZE_v6_FINAL",
       "revision": 6,
       "contract_status": "frozen",
-      "materialization_status": "pending",
+      "materialization_status": "materialized",
       "path": "bundles/conv03",
       "review": {
         "status": "draft",
@@ -120,12 +120,12 @@
         "qa": 52,
         "hard_gate": 32,
         "diagnostic_history": 20,
-        "pending_answers": 12
+        "pending_answers": 0
       },
       "files": {
         "conversation": {
           "name": "conversation.json",
-          "sha256": "6da4b0c5bc9bc2c1c40b8c839c075f52d3238db53765449f806e2d6dc8a114ce"
+          "sha256": "e9b8b68f8e547b9b1572e3e798e02f79c024f0464e50f831fefd7b20a586e176"
         },
         "fills": {
           "name": "fills.json",
@@ -137,7 +137,7 @@
         },
         "qa": {
           "name": "qa.json",
-          "sha256": "20a2abb736c130e64f48f0f34f24cdf4bdd0464d5212bf6c38503f720a15cd29"
+          "sha256": "b6760cabb8a4c0eed8ea3327f9acefb8a11c1fc1263726c239b017f5afcba2b6"
         }
       }
     },
@@ -146,7 +146,7 @@
       "source_conversation_id": "conv_04_FREEZE_v5_FINAL",
       "revision": 5,
       "contract_status": "frozen",
-      "materialization_status": "pending",
+      "materialization_status": "materialized",
       "path": "bundles/conv04",
       "review": {
         "status": "draft",
@@ -161,12 +161,12 @@
         "qa": 52,
         "hard_gate": 36,
         "diagnostic_history": 16,
-        "pending_answers": 11
+        "pending_answers": 0
       },
       "files": {
         "conversation": {
           "name": "conversation.json",
-          "sha256": "677ea01047b3953207ec06a011038c35e7723e015bcb293e4b77b885ec0a2b5f"
+          "sha256": "664cbf56ebf627ca3d4c8141caea6ffcac53ac525b977b8ef86343a8c9769f2e"
         },
         "fills": {
           "name": "fills.json",
@@ -178,7 +178,7 @@
         },
         "qa": {
           "name": "qa.json",
-          "sha256": "e46674dacd1928dbf3c6ddb423d662bbc9aaff621cbba1a4a359fc70662c1a05"
+          "sha256": "a158fd5c08cbe5ff19dca5537a234bcceb99a345073301ca992cd60f73253646"
         }
       }
     }

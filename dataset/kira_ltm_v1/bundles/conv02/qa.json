@@ -271,7 +271,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dữ liệu doanh thu dịch vụ (VTT+VTS+VDS) của Toàn quốc tháng 08/2026 (lũy kế) là:\n\n**7.295,35 tỷ đồng**\n\nCác thông tin bổ sung:\n- Kế hoạch: 7.048,46 tỷ đồng\n- Hoàn thành kế hoạch: **103,5%**\n- Tăng trưởng so với cùng kỳ tháng trước: **2,93%** (tăng 203,37 tỷ đồng)\n- Tăng trưởng so với cùng kỳ năm trước: **9,75%** (tăng 634,08 tỷ đồng)",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -296,7 +296,7 @@
         "condition": []
       },
       "gold_rewrite": "Doanh thu dịch vụ (VTT+VTS+VDS) của Toàn quốc tháng 08/2026 là bao nhiêu?",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Dữ liệu doanh thu dịch vụ (VTT+VTS+VDS) của Toàn quốc tháng 08/2026 (lũy kế) là:\n\n**7.295,35 tỷ đồng**\n\nCác thông tin bổ sung:\n- Kế hoạch: 7.048,46 tỷ đồng\n- Hoàn thành kế hoạch: **103,5%**\n- Tăng trưởng so với cùng kỳ tháng trước: **2,93%** (tăng 203,37 tỷ đồng)\n- Tăng trưởng so với cùng kỳ năm trước: **9,75%** (tăng 634,08 tỷ đồng)"
     },
     {
       "question_id": "Q_SINGLE_HOP_009",
@@ -312,7 +312,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dưới đây là Top 3 tỉnh/thành phố xếp hạng đầu về **Doanh thu dịch vụ (VTT+VTS+VDS)** lũy kế tháng 08/2026:\n\n| Xếp hạng | Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước |\n| :--- | :--- | :--- | :--- | :--- |\n| **1** | **Thành phố Hồ Chí Minh** | **1.128,39 tỷ** | <span style='color:red'>-1,28%</span> (-14,3 tỷ) | <span style='color:green'>4,06%</span> (43,09 tỷ) |\n| **2** | **Thành phố Hà Nội** | **953,13 tỷ** | <span style='color:red'>-0,4%</span> (-3,75 tỷ) | <span style='color:green'>5,73%</span> (50,36 tỷ) |\n| **3** | **Tỉnh Đồng Nai** | **354,45 tỷ** | <span style='color:red'>-1,43%</span> (-5,05 tỷ) | <span style='color:green'>7,87%</span> (25,29 tỷ) |\n\nCả 3 địa bàn dẫn đầu đều ghi nhận mức tăng trưởng dương so với cùng kỳ năm trước, trong đó Đồng Nai có mức tăng trưởng cao nhất (7,87%). Tuy nhiên, so với cùng kỳ tháng trước, cả 3 địa bàn đều có mức giảm nhẹ.\n\n\n\nDưới đây là Top 3 tỉnh/thành phố xếp hạng đầu về **Doanh thu dịch vụ (VTT+VTS+VDS)** lũy kế tháng 08/2026:\n\n| Xếp hạng | Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước |\n| :--- | :--- | :--- | :--- | :--- |\n| **1** | **Thành phố Hồ Chí Minh** | **1.128,39 tỷ** | <span style='color:red'>-1,28%</span> (-14,3 tỷ) | <span style='color:green'>4,06%</span> (43,09 tỷ) |\n| **2** | **Thành phố Hà Nội** | **953,13 tỷ** | <span style='color:red'>-0,4%</span> (-3,75 tỷ) | <span style='color:green'>5,73%</span> (50,36 tỷ) |\n| **3** | **Tỉnh Đồng Nai** | **354,45 tỷ** | <span style='color:red'>-1,43%</span> (-5,05 tỷ) | <span style='color:green'>7,87%</span> (25,29 tỷ) |\n\nCả 3 địa bàn dẫn đầu đều ghi nhận mức tăng trưởng dương so với cùng kỳ năm trước, trong đó Đồng Nai có mức tăng trưởng cao nhất (7,87%). Tuy nhiên, so với cùng kỳ tháng trước, cả 3 địa bàn đều có mức giảm nhẹ.",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -339,7 +339,7 @@
         "condition": []
       },
       "gold_rewrite": "Top 3 tỉnh xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) tháng 08/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Dưới đây là Top 3 tỉnh/thành phố xếp hạng đầu về **Doanh thu dịch vụ (VTT+VTS+VDS)** lũy kế tháng 08/2026:\n\n| Xếp hạng | Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước |\n| :--- | :--- | :--- | :--- | :--- |\n| **1** | **Thành phố Hồ Chí Minh** | **1.128,39 tỷ** | <span style='color:red'>-1,28%</span> (-14,3 tỷ) | <span style='color:green'>4,06%</span> (43,09 tỷ) |\n| **2** | **Thành phố Hà Nội** | **953,13 tỷ** | <span style='color:red'>-0,4%</span> (-3,75 tỷ) | <span style='color:green'>5,73%</span> (50,36 tỷ) |\n| **3** | **Tỉnh Đồng Nai** | **354,45 tỷ** | <span style='color:red'>-1,43%</span> (-5,05 tỷ) | <span style='color:green'>7,87%</span> (25,29 tỷ) |\n\nCả 3 địa bàn dẫn đầu đều ghi nhận mức tăng trưởng dương so với cùng kỳ năm trước, trong đó Đồng Nai có mức tăng trưởng cao nhất (7,87%). Tuy nhiên, so với cùng kỳ tháng trước, cả 3 địa bàn đều có mức giảm nhẹ.\n\n\n\nDưới đây là Top 3 tỉnh/thành phố xếp hạng đầu về **Doanh thu dịch vụ (VTT+VTS+VDS)** lũy kế tháng 08/2026:\n\n| Xếp hạng | Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước |\n| :--- | :--- | :--- | :--- | :--- |\n| **1** | **Thành phố Hồ Chí Minh** | **1.128,39 tỷ** | <span style='color:red'>-1,28%</span> (-14,3 tỷ) | <span style='color:green'>4,06%</span> (43,09 tỷ) |\n| **2** | **Thành phố Hà Nội** | **953,13 tỷ** | <span style='color:red'>-0,4%</span> (-3,75 tỷ) | <span style='color:green'>5,73%</span> (50,36 tỷ) |\n| **3** | **Tỉnh Đồng Nai** | **354,45 tỷ** | <span style='color:red'>-1,43%</span> (-5,05 tỷ) | <span style='color:green'>7,87%</span> (25,29 tỷ) |\n\nCả 3 địa bàn dẫn đầu đều ghi nhận mức tăng trưởng dương so với cùng kỳ năm trước, trong đó Đồng Nai có mức tăng trưởng cao nhất (7,87%). Tuy nhiên, so với cùng kỳ tháng trước, cả 3 địa bàn đều có mức giảm nhẹ."
     },
     {
       "question_id": "Q_SINGLE_HOP_010",
@@ -355,7 +355,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Doanh thu dịch vụ IOT của Toàn quốc lũy kế tháng 08/2026 là **79,62 tỷ**.\n\n* **Kế hoạch:** 84,7 tỷ (mức hoàn thành **94%**).\n* **Tăng trưởng so với cùng kỳ tháng trước:** **10,4%** (tăng 7,5 tỷ).\n* **Tăng trưởng so với cùng kỳ năm trước:** **53,99%** (tăng 27,91 tỷ).",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -380,7 +380,7 @@
         "condition": []
       },
       "gold_rewrite": "Doanh thu dịch vụ IOT của Toàn quốc tháng 08/2026 là bao nhiêu?",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Doanh thu dịch vụ IOT của Toàn quốc lũy kế tháng 08/2026 là **79,62 tỷ**.\n\n* **Kế hoạch:** 84,7 tỷ (mức hoàn thành **94%**).\n* **Tăng trưởng so với cùng kỳ tháng trước:** **10,4%** (tăng 7,5 tỷ).\n* **Tăng trưởng so với cùng kỳ năm trước:** **53,99%** (tăng 27,91 tỷ)."
     },
     {
       "question_id": "Q_SINGLE_HOP_011",
@@ -422,7 +422,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "**Top 5 cụm xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) tại tỉnh Hà Nội tháng 08/2026 (Lũy kế):**\n\n| STT | Cụm | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước | Xếp hạng thực hiện (cụm) |\n|:---:|:---|:---:|:---:|:---:|:---:|\n| 1 | Cụm Nam Từ Liêm · Thành phố Hà Nội | **61,77 tỷ** | **<span style='color:green'>1,04%</span> (<span style='color:green'>0,62 tỷ</span>)** | **<span style='color:green'>1,16%</span> (<span style='color:green'>0,69 tỷ</span>)** | **1/30** |\n| 2 | Cụm Hà Đông · Thành phố Hà Nội | **55,91 tỷ** | **<span style='color:green'>0,37%</span> (<span style='color:green'>0,2 tỷ</span>)** | **<span style='color:green'>6,14%</span> (<span style='color:green'>3,15 tỷ</span>)** | **2/30** |\n| 3 | Cụm Cầu Giấy · Thành phố Hà Nội | **55,41 tỷ** | **<span style='color:green'>4,66%</span> (<span style='color:green'>2,41 tỷ</span>)** | **<span style='color:green'>2,38%</span> (<span style='color:green'>1,26 tỷ</span>)** | **3/30** |\n| 4 | Cụm Thanh Xuân · Thành phố Hà Nội | **51,56 tỷ** | **<span style='color:green'>0,36%</span> (<span style='color:green'>0,18 tỷ</span>)** | **<span style='color:green'>29,93%</span> (<span style='color:green'>11,57 tỷ</span>)** | **4/30** |\n| 5 | Cụm Đống Đa · Thành phố Hà Nội | **49,34 tỷ** | **<span style='color:green'>0,24%</span> (<span style='color:green'>0,12 tỷ</span>)** | **<span style='color:red'>-1,81%</span> (<span style='color:red'>-0,89 tỷ</span>)** | **5/30** |\n\n**Tổng quan toàn tỉnh Hà Nội:**\n* **Doanh thu dịch vụ:** **953,13 tỷ**\n* **Tăng trưởng so với cùng kỳ tháng trước:** **<span style='color:red'>-0,4%</span> (<span style='color:red'>-3,75 tỷ</span>)**\n* **Tăng trưởng so với cùng kỳ năm trước:** **<span style='color:green'>5,73%</span> (<span style='color:green'>50,36 tỷ</span>)**\n* **Xếp hạng thực hiện (tỉnh):** **2**\n\n**Nhận xét:**\n* Cụm **Nam Từ Liêm** dẫn đầu về doanh thu với **61,77 tỷ**, tiếp theo là **Hà Đông** (55,91 tỷ) và **Cầu Giấy** (55,41 tỷ).\n* **Cụm Thanh Xuân** có mức tăng trưởng so với cùng kỳ năm trước cao nhất trong top 5 (**29,93%**).\n* **Cụm Cầu Giấy** có mức tăng trưởng so với cùng kỳ tháng trước cao nhất (**4,66%**).\n* Chỉ có **Cụm Đống Đa** ghi nhận mức giảm so với cùng kỳ năm trước (**-1,81%**).\n\nBiểu đồ dưới đây minh họa doanh thu của Top 5 cụm:\n\n\n\nBiểu đồ đã được vẽ và sẽ hiển thị bên dưới.",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -449,7 +449,7 @@
         "condition": []
       },
       "gold_rewrite": "Top 5 cụm xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) tại tỉnh Hà Nội tháng 08/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "**Top 5 cụm xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) tại tỉnh Hà Nội tháng 08/2026 (Lũy kế):**\n\n| STT | Cụm | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước | Xếp hạng thực hiện (cụm) |\n|:---:|:---|:---:|:---:|:---:|:---:|\n| 1 | Cụm Nam Từ Liêm · Thành phố Hà Nội | **61,77 tỷ** | **<span style='color:green'>1,04%</span> (<span style='color:green'>0,62 tỷ</span>)** | **<span style='color:green'>1,16%</span> (<span style='color:green'>0,69 tỷ</span>)** | **1/30** |\n| 2 | Cụm Hà Đông · Thành phố Hà Nội | **55,91 tỷ** | **<span style='color:green'>0,37%</span> (<span style='color:green'>0,2 tỷ</span>)** | **<span style='color:green'>6,14%</span> (<span style='color:green'>3,15 tỷ</span>)** | **2/30** |\n| 3 | Cụm Cầu Giấy · Thành phố Hà Nội | **55,41 tỷ** | **<span style='color:green'>4,66%</span> (<span style='color:green'>2,41 tỷ</span>)** | **<span style='color:green'>2,38%</span> (<span style='color:green'>1,26 tỷ</span>)** | **3/30** |\n| 4 | Cụm Thanh Xuân · Thành phố Hà Nội | **51,56 tỷ** | **<span style='color:green'>0,36%</span> (<span style='color:green'>0,18 tỷ</span>)** | **<span style='color:green'>29,93%</span> (<span style='color:green'>11,57 tỷ</span>)** | **4/30** |\n| 5 | Cụm Đống Đa · Thành phố Hà Nội | **49,34 tỷ** | **<span style='color:green'>0,24%</span> (<span style='color:green'>0,12 tỷ</span>)** | **<span style='color:red'>-1,81%</span> (<span style='color:red'>-0,89 tỷ</span>)** | **5/30** |\n\n**Tổng quan toàn tỉnh Hà Nội:**\n* **Doanh thu dịch vụ:** **953,13 tỷ**\n* **Tăng trưởng so với cùng kỳ tháng trước:** **<span style='color:red'>-0,4%</span> (<span style='color:red'>-3,75 tỷ</span>)**\n* **Tăng trưởng so với cùng kỳ năm trước:** **<span style='color:green'>5,73%</span> (<span style='color:green'>50,36 tỷ</span>)**\n* **Xếp hạng thực hiện (tỉnh):** **2**\n\n**Nhận xét:**\n* Cụm **Nam Từ Liêm** dẫn đầu về doanh thu với **61,77 tỷ**, tiếp theo là **Hà Đông** (55,91 tỷ) và **Cầu Giấy** (55,41 tỷ).\n* **Cụm Thanh Xuân** có mức tăng trưởng so với cùng kỳ năm trước cao nhất trong top 5 (**29,93%**).\n* **Cụm Cầu Giấy** có mức tăng trưởng so với cùng kỳ tháng trước cao nhất (**4,66%**).\n* Chỉ có **Cụm Đống Đa** ghi nhận mức giảm so với cùng kỳ năm trước (**-1,81%**).\n\nBiểu đồ dưới đây minh họa doanh thu của Top 5 cụm:\n\n\n\nBiểu đồ đã được vẽ và sẽ hiển thị bên dưới."
     },
     {
       "question_id": "Q_SINGLE_HOP_013",
@@ -465,7 +465,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dưới đây là kết quả so sánh **Doanh thu dịch vụ (VTT+VTS+VDS)** của tỉnh Phú Thọ và thành phố Đà Nẵng ngày 06/09/2026:\n\n| Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Tỉnh Phú Thọ** | **7,43 tỷ** | **<span style='color:green'>0,83%</span> (<span style='color:green'>0,06 tỷ</span>)** | **5** |\n| **Thành phố Đà Nẵng** | **4,9 tỷ** | **<span style='color:green'>2,32%</span> (<span style='color:green'>0,11 tỷ</span>)** | **18** |\n\nNgày 06/09/2026, doanh thu dịch vụ của **Phú Thọ (7,43 tỷ)** cao hơn **Đà Nẵng (4,9 tỷ)**. Tuy nhiên, Đà Nẵng có tốc độ tăng trưởng so với cùng kỳ tháng trước cao hơn (**2,32%** so với **0,83%** của Phú Thọ).",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -490,7 +490,7 @@
         "condition": []
       },
       "gold_rewrite": "So sánh Doanh thu dịch vụ (VTT+VTS+VDS) của tỉnh Phú Thọ và tỉnh Đà Nẵng ngày 06/09/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Dưới đây là kết quả so sánh **Doanh thu dịch vụ (VTT+VTS+VDS)** của tỉnh Phú Thọ và thành phố Đà Nẵng ngày 06/09/2026:\n\n| Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Tỉnh Phú Thọ** | **7,43 tỷ** | **<span style='color:green'>0,83%</span> (<span style='color:green'>0,06 tỷ</span>)** | **5** |\n| **Thành phố Đà Nẵng** | **4,9 tỷ** | **<span style='color:green'>2,32%</span> (<span style='color:green'>0,11 tỷ</span>)** | **18** |\n\nNgày 06/09/2026, doanh thu dịch vụ của **Phú Thọ (7,43 tỷ)** cao hơn **Đà Nẵng (4,9 tỷ)**. Tuy nhiên, Đà Nẵng có tốc độ tăng trưởng so với cùng kỳ tháng trước cao hơn (**2,32%** so với **0,83%** của Phú Thọ)."
     },
     {
       "question_id": "Q_SINGLE_HOP_014",
@@ -562,7 +562,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dưới đây là Top 3 tỉnh/thành phố xếp hạng đầu về **Doanh thu dịch vụ (VTT+VTS+VDS)** lũy kế tháng 08/2026:\n\n| Xếp hạng | Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước |\n| :--- | :--- | :--- | :--- | :--- |\n| **1** | **Thành phố Hồ Chí Minh** | **1.128,39 tỷ** | <span style='color:red'>-1,28%</span> (-14,3 tỷ) | <span style='color:green'>4,06%</span> (43,09 tỷ) |\n| **2** | **Thành phố Hà Nội** | **953,13 tỷ** | <span style='color:red'>-0,4%</span> (-3,75 tỷ) | <span style='color:green'>5,73%</span> (50,36 tỷ) |\n| **3** | **Tỉnh Đồng Nai** | **354,45 tỷ** | <span style='color:red'>-1,43%</span> (-5,05 tỷ) | <span style='color:green'>7,87%</span> (25,29 tỷ) |\n\nCả 3 địa bàn dẫn đầu đều ghi nhận mức tăng trưởng dương so với cùng kỳ năm trước, trong đó Đồng Nai có mức tăng trưởng cao nhất (7,87%). Tuy nhiên, so với cùng kỳ tháng trước, cả 3 địa bàn đều có mức giảm nhẹ.\n\n\n\nDưới đây là Top 3 tỉnh/thành phố xếp hạng đầu về **Doanh thu dịch vụ (VTT+VTS+VDS)** lũy kế tháng 08/2026:\n\n| Xếp hạng | Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước |\n| :--- | :--- | :--- | :--- | :--- |\n| **1** | **Thành phố Hồ Chí Minh** | **1.128,39 tỷ** | <span style='color:red'>-1,28%</span> (-14,3 tỷ) | <span style='color:green'>4,06%</span> (43,09 tỷ) |\n| **2** | **Thành phố Hà Nội** | **953,13 tỷ** | <span style='color:red'>-0,4%</span> (-3,75 tỷ) | <span style='color:green'>5,73%</span> (50,36 tỷ) |\n| **3** | **Tỉnh Đồng Nai** | **354,45 tỷ** | <span style='color:red'>-1,43%</span> (-5,05 tỷ) | <span style='color:green'>7,87%</span> (25,29 tỷ) |\n\nCả 3 địa bàn dẫn đầu đều ghi nhận mức tăng trưởng dương so với cùng kỳ năm trước, trong đó Đồng Nai có mức tăng trưởng cao nhất (7,87%). Tuy nhiên, so với cùng kỳ tháng trước, cả 3 địa bàn đều có mức giảm nhẹ.",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -590,7 +590,7 @@
         "condition": []
       },
       "gold_rewrite": "Top 3 tỉnh xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) tháng 08/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Dưới đây là Top 3 tỉnh/thành phố xếp hạng đầu về **Doanh thu dịch vụ (VTT+VTS+VDS)** lũy kế tháng 08/2026:\n\n| Xếp hạng | Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước |\n| :--- | :--- | :--- | :--- | :--- |\n| **1** | **Thành phố Hồ Chí Minh** | **1.128,39 tỷ** | <span style='color:red'>-1,28%</span> (-14,3 tỷ) | <span style='color:green'>4,06%</span> (43,09 tỷ) |\n| **2** | **Thành phố Hà Nội** | **953,13 tỷ** | <span style='color:red'>-0,4%</span> (-3,75 tỷ) | <span style='color:green'>5,73%</span> (50,36 tỷ) |\n| **3** | **Tỉnh Đồng Nai** | **354,45 tỷ** | <span style='color:red'>-1,43%</span> (-5,05 tỷ) | <span style='color:green'>7,87%</span> (25,29 tỷ) |\n\nCả 3 địa bàn dẫn đầu đều ghi nhận mức tăng trưởng dương so với cùng kỳ năm trước, trong đó Đồng Nai có mức tăng trưởng cao nhất (7,87%). Tuy nhiên, so với cùng kỳ tháng trước, cả 3 địa bàn đều có mức giảm nhẹ.\n\n\n\nDưới đây là Top 3 tỉnh/thành phố xếp hạng đầu về **Doanh thu dịch vụ (VTT+VTS+VDS)** lũy kế tháng 08/2026:\n\n| Xếp hạng | Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước |\n| :--- | :--- | :--- | :--- | :--- |\n| **1** | **Thành phố Hồ Chí Minh** | **1.128,39 tỷ** | <span style='color:red'>-1,28%</span> (-14,3 tỷ) | <span style='color:green'>4,06%</span> (43,09 tỷ) |\n| **2** | **Thành phố Hà Nội** | **953,13 tỷ** | <span style='color:red'>-0,4%</span> (-3,75 tỷ) | <span style='color:green'>5,73%</span> (50,36 tỷ) |\n| **3** | **Tỉnh Đồng Nai** | **354,45 tỷ** | <span style='color:red'>-1,43%</span> (-5,05 tỷ) | <span style='color:green'>7,87%</span> (25,29 tỷ) |\n\nCả 3 địa bàn dẫn đầu đều ghi nhận mức tăng trưởng dương so với cùng kỳ năm trước, trong đó Đồng Nai có mức tăng trưởng cao nhất (7,87%). Tuy nhiên, so với cùng kỳ tháng trước, cả 3 địa bàn đều có mức giảm nhẹ."
     },
     {
       "question_id": "Q_MULTI_HOP_002",
@@ -637,7 +637,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dưới đây là kết quả so sánh **Doanh thu dịch vụ (VTT+VTS+VDS)** của tỉnh Phú Thọ và thành phố Đà Nẵng ngày 06/09/2026:\n\n| Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Tỉnh Phú Thọ** | **7,43 tỷ** | **<span style='color:green'>0,83%</span> (<span style='color:green'>0,06 tỷ</span>)** | **5** |\n| **Thành phố Đà Nẵng** | **4,9 tỷ** | **<span style='color:green'>2,32%</span> (<span style='color:green'>0,11 tỷ</span>)** | **18** |\n\nNgày 06/09/2026, doanh thu dịch vụ của **Phú Thọ (7,43 tỷ)** cao hơn **Đà Nẵng (4,9 tỷ)**. Tuy nhiên, Đà Nẵng có tốc độ tăng trưởng so với cùng kỳ tháng trước cao hơn (**2,32%** so với **0,83%** của Phú Thọ).",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -663,7 +663,7 @@
         "condition": []
       },
       "gold_rewrite": "So sánh Doanh thu dịch vụ (VTT+VTS+VDS) của tỉnh Phú Thọ và tỉnh Đà Nẵng ngày 06/09/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Dưới đây là kết quả so sánh **Doanh thu dịch vụ (VTT+VTS+VDS)** của tỉnh Phú Thọ và thành phố Đà Nẵng ngày 06/09/2026:\n\n| Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Tỉnh Phú Thọ** | **7,43 tỷ** | **<span style='color:green'>0,83%</span> (<span style='color:green'>0,06 tỷ</span>)** | **5** |\n| **Thành phố Đà Nẵng** | **4,9 tỷ** | **<span style='color:green'>2,32%</span> (<span style='color:green'>0,11 tỷ</span>)** | **18** |\n\nNgày 06/09/2026, doanh thu dịch vụ của **Phú Thọ (7,43 tỷ)** cao hơn **Đà Nẵng (4,9 tỷ)**. Tuy nhiên, Đà Nẵng có tốc độ tăng trưởng so với cùng kỳ tháng trước cao hơn (**2,32%** so với **0,83%** của Phú Thọ)."
     },
     {
       "question_id": "Q_MULTI_HOP_004",
@@ -1202,7 +1202,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "**Top 5 cụm xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) tại tỉnh Hà Nội tháng 08/2026 (Lũy kế):**\n\n| STT | Cụm | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước | Xếp hạng thực hiện (cụm) |\n|:---:|:---|:---:|:---:|:---:|:---:|\n| 1 | Cụm Nam Từ Liêm · Thành phố Hà Nội | **61,77 tỷ** | **<span style='color:green'>1,04%</span> (<span style='color:green'>0,62 tỷ</span>)** | **<span style='color:green'>1,16%</span> (<span style='color:green'>0,69 tỷ</span>)** | **1/30** |\n| 2 | Cụm Hà Đông · Thành phố Hà Nội | **55,91 tỷ** | **<span style='color:green'>0,37%</span> (<span style='color:green'>0,2 tỷ</span>)** | **<span style='color:green'>6,14%</span> (<span style='color:green'>3,15 tỷ</span>)** | **2/30** |\n| 3 | Cụm Cầu Giấy · Thành phố Hà Nội | **55,41 tỷ** | **<span style='color:green'>4,66%</span> (<span style='color:green'>2,41 tỷ</span>)** | **<span style='color:green'>2,38%</span> (<span style='color:green'>1,26 tỷ</span>)** | **3/30** |\n| 4 | Cụm Thanh Xuân · Thành phố Hà Nội | **51,56 tỷ** | **<span style='color:green'>0,36%</span> (<span style='color:green'>0,18 tỷ</span>)** | **<span style='color:green'>29,93%</span> (<span style='color:green'>11,57 tỷ</span>)** | **4/30** |\n| 5 | Cụm Đống Đa · Thành phố Hà Nội | **49,34 tỷ** | **<span style='color:green'>0,24%</span> (<span style='color:green'>0,12 tỷ</span>)** | **<span style='color:red'>-1,81%</span> (<span style='color:red'>-0,89 tỷ</span>)** | **5/30** |\n\n**Tổng quan toàn tỉnh Hà Nội:**\n* **Doanh thu dịch vụ:** **953,13 tỷ**\n* **Tăng trưởng so với cùng kỳ tháng trước:** **<span style='color:red'>-0,4%</span> (<span style='color:red'>-3,75 tỷ</span>)**\n* **Tăng trưởng so với cùng kỳ năm trước:** **<span style='color:green'>5,73%</span> (<span style='color:green'>50,36 tỷ</span>)**\n* **Xếp hạng thực hiện (tỉnh):** **2**\n\n**Nhận xét:**\n* Cụm **Nam Từ Liêm** dẫn đầu về doanh thu với **61,77 tỷ**, tiếp theo là **Hà Đông** (55,91 tỷ) và **Cầu Giấy** (55,41 tỷ).\n* **Cụm Thanh Xuân** có mức tăng trưởng so với cùng kỳ năm trước cao nhất trong top 5 (**29,93%**).\n* **Cụm Cầu Giấy** có mức tăng trưởng so với cùng kỳ tháng trước cao nhất (**4,66%**).\n* Chỉ có **Cụm Đống Đa** ghi nhận mức giảm so với cùng kỳ năm trước (**-1,81%**).\n\nBiểu đồ dưới đây minh họa doanh thu của Top 5 cụm:\n\n\n\nBiểu đồ đã được vẽ và sẽ hiển thị bên dưới.",
       "notes": "",
       "evaluation_tier": "diagnostic_history",
       "hard_gate": false,
@@ -1230,7 +1230,7 @@
         "condition": []
       },
       "gold_rewrite": "Top 5 cụm xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) tại tỉnh Hà Nội tháng 08/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "**Top 5 cụm xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) tại tỉnh Hà Nội tháng 08/2026 (Lũy kế):**\n\n| STT | Cụm | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước | Xếp hạng thực hiện (cụm) |\n|:---:|:---|:---:|:---:|:---:|:---:|\n| 1 | Cụm Nam Từ Liêm · Thành phố Hà Nội | **61,77 tỷ** | **<span style='color:green'>1,04%</span> (<span style='color:green'>0,62 tỷ</span>)** | **<span style='color:green'>1,16%</span> (<span style='color:green'>0,69 tỷ</span>)** | **1/30** |\n| 2 | Cụm Hà Đông · Thành phố Hà Nội | **55,91 tỷ** | **<span style='color:green'>0,37%</span> (<span style='color:green'>0,2 tỷ</span>)** | **<span style='color:green'>6,14%</span> (<span style='color:green'>3,15 tỷ</span>)** | **2/30** |\n| 3 | Cụm Cầu Giấy · Thành phố Hà Nội | **55,41 tỷ** | **<span style='color:green'>4,66%</span> (<span style='color:green'>2,41 tỷ</span>)** | **<span style='color:green'>2,38%</span> (<span style='color:green'>1,26 tỷ</span>)** | **3/30** |\n| 4 | Cụm Thanh Xuân · Thành phố Hà Nội | **51,56 tỷ** | **<span style='color:green'>0,36%</span> (<span style='color:green'>0,18 tỷ</span>)** | **<span style='color:green'>29,93%</span> (<span style='color:green'>11,57 tỷ</span>)** | **4/30** |\n| 5 | Cụm Đống Đa · Thành phố Hà Nội | **49,34 tỷ** | **<span style='color:green'>0,24%</span> (<span style='color:green'>0,12 tỷ</span>)** | **<span style='color:red'>-1,81%</span> (<span style='color:red'>-0,89 tỷ</span>)** | **5/30** |\n\n**Tổng quan toàn tỉnh Hà Nội:**\n* **Doanh thu dịch vụ:** **953,13 tỷ**\n* **Tăng trưởng so với cùng kỳ tháng trước:** **<span style='color:red'>-0,4%</span> (<span style='color:red'>-3,75 tỷ</span>)**\n* **Tăng trưởng so với cùng kỳ năm trước:** **<span style='color:green'>5,73%</span> (<span style='color:green'>50,36 tỷ</span>)**\n* **Xếp hạng thực hiện (tỉnh):** **2**\n\n**Nhận xét:**\n* Cụm **Nam Từ Liêm** dẫn đầu về doanh thu với **61,77 tỷ**, tiếp theo là **Hà Đông** (55,91 tỷ) và **Cầu Giấy** (55,41 tỷ).\n* **Cụm Thanh Xuân** có mức tăng trưởng so với cùng kỳ năm trước cao nhất trong top 5 (**29,93%**).\n* **Cụm Cầu Giấy** có mức tăng trưởng so với cùng kỳ tháng trước cao nhất (**4,66%**).\n* Chỉ có **Cụm Đống Đa** ghi nhận mức giảm so với cùng kỳ năm trước (**-1,81%**).\n\nBiểu đồ dưới đây minh họa doanh thu của Top 5 cụm:\n\n\n\nBiểu đồ đã được vẽ và sẽ hiển thị bên dưới."
     },
     {
       "question_id": "Q_TEMPORAL_BUSINESS_ACTION_002",
@@ -1246,7 +1246,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Thuê bao FTTH phát triển thực lũy kế của Toàn quốc tính đến hết tháng 08/2026 là **9.521.622 TB**.\n\n* **Kế hoạch:** 9.516.549 TB\n* **Mức hoàn thành kế hoạch:** 100,05%\n* **Tăng trưởng so với cùng kỳ tháng trước:** 0,41% (tăng 39.337 TB)\n* **Tăng trưởng so với cùng kỳ năm trước:** 4,83% (tăng 438.620 TB)",
       "notes": "",
       "evaluation_tier": "diagnostic_history",
       "hard_gate": false,
@@ -1271,7 +1271,7 @@
         "condition": []
       },
       "gold_rewrite": "Thuê bao FTTH phát triển thực LK của Toàn quốc tháng 08/2026 là bao nhiêu?",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Thuê bao FTTH phát triển thực lũy kế của Toàn quốc tính đến hết tháng 08/2026 là **9.521.622 TB**.\n\n* **Kế hoạch:** 9.516.549 TB\n* **Mức hoàn thành kế hoạch:** 100,05%\n* **Tăng trưởng so với cùng kỳ tháng trước:** 0,41% (tăng 39.337 TB)\n* **Tăng trưởng so với cùng kỳ năm trước:** 4,83% (tăng 438.620 TB)"
     },
     {
       "question_id": "Q_TEMPORAL_BUSINESS_ACTION_003",
@@ -1287,7 +1287,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Doanh thu dịch vụ IOT của Toàn quốc lũy kế tháng 08/2026 là **79,62 tỷ**.\n\n* **Kế hoạch:** 84,7 tỷ (mức hoàn thành **94%**).\n* **Tăng trưởng so với cùng kỳ tháng trước:** **10,4%** (tăng 7,5 tỷ).\n* **Tăng trưởng so với cùng kỳ năm trước:** **53,99%** (tăng 27,91 tỷ).",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -1312,7 +1312,7 @@
         "condition": []
       },
       "gold_rewrite": "Doanh thu dịch vụ IOT của Toàn quốc tháng 08/2026 là bao nhiêu?",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Doanh thu dịch vụ IOT của Toàn quốc lũy kế tháng 08/2026 là **79,62 tỷ**.\n\n* **Kế hoạch:** 84,7 tỷ (mức hoàn thành **94%**).\n* **Tăng trưởng so với cùng kỳ tháng trước:** **10,4%** (tăng 7,5 tỷ).\n* **Tăng trưởng so với cùng kỳ năm trước:** **53,99%** (tăng 27,91 tỷ)."
     },
     {
       "question_id": "Q_TEMPORAL_BUSINESS_ACTION_004",
@@ -1331,7 +1331,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "**Top 5 cụm xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) tại tỉnh Hà Nội tháng 08/2026 (Lũy kế):**\n\n| STT | Cụm | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước | Xếp hạng thực hiện (cụm) |\n|:---:|:---|:---:|:---:|:---:|:---:|\n| 1 | Cụm Nam Từ Liêm · Thành phố Hà Nội | **61,77 tỷ** | **<span style='color:green'>1,04%</span> (<span style='color:green'>0,62 tỷ</span>)** | **<span style='color:green'>1,16%</span> (<span style='color:green'>0,69 tỷ</span>)** | **1/30** |\n| 2 | Cụm Hà Đông · Thành phố Hà Nội | **55,91 tỷ** | **<span style='color:green'>0,37%</span> (<span style='color:green'>0,2 tỷ</span>)** | **<span style='color:green'>6,14%</span> (<span style='color:green'>3,15 tỷ</span>)** | **2/30** |\n| 3 | Cụm Cầu Giấy · Thành phố Hà Nội | **55,41 tỷ** | **<span style='color:green'>4,66%</span> (<span style='color:green'>2,41 tỷ</span>)** | **<span style='color:green'>2,38%</span> (<span style='color:green'>1,26 tỷ</span>)** | **3/30** |\n| 4 | Cụm Thanh Xuân · Thành phố Hà Nội | **51,56 tỷ** | **<span style='color:green'>0,36%</span> (<span style='color:green'>0,18 tỷ</span>)** | **<span style='color:green'>29,93%</span> (<span style='color:green'>11,57 tỷ</span>)** | **4/30** |\n| 5 | Cụm Đống Đa · Thành phố Hà Nội | **49,34 tỷ** | **<span style='color:green'>0,24%</span> (<span style='color:green'>0,12 tỷ</span>)** | **<span style='color:red'>-1,81%</span> (<span style='color:red'>-0,89 tỷ</span>)** | **5/30** |\n\n**Tổng quan toàn tỉnh Hà Nội:**\n* **Doanh thu dịch vụ:** **953,13 tỷ**\n* **Tăng trưởng so với cùng kỳ tháng trước:** **<span style='color:red'>-0,4%</span> (<span style='color:red'>-3,75 tỷ</span>)**\n* **Tăng trưởng so với cùng kỳ năm trước:** **<span style='color:green'>5,73%</span> (<span style='color:green'>50,36 tỷ</span>)**\n* **Xếp hạng thực hiện (tỉnh):** **2**\n\n**Nhận xét:**\n* Cụm **Nam Từ Liêm** dẫn đầu về doanh thu với **61,77 tỷ**, tiếp theo là **Hà Đông** (55,91 tỷ) và **Cầu Giấy** (55,41 tỷ).\n* **Cụm Thanh Xuân** có mức tăng trưởng so với cùng kỳ năm trước cao nhất trong top 5 (**29,93%**).\n* **Cụm Cầu Giấy** có mức tăng trưởng so với cùng kỳ tháng trước cao nhất (**4,66%**).\n* Chỉ có **Cụm Đống Đa** ghi nhận mức giảm so với cùng kỳ năm trước (**-1,81%**).\n\nBiểu đồ dưới đây minh họa doanh thu của Top 5 cụm:\n\n\n\nBiểu đồ đã được vẽ và sẽ hiển thị bên dưới.",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -1359,7 +1359,7 @@
         "condition": []
       },
       "gold_rewrite": "Top 5 cụm xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) tại tỉnh Hà Nội tháng 08/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL",
+      "final_answer": "**Top 5 cụm xếp hạng đầu về Doanh thu dịch vụ (VTT+VTS+VDS) tại tỉnh Hà Nội tháng 08/2026 (Lũy kế):**\n\n| STT | Cụm | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước | Xếp hạng thực hiện (cụm) |\n|:---:|:---|:---:|:---:|:---:|:---:|\n| 1 | Cụm Nam Từ Liêm · Thành phố Hà Nội | **61,77 tỷ** | **<span style='color:green'>1,04%</span> (<span style='color:green'>0,62 tỷ</span>)** | **<span style='color:green'>1,16%</span> (<span style='color:green'>0,69 tỷ</span>)** | **1/30** |\n| 2 | Cụm Hà Đông · Thành phố Hà Nội | **55,91 tỷ** | **<span style='color:green'>0,37%</span> (<span style='color:green'>0,2 tỷ</span>)** | **<span style='color:green'>6,14%</span> (<span style='color:green'>3,15 tỷ</span>)** | **2/30** |\n| 3 | Cụm Cầu Giấy · Thành phố Hà Nội | **55,41 tỷ** | **<span style='color:green'>4,66%</span> (<span style='color:green'>2,41 tỷ</span>)** | **<span style='color:green'>2,38%</span> (<span style='color:green'>1,26 tỷ</span>)** | **3/30** |\n| 4 | Cụm Thanh Xuân · Thành phố Hà Nội | **51,56 tỷ** | **<span style='color:green'>0,36%</span> (<span style='color:green'>0,18 tỷ</span>)** | **<span style='color:green'>29,93%</span> (<span style='color:green'>11,57 tỷ</span>)** | **4/30** |\n| 5 | Cụm Đống Đa · Thành phố Hà Nội | **49,34 tỷ** | **<span style='color:green'>0,24%</span> (<span style='color:green'>0,12 tỷ</span>)** | **<span style='color:red'>-1,81%</span> (<span style='color:red'>-0,89 tỷ</span>)** | **5/30** |\n\n**Tổng quan toàn tỉnh Hà Nội:**\n* **Doanh thu dịch vụ:** **953,13 tỷ**\n* **Tăng trưởng so với cùng kỳ tháng trước:** **<span style='color:red'>-0,4%</span> (<span style='color:red'>-3,75 tỷ</span>)**\n* **Tăng trưởng so với cùng kỳ năm trước:** **<span style='color:green'>5,73%</span> (<span style='color:green'>50,36 tỷ</span>)**\n* **Xếp hạng thực hiện (tỉnh):** **2**\n\n**Nhận xét:**\n* Cụm **Nam Từ Liêm** dẫn đầu về doanh thu với **61,77 tỷ**, tiếp theo là **Hà Đông** (55,91 tỷ) và **Cầu Giấy** (55,41 tỷ).\n* **Cụm Thanh Xuân** có mức tăng trưởng so với cùng kỳ năm trước cao nhất trong top 5 (**29,93%**).\n* **Cụm Cầu Giấy** có mức tăng trưởng so với cùng kỳ tháng trước cao nhất (**4,66%**).\n* Chỉ có **Cụm Đống Đa** ghi nhận mức giảm so với cùng kỳ năm trước (**-1,81%**).\n\nBiểu đồ dưới đây minh họa doanh thu của Top 5 cụm:\n\n\n\nBiểu đồ đã được vẽ và sẽ hiển thị bên dưới.",
       "capability_tags": [
         "partial_policy_overlap",
         "explicit_limit_precedence"
@@ -1412,7 +1412,7 @@
       ],
       "answer_type": "business_action",
       "expected_action": "execute",
-      "gold_answer": null,
+      "gold_answer": "Dưới đây là kết quả so sánh **Doanh thu dịch vụ (VTT+VTS+VDS)** của tỉnh Phú Thọ và thành phố Đà Nẵng ngày 06/09/2026:\n\n| Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Tỉnh Phú Thọ** | **7,43 tỷ** | **<span style='color:green'>0,83%</span> (<span style='color:green'>0,06 tỷ</span>)** | **5** |\n| **Thành phố Đà Nẵng** | **4,9 tỷ** | **<span style='color:green'>2,32%</span> (<span style='color:green'>0,11 tỷ</span>)** | **18** |\n\nNgày 06/09/2026, doanh thu dịch vụ của **Phú Thọ (7,43 tỷ)** cao hơn **Đà Nẵng (4,9 tỷ)**. Tuy nhiên, Đà Nẵng có tốc độ tăng trưởng so với cùng kỳ tháng trước cao hơn (**2,32%** so với **0,83%** của Phú Thọ).",
       "notes": "",
       "evaluation_tier": "hard_gate",
       "hard_gate": true,
@@ -1438,7 +1438,7 @@
         "condition": []
       },
       "gold_rewrite": "So sánh Doanh thu dịch vụ (VTT+VTS+VDS) của tỉnh Phú Thọ và tỉnh Đà Nẵng ngày 06/09/2026.",
-      "final_answer": "TBD_AFTER_KIRA_FILL"
+      "final_answer": "Dưới đây là kết quả so sánh **Doanh thu dịch vụ (VTT+VTS+VDS)** của tỉnh Phú Thọ và thành phố Đà Nẵng ngày 06/09/2026:\n\n| Địa bàn | Doanh thu dịch vụ | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Tỉnh Phú Thọ** | **7,43 tỷ** | **<span style='color:green'>0,83%</span> (<span style='color:green'>0,06 tỷ</span>)** | **5** |\n| **Thành phố Đà Nẵng** | **4,9 tỷ** | **<span style='color:green'>2,32%</span> (<span style='color:green'>0,11 tỷ</span>)** | **18** |\n\nNgày 06/09/2026, doanh thu dịch vụ của **Phú Thọ (7,43 tỷ)** cao hơn **Đà Nẵng (4,9 tỷ)**. Tuy nhiên, Đà Nẵng có tốc độ tăng trưởng so với cùng kỳ tháng trước cao hơn (**2,32%** so với **0,83%** của Phú Thọ)."
     },
     {
       "question_id": "Q_FALSE_PREMISE_001",
