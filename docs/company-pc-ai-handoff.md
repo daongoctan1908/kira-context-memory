@@ -247,6 +247,17 @@ Copy-Item evaluation/benchmark.pc.env.example .env.benchmark.pc.local
 KiRa cần `KIRA_BASE_URL`, username, domain và `KIRA_BASIC_AUTH`. Giá trị
 `KIRA_BASIC_AUTH` không chứa literal `Basic ` vì adapter tự thêm prefix.
 
+Hành vi đã xác minh trên KiRa Test (2026-09-22): short-term memory của KiRa
+lưu phía server theo username, không scope theo token hay `sender.data`.
+Mọi request cùng username (kể từ web, API, tool) dùng chung một không gian
+hội thoại. Header `KIRA_BASIC_AUTH` không được validate và username cũng
+không; chỉ sai `KIRA_DOMAIN` mới bị từ chối (`errorCode 01`). Username mới
+được tự động cấp token với context trống.
+
+Khuyến nghị: dùng username riêng cho mỗi lần chạy tạo dữ liệu/benchmark
+(ví dụ `benchmark_run_<date>_<seq>`), không dùng chung với chat tay trên
+web, để đảm bảo response không nhiễm context cũ và tái lập được.
+
 Kiểm tra không lộ secret:
 
 ```powershell
