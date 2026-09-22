@@ -1,5 +1,5 @@
 {
-  "conversation_id": "conv_02_FREEZE_v4_FINAL",
+  "conversation_id": "conv_02_FREEZE_v5_FINAL",
   "do_not_ingest": true,
   "artifact_semantics": "Gold memory EVENTS, not a closed-world list of final Mem0 rows.",
   "formation_scoring_note": "Score semantic add/update/reinforce/do_not_persist behavior. A reinforcement may confirm one or multiple existing memories without creating duplicate rows. Equivalent merges are allowed; valid unannotated extra facts are not automatically false positives.",

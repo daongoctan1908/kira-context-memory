@@ -2,8 +2,8 @@
   "$schema": "schemas/manifest.schema.json",
   "schema_version": 1,
   "dataset_id": "kira_ltm_v1",
-  "dataset_version": "1.0.0-materialized.1",
-  "status": "materialized",
+  "dataset_version": "1.0.0-draft.3",
+  "status": "contract_frozen",
   "canonical_format": "json",
   "evaluation_scope": "full_corpus",
   "id_namespace": "{bundle_id}:{local_id}",
@@ -20,10 +20,10 @@
   "bundles": [
     {
       "bundle_id": "conv01",
-      "source_conversation_id": "conv_01_FREEZE_v10_FINAL",
-      "revision": 10,
+      "source_conversation_id": "conv_01_FREEZE_v11_FINAL",
+      "revision": 11,
       "contract_status": "frozen",
-      "materialization_status": "materialized",
+      "materialization_status": "pending",
       "path": "bundles/conv01",
       "review": {
         "status": "draft",
@@ -38,33 +38,33 @@
         "qa": 55,
         "hard_gate": 36,
         "diagnostic_history": 19,
-        "pending_answers": 0
+        "pending_answers": 19
       },
       "files": {
         "conversation": {
           "name": "conversation.json",
-          "sha256": "2a95d0b1451d07ef87f99c1821f1576126fb97a37721537a52ccce9eda984c73"
+          "sha256": "5c35c6c8dfca21f0e9237aa79db5e26d74b2a54a85a81d054de17b1ea0307383"
         },
         "fills": {
           "name": "fills.json",
-          "sha256": "d5acd438e951b08cf2e7aefa53936709750744bfdc231c8e815654290b485e00"
+          "sha256": "73d4970446aec3e1cdea3ddf12a2c171f4fc38b597187d7e05291ef7db70f045"
         },
         "memories": {
           "name": "memories.json",
-          "sha256": "e2e3a9999c37d304b8214dfc4aba27ccfe3017ae94d2f5d01c57b52b5a160336"
+          "sha256": "970670e542013f40e6db93dacbf4ba0ed1fc85dfd927092201f09f8f5a06cc30"
         },
         "qa": {
           "name": "qa.json",
-          "sha256": "1b23f3f8cae21b86027db76a45626a702d98cf1a18c0aa380793065dfdc6a180"
+          "sha256": "5dda2a5472133add073cea14b1c145e6334ed29c53c1026e8d308019f87b27ba"
         }
       }
     },
     {
       "bundle_id": "conv02",
-      "source_conversation_id": "conv_02_FREEZE_v4_FINAL",
-      "revision": 4,
+      "source_conversation_id": "conv_02_FREEZE_v5_FINAL",
+      "revision": 5,
       "contract_status": "frozen",
-      "materialization_status": "materialized",
+      "materialization_status": "pending",
       "path": "bundles/conv02",
       "review": {
         "status": "draft",
@@ -79,33 +79,33 @@
         "qa": 50,
         "hard_gate": 35,
         "diagnostic_history": 15,
-        "pending_answers": 0
+        "pending_answers": 12
       },
       "files": {
         "conversation": {
           "name": "conversation.json",
-          "sha256": "8f75602af504557dbd3317e83bc8af821a407970f3144d34fe8cdf735ef9f07d"
+          "sha256": "57819563f6a05c1f8446bfc702559ce0213c3f29790839c7d50c72d2baf0ee42"
         },
         "fills": {
           "name": "fills.json",
-          "sha256": "05c6be883271dfb3f56edcfaf5e98a971c4fad0fecd291c096ced5d5d0c54a6a"
+          "sha256": "33599236c0b9469d4e67af95178e4876905353022d424fd16c5d8afc663aab72"
         },
         "memories": {
           "name": "memories.json",
-          "sha256": "fd2598571bb3e62d8775f26bdcb8078274bb7bda6ff2d5e69ab84eedf2cd2618"
+          "sha256": "160f799b094ccb3c694b564a66a90f5087a6483a1db9c9a18d04667ff50dbaf8"
         },
         "qa": {
           "name": "qa.json",
-          "sha256": "45ccce856593dc1840e0c0d4c181ba68894a2a085a8a6635026faa16dd21db53"
+          "sha256": "b2000bd7a0ac6053a0cf8c4578e506a74a781ffcea3d6d7cc0a0d539a2a33fe5"
         }
       }
     },
     {
       "bundle_id": "conv03",
-      "source_conversation_id": "conv_03_FREEZE_v5_FINAL",
-      "revision": 5,
+      "source_conversation_id": "conv_03_FREEZE_v6_FINAL",
+      "revision": 6,
       "contract_status": "frozen",
-      "materialization_status": "materialized",
+      "materialization_status": "pending",
       "path": "bundles/conv03",
       "review": {
         "status": "draft",
@@ -120,33 +120,33 @@
         "qa": 52,
         "hard_gate": 32,
         "diagnostic_history": 20,
-        "pending_answers": 0
+        "pending_answers": 12
       },
       "files": {
         "conversation": {
           "name": "conversation.json",
-          "sha256": "c1c7f7718cfe3c912db4c3137b38e9cabaacdfc6f5a68996016b01debb07428f"
+          "sha256": "6da4b0c5bc9bc2c1c40b8c839c075f52d3238db53765449f806e2d6dc8a114ce"
         },
         "fills": {
           "name": "fills.json",
-          "sha256": "856c85a10888f2975867d48c866a81750e09d14cc603650c0b7ac3485eb7d0d4"
+          "sha256": "a9ad7217381fcf69bd52aa7295e589bc9584c8de7512b0f8233e18b58e6f40c7"
         },
         "memories": {
           "name": "memories.json",
-          "sha256": "1aa1f3b2cb7797cb2d91f2f398ebe3ae7dc418f6a586fc9d0212adb5cdf7cb6e"
+          "sha256": "56d537a87016d59c90bbf4d6ed7aba01f4ce7e0de8884959296e48806fa682d1"
         },
         "qa": {
           "name": "qa.json",
-          "sha256": "544d9c53f728bbccfdef58525016928921861d80c99124e6a7d68bde1281d438"
+          "sha256": "20a2abb736c130e64f48f0f34f24cdf4bdd0464d5212bf6c38503f720a15cd29"
         }
       }
     },
     {
       "bundle_id": "conv04",
-      "source_conversation_id": "conv_04_FREEZE_v4_FINAL",
-      "revision": 4,
+      "source_conversation_id": "conv_04_FREEZE_v5_FINAL",
+      "revision": 5,
       "contract_status": "frozen",
-      "materialization_status": "materialized",
+      "materialization_status": "pending",
       "path": "bundles/conv04",
       "review": {
         "status": "draft",
@@ -161,24 +161,24 @@
         "qa": 52,
         "hard_gate": 36,
         "diagnostic_history": 16,
-        "pending_answers": 0
+        "pending_answers": 11
       },
       "files": {
         "conversation": {
           "name": "conversation.json",
-          "sha256": "8cbe6df021f6fa36e883ee212de16a74a6878909c2b2936f2de3006adb733f2d"
+          "sha256": "677ea01047b3953207ec06a011038c35e7723e015bcb293e4b77b885ec0a2b5f"
         },
         "fills": {
           "name": "fills.json",
-          "sha256": "cc0f829817911ea2823b6c1a14c55da6e1d2b7ca22f4a7fd881f1312d0237417"
+          "sha256": "ddd2273357bea049aa1577709f974b5715e535bdc3657b04eb698178fc111ea7"
         },
         "memories": {
           "name": "memories.json",
-          "sha256": "94dd08ff15d6ee59f29597bc399458a91220d8425a61229871d0fccbe76474dd"
+          "sha256": "582a074677e5ed6141af3898a118e2f67bc46be6beb504d22229423c471d26c4"
         },
         "qa": {
           "name": "qa.json",
-          "sha256": "09634a16457bf3745e5923276744d59da4491802d84bbf369b89c35d8a06a31e"
+          "sha256": "e46674dacd1928dbf3c6ddb423d662bbc9aaff621cbba1a4a359fc70662c1a05"
         }
       }
     }

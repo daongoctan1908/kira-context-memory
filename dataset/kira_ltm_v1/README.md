@@ -53,6 +53,12 @@ The source records one timezone-aware timestamp per session. The loader derives 
 per-message timestamps by adding the zero-based turn index in microseconds. This preserves source
 ordering without rewriting the synthetic source transcript.
 
+KiRa business queries use explicit reporting dates or months from their source testcase contracts.
+Wall-clock-relative wording such as `hôm trước` is excluded from canonical KiRa fill and QA queries
+so benchmark results measure memory/rewrite behavior rather than KiRa's independent clock. Relative
+language may remain in non-KiRa narrative or lifecycle questions when chronology itself is the
+capability under evaluation.
+
 ## Evaluation scope
 
 This is a single `full_corpus` acceptance dataset. Every official run evaluates all four bundles

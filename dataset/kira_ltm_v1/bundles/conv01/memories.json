@@ -1,5 +1,5 @@
 {
-  "conversation_id": "conv_01_FREEZE_v10_FINAL",
+  "conversation_id": "conv_01_FREEZE_v11_FINAL",
   "do_not_ingest": true,
   "artifact_semantics": "17 gold memory EVENTS, not 17 required final Mem0 rows.",
   "formation_scoring_note": "Score semantic behavior: add/update/reinforce/do_not_persist. A confirmation event may correctly reinforce/merge an existing memory instead of creating a duplicate row.",

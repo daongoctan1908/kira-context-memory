@@ -1,5 +1,5 @@
 {
-  "conversation_id": "conv_03_FREEZE_v5_FINAL",
+  "conversation_id": "conv_03_FREEZE_v6_FINAL",
   "do_not_ingest": true,
   "artifact_semantics": "Gold memory EVENTS, not a closed-world list of final Mem0 rows.",
   "formation_negative_event_ids": [

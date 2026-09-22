@@ -1,5 +1,5 @@
 {
-  "conversation_id": "conv_01_FREEZE_v10_FINAL",
+  "conversation_id": "conv_01_FREEZE_v11_FINAL",
   "persona": {
     "role": "Nhân viên vận hành kinh doanh tại Phú Thọ",
     "job_story": "Theo dõi Thanh Sơn thường xuyên; sau một giai đoạn drill-down và theo dõi song song, được chuyển trọng tâm chính sang Thượng Long."
@@ -36,7 +36,7 @@
       8,
       8
     ],
-    "version": "v10_FINAL",
+    "version": "v11_FINAL",
     "assistant_bridge_count": 48,
     "assistant_bridge_unique": 48,
     "review_status": "FROZEN",
@@ -69,7 +69,7 @@
       {
         "role": "assistant",
         "dia_id": "D1:4",
-        "text": "Doanh thu tiêu dùng di động của **Cụm Thanh Sơn - Phú Thọ** lũy kế tháng 08/2026 là **6,58 tỷ đồng**.\n\nThông tin chi tiết:\n* **Tăng trưởng so với cùng kỳ tháng trước:** <span style='color:green'>1,85%</span> (<span style='color:green'>0,12 tỷ</span>)\n* **Tăng trưởng so với cùng kỳ năm trước:** <span style='color:green'>8,99%</span> (<span style='color:green'>0,53 tỷ</span>)\n* **Xếp hạng thực hiện:** 14/32 cụm",
+        "text": "",
         "fill_id": "CONV01V2_FILL_001",
         "needs_kira_fill": true
       },
@@ -82,7 +82,7 @@
       {
         "role": "assistant",
         "dia_id": "D1:6",
-        "text": "Chỉ tiêu tra cứu được là **Thuê bao Di động 4G thực Lũy kế** — khớp đúng yêu cầu của Anh/chị.\n\nDưới đây là số liệu **Lũy kế tháng 08/2026**:\n\n| Địa bàn | Thuê bao Di động 4G thực Lũy kế | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- | :--- |\n| **Cụm Thanh Sơn** | **67.879 TB** | **<span style='color:green'>49,68%</span> (<span style='color:green'>22.529 TB</span>)** | **<span style='color:green'>18,09%</span> (<span style='color:green'>10.398 TB</span>)** | **12/32** |\n| Cụm Phú Thọ | 71.746 TB | <span style='color:green'>65,86%</span> (<span style='color:green'>28.488 TB</span>) | <span style='color:green'>20,4%</span> (<span style='color:green'>12.158 TB</span>) | 9/32 |\n\n**Tổng kết giai đoạn:**\n* **Cụm Thanh Sơn:** Đạt **67.879 thuê bao**, tăng trưởng mạnh so với cùng kỳ tháng trước (**+49,68%**) và cùng kỳ năm trước (**+18,09%**), xếp hạng thực hiện thứ **12/32** cụm.\n* **Cụm Phú Thọ:** Đạt **71.746 thuê bao**, tăng trưởng cao hơn so với cùng kỳ tháng trước (**+65,86%**) và cùng kỳ năm trước (**+20,4%**), xếp hạng thực hiện thứ **9/32** cụm.",
+        "text": "",
         "fill_id": "CONV01V2_FILL_002",
         "needs_kira_fill": true
       },
@@ -126,26 +126,26 @@
       {
         "role": "user",
         "dia_id": "D2:3",
-        "text": "Xem doanh thu tiêu dùng di động trừ VAS hợp tác của Thanh Sơn lũy kế đến hôm trước.",
+        "text": "Xem doanh thu tiêu dùng di động trừ VAS hợp tác của Thanh Sơn lũy kế đến ngày 07/09/2026.",
         "fill_id": "CONV01V2_FILL_003"
       },
       {
         "role": "assistant",
         "dia_id": "D2:4",
-        "text": "Chỉ tiêu tra cứu được là **Doanh thu tiêu dùng di động trừ vas hợp tác** — khớp với yêu cầu của Anh/chị.\n\nDữ liệu cho **Cụm Thanh Sơn (Phú Thọ)** lũy kế đến ngày 07/09/2026 như sau:\n\n* **Lũy kế tháng 09/2026** (từ 01/09 đến 07/09/2026): **3,08 tỷ**\n * Tăng trưởng so với cùng kỳ tháng trước: **<span style='color:green'>3,25%</span> (<span style='color:green'>0,1 tỷ</span>)**\n  * Tăng trưởng so với cùng kỳ năm trước: **<span style='color:green'>6,5%</span> (<span style='color:green'>0,19 tỷ</span>)**\n * Xếp hạng thực hiện: **8/32**\n\n* **Lũy kế năm 2026** (từ 01/01 đến 07/09/2026): **54,86 tỷ**\n * Tăng trưởng so với cùng kỳ năm trước: **<span style='color:green'>8,74%</span> (<span style='color:green'>4,41 tỷ</span>)**\n  * Xếp hạng thực hiện: **11/32**\n\n*(Lưu ý: Dữ liệu trên là của Cụm Thanh Sơn thuộc Tỉnh Phú Thọ. Hệ thống cũng trả về dữ liệu của toàn Tỉnh Phú Thọ để tham chiếu: Lũy kế tháng 09/2026 là 2,68 tỷ và Lũy kế năm 2026 là 56,88 tỷ).*",
+        "text": "",
         "fill_id": "CONV01V2_FILL_003",
         "needs_kira_fill": true
       },
       {
         "role": "user",
         "dia_id": "D2:5",
-        "text": "Còn 4G thực lũy kế của Thanh Sơn đến hôm trước thì sao?",
+        "text": "Còn 4G thực lũy kế của Thanh Sơn đến ngày 07/09/2026 thì sao?",
         "fill_id": "CONV01V2_FILL_004"
       },
       {
         "role": "assistant",
         "dia_id": "D2:6",
-        "text": "Dữ liệu **Thuê bao Di động 4G thực Lũy kế** của **Cụm Thanh Sơn (Phú Thọ)** lũy kế đến ngày **07/09/2026** như sau:\n\n* **Lũy kế tháng 09/2026** (từ 01/09 đến 07/09/2026): **33.261 TB**\n * Tăng trưởng so với cùng kỳ tháng trước: **<span style='color:green'>4,87%</span> (<span style='color:green'>1.546 TB</span>)**\n  * Tăng trưởng so với cùng kỳ năm trước: **<span style='color:red'>-19,81%</span> (<span style='color:red'>-8.219 TB</span>)**\n * Xếp hạng thực hiện: **8/32**\n\n* **Lũy kế năm 2026** (từ 01/01 đến 07/09/2026): **33.261 TB**\n * Tăng trưởng so với cùng kỳ năm trước: **<span style='color:red'>-19,81%</span> (<span style='color:red'>-8.219 TB</span>)**\n  * Xếp hạng thực hiện: **8/32**\n\n*Lưu ý: Số liệu lũy kế tháng và lũy kế năm tại thời điểm này có giá trị trùng nhau do dữ liệu mới chỉ tích lũy từ đầu tháng 9/2026.*",
+        "text": "",
         "fill_id": "CONV01V2_FILL_004",
         "needs_kira_fill": true
       },
@@ -184,7 +184,7 @@
       {
         "role": "assistant",
         "dia_id": "D3:4",
-        "text": "**Thuê bao FTTH phát triển thực lũy kế** của **Cụm Thanh Sơn - Phú Thọ** tính đến **lũy kế tháng 08/2026** là:\n\n* **Giá trị thực hiện:** **15.385 TB**\n* **Tăng trưởng so với cùng kỳ tháng trước:** **<span style='color:green'>1,22%</span> (<span style='color:green'>185 TB</span>)**\n* **Tăng trưởng so với cùng kỳ năm trước:** **<span style='color:green'>5,36%</span> (<span style='color:green'>783 TB</span>)**\n* **Xếp hạng thực hiện:** **6/32** (trong các cụm của tỉnh Phú Thọ)\n* **Xếp hạng tăng trưởng cùng kỳ tháng:** **4/32**\n* **Xếp hạng tăng trưởng cùng kỳ năm:** **18/32**",
+        "text": "",
         "fill_id": "CONV01V2_FILL_005",
         "needs_kira_fill": true
       },
@@ -223,7 +223,7 @@
       {
         "role": "assistant",
         "dia_id": "D4:4",
-        "text": "Doanh thu dịch vụ SME của **Cụm Thanh Sơn - Phú Thọ** lũy kế tháng 08/2026 là **0,02 tỷ**.\n\n**Chi tiết biến động và xếp hạng:**\n* **Tăng trưởng so với cùng kỳ tháng trước:** <span style='color:red'>-3,89%</span> (<span style='color:red'>-0,95 triệu</span>)\n* **Tăng trưởng so với cùng kỳ năm trước:** <span style='color:green'>202,06%</span> (<span style='color:green'>0,02 tỷ</span>)\n* **Xếp hạng thực hiện:** 5/32\n* **Xếp hạng tăng trưởng cùng kỳ tháng:** 29/32\n* **Xếp hạng tăng trưởng cùng kỳ năm:** 10/32",
+        "text": "",
         "fill_id": "CONV01V2_FILL_006",
         "needs_kira_fill": true
       },
@@ -236,7 +236,7 @@
       {
         "role": "assistant",
         "dia_id": "D4:6",
-        "text": "Doanh thu dịch vụ IOT của **Cụm Thanh Sơn - Phú Thọ** lũy kế tháng 08/2026 là **59.710.912,7** đồng.\n\n**Chi tiết tăng trưởng và xếp hạng:**\n* **Tăng trưởng so với cùng kỳ tháng trước:** <span style='color:green'>9,31%</span> (<span style='color:green'>5.085.513,65</span> đồng)\n* **Tăng trưởng so với cùng kỳ năm trước:** <span style='color:green'>59,86%</span> (<span style='color:green'>22.359.597,23</span> đồng)\n* **Xếp hạng thực hiện:** 14/32\n* **Xếp hạng tăng trưởng cùng kỳ tháng:** 10/32\n* **Xếp hạng tăng trưởng cùng kỳ năm:** 20/32",
+        "text": "",
         "fill_id": "CONV01V2_FILL_007",
         "needs_kira_fill": true
       },
@@ -249,7 +249,7 @@
       {
         "role": "assistant",
         "dia_id": "D4:8",
-        "text": "**Thuê bao truyền hình phát triển thực lũy kế** của **Cụm Thanh Sơn - Phú Thọ** tính đến **lũy kế tháng 08/2026** là:\n\n* **Giá trị thực hiện:** **6.126 TB**\n* **Tăng trưởng so với cùng kỳ tháng trước:** <span style='color:green'>0,34%</span> (<span style='color:green'>21 TB</span>)\n* **Tăng trưởng so với cùng kỳ năm trước:** <span style='color:green'>3,97%</span> (<span style='color:green'>234 TB</span>)\n* **Xếp hạng thực hiện:** 5/32 cụm trong tỉnh.",
+        "text": "",
         "fill_id": "CONV01V2_FILL_008",
         "needs_kira_fill": true
       },
@@ -288,7 +288,7 @@
       {
         "role": "assistant",
         "dia_id": "D5:4",
-        "text": "Dưới đây là kết quả so sánh **Doanh thu tiêu dùng di động** ngày **06/09/2026**:\n\n| Địa bàn | Doanh thu tiêu dùng di động | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- |\n| **Tỉnh Phú Thọ** | **4,57 tỷ** | **<span style='color:red'>-1,43%</span> (<span style='color:red'>-0,07 tỷ</span>)** | **7** |\n| **Thành phố Đà Nẵng** | **2,72 tỷ** | **<span style='color:green'>0,11%</span> (<span style='color:green'>3,1 triệu</span>)** | **18** |\n\n**Nhận xét:**\n* **Tỉnh Phú Thọ** có doanh thu cao hơn (**4,57 tỷ** so với **2,72 tỷ** của Đà Nẵng) và xếp hạng thực hiện tốt hơn (hạng **7** so với hạng **18**).\n* Tuy nhiên, về xu hướng tăng trưởng so với cùng kỳ tháng trước, **Đà Nẵng** ghi nhận mức tăng nhẹ (**0,11%**), trong khi **Phú Thọ** lại giảm (**-1,43%**).",
+        "text": "",
         "fill_id": "CONV01V2_FILL_009",
         "needs_kira_fill": true
       },
@@ -301,7 +301,7 @@
       {
         "role": "assistant",
         "dia_id": "D5:6",
-        "text": "Dưới đây là số liệu so sánh **Thuê bao Di động 4G thực Lũy kế** ngày 06/09/2026:\n\n| Địa bàn | Số thuê bao | Tăng trưởng so với cùng kỳ tháng trước | Xếp hạng |\n| :--- | :--- | :--- | :--- |\n| **Tỉnh Phú Thọ** | **834.111 TB** | **<span style='color:green'>4,12%</span> (<span style='color:green'>32.982 TB</span>)** | **3** |\n| **Thành phố Đà Nẵng** | **341.459 TB** | **<span style='color:red'>-2,15%</span> (<span style='color:red'>-7.496 TB</span>)** | **21** |\n\n**Nhận xét:**\n* Tại ngày 06/09/2026, số thuê bao Di động 4G thực lũy kế của **Phú Thọ** cao hơn đáng kể so với **Đà Nẵng** (gấp khoảng 2,4 lần).\n* Về xu hướng tăng trưởng, **Phú Thọ** ghi nhận mức tăng dương **4,12%**, trong khi **Đà Nẵng** lại giảm **2,15%** so với cùng kỳ tháng trước.",
+        "text": "",
         "fill_id": "CONV01V2_FILL_010",
         "needs_kira_fill": true
       },
@@ -340,7 +340,7 @@
       {
         "role": "assistant",
         "dia_id": "D6:4",
-        "text": "Biểu đồ dưới đây minh họa trực quan doanh thu tiêu dùng di động của Top 3 tỉnh/thành phố xếp hạng đầu trong tháng 08/2026:\n\n![Biểu đồ Top 3 tỉnh/thành doanh thu tiêu dùng di động tháng 08/2026](chart_image_url_will_be_displayed_here)",
+        "text": "",
         "fill_id": "CONV01V2_FILL_011",
         "needs_kira_fill": true
       },
@@ -379,7 +379,7 @@
       {
         "role": "assistant",
         "dia_id": "D7:4",
-        "text": "Năm 2026 (lũy kế từ 01/01/2026 đến 20/09/2026), **doanh thu tiêu dùng di động** của **Xã Thượng Long - Tỉnh Phú Thọ** là:\n\n- **5,5 tỷ đồng**\n- Tăng trưởng so với cùng kỳ năm trước: **<span style='color:green'>152,65%</span> (<span style='color:green'>3,33 tỷ</span>)**\n- Xếp hạng thực hiện (xã): **121/148**\n- Xếp hạng tăng trưởng cùng kỳ năm (xã): **57/148**\n\nSo với toàn tỉnh Phú Thọ (1.779,24 tỷ đồng, tăng 6,2%), Xã Thượng Long có mức tăng trưởng rất cao nhưng quy mô doanh thu còn nhỏ.",
+        "text": "",
         "fill_id": "CONV01V2_FILL_012",
         "needs_kira_fill": true
       },
@@ -392,7 +392,7 @@
       {
         "role": "assistant",
         "dia_id": "D7:6",
-        "text": "Năm 2026 (lũy kế từ 01/01/2026 đến 20/09/2026), số liệu **Thuê bao FTTH phát triển thực lũy kế** của **Xã Thượng Long - Tỉnh Phú Thọ** như sau:\n\n| Địa bàn | Giá trị | Tăng trưởng so với cùng kỳ | Xếp hạng thực hiện (xã) | Xếp hạng tăng trưởng (xã) |\n| :--- | :--- | :--- | :--- | :--- |\n| **Xã Thượng Long** | **1.827 TB** | **<span style='color:red'>-3,89%</span> (<span style='color:red'>-74 TB</span>)** | **97/148** | **148/148** |\n\nSo với cùng kỳ năm trước, số thuê bao phát triển thực lũy kế tại xã Thượng Long giảm 74 thuê bao (-3,89%).",
+        "text": "",
         "fill_id": "CONV01V2_FILL_013",
         "needs_kira_fill": true
       },
@@ -442,7 +442,7 @@
       {
         "role": "assistant",
         "dia_id": "D8:4",
-        "text": "Chỉ tiêu **TB Di động 5G thực Lũy kế** tại **Cụm Thanh Sơn - Phú Thọ** tính đến **lũy kế tháng 08/2026** như sau:\n\n| Đơn vị | Số thuê bao | Tăng trưởng so với tháng trước | Tăng trưởng so với cùng kỳ năm trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- | :--- |\n| **Khu vực Thanh Sơn** | **22.466 TB** | **<span style='color:green'>5,38%</span> (<span style='color:green'>1.147 TB</span>)** | **<span style='color:green'>281,3%</span> (<span style='color:green'>16.574 TB</span>)** | **15/32** |\n| **Tỉnh Phú Thọ** | **29.325 TB** | **<span style='color:green'>2,25%</span> (<span style='color:green'>644 TB</span>)** | **<span style='color:green'>213,47%</span> (<span style='color:green'>19.970 TB</span>)** | **8/32** |\n\n**Nhận xét:**\n* Khu vực Thanh Sơn đóng góp phần lớn vào số thuê bao 5G lũy kế của toàn tỉnh Phú Thọ (chiếm khoảng 76,6%).\n* Tốc độ tăng trưởng so với cùng kỳ năm trước của Khu vực Thanh Sơn rất cao (**281,3%**), vượt xa mức tăng trưởng chung của toàn tỉnh (**213,47%**).",
+        "text": "",
         "fill_id": "CONV01V2_FILL_014",
         "needs_kira_fill": true
       },
@@ -481,7 +481,7 @@
       {
         "role": "assistant",
         "dia_id": "D9:4",
-        "text": "**Doanh thu tiêu dùng di động trừ VAS hợp tác** của **Cụm Thanh Sơn - Phú Thọ** trong **lũy kế tháng 08/2026** là:\n\n| Địa bàn | Doanh thu | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- | :--- |\n| **Cụm Thanh Sơn** | **6,57 tỷ** | **<span style='color:green'>1,82%</span> (<span style='color:green'>0,11 tỷ</span>)** | **<span style='color:green'>10%</span> (<span style='color:green'>0,58 tỷ</span>)** | **14/32** |\n| **Cụm Phú Thọ** | **7,2 tỷ** | **<span style='color:green'>3,32%</span> (<span style='color:green'>0,22 tỷ</span>)** | **<span style='color:green'>6,66%</span> (<span style='color:green'>0,43 tỷ</span>)** | **9/32** |\n\n**Tổng hợp giai đoạn:**\n* **Tổng doanh thu** của hai cụm trong lũy kế tháng 08/2026 là **13,77 tỷ**.\n* Cả hai cụm đều ghi nhận **tăng trưởng dương** so với cùng kỳ tháng trước và cùng kỳ năm trước.\n* Cụm Thanh Sơn có tốc độ tăng trưởng so với cùng kỳ năm trước cao hơn (**10%**) so với Cụm Phú Thọ (**6,66%**), nhưng Cụm Phú Thọ lại có thứ hạng thực hiện cao hơn (hạng 9 so với hạng 14).",
+        "text": "",
         "fill_id": "CONV01V2_FILL_015",
         "needs_kira_fill": true
       },
@@ -514,26 +514,26 @@
       {
         "role": "user",
         "dia_id": "D10:3",
-        "text": "Lấy doanh thu SME của Chí Tiên lũy kế đến hôm trước.",
+        "text": "Lấy doanh thu SME của Chí Tiên lũy kế đến ngày 07/09/2026.",
         "fill_id": "CONV01V2_FILL_016"
       },
       {
         "role": "assistant",
         "dia_id": "D10:4",
-        "text": "Doanh thu dịch vụ SME của Xã Chí Tiên (Phú Thọ) lũy kế đến ngày 07/09/2026 là **0,02 tỷ**.\n\nChỉ tiêu này có tăng trưởng **40,29%** (tương ứng **4,72 triệu**) so với cùng kỳ năm trước.",
+        "text": "",
         "fill_id": "CONV01V2_FILL_016",
         "needs_kira_fill": true
       },
       {
         "role": "user",
         "dia_id": "D10:5",
-        "text": "Lấy thêm FTTH phát triển thực lũy kế của Chí Tiên cùng mốc.",
+        "text": "Lấy thêm FTTH phát triển thực lũy kế của Chí Tiên đến ngày 07/09/2026.",
         "fill_id": "CONV01V2_FILL_017"
       },
       {
         "role": "assistant",
         "dia_id": "D10:6",
-        "text": "**Thuê bao FTTH phát triển thực lũy kế** của **Xã Chí Tiên (Phú Thọ)** tính đến ngày **07/09/2026** là:\n\n| Chỉ tiêu | Giá trị | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước | Xếp hạng thực hiện |\n|----------|---------|----------------------------------------|--------------------------------------|---------------------|\n| **Lũy kế tháng 09/2026** (01/09–07/09) | **1.272 TB** | <span style='color:green'>0,47%</span> (<span style='color:green'>6 TB</span>) | <span style='color:green'>8,26%</span> (<span style='color:green'>97 TB</span>) | **126/148** |\n| **Lũy kế năm 2026** (01/01–07/09) | **1.272 TB** | — | <span style='color:green'>8,26%</span> (<span style='color:green'>97 TB</span>) | **126/148** |\n\n**Tổng kết giai đoạn:**\n- Số thuê bao FTTH phát triển thực lũy kế đến ngày 07/09/2026 là **1.272 thuê bao**.\n- Tăng trưởng so với cùng kỳ năm trước đạt **8,26%** (tăng 97 thuê bao).\n- Xếp hạng thực hiện trong toàn tỉnh: **126/148** xã.",
+        "text": "",
         "fill_id": "CONV01V2_FILL_017",
         "needs_kira_fill": true
       },
@@ -555,7 +555,7 @@
       {
         "role": "user",
         "dia_id": "D11:1",
-        "text": "Mình chốt lại bộ số Thanh Sơn để khóa báo cáo tháng trước."
+        "text": "Mình chốt lại bộ số Thanh Sơn để khóa báo cáo tháng 08/2026."
       },
       {
         "role": "assistant",
@@ -566,39 +566,39 @@
       {
         "role": "user",
         "dia_id": "D11:3",
-        "text": "Cho mình doanh thu tiêu dùng di động của Thanh Sơn lũy kế đến hôm trước.",
+        "text": "Cho mình doanh thu tiêu dùng di động của Thanh Sơn lũy kế đến ngày 07/09/2026.",
         "fill_id": "CONV01V2_FILL_018"
       },
       {
         "role": "assistant",
         "dia_id": "D11:4",
-        "text": "**Doanh thu tiêu dùng di động** của **Cụm Thanh Sơn (Phú Thọ)** lũy kế đến ngày **07/09/2026** như sau:\n\n| Chỉ tiêu | Giá trị | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước | Xếp hạng thực hiện |\n| :--- | :--- | :--- | :--- | :--- |\n| **Lũy kế tháng 09/2026** (01/09 - 07/09) | **3,08 tỷ** | <span style='color:green'>3,24%</span> (<span style='color:green'>0,1 tỷ</span>) | <span style='color:green'>5,82%</span> (<span style='color:green'>0,17 tỷ</span>) | **8/32** |\n| **Lũy kế năm 2026** (01/01 - 07/09) | **55,18 tỷ** | - | <span style='color:green'>7,73%</span> (<span style='color:green'>3,96 tỷ</span>) | **11/32** |\n\n**Tổng kết giai đoạn:**\n* **Lũy kế tháng 09/2026:** Đạt **3,08 tỷ**, tăng trưởng tốt so với cùng kỳ tháng trước (**+3,24%**) và cùng kỳ năm trước (**+5,82%**). Cụm Thanh Sơn đang xếp hạng **8/32** về thực hiện.\n* **Lũy kế năm 2026:** Đạt **55,18 tỷ**, tăng trưởng **7,73%** so với cùng kỳ năm trước. Cụm Thanh Sơn xếp hạng **11/32** về thực hiện lũy kế năm.",
+        "text": "",
         "fill_id": "CONV01V2_FILL_018",
         "needs_kira_fill": true
       },
       {
         "role": "user",
         "dia_id": "D11:5",
-        "text": "Lấy thêm bản trừ VAS để đặt cạnh.",
+        "text": "Lấy thêm bản trừ VAS lũy kế đến ngày 07/09/2026 để đặt cạnh.",
         "fill_id": "CONV01V2_FILL_019"
       },
       {
         "role": "assistant",
         "dia_id": "D11:6",
-        "text": "Chỉ tiêu tra cứu được là **Doanh thu tiêu dùng di động trừ vas hợp tác** — khớp với yêu cầu của Anh/chị.\n\nDữ liệu cho **Cụm Thanh Sơn (Phú Thọ)** lũy kế đến ngày 07/09/2026 như sau:\n\n* **Lũy kế tháng 09/2026** (từ 01/09 đến 07/09/2026): **3,08 tỷ**\n * Tăng trưởng so với cùng kỳ tháng trước: **<span style='color:green'>3,25%</span> (<span style='color:green'>0,1 tỷ</span>)**\n  * Tăng trưởng so với cùng kỳ năm trước: **<span style='color:green'>6,5%</span> (<span style='color:green'>0,19 tỷ</span>)**\n * Xếp hạng thực hiện: **8/32**\n\n* **Lũy kế năm 2026** (từ 01/01 đến 07/09/2026): **54,86 tỷ**\n * Tăng trưởng so với cùng kỳ năm trước: **<span style='color:green'>8,74%</span> (<span style='color:green'>4,41 tỷ</span>)**\n  * Xếp hạng thực hiện: **11/32**\n\n*(Lưu ý: Dữ liệu trên là của Cụm Thanh Sơn thuộc Tỉnh Phú Thọ. Hệ thống cũng trả về dữ liệu của toàn Tỉnh Phú Thọ để tham chiếu: Lũy kế tháng 09/2026 là 2,68 tỷ và Lũy kế năm 2026 là 56,88 tỷ).*",
+        "text": "",
         "fill_id": "CONV01V2_FILL_019",
         "needs_kira_fill": true
       },
       {
         "role": "user",
         "dia_id": "D11:7",
-        "text": "Và 4G thực lũy kế của Thanh Sơn.",
+        "text": "Và 4G thực lũy kế của Thanh Sơn đến ngày 07/09/2026.",
         "fill_id": "CONV01V2_FILL_020"
       },
       {
         "role": "assistant",
         "dia_id": "D11:8",
-        "text": "Dữ liệu **Thuê bao Di động 4G thực Lũy kế** của **Cụm Thanh Sơn (Phú Thọ)** lũy kế đến ngày **07/09/2026** như sau:\n\n* **Lũy kế tháng 09/2026** (từ 01/09 đến 07/09/2026): **33.261 TB**\n * Tăng trưởng so với cùng kỳ tháng trước: **<span style='color:green'>4,87%</span> (<span style='color:green'>1.546 TB</span>)**\n  * Tăng trưởng so với cùng kỳ năm trước: **<span style='color:red'>-19,81%</span> (<span style='color:red'>-8.219 TB</span>)**\n * Xếp hạng thực hiện: **8/32**\n\n* **Lũy kế năm 2026** (từ 01/01 đến 07/09/2026): **33.261 TB**\n * Tăng trưởng so với cùng kỳ năm trước: **<span style='color:red'>-19,81%</span> (<span style='color:red'>-8.219 TB</span>)**\n  * Xếp hạng thực hiện: **8/32**\n\n*Lưu ý: Số liệu lũy kế tháng và lũy kế năm tại thời điểm này có giá trị trùng nhau do dữ liệu mới chỉ tích lũy từ đầu tháng 9/2026.*",
+        "text": "",
         "fill_id": "CONV01V2_FILL_020",
         "needs_kira_fill": true
       },
@@ -631,26 +631,26 @@
       {
         "role": "user",
         "dia_id": "D12:3",
-        "text": "Xem tăng trưởng doanh thu trừ VAS của Thanh Sơn so cùng kỳ tháng.",
+        "text": "Xem tăng trưởng doanh thu trừ VAS của Thanh Sơn lũy kế đến ngày 07/09/2026, so cùng kỳ tháng.",
         "fill_id": "CONV01V2_FILL_021"
       },
       {
         "role": "assistant",
         "dia_id": "D12:4",
-        "text": "**Doanh thu tiêu dùng di động trừ VAS hợp tác** của **Cụm Thanh Sơn (Phú Thọ)** lũy kế đến ngày **07/09/2026**:\n\n| Chỉ tiêu | Giá trị | Tăng trưởng so với cùng kỳ tháng trước | Tăng trưởng so với cùng kỳ năm trước |\n| :--- | :--- | :--- | :--- |\n| **Lũy kế tháng 09/2026** (01/09 - 07/09) | **3,08 tỷ** | **<span style='color:green'>3,25%</span> (<span style='color:green'>0,1 tỷ</span>)** | **<span style='color:green'>6,5%</span> (<span style='color:green'>0,19 tỷ</span>)** |\n| **Lũy kế năm 2026** (01/01 - 07/09) | **54,86 tỷ** | - | **<span style='color:green'>8,74%</span> (<span style='color:green'>4,41 tỷ</span>)** |\n\n**So với cùng kỳ tháng trước**, doanh thu lũy kế tháng 09/2026 của Cụm Thanh Sơn **tăng <span style='color:green'>3,25%</span> (tương ứng <span style='color:green'>0,1 tỷ</span>)**.\n\n*Xếp hạng tăng trưởng cùng kỳ tháng: 11/32 cụm trong tỉnh.*",
+        "text": "",
         "fill_id": "CONV01V2_FILL_021",
         "needs_kira_fill": true
       },
       {
         "role": "user",
         "dia_id": "D12:5",
-        "text": "Còn tăng trưởng 4G thực lũy kế của Thanh Sơn theo cùng kỳ tháng?",
+        "text": "Còn tăng trưởng 4G thực lũy kế của Thanh Sơn đến ngày 07/09/2026 theo cùng kỳ tháng?",
         "fill_id": "CONV01V2_FILL_022"
       },
       {
         "role": "assistant",
         "dia_id": "D12:6",
-        "text": "Kết quả tra cứu cho **Cụm Thanh Sơn - Tỉnh Phú Thọ** lũy kế đến ngày 07/09/2026:\n\n**Chỉ tiêu:** Thuê bao Di động 4G thực Lũy kế\n\n| Phạm vi | Lũy kế tháng 09/2026 | Tăng trưởng so với cùng kỳ tháng trước |\n| :--- | :--- | :--- |\n| **Cụm Thanh Sơn** | **33.261 TB** | **<span style='color:green'>4,87%</span> (<span style='color:green'>1.546 TB</span>)** |\n| *Toàn tỉnh Phú Thọ* | *900.559 TB* | *<span style='color:green'>3,72%</span> (<span style='color:green'>32.321 TB</span>)* |\n\n**Nhận xét:**\n* Cụm Thanh Sơn đạt **33.261 thuê bao**, xếp hạng thực hiện thứ **8/32** cụm trong tỉnh.\n* So với cùng kỳ tháng trước, cụm tăng trưởng **4,87%** (tương đương tăng 1.546 TB), xếp hạng tăng trưởng thứ **11/32** cụm.\n* Mức tăng trưởng này cao hơn mức tăng trưởng bình quân của toàn tỉnh Phú Thọ (3,72%).",
+        "text": "",
         "fill_id": "CONV01V2_FILL_022",
         "needs_kira_fill": true
       },
@@ -700,7 +700,7 @@
       {
         "role": "assistant",
         "dia_id": "D13:4",
-        "text": "**Doanh thu tiêu dùng di động trừ VAS hợp tác** của **Xã Thượng Long - Tỉnh Phú Thọ** lũy kế năm 2026 (từ 01/01/2026 đến 20/09/2026) là:\n\n* **Giá trị thực hiện:** **5,47 tỷ**\n* **Tăng trưởng so với cùng kỳ năm trước:** **<span style='color:green'>154,3%</span> (<span style='color:green'>3,32 tỷ</span>)**\n* **Xếp hạng thực hiện (xã):** 121/148\n* **Xếp hạng tăng trưởng cùng kỳ năm (xã):** 57/148\n\nSo với toàn tỉnh Phú Thọ (đạt 1.770,01 tỷ, tăng trưởng 7,08%), Xã Thượng Long có mức tăng trưởng rất cao trong giai đoạn này.",
+        "text": "",
         "fill_id": "CONV01V2_FILL_023",
         "needs_kira_fill": true
       },
@@ -713,7 +713,7 @@
       {
         "role": "assistant",
         "dia_id": "D13:6",
-        "text": "Chỉ tiêu **TB Di động 5G thực Lũy kế** năm 2026 của **Xã Thượng Long - Tỉnh Phú Thọ** như sau:\n\n| Địa bàn | Giá trị lũy kế (đến 20/09/2026) | Tăng trưởng so với cùng kỳ 2025 | Xếp hạng thực hiện (xã) | Xếp hạng tăng trưởng (xã) |\n| :--- | :--- | :--- | :--- | :--- |\n| **Xã Thượng Long** | **1.565 TB** | **<span style='color:green'>237,28%</span> (<span style='color:green'>1.101 TB</span>)** | **123/148** | **35/148** |\n\n**Tổng kết giai đoạn:**\n* **Toàn tỉnh Phú Thọ:** Đạt **672.463 TB** (tăng **<span style='color:green'>129,2%</span>** so với cùng kỳ), xếp hạng thực hiện thứ **6** toàn quốc.\n* **Xã Thượng Long:** Đóng góp **1.565 TB** vào tổng số của tỉnh, với mức tăng trưởng rất cao (**237,28%**), xếp hạng tăng trưởng thứ **35** trong toàn tỉnh.",
+        "text": "",
         "fill_id": "CONV01V2_FILL_024",
         "needs_kira_fill": true
       },
@@ -752,7 +752,7 @@
       {
         "role": "assistant",
         "dia_id": "D14:4",
-        "text": "Năm 2026 (lũy kế từ 01/01/2026 đến 20/09/2026), số thuê bao FTTH rời mạng tại **Xã Thượng Long - Tỉnh Phú Thọ** là **32 TB**.\n\nThông tin chi tiết:\n- **Tăng trưởng so với cùng kỳ năm trước**: <span style='color:green'>255,56%</span> (<span style='color:green'>23 TB</span>)\n- **Xếp hạng thực hiện (xã)**: 90/148\n- **Xếp hạng tăng trưởng cùng kỳ năm (xã)**: 18/148\n\nSo với toàn tỉnh Phú Thọ (1.291 TB), xã Thượng Long chiếm khoảng 2,5% tổng số thuê bao FTTH rời mạng của tỉnh.",
+        "text": "",
         "fill_id": "CONV01V2_FILL_025",
         "needs_kira_fill": true
       },
@@ -791,7 +791,7 @@
       {
         "role": "assistant",
         "dia_id": "D15:4",
-        "text": "Dữ liệu **Thuê bao Di động 4G thực Lũy kế** của **Xã Thượng Long - Tỉnh Phú Thọ** lũy kế năm 2026 (từ ngày 01/01/2026 đến ngày 20/09/2026) như sau:\n\n* **Số lượng:** **5.582 TB**\n* **Tăng trưởng so với cùng kỳ năm trước:** **<span style='color:red'>-9,32%</span> (<span style='color:red'>-574 TB</span>)**\n* **Xếp hạng thực hiện (xã):** **114/148**\n* **Xếp hạng tăng trưởng cùng kỳ năm (xã):** **23/148**\n\nToàn tỉnh Phú Thọ có tổng cộng **1.408.685 TB** (tăng trưởng **-17,2%**, tương ứng giảm **292.714 TB** so với cùng kỳ).",
+        "text": "",
         "fill_id": "CONV01V2_FILL_026",
         "needs_kira_fill": true
       },
@@ -804,7 +804,7 @@
       {
         "role": "assistant",
         "dia_id": "D15:6",
-        "text": "Chỉ tiêu **TB Di động 5G thực Lũy kế** năm 2026 của **Xã Thượng Long - Tỉnh Phú Thọ** như sau:\n\n| Địa bàn | Giá trị lũy kế (đến 20/09/2026) | Tăng trưởng so với cùng kỳ 2025 | Xếp hạng thực hiện (xã) | Xếp hạng tăng trưởng (xã) |\n| :--- | :--- | :--- | :--- | :--- |\n| **Xã Thượng Long** | **1.565 TB** | **<span style='color:green'>237,28%</span> (<span style='color:green'>1.101 TB</span>)** | **123/148** | **35/148** |\n\n**Tổng kết giai đoạn:**\n* **Toàn tỉnh Phú Thọ:** Đạt **672.463 TB** (tăng **<span style='color:green'>129,2%</span>** so với cùng kỳ), xếp hạng thực hiện thứ **6** toàn quốc.\n* **Xã Thượng Long:** Đóng góp **1.565 TB** vào tổng số của tỉnh, với mức tăng trưởng rất cao (**237,28%**), xếp hạng tăng trưởng thứ **35** trong toàn tỉnh.",
+        "text": "",
         "fill_id": "CONV01V2_FILL_027",
         "needs_kira_fill": true
       },
@@ -843,7 +843,7 @@
       {
         "role": "assistant",
         "dia_id": "D16:4",
-        "text": "**Doanh thu tiêu dùng di động trừ VAS hợp tác** của **Xã Thượng Long - Tỉnh Phú Thọ** lũy kế năm 2026 (từ 01/01/2026 đến 20/09/2026) là:\n\n* **Giá trị thực hiện:** **5,47 tỷ**\n* **Tăng trưởng so với cùng kỳ năm trước:** **<span style='color:green'>154,3%</span> (<span style='color:green'>3,32 tỷ</span>)**\n* **Xếp hạng thực hiện (xã):** 121/148\n* **Xếp hạng tăng trưởng cùng kỳ năm (xã):** 57/148\n\nSo với toàn tỉnh Phú Thọ (đạt 1.770,01 tỷ, tăng trưởng 7,08%), Xã Thượng Long có mức tăng trưởng rất cao trong giai đoạn này.",
+        "text": "",
         "fill_id": "CONV01V2_FILL_028",
         "needs_kira_fill": true
       },
@@ -856,7 +856,7 @@
       {
         "role": "assistant",
         "dia_id": "D16:6",
-        "text": "Chỉ tiêu **TB Di động 5G thực Lũy kế** năm 2026 của **Xã Thượng Long - Tỉnh Phú Thọ** như sau:\n\n| Địa bàn | Giá trị lũy kế (đến 20/09/2026) | Tăng trưởng so với cùng kỳ 2025 | Xếp hạng thực hiện (xã) | Xếp hạng tăng trưởng (xã) |\n| :--- | :--- | :--- | :--- | :--- |\n| **Xã Thượng Long** | **1.565 TB** | **<span style='color:green'>237,28%</span> (<span style='color:green'>1.101 TB</span>)** | **123/148** | **35/148** |\n\n**Tổng kết giai đoạn:**\n* **Toàn tỉnh Phú Thọ:** Đạt **672.463 TB** (tăng **<span style='color:green'>129,2%</span>** so với cùng kỳ), xếp hạng thực hiện thứ **6** toàn quốc.\n* **Xã Thượng Long:** Đóng góp **1.565 TB** vào tổng số của tỉnh, với mức tăng trưởng rất cao (**237,28%**), xếp hạng tăng trưởng thứ **35** trong toàn tỉnh.",
+        "text": "",
         "fill_id": "CONV01V2_FILL_029",
         "needs_kira_fill": true
       },
@@ -906,7 +906,7 @@
       {
         "role": "assistant",
         "dia_id": "D17:4",
-        "text": "Năm 2026 (lũy kế từ 01/01/2026 đến 20/09/2026), **doanh thu tiêu dùng di động** của **Xã Thượng Long - Tỉnh Phú Thọ** là:\n\n- **5,5 tỷ đồng**\n- Tăng trưởng so với cùng kỳ năm trước: **<span style='color:green'>152,65%</span> (<span style='color:green'>3,33 tỷ</span>)**\n- Xếp hạng thực hiện (xã): **121/148**\n- Xếp hạng tăng trưởng cùng kỳ năm (xã): **57/148**\n\nSo với toàn tỉnh Phú Thọ (1.779,24 tỷ đồng, tăng 6,2%), Xã Thượng Long có mức tăng trưởng rất cao nhưng quy mô doanh thu còn nhỏ.",
+        "text": "",
         "fill_id": "CONV01V2_FILL_030",
         "needs_kira_fill": true
       },
@@ -939,26 +939,26 @@
       {
         "role": "user",
         "dia_id": "D18:3",
-        "text": "Lấy doanh thu trừ VAS của Thanh Sơn lũy kế đến hôm trước.",
+        "text": "Lấy doanh thu trừ VAS của Thanh Sơn lũy kế đến ngày 07/09/2026.",
         "fill_id": "CONV01V2_FILL_031"
       },
       {
         "role": "assistant",
         "dia_id": "D18:4",
-        "text": "Chỉ tiêu tra cứu được là **Doanh thu tiêu dùng di động trừ vas hợp tác** — khớp với yêu cầu của Anh/chị.\n\nDữ liệu cho **Cụm Thanh Sơn (Phú Thọ)** lũy kế đến ngày 07/09/2026 như sau:\n\n* **Lũy kế tháng 09/2026** (từ 01/09 đến 07/09/2026): **3,08 tỷ**\n * Tăng trưởng so với cùng kỳ tháng trước: **<span style='color:green'>3,25%</span> (<span style='color:green'>0,1 tỷ</span>)**\n  * Tăng trưởng so với cùng kỳ năm trước: **<span style='color:green'>6,5%</span> (<span style='color:green'>0,19 tỷ</span>)**\n * Xếp hạng thực hiện: **8/32**\n\n* **Lũy kế năm 2026** (từ 01/01 đến 07/09/2026): **54,86 tỷ**\n * Tăng trưởng so với cùng kỳ năm trước: **<span style='color:green'>8,74%</span> (<span style='color:green'>4,41 tỷ</span>)**\n  * Xếp hạng thực hiện: **11/32**\n\n*(Lưu ý: Dữ liệu trên là của Cụm Thanh Sơn thuộc Tỉnh Phú Thọ. Hệ thống cũng trả về dữ liệu của toàn Tỉnh Phú Thọ để tham chiếu: Lũy kế tháng 09/2026 là 2,68 tỷ và Lũy kế năm 2026 là 56,88 tỷ).*",
+        "text": "",
         "fill_id": "CONV01V2_FILL_031",
         "needs_kira_fill": true
       },
       {
         "role": "user",
         "dia_id": "D18:5",
-        "text": "Lấy thêm 5G thực lũy kế của Thanh Sơn.",
+        "text": "Lấy thêm 5G thực lũy kế của Thanh Sơn đến ngày 07/09/2026.",
         "fill_id": "CONV01V2_FILL_032"
       },
       {
         "role": "assistant",
         "dia_id": "D18:6",
-        "text": "Số liệu **Thuê bao Di động 5G thực Lũy kế** của **Cụm Thanh Sơn (Phú Thọ)** lũy kế đến ngày **07/09/2026** là:\n\n* **Lũy kế tháng 09/2026** (từ 01/09 đến 07/09/2026): **14.729 TB**\n  * Tăng trưởng so với cùng kỳ tháng trước: **<span style='color:green'>10,33%</span> (<span style='color:green'>1.379 TB</span>)**\n * Tăng trưởng so với cùng kỳ năm trước: **<span style='color:green'>217,78%</span> (<span style='color:green'>10.094 TB</span>)**\n * Xếp hạng thực hiện: **13/32**\n\n*Lưu ý: Do là chỉ tiêu lũy kế đến ngày 07/09, giá trị lũy kế tháng và lũy kế năm trong hệ thống tại thời điểm này trùng nhau (14.729 TB).*",
+        "text": "",
         "fill_id": "CONV01V2_FILL_032",
         "needs_kira_fill": true
       },
@@ -997,7 +997,7 @@
       {
         "role": "assistant",
         "dia_id": "D19:4",
-        "text": "Tại Xã Thượng Long (cụm Yên Lập, tỉnh Phú Thọ), lũy kế đến tháng 08/2026 so với cùng kỳ năm trước, chỉ tiêu **Doanh thu tiêu dùng di động trừ VAS hợp tác** đạt mức tăng trưởng:\n\n**<span style='color:green'>335,13%</span> (<span style='color:green'>3,84 tỷ</span>)**\n\nCụ thể:\n- Doanh thu lũy kế: **4,99 tỷ**\n- Xếp hạng thực hiện tại xã: **121/148**\n- Xếp hạng tăng trưởng cùng kỳ năm tại xã: **58/148**",
+        "text": "",
         "fill_id": "CONV01V2_FILL_033",
         "needs_kira_fill": true
       },
@@ -1010,7 +1010,7 @@
       {
         "role": "assistant",
         "dia_id": "D19:6",
-        "text": "Dữ liệu **Thuê bao Di động 5G thực Lũy kế** tại **Xã Thượng Long, tỉnh Phú Thọ** lũy kế đến tháng 08/2026 so với cùng kỳ năm trước như sau:\n\n* **Số lượng thuê bao:** **1.703 TB**\n* **Tăng trưởng:** **<span style='color:green'>274,29%</span> (<span style='color:green'>1.248 TB</span>)**\n* **Xếp hạng tăng trưởng (cấp xã):** **43/148**\n\nToàn tỉnh Phú Thọ trong cùng kỳ có mức tăng trưởng **142,17%** với tổng số thuê bao lũy kế là **754.057 TB**.",
+        "text": "",
         "fill_id": "CONV01V2_FILL_034",
         "needs_kira_fill": true
       },
@@ -1049,7 +1049,7 @@
       {
         "role": "assistant",
         "dia_id": "D20:4",
-        "text": "Biểu đồ dưới đây minh họa trực quan sự chênh lệch về quy mô thuê bao giữa 3 địa phương dẫn đầu:\n\n*(Biểu đồ sẽ hiển thị bên dưới)*",
+        "text": "",
         "fill_id": "CONV01V2_FILL_035",
         "needs_kira_fill": true
       },
@@ -1088,7 +1088,7 @@
       {
         "role": "assistant",
         "dia_id": "D21:4",
-        "text": "Năm 2026 (lũy kế từ 01/01/2026 đến 20/09/2026), **doanh thu tiêu dùng di động** của **Xã Thượng Long - Tỉnh Phú Thọ** là:\n\n- **5,5 tỷ đồng**\n- Tăng trưởng so với cùng kỳ năm trước: **<span style='color:green'>152,65%</span> (<span style='color:green'>3,33 tỷ</span>)**\n- Xếp hạng thực hiện (xã): **121/148**\n- Xếp hạng tăng trưởng cùng kỳ năm (xã): **57/148**\n\nSo với toàn tỉnh Phú Thọ (1.779,24 tỷ đồng, tăng 6,2%), Xã Thượng Long có mức tăng trưởng rất cao nhưng quy mô doanh thu còn nhỏ.",
+        "text": "",
         "fill_id": "CONV01V2_FILL_036",
         "needs_kira_fill": true
       },
@@ -1101,7 +1101,7 @@
       {
         "role": "assistant",
         "dia_id": "D21:6",
-        "text": "Dữ liệu **Thuê bao Di động 4G thực Lũy kế** của **Xã Thượng Long - Tỉnh Phú Thọ** lũy kế năm 2026 (từ ngày 01/01/2026 đến ngày 20/09/2026) như sau:\n\n* **Số lượng:** **5.582 TB**\n* **Tăng trưởng so với cùng kỳ năm trước:** **<span style='color:red'>-9,32%</span> (<span style='color:red'>-574 TB</span>)**\n* **Xếp hạng thực hiện (xã):** **114/148**\n* **Xếp hạng tăng trưởng cùng kỳ năm (xã):** **23/148**\n\nToàn tỉnh Phú Thọ có tổng cộng **1.408.685 TB** (tăng trưởng **-17,2%**, tương ứng giảm **292.714 TB** so với cùng kỳ).",
+        "text": "",
         "fill_id": "CONV01V2_FILL_037",
         "needs_kira_fill": true
       },
@@ -1140,7 +1140,7 @@
       {
         "role": "assistant",
         "dia_id": "D22:4",
-        "text": "**Doanh thu tiêu dùng di động trừ VAS hợp tác** của **Xã Thượng Long - Tỉnh Phú Thọ** lũy kế năm 2026 (từ 01/01/2026 đến 20/09/2026) là:\n\n* **Giá trị thực hiện:** **5,47 tỷ**\n* **Tăng trưởng so với cùng kỳ năm trước:** **<span style='color:green'>154,3%</span> (<span style='color:green'>3,32 tỷ</span>)**\n* **Xếp hạng thực hiện (xã):** 121/148\n* **Xếp hạng tăng trưởng cùng kỳ năm (xã):** 57/148\n\nSo với toàn tỉnh Phú Thọ (đạt 1.770,01 tỷ, tăng trưởng 7,08%), Xã Thượng Long có mức tăng trưởng rất cao trong giai đoạn này.",
+        "text": "",
         "fill_id": "CONV01V2_FILL_038",
         "needs_kira_fill": true
       },
@@ -1153,7 +1153,7 @@
       {
         "role": "assistant",
         "dia_id": "D22:6",
-        "text": "Chỉ tiêu **TB Di động 5G thực Lũy kế** năm 2026 của **Xã Thượng Long - Tỉnh Phú Thọ** như sau:\n\n| Địa bàn | Giá trị lũy kế (đến 20/09/2026) | Tăng trưởng so với cùng kỳ 2025 | Xếp hạng thực hiện (xã) | Xếp hạng tăng trưởng (xã) |\n| :--- | :--- | :--- | :--- | :--- |\n| **Xã Thượng Long** | **1.565 TB** | **<span style='color:green'>237,28%</span> (<span style='color:green'>1.101 TB</span>)** | **123/148** | **35/148** |\n\n**Tổng kết giai đoạn:**\n* **Toàn tỉnh Phú Thọ:** Đạt **672.463 TB** (tăng **<span style='color:green'>129,2%</span>** so với cùng kỳ), xếp hạng thực hiện thứ **6** toàn quốc.\n* **Xã Thượng Long:** Đóng góp **1.565 TB** vào tổng số của tỉnh, với mức tăng trưởng rất cao (**237,28%**), xếp hạng tăng trưởng thứ **35** trong toàn tỉnh.",
+        "text": "",
         "fill_id": "CONV01V2_FILL_039",
         "needs_kira_fill": true
       },

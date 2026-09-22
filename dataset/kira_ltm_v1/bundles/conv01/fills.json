@@ -1,5 +1,5 @@
 {
-  "conversation_id": "conv_01_FREEZE_v10_FINAL",
+  "conversation_id": "conv_01_FREEZE_v11_FINAL",
   "instructions": "For each fill, follow `runner_contract.send_field` exactly. Send the value from that field to KiRa; do not assume `kira_fill_query` is always the execution query.",
   "fills": [
     {
@@ -80,8 +80,8 @@
       "session_goal": "Rà mobile cuối ngày",
       "user_turn_id": "D2:3",
       "assistant_turn_id": "D2:4",
-      "surface_text": "Xem doanh thu tiêu dùng di động trừ VAS hợp tác của Thanh Sơn lũy kế đến hôm trước.",
-      "kira_fill_query": "Doanh thu tiêu dùng di động trừ VAS hợp tác của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày hôm trước là bao nhiêu?",
+      "surface_text": "Xem doanh thu tiêu dùng di động trừ VAS hợp tác của Thanh Sơn lũy kế đến ngày 07/09/2026.",
+      "kira_fill_query": "Doanh thu tiêu dùng di động trừ VAS hợp tác của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
       "source_indicator": "Doanh thu tiêu dùng di động trừ VAS hợp tác",
       "source_service_id": "59",
       "source_testcase": "CT_61",
@@ -98,21 +98,16 @@
         "condition": []
       },
       "session_datetime": "2026-09-15T14:10:00+07:00",
-      "has_relative_time": true,
+      "has_relative_time": false,
       "temporal_fill_policy": {
-        "recommended_mode": "explicit_fixture_rewrite",
-        "reason": "Source testcase expected_api uses a fixed fixture date; raw relative wording would resolve differently at the synthetic session date.",
-        "do_not_send_raw_relative_query_as_if_session_date_matches_fixture": true,
-        "session_datetime": "2026-09-15T14:10:00+07:00",
-        "source_expected_prd_id": "20260907",
-        "action": "Use an explicit-date equivalent query matching the source testcase fixture, or re-run KiRa with a session-date-consistent expected_api and regenerate gold."
+        "recommended_mode": "normal",
+        "session_datetime": "2026-09-15T14:10:00+07:00"
       },
       "fill_execution_query": "Doanh thu tiêu dùng di động trừ VAS hợp tác của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
-      "fill_execution_mode": "explicit_fixture_rewrite",
+      "fill_execution_mode": "normal",
       "runner_contract": {
-        "send_field": "fill_execution_query",
-        "do_not_send_field": "kira_fill_query",
-        "reason": "Raw relative wording would resolve against the synthetic session date, not the fixed KiRa source fixture."
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
       }
     },
     {
@@ -121,8 +116,8 @@
       "session_goal": "Rà mobile cuối ngày",
       "user_turn_id": "D2:5",
       "assistant_turn_id": "D2:6",
-      "surface_text": "Còn 4G thực lũy kế của Thanh Sơn đến hôm trước thì sao?",
-      "kira_fill_query": "Thuê bao Di động 4G thực Lũy kế của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày hôm trước là bao nhiêu?",
+      "surface_text": "Còn 4G thực lũy kế của Thanh Sơn đến ngày 07/09/2026 thì sao?",
+      "kira_fill_query": "Thuê bao Di động 4G thực Lũy kế của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
       "source_indicator": "Thuê bao Di động 4G thực Lũy kế",
       "source_service_id": "36",
       "source_testcase": "CT_61",
@@ -139,21 +134,16 @@
         "condition": []
       },
       "session_datetime": "2026-09-15T14:10:00+07:00",
-      "has_relative_time": true,
+      "has_relative_time": false,
       "temporal_fill_policy": {
-        "recommended_mode": "explicit_fixture_rewrite",
-        "reason": "Source testcase expected_api uses a fixed fixture date; raw relative wording would resolve differently at the synthetic session date.",
-        "do_not_send_raw_relative_query_as_if_session_date_matches_fixture": true,
-        "session_datetime": "2026-09-15T14:10:00+07:00",
-        "source_expected_prd_id": "20260907",
-        "action": "Use an explicit-date equivalent query matching the source testcase fixture, or re-run KiRa with a session-date-consistent expected_api and regenerate gold."
+        "recommended_mode": "normal",
+        "session_datetime": "2026-09-15T14:10:00+07:00"
       },
       "fill_execution_query": "Thuê bao Di động 4G thực Lũy kế của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
-      "fill_execution_mode": "explicit_fixture_rewrite",
+      "fill_execution_mode": "normal",
       "runner_contract": {
-        "send_field": "fill_execution_query",
-        "do_not_send_field": "kira_fill_query",
-        "reason": "Raw relative wording would resolve against the synthetic session date, not the fixed KiRa source fixture."
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
       }
     },
     {
@@ -692,8 +682,8 @@
       "session_goal": "Hỗ trợ Chí Tiên",
       "user_turn_id": "D10:3",
       "assistant_turn_id": "D10:4",
-      "surface_text": "Lấy doanh thu SME của Chí Tiên lũy kế đến hôm trước.",
-      "kira_fill_query": "Doanh thu dịch vụ SME của Xã Chí Tiên (Phú Thọ) lũy kế đến ngày hôm trước là bao nhiêu?",
+      "surface_text": "Lấy doanh thu SME của Chí Tiên lũy kế đến ngày 07/09/2026.",
+      "kira_fill_query": "Doanh thu dịch vụ SME của Xã Chí Tiên (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
       "source_indicator": "Doanh thu dịch vụ SME",
       "source_service_id": "58",
       "source_testcase": "CT_63",
@@ -710,21 +700,16 @@
         "condition": []
       },
       "session_datetime": "2026-11-01T15:45:00+07:00",
-      "has_relative_time": true,
+      "has_relative_time": false,
       "temporal_fill_policy": {
-        "recommended_mode": "explicit_fixture_rewrite",
-        "reason": "Source testcase expected_api uses a fixed fixture date; raw relative wording would resolve differently at the synthetic session date.",
-        "do_not_send_raw_relative_query_as_if_session_date_matches_fixture": true,
-        "session_datetime": "2026-11-01T15:45:00+07:00",
-        "source_expected_prd_id": "20260907",
-        "action": "Use an explicit-date equivalent query matching the source testcase fixture, or re-run KiRa with a session-date-consistent expected_api and regenerate gold."
+        "recommended_mode": "normal",
+        "session_datetime": "2026-11-01T15:45:00+07:00"
       },
       "fill_execution_query": "Doanh thu dịch vụ SME của Xã Chí Tiên (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
-      "fill_execution_mode": "explicit_fixture_rewrite",
+      "fill_execution_mode": "normal",
       "runner_contract": {
-        "send_field": "fill_execution_query",
-        "do_not_send_field": "kira_fill_query",
-        "reason": "Raw relative wording would resolve against the synthetic session date, not the fixed KiRa source fixture."
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
       }
     },
     {
@@ -733,8 +718,8 @@
       "session_goal": "Hỗ trợ Chí Tiên",
       "user_turn_id": "D10:5",
       "assistant_turn_id": "D10:6",
-      "surface_text": "Lấy thêm FTTH phát triển thực lũy kế của Chí Tiên cùng mốc.",
-      "kira_fill_query": "Thuê bao FTTH phát triển thực LK của Xã Chí Tiên (Phú Thọ) lũy kế đến ngày hôm trước là bao nhiêu?",
+      "surface_text": "Lấy thêm FTTH phát triển thực lũy kế của Chí Tiên đến ngày 07/09/2026.",
+      "kira_fill_query": "Thuê bao FTTH phát triển thực LK của Xã Chí Tiên (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
       "source_indicator": "Thuê bao FTTH phát triển thực LK",
       "source_service_id": "38",
       "source_testcase": "CT_63",
@@ -751,21 +736,16 @@
         "condition": []
       },
       "session_datetime": "2026-11-01T15:45:00+07:00",
-      "has_relative_time": true,
+      "has_relative_time": false,
       "temporal_fill_policy": {
-        "recommended_mode": "explicit_fixture_rewrite",
-        "reason": "Source testcase expected_api uses a fixed fixture date; raw relative wording would resolve differently at the synthetic session date.",
-        "do_not_send_raw_relative_query_as_if_session_date_matches_fixture": true,
-        "session_datetime": "2026-11-01T15:45:00+07:00",
-        "source_expected_prd_id": "20260907",
-        "action": "Use an explicit-date equivalent query matching the source testcase fixture, or re-run KiRa with a session-date-consistent expected_api and regenerate gold."
+        "recommended_mode": "normal",
+        "session_datetime": "2026-11-01T15:45:00+07:00"
       },
       "fill_execution_query": "Thuê bao FTTH phát triển thực LK của Xã Chí Tiên (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
-      "fill_execution_mode": "explicit_fixture_rewrite",
+      "fill_execution_mode": "normal",
       "runner_contract": {
-        "send_field": "fill_execution_query",
-        "do_not_send_field": "kira_fill_query",
-        "reason": "Raw relative wording would resolve against the synthetic session date, not the fixed KiRa source fixture."
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
       }
     },
     {
@@ -774,8 +754,8 @@
       "session_goal": "Chốt báo cáo tháng",
       "user_turn_id": "D11:3",
       "assistant_turn_id": "D11:4",
-      "surface_text": "Cho mình doanh thu tiêu dùng di động của Thanh Sơn lũy kế đến hôm trước.",
-      "kira_fill_query": "Doanh thu tiêu dùng di động của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày hôm trước là bao nhiêu?",
+      "surface_text": "Cho mình doanh thu tiêu dùng di động của Thanh Sơn lũy kế đến ngày 07/09/2026.",
+      "kira_fill_query": "Doanh thu tiêu dùng di động của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
       "source_indicator": "Doanh thu tiêu dùng di động",
       "source_service_id": "33",
       "source_testcase": "CT_61",
@@ -792,21 +772,16 @@
         "condition": []
       },
       "session_datetime": "2026-11-06T08:15:00+07:00",
-      "has_relative_time": true,
+      "has_relative_time": false,
       "temporal_fill_policy": {
-        "recommended_mode": "explicit_fixture_rewrite",
-        "reason": "Source testcase expected_api uses a fixed fixture date; raw relative wording would resolve differently at the synthetic session date.",
-        "do_not_send_raw_relative_query_as_if_session_date_matches_fixture": true,
-        "session_datetime": "2026-11-06T08:15:00+07:00",
-        "source_expected_prd_id": "20260907",
-        "action": "Use an explicit-date equivalent query matching the source testcase fixture, or re-run KiRa with a session-date-consistent expected_api and regenerate gold."
+        "recommended_mode": "normal",
+        "session_datetime": "2026-11-06T08:15:00+07:00"
       },
       "fill_execution_query": "Doanh thu tiêu dùng di động của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
-      "fill_execution_mode": "explicit_fixture_rewrite",
+      "fill_execution_mode": "normal",
       "runner_contract": {
-        "send_field": "fill_execution_query",
-        "do_not_send_field": "kira_fill_query",
-        "reason": "Raw relative wording would resolve against the synthetic session date, not the fixed KiRa source fixture."
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
       }
     },
     {
@@ -815,8 +790,8 @@
       "session_goal": "Chốt báo cáo tháng",
       "user_turn_id": "D11:5",
       "assistant_turn_id": "D11:6",
-      "surface_text": "Lấy thêm bản trừ VAS để đặt cạnh.",
-      "kira_fill_query": "Doanh thu tiêu dùng di động trừ VAS hợp tác của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày hôm trước là bao nhiêu?",
+      "surface_text": "Lấy thêm bản trừ VAS lũy kế đến ngày 07/09/2026 để đặt cạnh.",
+      "kira_fill_query": "Doanh thu tiêu dùng di động trừ VAS hợp tác của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
       "source_indicator": "Doanh thu tiêu dùng di động trừ VAS hợp tác",
       "source_service_id": "59",
       "source_testcase": "CT_61",
@@ -833,21 +808,16 @@
         "condition": []
       },
       "session_datetime": "2026-11-06T08:15:00+07:00",
-      "has_relative_time": true,
+      "has_relative_time": false,
       "temporal_fill_policy": {
-        "recommended_mode": "explicit_fixture_rewrite",
-        "reason": "Source testcase expected_api uses a fixed fixture date; raw relative wording would resolve differently at the synthetic session date.",
-        "do_not_send_raw_relative_query_as_if_session_date_matches_fixture": true,
-        "session_datetime": "2026-11-06T08:15:00+07:00",
-        "source_expected_prd_id": "20260907",
-        "action": "Use an explicit-date equivalent query matching the source testcase fixture, or re-run KiRa with a session-date-consistent expected_api and regenerate gold."
+        "recommended_mode": "normal",
+        "session_datetime": "2026-11-06T08:15:00+07:00"
       },
       "fill_execution_query": "Doanh thu tiêu dùng di động trừ VAS hợp tác của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
-      "fill_execution_mode": "explicit_fixture_rewrite",
+      "fill_execution_mode": "normal",
       "runner_contract": {
-        "send_field": "fill_execution_query",
-        "do_not_send_field": "kira_fill_query",
-        "reason": "Raw relative wording would resolve against the synthetic session date, not the fixed KiRa source fixture."
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
       }
     },
     {
@@ -856,8 +826,8 @@
       "session_goal": "Chốt báo cáo tháng",
       "user_turn_id": "D11:7",
       "assistant_turn_id": "D11:8",
-      "surface_text": "Và 4G thực lũy kế của Thanh Sơn.",
-      "kira_fill_query": "Thuê bao Di động 4G thực Lũy kế của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày hôm trước là bao nhiêu?",
+      "surface_text": "Và 4G thực lũy kế của Thanh Sơn đến ngày 07/09/2026.",
+      "kira_fill_query": "Thuê bao Di động 4G thực Lũy kế của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
       "source_indicator": "Thuê bao Di động 4G thực Lũy kế",
       "source_service_id": "36",
       "source_testcase": "CT_61",
@@ -874,21 +844,16 @@
         "condition": []
       },
       "session_datetime": "2026-11-06T08:15:00+07:00",
-      "has_relative_time": true,
+      "has_relative_time": false,
       "temporal_fill_policy": {
-        "recommended_mode": "explicit_fixture_rewrite",
-        "reason": "Source testcase expected_api uses a fixed fixture date; raw relative wording would resolve differently at the synthetic session date.",
-        "do_not_send_raw_relative_query_as_if_session_date_matches_fixture": true,
-        "session_datetime": "2026-11-06T08:15:00+07:00",
-        "source_expected_prd_id": "20260907",
-        "action": "Use an explicit-date equivalent query matching the source testcase fixture, or re-run KiRa with a session-date-consistent expected_api and regenerate gold."
+        "recommended_mode": "normal",
+        "session_datetime": "2026-11-06T08:15:00+07:00"
       },
       "fill_execution_query": "Thuê bao Di động 4G thực Lũy kế của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
-      "fill_execution_mode": "explicit_fixture_rewrite",
+      "fill_execution_mode": "normal",
       "runner_contract": {
-        "send_field": "fill_execution_query",
-        "do_not_send_field": "kira_fill_query",
-        "reason": "Raw relative wording would resolve against the synthetic session date, not the fixed KiRa source fixture."
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
       }
     },
     {
@@ -897,8 +862,8 @@
       "session_goal": "Xem tăng trưởng ngắn hạn",
       "user_turn_id": "D12:3",
       "assistant_turn_id": "D12:4",
-      "surface_text": "Xem tăng trưởng doanh thu trừ VAS của Thanh Sơn so cùng kỳ tháng.",
-      "kira_fill_query": "Cụm Thanh Sơn trong tỉnh Phú Thọ lũy kế đến ngày hôm trước so với cùng kỳ tháng, tăng trưởng Doanh thu tiêu dùng di động trừ VAS hợp tác là bao nhiêu?",
+      "surface_text": "Xem tăng trưởng doanh thu trừ VAS của Thanh Sơn lũy kế đến ngày 07/09/2026, so cùng kỳ tháng.",
+      "kira_fill_query": "Cụm Thanh Sơn trong tỉnh Phú Thọ lũy kế đến ngày 07/09/2026 so với cùng kỳ tháng, tăng trưởng Doanh thu tiêu dùng di động trừ VAS hợp tác là bao nhiêu?",
       "source_indicator": "Doanh thu tiêu dùng di động trừ VAS hợp tác",
       "source_service_id": "59",
       "source_testcase": "CT_79",
@@ -915,21 +880,16 @@
         "condition": []
       },
       "session_datetime": "2026-11-11T16:20:00+07:00",
-      "has_relative_time": true,
+      "has_relative_time": false,
       "temporal_fill_policy": {
-        "recommended_mode": "explicit_fixture_rewrite",
-        "reason": "Source testcase expected_api uses a fixed fixture date; raw relative wording would resolve differently at the synthetic session date.",
-        "do_not_send_raw_relative_query_as_if_session_date_matches_fixture": true,
-        "session_datetime": "2026-11-11T16:20:00+07:00",
-        "source_expected_prd_id": "20260907",
-        "action": "Use an explicit-date equivalent query matching the source testcase fixture, or re-run KiRa with a session-date-consistent expected_api and regenerate gold."
+        "recommended_mode": "normal",
+        "session_datetime": "2026-11-11T16:20:00+07:00"
       },
       "fill_execution_query": "Cụm Thanh Sơn trong tỉnh Phú Thọ lũy kế đến ngày 07/09/2026 so với cùng kỳ tháng, tăng trưởng Doanh thu tiêu dùng di động trừ VAS hợp tác là bao nhiêu?",
-      "fill_execution_mode": "explicit_fixture_rewrite",
+      "fill_execution_mode": "normal",
       "runner_contract": {
-        "send_field": "fill_execution_query",
-        "do_not_send_field": "kira_fill_query",
-        "reason": "Raw relative wording would resolve against the synthetic session date, not the fixed KiRa source fixture."
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
       }
     },
     {
@@ -938,8 +898,8 @@
       "session_goal": "Xem tăng trưởng ngắn hạn",
       "user_turn_id": "D12:5",
       "assistant_turn_id": "D12:6",
-      "surface_text": "Còn tăng trưởng 4G thực lũy kế của Thanh Sơn theo cùng kỳ tháng?",
-      "kira_fill_query": "Cụm Thanh Sơn trong tỉnh Phú Thọ lũy kế đến ngày hôm trước so với cùng kỳ tháng, tăng trưởng Thuê bao Di động 4G thực Lũy kế là bao nhiêu?",
+      "surface_text": "Còn tăng trưởng 4G thực lũy kế của Thanh Sơn đến ngày 07/09/2026 theo cùng kỳ tháng?",
+      "kira_fill_query": "Cụm Thanh Sơn trong tỉnh Phú Thọ lũy kế đến ngày 07/09/2026 so với cùng kỳ tháng, tăng trưởng Thuê bao Di động 4G thực Lũy kế là bao nhiêu?",
       "source_indicator": "Thuê bao Di động 4G thực Lũy kế",
       "source_service_id": "36",
       "source_testcase": "CT_79",
@@ -956,21 +916,16 @@
         "condition": []
       },
       "session_datetime": "2026-11-11T16:20:00+07:00",
-      "has_relative_time": true,
+      "has_relative_time": false,
       "temporal_fill_policy": {
-        "recommended_mode": "explicit_fixture_rewrite",
-        "reason": "Source testcase expected_api uses a fixed fixture date; raw relative wording would resolve differently at the synthetic session date.",
-        "do_not_send_raw_relative_query_as_if_session_date_matches_fixture": true,
-        "session_datetime": "2026-11-11T16:20:00+07:00",
-        "source_expected_prd_id": "20260907",
-        "action": "Use an explicit-date equivalent query matching the source testcase fixture, or re-run KiRa with a session-date-consistent expected_api and regenerate gold."
+        "recommended_mode": "normal",
+        "session_datetime": "2026-11-11T16:20:00+07:00"
       },
       "fill_execution_query": "Cụm Thanh Sơn trong tỉnh Phú Thọ lũy kế đến ngày 07/09/2026 so với cùng kỳ tháng, tăng trưởng Thuê bao Di động 4G thực Lũy kế là bao nhiêu?",
-      "fill_execution_mode": "explicit_fixture_rewrite",
+      "fill_execution_mode": "normal",
       "runner_contract": {
-        "send_field": "fill_execution_query",
-        "do_not_send_field": "kira_fill_query",
-        "reason": "Raw relative wording would resolve against the synthetic session date, not the fixed KiRa source fixture."
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
       }
     },
     {
@@ -1603,8 +1558,8 @@
       "session_goal": "Quay lên Thanh Sơn để đối chiếu",
       "user_turn_id": "D18:3",
       "assistant_turn_id": "D18:4",
-      "surface_text": "Lấy doanh thu trừ VAS của Thanh Sơn lũy kế đến hôm trước.",
-      "kira_fill_query": "Doanh thu tiêu dùng di động trừ VAS hợp tác của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày hôm trước là bao nhiêu?",
+      "surface_text": "Lấy doanh thu trừ VAS của Thanh Sơn lũy kế đến ngày 07/09/2026.",
+      "kira_fill_query": "Doanh thu tiêu dùng di động trừ VAS hợp tác của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
       "source_indicator": "Doanh thu tiêu dùng di động trừ VAS hợp tác",
       "source_service_id": "59",
       "source_testcase": "CT_61",
@@ -1621,21 +1576,16 @@
         "condition": []
       },
       "session_datetime": "2026-12-11T16:40:00+07:00",
-      "has_relative_time": true,
+      "has_relative_time": false,
       "temporal_fill_policy": {
-        "recommended_mode": "explicit_fixture_rewrite",
-        "reason": "Source testcase expected_api uses a fixed fixture date; raw relative wording would resolve differently at the synthetic session date.",
-        "do_not_send_raw_relative_query_as_if_session_date_matches_fixture": true,
-        "session_datetime": "2026-12-11T16:40:00+07:00",
-        "source_expected_prd_id": "20260907",
-        "action": "Use an explicit-date equivalent query matching the source testcase fixture, or re-run KiRa with a session-date-consistent expected_api and regenerate gold."
+        "recommended_mode": "normal",
+        "session_datetime": "2026-12-11T16:40:00+07:00"
       },
       "fill_execution_query": "Doanh thu tiêu dùng di động trừ VAS hợp tác của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
-      "fill_execution_mode": "explicit_fixture_rewrite",
+      "fill_execution_mode": "normal",
       "runner_contract": {
-        "send_field": "fill_execution_query",
-        "do_not_send_field": "kira_fill_query",
-        "reason": "Raw relative wording would resolve against the synthetic session date, not the fixed KiRa source fixture."
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
       }
     },
     {
@@ -1644,8 +1594,8 @@
       "session_goal": "Quay lên Thanh Sơn để đối chiếu",
       "user_turn_id": "D18:5",
       "assistant_turn_id": "D18:6",
-      "surface_text": "Lấy thêm 5G thực lũy kế của Thanh Sơn.",
-      "kira_fill_query": "TB Di động 5G thực Lũy kế của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày hôm trước là bao nhiêu?",
+      "surface_text": "Lấy thêm 5G thực lũy kế của Thanh Sơn đến ngày 07/09/2026.",
+      "kira_fill_query": "TB Di động 5G thực Lũy kế của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
       "source_indicator": "TB Di động 5G thực Lũy kế",
       "source_service_id": "413",
       "source_testcase": "CT_61",
@@ -1662,21 +1612,16 @@
         "condition": []
       },
       "session_datetime": "2026-12-11T16:40:00+07:00",
-      "has_relative_time": true,
+      "has_relative_time": false,
       "temporal_fill_policy": {
-        "recommended_mode": "explicit_fixture_rewrite",
-        "reason": "Source testcase expected_api uses a fixed fixture date; raw relative wording would resolve differently at the synthetic session date.",
-        "do_not_send_raw_relative_query_as_if_session_date_matches_fixture": true,
-        "session_datetime": "2026-12-11T16:40:00+07:00",
-        "source_expected_prd_id": "20260907",
-        "action": "Use an explicit-date equivalent query matching the source testcase fixture, or re-run KiRa with a session-date-consistent expected_api and regenerate gold."
+        "recommended_mode": "normal",
+        "session_datetime": "2026-12-11T16:40:00+07:00"
       },
       "fill_execution_query": "TB Di động 5G thực Lũy kế của Cụm Thanh Sơn (Phú Thọ) lũy kế đến ngày 07/09/2026 là bao nhiêu?",
-      "fill_execution_mode": "explicit_fixture_rewrite",
+      "fill_execution_mode": "normal",
       "runner_contract": {
-        "send_field": "fill_execution_query",
-        "do_not_send_field": "kira_fill_query",
-        "reason": "Raw relative wording would resolve against the synthetic session date, not the fixed KiRa source fixture."
+        "send_field": "kira_fill_query",
+        "do_not_send_field": null
       }
     },
     {
@@ -2104,25 +2049,9 @@
   ],
   "note": "Business fill mappings unchanged from v2.",
   "temporal_fill_policy": {
-    "rule": "Do not fill relative-time conversation turns with a KiRa response generated under a mismatched fixed testcase date.",
-    "safe_options": [
-      "Use an explicit-date equivalent query matching the source testcase fixture and keep the existing expected_api.",
-      "Or ground KiRa to the synthetic session date, then regenerate expected_api/gold for that turn."
-    ],
-    "relative_fill_count": 11,
-    "relative_fill_ids": [
-      "CONV01V2_FILL_003",
-      "CONV01V2_FILL_004",
-      "CONV01V2_FILL_016",
-      "CONV01V2_FILL_017",
-      "CONV01V2_FILL_018",
-      "CONV01V2_FILL_019",
-      "CONV01V2_FILL_020",
-      "CONV01V2_FILL_021",
-      "CONV01V2_FILL_022",
-      "CONV01V2_FILL_031",
-      "CONV01V2_FILL_032"
-    ]
+    "relative_fill_count": 0,
+    "relative_fill_ids": [],
+    "note": "Conv 1 uses explicit source dates for KiRa business queries; relative wording remains only in non-KiRa narrative or memory chronology where applicable."
   },
   "ct28_contract": {
     "ct28_fill_count": 14,
@@ -2151,7 +2080,6 @@
   },
   "execution_contract": {
     "normal": "Send `kira_fill_query`.",
-    "explicit_fixture_rewrite": "Send `fill_execution_query`.",
     "runner_must_not_infer_rewrite_itself": true,
     "fixture_date_replay": "Send `fill_execution_query`. This mode deliberately replays a source testcase date that is fixture-only and not inferred from the natural conversation turn."
   },
