@@ -1,12 +1,11 @@
 """Human review packet binding and atomic dataset freeze tests."""
 
-import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
-from evaluation.dataset import default_dataset_root, load_manifest
+from evaluation.dataset import load_manifest
 from evaluation.materialization import (
     apply_materialization,
     build_materialization_checkpoint,
@@ -20,11 +19,11 @@ from evaluation.review import (
     freeze_reviewed_dataset,
 )
 from scripts.benchmark.validate_dataset import validate_dataset
+from tests.support.draft_dataset import copy_draft_dataset
 
 
 def _materialized_dataset(tmp_path: Path) -> Path:
-    source = tmp_path / "source"
-    shutil.copytree(default_dataset_root(), source)
+    source = copy_draft_dataset(tmp_path / "source")
     checkpoint = build_materialization_checkpoint(source)
     for index, task in enumerate(checkpoint.tasks):
         checkpoint = replace_checkpoint_task(
@@ -68,9 +67,9 @@ def _approvals(root: Path) -> tuple[BundleReviewDecision, ...]:
     )
 
 
-def test_review_packet_requires_materialized_source():
+def test_review_packet_requires_materialized_source(tmp_path):
     with pytest.raises(ValueError, match="materialized"):
-        build_review_packet(default_dataset_root())
+        build_review_packet(copy_draft_dataset(tmp_path / "source"))
 
 
 def test_review_freeze_is_hash_bound_complete_and_enables_pc_acceptance(tmp_path):

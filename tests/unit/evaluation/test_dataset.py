@@ -18,6 +18,7 @@ from evaluation.dataset import (
     namespace_id,
 )
 from scripts.benchmark.validate_dataset import main, validate_dataset
+from tests.support.draft_dataset import copy_draft_dataset
 
 
 def test_canonical_dataset_loads_with_namespaced_deterministic_messages():
@@ -45,7 +46,9 @@ def test_canonical_dataset_loads_with_namespaced_deterministic_messages():
     assert messages[0].local_message_id == "D1:1"
     assert messages[1].timestamp - messages[0].timestamp == timedelta(microseconds=1)
     assert messages[0].timestamp.utcoffset() is not None
-    assert sum(not message.content for message in messages) == entry.counts.fills
+    assert sum(not message.content for message in messages) == (
+        entry.counts.fills if entry.materialization_status == "pending" else 0
+    )
 
 
 def test_dataset_path_and_identifier_guards():
@@ -102,7 +105,7 @@ def test_validator_accepts_canonical_dataset_and_cli_formats(capsys):
         "fills": 140,
         "hard_gate": 139,
         "memory_events": 62,
-        "pending_answers": 54,
+        "pending_answers": 0,
         "qa": 209,
         "sessions": 86,
         "turns": 506,
@@ -127,11 +130,15 @@ def test_validator_rejects_checksum_drift(tmp_path):
 
 
 def test_validator_enforces_materialization_and_manifest_contract(tmp_path):
-    root = _copy_dataset(tmp_path)
+    root = copy_draft_dataset(tmp_path / "dataset")
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["bundles"][0]["materialization_status"] = "materialized"
-    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    entry = manifest["bundles"][0]
+    entry["materialization_status"] = "materialized"
+    entry["counts"]["pending_answers"] = 0
+    manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
 
     report = validate_dataset(root)
 

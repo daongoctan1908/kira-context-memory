@@ -17,6 +17,7 @@ from evaluation.materialization import (
     replace_checkpoint_task,
 )
 from evaluation.models import FormationInput, Suite
+from tests.support.draft_dataset import copy_draft_dataset
 
 
 def _copy_dataset(tmp_path: Path) -> Path:
@@ -49,7 +50,7 @@ def test_compiler_emits_all_suites_namespaces_and_source_coverage():
         Suite.FORMATION: (62, 62, 0),
         Suite.RETRIEVAL: (209, 209, 0),
         Suite.REWRITE: (54, 54, 0),
-        Suite.CROSS_SESSION: (209, 155, 54),
+        Suite.CROSS_SESSION: (209, 209, 0),
     }
     assert {
         source.kind: (source.total, source.linked, source.accounted_not_selected)
@@ -91,8 +92,8 @@ def test_compiler_is_byte_deterministic_for_dataset_and_seed():
         compile_dataset(seed=True)
 
 
-def test_pending_kira_answers_are_blocked_without_silent_case_loss():
-    compilation = compile_dataset()
+def test_pending_kira_answers_are_blocked_without_silent_case_loss(tmp_path):
+    compilation = compile_dataset(copy_draft_dataset(tmp_path / "dataset"))
     blocked = [case for case in compilation.cases if case.eligibility.status == "blocked"]
 
     assert len(blocked) == 54
@@ -128,7 +129,7 @@ def test_pending_evidence_assistant_blocks_formation_case(tmp_path):
 
 
 def test_materialized_dataset_unblocks_cross_session_cases(tmp_path):
-    root = _copy_dataset(tmp_path)
+    root = copy_draft_dataset(tmp_path / "dataset")
     checkpoint = build_materialization_checkpoint(root, now=datetime(2026, 9, 18, tzinfo=UTC))
     for index, task in enumerate(checkpoint.tasks):
         checkpoint = replace_checkpoint_task(

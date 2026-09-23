@@ -22,6 +22,7 @@ from evaluation.mock import mock_database, mock_response
 from evaluation.models import BenchmarkVariant, GitSource, Profile, RunProvenance, Suite
 from evaluation.pc_preflight import freeze_pc_preflight
 from evaluation.preflight import run_preflight
+from tests.support.draft_dataset import copy_draft_dataset
 
 
 def _approved_dataset(tmp_path: Path) -> Path:
@@ -77,7 +78,7 @@ def _config() -> EvalConfig:
 
 
 def _complete_checkpoint(path: Path) -> None:
-    current = build_materialization_checkpoint(default_dataset_root())
+    current = build_materialization_checkpoint(copy_draft_dataset(Path(path.parent) / "draft"))
     for index, task in enumerate(current.tasks):
         current = replace_checkpoint_task(
             current,
@@ -131,7 +132,7 @@ async def test_freeze_rejects_missing_judge_or_incomplete_kira(tmp_path: Path):
     await _write_provider_report(provider_path, judge_configured=False)
     write_materialization_checkpoint(
         checkpoint_path,
-        build_materialization_checkpoint(default_dataset_root()),
+        build_materialization_checkpoint(copy_draft_dataset(tmp_path / "draft")),
     )
 
     with pytest.raises(ValueError):

@@ -1,13 +1,12 @@
 """Materialization planning, resume state and atomic dataset application."""
 
 import json
-import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
-from evaluation.dataset import default_dataset_root, load_manifest
+from evaluation.dataset import load_manifest
 from evaluation.materialization import (
     MaterializationCheckpoint,
     apply_materialization,
@@ -20,12 +19,11 @@ from evaluation.materialization import (
     write_materialization_checkpoint,
 )
 from scripts.benchmark.validate_dataset import validate_dataset
+from tests.support.draft_dataset import copy_draft_dataset
 
 
 def _copy_dataset(tmp_path: Path) -> Path:
-    root = tmp_path / "source"
-    shutil.copytree(default_dataset_root(), root)
-    return root
+    return copy_draft_dataset(tmp_path / "source")
 
 
 def _complete(checkpoint: MaterializationCheckpoint) -> MaterializationCheckpoint:
@@ -47,9 +45,9 @@ def _complete(checkpoint: MaterializationCheckpoint) -> MaterializationCheckpoin
     return current
 
 
-def test_plan_deduplicates_queries_and_covers_every_pending_target():
+def test_plan_deduplicates_queries_and_covers_every_pending_target(tmp_path):
     checkpoint = build_materialization_checkpoint(
-        default_dataset_root(),
+        copy_draft_dataset(tmp_path / "source"),
         now=datetime(2026, 9, 17, tzinfo=UTC),
     )
 
@@ -63,7 +61,7 @@ def test_plan_deduplicates_queries_and_covers_every_pending_target():
 
 
 def test_checkpoint_round_trip_and_terminal_state_guards(tmp_path):
-    checkpoint = build_materialization_checkpoint(default_dataset_root())
+    checkpoint = build_materialization_checkpoint(copy_draft_dataset(tmp_path / "source"))
     task = checkpoint.tasks[0]
     completed = completed_task(
         task,

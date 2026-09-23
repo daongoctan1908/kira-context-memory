@@ -5,10 +5,10 @@ from datetime import UTC, datetime
 import pytest
 
 from app.domain.models.kira import KiraEventKind, KiraStreamEvent
-from evaluation.dataset import default_dataset_root
 from evaluation.materialization import completed_task, replace_checkpoint_task
 from scripts.benchmark import materialize_dataset
 from scripts.benchmark.materialize_dataset import collect_kira_text, main
+from tests.support.draft_dataset import copy_draft_dataset
 
 
 class FakeKiraAdapter:
@@ -50,8 +50,9 @@ async def test_collect_kira_text_rejects_empty_stream():
         await collect_kira_text(FakeKiraAdapter((_event(None),)), "query")  # type: ignore[arg-type]
 
 
-def test_plan_cli_reports_exact_workload(capsys):
-    assert main(["plan", "--root", str(default_dataset_root())]) == 0
+def test_plan_cli_reports_exact_workload(tmp_path, capsys):
+    root = copy_draft_dataset(tmp_path / "dataset")
+    assert main(["plan", "--root", str(root)]) == 0
     output = capsys.readouterr().out
     assert "unique_queries=80" in output
     assert "conversation_fills=140" in output
@@ -60,13 +61,14 @@ def test_plan_cli_reports_exact_workload(capsys):
 
 def test_collect_cli_rejects_bad_limits_without_creating_checkpoint(tmp_path, capsys):
     checkpoint = tmp_path / "checkpoint.json"
+    root = copy_draft_dataset(tmp_path / "dataset")
 
     assert (
         main(
             [
                 "collect",
                 "--root",
-                str(default_dataset_root()),
+                str(root),
                 "--checkpoint",
                 str(checkpoint),
                 "--max-requests",
@@ -82,13 +84,14 @@ def test_collect_cli_rejects_bad_limits_without_creating_checkpoint(tmp_path, ca
 
 def test_apply_cli_rejects_missing_checkpoint_without_details(tmp_path, capsys):
     missing = tmp_path / "missing.json"
+    root = copy_draft_dataset(tmp_path / "dataset")
 
     assert (
         main(
             [
                 "apply",
                 "--root",
-                str(default_dataset_root()),
+                str(root),
                 "--checkpoint",
                 str(missing),
                 "--dataset-version",
@@ -134,7 +137,7 @@ def test_preflight_persists_one_request_then_reuses_it(tmp_path, capsys, monkeyp
     command = [
         "preflight",
         "--root",
-        str(default_dataset_root()),
+        str(copy_draft_dataset(tmp_path / "dataset")),
         "--checkpoint",
         str(checkpoint_path),
         "--env-file-only",
