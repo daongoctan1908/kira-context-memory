@@ -62,7 +62,7 @@ def _setup_store():
     return store
 
 
-async def _process(store, embedder, llm, history):
+async def _process(store, embedder, llm, history, source=None):
     with (
         patch("mem0.memory.main.MEM0_TELEMETRY", False),
         patch("mem0.memory.main.extract_entities_batch", return_value=[[]]),
@@ -73,7 +73,7 @@ async def _process(store, embedder, llm, history):
     ):
         memory = AsyncMemory(MemoryConfig())
         adapter = Mem0Adapter(memory, search_timeout_seconds=2, operation_timeout_seconds=5)
-        return await adapter.process_memory(_source())
+        return await adapter.process_memory(source or _source())
 
 
 def _embedder_and_llm(llm_response: str):
@@ -162,3 +162,58 @@ async def test_all_invalid_scopes_persist_nothing_but_commit_receipt():
     assert result.events == ()
     assert store.last_receipt_vectors == []
     embedder.embed_batch.assert_not_called()
+
+
+async def test_receipt_replay_creates_no_new_write_and_keeps_persisted_scope():
+    """Replay is idempotent: zero new writes and the persisted payload keeps its scope.
+
+    The add() response only exposes lifecycle rows {id, memory, event}, so scope
+    assertions read the store's persisted payloads, not the replay response.
+    """
+    store = _setup_store()
+    persisted: list[dict] = []
+
+    def get_formation_result(event_id, user_id, conversation_id):
+        return store.receipts.get((event_id, user_id))
+
+    def insert_with_formation_receipt(
+        vectors, ids, payloads, *, event_id, user_id, conversation_id, result
+    ):
+        if (event_id, user_id) in store.receipts:
+            return False, store.receipts[(event_id, user_id)]
+        store.receipts[(event_id, user_id)] = list(result)
+        store.last_receipt_payloads = list(payloads)
+        store.last_receipt_vectors = list(vectors)
+        persisted.extend(dict(payload) for payload in payloads)
+        return True, list(result)
+
+    store.receipts = {}
+    store.get_formation_result.side_effect = get_formation_result
+    store.insert_with_formation_receipt.side_effect = insert_with_formation_receipt
+    response = json.dumps(
+        {
+            "memory": [
+                {"text": "User prefers short Vietnamese reports.", "scope": "GLOBAL"},
+                {"text": "This week focuses on Hanoi.", "scope": "CONVERSATION"},
+            ]
+        }
+    )
+    embedder, llm, history = _embedder_and_llm(response)
+    source = _source()
+
+    first = await _process(store, embedder, llm, history, source=source)
+    payloads_after_first = [dict(payload) for payload in persisted]
+    embed_calls_after_first = embedder.embed_batch.call_count
+    llm_calls_after_first = llm.generate_response.call_count
+
+    replay = await _process(store, embedder, llm, history, source=source)
+
+    assert [event.action for event in first.events] == ["ADD", "ADD"]
+    # Replay returns the committed receipt result without new writes or provider calls.
+    assert [event.action for event in replay.events] == ["ADD", "ADD"]
+    assert len(persisted) == 2
+    assert embedder.embed_batch.call_count == embed_calls_after_first
+    assert llm.generate_response.call_count == llm_calls_after_first
+    # Persisted payload scope is unchanged after replay (read from store, not response).
+    assert [payload["memory_scope"] for payload in persisted] == ["GLOBAL", "CONVERSATION"]
+    assert payloads_after_first == persisted

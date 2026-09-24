@@ -10,6 +10,8 @@ from uuid import uuid4
 
 import psycopg
 import pytest
+from alembic import command
+from alembic.config import Config
 from psycopg import sql
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -708,6 +710,158 @@ async def test_after_commit_reclaim_replays_receipt_while_fresh_event_runs_indep
                 )
             ).one()
         assert job_row == (MemoryJobStatus.COMPLETED.value, 2, 1)
+    finally:
+        if adapter is not None:
+            adapter.close()
+        try:
+            async with engine.begin() as connection:
+                await connection.execute(
+                    delete(conversations).where(conversations.c.user_id == user_id)
+                )
+        finally:
+            await engine.dispose()
+            with psycopg.connect(psycopg_dsn) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(sql.Identifier(schema_name))
+                )
+
+
+class ScopeScriptedMemoryLlm:
+    """Serve a fixed scope-classified envelope for each extraction call in order."""
+
+    def __init__(self, responses: list[str]) -> None:
+        self.responses = list(responses)
+        self.calls = 0
+
+    def generate_response(
+        self,
+        messages: list[dict[str, str]],
+        response_format: object = None,
+        **kwargs: object,
+    ) -> str:
+        assert response_format == {"type": "json_object"}
+        response = self.responses[self.calls]
+        self.calls += 1
+        return response
+
+
+async def test_persisted_payload_carries_memory_scope_and_invalid_scope_row_is_absent() -> None:
+    """Scope assertions read persisted pgvector payloads directly (not the add() response)."""
+    database_url = _database_url()
+    psycopg_dsn = normalize_psycopg_dsn(database_url)
+    schema_name = f"memory_scope_{uuid4().hex}"
+    settings = _settings(database_url, schema_name)
+    engine = create_async_engine(database_url)
+    store = PostgresConversationStoreAdapter(engine)
+    case = next(item for item in SELECTED_CASES if item.name == "user_context_explicit_scope")
+    user_id = f"scope-persisted-{uuid4().hex}"
+    session_id = f"scope-session-{uuid4().hex}"
+    adapter: Mem0Adapter | None = None
+
+    fact_global = FACTS_BY_CASE[case.name]
+    fact_conversation = "Trong phiên này, người dùng muốn ưu tiên theo dõi Hà Nội."
+    fact_invalid = "Fact with a broken scope value."
+
+    def _migrate_application_schema() -> None:
+        previous = os.environ.get("DATABASE_URL")
+        os.environ["DATABASE_URL"] = database_url
+        try:
+            command.upgrade(Config("alembic.ini"), "head")
+        finally:
+            if previous is None:
+                os.environ.pop("DATABASE_URL", None)
+            else:
+                os.environ["DATABASE_URL"] = previous
+
+    def _read_payloads() -> list[dict]:
+        with psycopg.connect(psycopg_dsn) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                sql.SQL("SELECT payload FROM {}.{}").format(
+                    sql.Identifier(schema_name),
+                    sql.Identifier(settings.memory_collection_name),
+                )
+            )
+            return [row[0] for row in cursor.fetchall()]
+
+    try:
+        await asyncio.to_thread(_migrate_application_schema)
+        await asyncio.to_thread(
+            _initialize_memory_schema_sync,
+            psycopg_dsn,
+            schema_name,
+            settings.memory_collection_name,
+            settings.memory_embedding_model,
+            settings.memory_embedding_dims,
+        )
+        reference = await _persist_case(store, case, user_id, session_id)
+        llm = ScopeScriptedMemoryLlm(
+            [
+                json.dumps(
+                    {
+                        "memory": [
+                            {"text": fact_global, "scope": "GLOBAL"},
+                            {"text": fact_conversation, "scope": "CONVERSATION"},
+                        ]
+                    },
+                    ensure_ascii=False,
+                ),
+                json.dumps(
+                    {"memory": [{"text": "No scope field at all.", }]},
+                    ensure_ascii=False,
+                ),
+                json.dumps(
+                    {
+                        "memory": [
+                            {"text": fact_global, "scope": "GLOBAL"},
+                            {"text": fact_invalid, "scope": "galaxy"},
+                        ]
+                    },
+                    ensure_ascii=False,
+                ),
+            ]
+        )
+        with (
+            patch("mem0.memory.main.EmbedderFactory.create", return_value=DeterministicEmbedding()),
+            patch("mem0.memory.main.LlmFactory.create", return_value=llm),
+            patch(
+                "mem0.memory.main.extract_entities_batch",
+                side_effect=lambda texts: [[] for _ in texts],
+            ),
+            patch("mem0.memory.main.extract_entities", return_value=[]),
+        ):
+            adapter = Mem0Adapter(
+                create_mem0_client(settings),
+                search_timeout_seconds=settings.memory_search_timeout_seconds,
+                operation_timeout_seconds=settings.memory_operation_timeout_seconds,
+            )
+
+            await ProcessMemoryUseCase(store, adapter).execute(reference, uuid4())
+            payloads = _read_payloads()
+            scopes = {payload["data"]: payload.get("memory_scope") for payload in payloads}
+            assert scopes == {
+                fact_global: "GLOBAL",
+                fact_conversation: "CONVERSATION",
+            }
+
+            await ProcessMemoryUseCase(store, adapter).execute(reference, uuid4())
+            payloads = _read_payloads()
+            missing_scoped = [
+                payload for payload in payloads if payload["data"] == "No scope field at all."
+            ]
+            assert len(missing_scoped) == 1
+            assert missing_scoped[0]["memory_scope"] == "CONVERSATION"
+
+            await ProcessMemoryUseCase(store, adapter).execute(reference, uuid4())
+            payloads = _read_payloads()
+            # The invalid-scope candidate never reaches a write; the GLOBAL fact is an exact
+            # hash duplicate from call 1 (same conversation), so it is deduplicated too.
+            assert not any(payload["data"] == fact_invalid for payload in payloads)
+            assert sum(payload["data"] == fact_global for payload in payloads) == 1
+            assert all(
+                payload.get("memory_scope") == "GLOBAL"
+                for payload in payloads
+                if payload["data"] == fact_global
+            )
     finally:
         if adapter is not None:
             adapter.close()
