@@ -43,3 +43,21 @@ Decoded từ `score_and_rank` (mem0/utils/scoring.py:60-139):
 ## T0.5 — Scope Gold Preparation (BLOCKED chờ materialized.2 freeze)
 
 Điều kiện: T4.2 (user điền artifacts/benchmark/dataset-review-decisions.json → review packet → freeze) hoàn tất. Trước khi bắt đầu T1.1.
+
+## T3.1 — In-place update probe: KẾT LUẬN = in-place ĐỦ AN TOÀN (đã chứng minh, code @ Phase 3)
+
+Probe: `tests/integration/postgres/test_scope_backfill_probe.py` — 3 test trên pgvector thật (disposable container, pgvector/pgvector:0.8.6-pg16):
+
+1. **`test_in_place_scope_backfill_preserves_identity_and_transitions_filters`** — seed legacy row (không `run_id`, không `memory_scope`) qua đúng đường formation thật (`insert_with_formation_receipt` → có receipt) + entity row link tới nó; chạy `UPDATE ... SET payload = jsonb_set(jsonb_set(payload, '{run_id}', ...), '{memory_scope}', ...)` trong 1 transaction có `SELECT ... FOR UPDATE`. Kết quả:
+   - `id`, `user_id`, `conversation_id`, `formation_event_id`, `data`, `text_lemmatized`, `hash`, `attributed_to` giữ nguyên; chỉ thêm đúng 2 field mới (`set(payload) == set(legacy) | {run_id, memory_scope}`).
+   - Receipt row byte-identical, identity contract vẫn đọc được.
+   - Entity link còn trỏ đúng (`linked_memory_ids == [memory_id]`).
+   - Filter transition: row rời legacy shape (không còn match `NOT payload ? 'run_id'`), vẫn match filter `user_id`-only cũ, match filter scoped mới `{user_id, run_id, memory_scope}` — và `store.search` với scoped filters trả đúng row.
+2. **`test_in_place_backfill_survives_retrieval_entity_boost_and_deletion`** — sau backfill, cả 3 đường runtime còn chạy: (a) `search_scoped` conversation branch trả đúng row với `memory_scope` đúng trong metadata; (b) entity boost vẫn áp — entity row (payload có `user_id` + `run_id` như production `**search_filters`) được lookup bởi filter `{user_id, run_id}` post-backfill và làm combined score tăng so với search không entity; (c) `AsyncMemory.delete` xóa row + prune entity link (`_remove_memory_from_entity_store`); (d) receipt vẫn đọc được qua `get_formation_result` với identity contract nguyên.
+3. **`test_backfill_rollback_on_mid_transaction_failure_leaves_payload_unchanged`** — inject exception sau UPDATE trước commit → transaction rollback sạch: payload byte-identical, receipt nguyên; chạy lại backfill ngay sau đó thành công (idempotent re-apply, hash/provenance giữ nguyên).
+
+**Chi tiết quan trọng ghi nhận cho T4.1:**
+- `sql.SQL` format: jsonb path phải escape `{{run_id}}` (psycopg sql.SQL hiểu `{name}` là placeholder).
+- Entity row phải mang `run_id` (production làm sẵn qua `**search_filters` khi insert entity) — nếu không, sau backfill filter `{user_id, run_id}` của `_compute_entity_boosts` sẽ không match entity cũ.
+- Không cần re-materialization: không đụng vector, không đụng id, transaction chuẩn PG đủ an toàn.
+- **T4.1 dùng in-place UPDATE** (1 transaction: `FOR UPDATE` → `jsonb_set` per-field → commit). Re-materialization không cần làm fallback runbook nữa.
