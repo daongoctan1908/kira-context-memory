@@ -1,6 +1,7 @@
 """Explicit pgvector schema initialization; runtime adapters never issue DDL."""
 
 import asyncio
+import json
 from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, version
 from uuid import UUID
@@ -584,3 +585,353 @@ def _validate_formation_schema(cursor, schema_name: str, collection_name: str) -
     index_registration = cursor.fetchone()
     if not index_registration or index_registration[0] is None:
         raise LongTermMemoryConfigurationError
+
+
+VALID_MEMORY_SCOPES = ("CONVERSATION", "GLOBAL")
+
+
+@dataclass(frozen=True, slots=True)
+class ScopeBackfillRow:
+    """Per-row disposition computed from the deterministic backfill rules."""
+
+    memory_id: str
+    user_id: str
+    run_id_action: str  # "backfill" | "keep" | "unresolved"
+    memory_scope_action: str  # "backfill" | "keep" | "unresolved"
+    resolved_conversation_id: str | None
+    owner_match: bool | None
+
+
+@dataclass(frozen=True, slots=True)
+class ScopeBackfillPlan:
+    """Inventory + per-row plan for one collection."""
+
+    collection: str
+    total_memories: int
+    run_id_matches_conversation: int
+    run_id_missing: int
+    run_id_mismatch: int
+    conversation_id_missing: int
+    owner_or_provenance_missing: int
+    memory_scope_valid: int
+    memory_scope_missing: int
+    memory_scope_invalid: int
+    rows: tuple[ScopeBackfillRow, ...]
+
+    @property
+    def unresolved_memory_ids(self) -> tuple[str, ...]:
+        return tuple(
+            row.memory_id
+            for row in self.rows
+            if row.run_id_action == "unresolved" or row.memory_scope_action == "unresolved"
+        )
+
+    @property
+    def pending_backfill_memory_ids(self) -> tuple[str, ...]:
+        return tuple(
+            row.memory_id
+            for row in self.rows
+            if row.run_id_action == "backfill" or row.memory_scope_action == "backfill"
+        )
+
+    def to_report(self) -> dict:
+        return {
+            "collection": self.collection,
+            "total_memories": self.total_memories,
+            "run_id_matches_conversation": self.run_id_matches_conversation,
+            "run_id_missing": self.run_id_missing,
+            "run_id_mismatch": self.run_id_mismatch,
+            "conversation_id_missing": self.conversation_id_missing,
+            "owner_or_provenance_missing": self.owner_or_provenance_missing,
+            "memory_scope_valid": self.memory_scope_valid,
+            "memory_scope_missing": self.memory_scope_missing,
+            "memory_scope_invalid": self.memory_scope_invalid,
+            "pending_backfill": len(self.pending_backfill_memory_ids),
+            "unresolved": len(self.unresolved_memory_ids),
+            "rows": [
+                {
+                    "memory_id": row.memory_id,
+                    "user_id": row.user_id,
+                    "run_id_action": row.run_id_action,
+                    "memory_scope_action": row.memory_scope_action,
+                    "resolved_conversation_id": row.resolved_conversation_id,
+                    "owner_match": row.owner_match,
+                }
+                for row in self.rows
+            ],
+        }
+
+
+def _plan_scope_backfill_row(
+    payload: dict,
+    *,
+    conversation_owner_status: dict[str, tuple[str, str] | None],
+) -> ScopeBackfillRow:
+    """Apply the deterministic backfill rules to one payload.
+
+    ``conversation_owner_status`` maps payload ``conversation_id`` -> the
+    (conversation_id, user_id) row in public.conversations, or None when the
+    conversation row does not exist.
+    """
+    memory_id = str(payload.get("id"))
+    user_id = payload.get("user_id")
+    conversation_id = payload.get("conversation_id")
+    run_id = payload.get("run_id")
+    memory_scope = payload.get("memory_scope")
+
+    conversation_id_valid = isinstance(conversation_id, str) and bool(conversation_id.strip())
+    try:
+        normalized_conversation_id = (
+            str(UUID(conversation_id)) if conversation_id_valid else None
+        )
+    except (ValueError, AttributeError, TypeError):
+        normalized_conversation_id = None
+        conversation_id_valid = False
+
+    owner_row = (
+        conversation_owner_status.get(str(conversation_id))
+        if conversation_id_valid and isinstance(conversation_id, str)
+        else None
+    )
+    # Owner validation: the conversations row must exist and its user_id must
+    # match the payload user_id. Provenance validation: formation_event_id
+    # present and (when the row exists in conversations) the canonical owner
+    # matches.
+    formation_event_id = payload.get("formation_event_id")
+    provenance_valid = isinstance(formation_event_id, str) and bool(formation_event_id.strip())
+    try:
+        if provenance_valid:
+            str(UUID(formation_event_id))
+    except (ValueError, AttributeError, TypeError):
+        provenance_valid = False
+    owner_match = (
+        (owner_row is not None and owner_row[1] == user_id)
+        if isinstance(user_id, str) and bool(user_id.strip())
+        else None
+    )
+    canonical = (
+        conversation_id_valid
+        and provenance_valid
+        and owner_match is True
+        and owner_row is not None
+        and owner_row[0] == str(conversation_id)
+    )
+
+    if canonical and run_id is None:
+        run_id_action = "backfill"
+    elif run_id is None:
+        run_id_action = "unresolved"
+    elif not conversation_id_valid or run_id == conversation_id:
+        run_id_action = "keep"
+    elif canonical:
+        # run_id != conversation_id with proven proof of the canonical owner.
+        run_id_action = "backfill"
+    else:
+        run_id_action = "unresolved"
+
+    if memory_scope is None:
+        memory_scope_action = "backfill"
+    elif isinstance(memory_scope, str) and memory_scope in VALID_MEMORY_SCOPES:
+        memory_scope_action = "keep"
+    else:
+        memory_scope_action = "unresolved"
+
+    return ScopeBackfillRow(
+        memory_id=memory_id,
+        user_id=user_id if isinstance(user_id, str) else "",
+        run_id_action=run_id_action,
+        memory_scope_action=memory_scope_action,
+        resolved_conversation_id=normalized_conversation_id,
+        owner_match=owner_match,
+    )
+
+
+def _scope_backfill_plan_sync(
+    dsn: str,
+    schema_name: str,
+    collection_name: str,
+) -> ScopeBackfillPlan:
+    """Read-only: classify every memory row against the backfill rules."""
+    memory_table = sql.Identifier(schema_name, collection_name)
+    with psycopg.connect(dsn) as connection, connection.cursor() as cursor:
+        cursor.execute(
+            sql.SQL(
+                "SELECT id::text, payload->>'user_id', payload->>'conversation_id', "
+                "payload->>'run_id', payload->>'memory_scope', "
+                "payload->>'formation_event_id' FROM {} ORDER BY id"
+            ).format(memory_table)
+        )
+        memory_rows = cursor.fetchall()
+        cursor.execute("SELECT conversation_id::text, user_id FROM public.conversations")
+        conversation_owners = {row[0]: (row[0], row[1]) for row in cursor.fetchall()}
+
+    rows = []
+    counters = {
+        "run_id_matches_conversation": 0,
+        "run_id_missing": 0,
+        "run_id_mismatch": 0,
+        "conversation_id_missing": 0,
+        "owner_or_provenance_missing": 0,
+        "memory_scope_valid": 0,
+        "memory_scope_missing": 0,
+        "memory_scope_invalid": 0,
+    }
+    for memory_id, user_id, conversation_id, run_id, memory_scope, _formation in memory_rows:
+        owner_status = conversation_owners.get(str(conversation_id))
+        if owner_status is None:
+            if not isinstance(conversation_id, str) or not conversation_id.strip():
+                counters["conversation_id_missing"] += 1
+            elif not isinstance(user_id, str) or not user_id.strip():
+                counters["owner_or_provenance_missing"] += 1
+        row = _plan_scope_backfill_row(
+            {
+                "id": memory_id,
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "run_id": run_id,
+                "memory_scope": memory_scope,
+                "formation_event_id": _formation,
+            },
+            conversation_owner_status=conversation_owners,
+        )
+        if run_id is None:
+            counters["run_id_missing"] += 1
+        elif isinstance(conversation_id, str) and run_id == conversation_id:
+            counters["run_id_matches_conversation"] += 1
+        else:
+            counters["run_id_mismatch"] += 1
+        if memory_scope is None:
+            counters["memory_scope_missing"] += 1
+        elif isinstance(memory_scope, str) and memory_scope in VALID_MEMORY_SCOPES:
+            counters["memory_scope_valid"] += 1
+        else:
+            counters["memory_scope_invalid"] += 1
+        rows.append(row)
+
+    return ScopeBackfillPlan(
+        collection=f"{schema_name}.{collection_name}",
+        total_memories=len(memory_rows),
+        run_id_matches_conversation=counters["run_id_matches_conversation"],
+        run_id_missing=counters["run_id_missing"],
+        run_id_mismatch=counters["run_id_mismatch"],
+        conversation_id_missing=counters["conversation_id_missing"],
+        owner_or_provenance_missing=counters["owner_or_provenance_missing"],
+        memory_scope_valid=counters["memory_scope_valid"],
+        memory_scope_missing=counters["memory_scope_missing"],
+        memory_scope_invalid=counters["memory_scope_invalid"],
+        rows=tuple(rows),
+    )
+
+
+def _scope_backfill_apply_sync(
+    dsn: str,
+    schema_name: str,
+    collection_name: str,
+    plan: ScopeBackfillPlan,
+    *,
+    allow_unresolved: bool,
+) -> int:
+    """Apply the plan in-place: one transaction, jsonb_set per backfilled field.
+
+    Returns the number of memory rows actually updated. Rows with unresolved
+    fields are never touched; the production gate is allow_unresolved=False.
+    """
+    if plan.unresolved_memory_ids and not allow_unresolved:
+        raise LongTermMemoryConfigurationError(
+            f"scope backfill has unresolved rows [{', '.join(plan.unresolved_memory_ids)}]"
+        )
+    updates = []
+    for row in plan.rows:
+        if row.run_id_action == "backfill" or row.memory_scope_action == "backfill":
+            updates.append(row)
+    if not updates:
+        return 0
+
+    memory_table = sql.Identifier(schema_name, collection_name)
+    updated = 0
+    with psycopg.connect(dsn) as connection:
+        with connection.transaction():
+            for row in updates:
+                params: list[str] = []
+                set_expression = sql.SQL("payload")
+                if row.run_id_action == "backfill":
+                    resolved = row.resolved_conversation_id
+                    if resolved is None:
+                        raise LongTermMemoryConfigurationError(
+                            f"backfill row {row.memory_id} has no resolved conversation_id"
+                        )
+                    set_expression = sql.SQL(
+                        "jsonb_set({}, '{{run_id}}', to_jsonb(%s::text), true)"
+                    ).format(set_expression)
+                    params.append(resolved)
+                if row.memory_scope_action == "backfill":
+                    set_expression = sql.SQL(
+                        "jsonb_set({}, '{{memory_scope}}', to_jsonb(%s::text), true)"
+                    ).format(set_expression)
+                    params.append("CONVERSATION")
+                statement = sql.SQL("UPDATE {} SET payload = {} WHERE id = %s").format(
+                    memory_table,
+                    set_expression,
+                )
+                cursor = connection.cursor()
+                cursor.execute(statement, (*params, row.memory_id))
+                if cursor.rowcount == 1:
+                    updated += 1
+                cursor.close()
+    return updated
+
+
+async def plan_scope_backfill(
+    settings: MemoryAdminRuntimeSettings,
+) -> ScopeBackfillPlan:
+    """Read-only inventory and per-row backfill plan for the memory collection."""
+    if settings.memory_database_url is None:
+        raise LongTermMemoryConfigurationError
+    dsn = normalize_psycopg_dsn(str(settings.memory_database_url.get_secret_value()))
+    try:
+        return await asyncio.to_thread(
+            _scope_backfill_plan_sync,
+            dsn,
+            settings.memory_schema,
+            settings.memory_collection_name,
+        )
+    except LongTermMemoryConfigurationError:
+        raise
+    except (psycopg.OperationalError, TimeoutError, OSError) as error:
+        raise LongTermMemoryConnectionError from error
+    except psycopg.Error as error:
+        raise LongTermMemoryOperationError from error
+
+
+async def apply_scope_backfill(
+    settings: MemoryAdminRuntimeSettings,
+    plan: ScopeBackfillPlan,
+    *,
+    dry_run: bool,
+) -> int:
+    """Apply the scope backfill in-place; dry_run reports without writing."""
+    if dry_run:
+        return 0
+    if settings.memory_database_url is None:
+        raise LongTermMemoryConfigurationError
+    dsn = normalize_psycopg_dsn(str(settings.memory_database_url.get_secret_value()))
+    try:
+        return await asyncio.to_thread(
+            _scope_backfill_apply_sync,
+            dsn,
+            settings.memory_schema,
+            settings.memory_collection_name,
+            plan,
+            allow_unresolved=False,
+        )
+    except LongTermMemoryConfigurationError:
+        raise
+    except (psycopg.OperationalError, TimeoutError, OSError) as error:
+        raise LongTermMemoryConnectionError from error
+    except psycopg.Error as error:
+        raise LongTermMemoryOperationError from error
+
+
+def dump_scope_backfill_report(plan: ScopeBackfillPlan) -> str:
+    """Serialize the plan as the operator-facing JSON report (no content)."""
+    return json.dumps(plan.to_report(), indent=2)
