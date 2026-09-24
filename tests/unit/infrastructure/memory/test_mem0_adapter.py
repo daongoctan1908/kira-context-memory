@@ -177,6 +177,181 @@ async def test_search_rejects_cross_user_result_even_if_provider_misbehaves():
         await adapter(client).search("user-1", "query", top_k=5, threshold=0.1)
 
 
+def scoped_row(
+    memory_id="memory-1",
+    *,
+    user_id="user-1",
+    memory_scope="CONVERSATION",
+    conversation_id=None,
+    score=0.8,
+):
+    row = {
+        "id": memory_id,
+        "memory": f"content {memory_id}",
+        "score": score,
+        "user_id": user_id,
+        "metadata": {"memory_scope": memory_scope},
+    }
+    if conversation_id is not None:
+        row["metadata"]["conversation_id"] = conversation_id
+    return row
+
+
+async def test_search_scoped_conversation_branch_filters_by_run_id_and_scope():
+    conversation_id = uuid4()
+    client = FakeMem0(
+        search_response={"results": [scoped_row(conversation_id=str(conversation_id))]}
+    )
+
+    result = await adapter(client).search_scoped(
+        "user-1",
+        "query",
+        conversation_id=conversation_id,
+        scope="conversation",
+        top_k=5,
+        threshold=0.2,
+    )
+
+    assert result[0].memory_id == "memory-1"
+    assert client.search_calls == [
+        (
+            "query",
+            {
+                "top_k": 5,
+                "threshold": 0.2,
+                "filters": {
+                    "user_id": "user-1",
+                    "run_id": str(conversation_id),
+                    "memory_scope": "CONVERSATION",
+                },
+                "rerank": False,
+            },
+        )
+    ]
+
+
+async def test_search_scoped_global_branch_filters_by_scope_only():
+    client = FakeMem0(search_response={"results": [scoped_row("memory-1", memory_scope="GLOBAL")]})
+
+    result = await adapter(client).search_scoped(
+        "user-1", "query", conversation_id=uuid4(), scope="global", top_k=5, threshold=0.2
+    )
+
+    assert result[0].memory_id == "memory-1"
+    _, kwargs = client.search_calls[0]
+    assert kwargs["filters"] == {"user_id": "user-1", "memory_scope": "GLOBAL"}
+
+
+async def test_search_scoped_rejects_unknown_scope():
+    with pytest.raises(ValueError):
+        await adapter(FakeMem0()).search_scoped(
+            "user-1", "query", conversation_id=uuid4(), scope="everything", top_k=5, threshold=0.1
+        )
+
+
+async def test_search_scoped_conversation_branch_drops_row_from_other_conversation():
+    conversation_id = uuid4()
+    other = uuid4()
+    client = FakeMem0(
+        search_response={
+            "results": [
+                scoped_row("in-scope", conversation_id=str(conversation_id)),
+                scoped_row("wrong-conversation", conversation_id=str(other)),
+                scoped_row("missing-conversation"),
+            ]
+        }
+    )
+
+    result = await adapter(client).search_scoped(
+        "user-1",
+        "query",
+        conversation_id=conversation_id,
+        scope="conversation",
+        top_k=5,
+        threshold=0.1,
+    )
+
+    assert [memory.memory_id for memory in result] == ["in-scope"]
+
+
+async def test_search_scoped_conversation_branch_drops_global_row():
+    conversation_id = uuid4()
+    client = FakeMem0(
+        search_response={
+            "results": [
+                scoped_row(
+                    "local", memory_scope="CONVERSATION", conversation_id=str(conversation_id)
+                ),
+                scoped_row(
+                    "global-row", memory_scope="GLOBAL", conversation_id=str(conversation_id)
+                ),
+            ]
+        }
+    )
+
+    result = await adapter(client).search_scoped(
+        "user-1",
+        "query",
+        conversation_id=conversation_id,
+        scope="conversation",
+        top_k=5,
+        threshold=0.1,
+    )
+
+    assert [memory.memory_id for memory in result] == ["local"]
+
+
+async def test_search_scoped_global_branch_drops_conversation_row():
+    client = FakeMem0(
+        search_response={
+            "results": [
+                scoped_row("global-row", memory_scope="GLOBAL"),
+                scoped_row("local-row", memory_scope="CONVERSATION"),
+            ]
+        }
+    )
+
+    result = await adapter(client).search_scoped(
+        "user-1", "query", conversation_id=uuid4(), scope="global", top_k=5, threshold=0.1
+    )
+
+    assert [memory.memory_id for memory in result] == ["global-row"]
+
+
+async def test_search_scoped_rejects_cross_user_result():
+    client = FakeMem0(search_response={"results": [scoped_row("private", user_id="other-user")]})
+
+    with pytest.raises(LongTermMemoryProtocolError):
+        await adapter(client).search_scoped(
+            "user-1", "query", conversation_id=uuid4(), scope="global", top_k=5, threshold=0.1
+        )
+
+
+@pytest.mark.parametrize(
+    "response",
+    ["not-a-response", {"unexpected": []}, {"results": "nope"}, {"results": [None]}],
+)
+async def test_search_scoped_rejects_malformed_response(response):
+    with pytest.raises(LongTermMemoryProtocolError):
+        await adapter(FakeMem0(search_response=response)).search_scoped(
+            "user-1", "query", conversation_id=uuid4(), scope="global", top_k=5, threshold=0.1
+        )
+
+
+@pytest.mark.parametrize(
+    "error,expected",
+    [
+        (ConnectionError("private endpoint"), LongTermMemoryConnectionError),
+        (TimeoutError(), LongTermMemoryTimeoutError),
+    ],
+)
+async def test_search_scoped_sanitizes_provider_failures(error, expected):
+    with pytest.raises(expected):
+        await adapter(FakeMem0(error=error)).search_scoped(
+            "user-1", "query", conversation_id=uuid4(), scope="global", top_k=5, threshold=0.1
+        )
+
+
 async def test_process_memory_calls_only_add_with_exact_boundary_metadata():
     client = FakeMem0(
         add_response={"results": [{"id": "memory-1", "memory": "preference", "event": "ADD"}]}

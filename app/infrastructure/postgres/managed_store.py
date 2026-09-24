@@ -154,6 +154,11 @@ class ManagedPostgresConversationStore:
             await self.validate_schema()
             return await self._adapter.is_conversation_active(user_id, session_id)
 
+    async def active_conversation_id(self, user_id: str, session_id: str) -> UUID | None:
+        async with self._operation():
+            await self.validate_schema()
+            return await self._adapter.active_conversation_id(user_id, session_id)
+
     async def reserve_chat_request(
         self,
         user_id: str,

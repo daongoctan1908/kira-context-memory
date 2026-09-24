@@ -60,6 +60,10 @@ class MemoryStore:
         self.read_users.append(user_id)
         return self.active
 
+    async def active_conversation_id(self, user_id, session_id):
+        self.read_users.append(user_id)
+        return self.conversation_id if self.active else None
+
     async def append_turn(
         self,
         user_id,

@@ -51,9 +51,9 @@ def test_branch_with_bm25_hit_divides_by_2_but_branch_without_keeps_divisor_1():
     assert branch_b[0]["score"] == same_semantic
 
 
-def test_entity_boost_dict_for_foreign_ids_still_inflates_divisor():
-    # Boost keyed to an id that is NOT in the candidate set: score_and_rank
-    # still divides by 2.5 because has_entity checks dict truthiness (pre-fix C).
+def test_entity_boost_for_out_of_candidates_id_does_not_inflate_divisor():
+    # Boost keyed to an id that is NOT in the candidate set: fix C keeps the
+    # divisor at 1.0 because has_entity intersects boost keys with candidate ids.
     scored = score_and_rank(
         semantic_results=_candidates(0.8),
         bm25_scores={},
@@ -62,7 +62,7 @@ def test_entity_boost_dict_for_foreign_ids_still_inflates_divisor():
         top_k=10,
     )
 
-    assert scored[0]["score"] == 0.8 / 1.5
+    assert scored[0]["score"] == 0.8
 
 
 def test_entity_boost_for_candidate_id_raises_divisor_and_score():

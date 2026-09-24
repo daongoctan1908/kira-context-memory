@@ -58,6 +58,9 @@ class UnavailableMemory:
     async def search(self, *args: object, **kwargs: object):
         raise LongTermMemoryConnectionError
 
+    async def search_scoped(self, *args: object, **kwargs: object):
+        raise LongTermMemoryConnectionError
+
     async def process_memory(self, source: object):  # pragma: no cover - not used by /chat
         raise AssertionError("formation must not run in the online request path")
 
@@ -80,7 +83,7 @@ class RecallEmbedding:
 
 
 class RecallMemoryLlm:
-    """Return one native-V3 memory fact from the persisted Session A turn."""
+    """Return one user-global memory fact from the persisted Session A turn."""
 
     def generate_response(
         self,
@@ -93,7 +96,7 @@ class RecallMemoryLlm:
         assert SESSION_A_USER_MESSAGE in prompt
         assert SESSION_A_ASSISTANT_MESSAGE in prompt
         return json.dumps(
-            {"memory": [{"text": FACT, "attributed_to": "user"}]},
+            {"memory": [{"text": FACT, "attributed_to": "user", "scope": "GLOBAL"}]},
             ensure_ascii=False,
         )
 

@@ -5,6 +5,7 @@ import logging
 import os
 from collections.abc import Mapping
 from typing import Any, Protocol
+from uuid import UUID
 
 import httpx
 from mem0.observability import bind_observer
@@ -192,6 +193,59 @@ class Mem0Adapter:
         except (KeyError, TypeError, ValueError) as error:
             raise LongTermMemoryProtocolError from error
 
+    async def search_scoped(
+        self,
+        user_id: str,
+        query: str,
+        *,
+        conversation_id: UUID,
+        scope: str,
+        top_k: int,
+        threshold: float,
+    ) -> tuple[LongTermMemory, ...]:
+        """Search one scope branch with filter-before-top-k and payload post-filter."""
+        if scope not in ("conversation", "global"):
+            raise ValueError("scope must be 'conversation' or 'global'")
+        if not user_id.strip() or not query.strip():
+            raise ValueError("user_id and query must not be empty")
+        if scope == "conversation":
+            filters: dict[str, str] = {
+                "user_id": user_id,
+                "run_id": str(conversation_id),
+                "memory_scope": "CONVERSATION",
+            }
+        else:
+            filters = {"user_id": user_id, "memory_scope": "GLOBAL"}
+        try:
+            async with asyncio.timeout(self._search_timeout):
+                with bind_observer(self._observer):
+                    response = await self._client.search(
+                        query,
+                        top_k=top_k,
+                        threshold=threshold,
+                        filters=filters,
+                        rerank=False,
+                    )
+        except TimeoutError as error:
+            raise LongTermMemoryTimeoutError from error
+        except Exception as error:
+            self._raise_mapped(error)
+
+        try:
+            if not isinstance(response, Mapping):
+                raise ValueError
+            rows = response["results"]
+            if not isinstance(rows, list):
+                raise ValueError
+            return tuple(
+                memory
+                for row in rows
+                if (memory := self._parse_scoped_memory(row, user_id, scope, conversation_id))
+                is not None
+            )
+        except (KeyError, TypeError, ValueError) as error:
+            raise LongTermMemoryProtocolError from error
+
     async def process_memory(self, source: MemorySource) -> MemoryProcessResult:
         messages = [
             {"role": message.role.value, "content": message.content} for message in source.messages
@@ -270,6 +324,34 @@ class Mem0Adapter:
             score=float(score),
             metadata=dict(metadata_value),
         )
+
+    @staticmethod
+    def _parse_scoped_memory(
+        row: object,
+        user_id: str,
+        scope: str,
+        conversation_id: UUID,
+    ) -> LongTermMemory | None:
+        """Parse a row and drop it when it fails its branch's scope invariant."""
+        if not isinstance(row, Mapping):
+            raise ValueError
+        metadata_value = row.get("metadata", {})
+        if not isinstance(metadata_value, Mapping):
+            raise ValueError
+        owner = row.get("user_id", metadata_value.get("user_id"))
+        if owner != user_id:
+            raise ValueError
+        row_scope = row.get("memory_scope", metadata_value.get("memory_scope"))
+        if scope == "conversation":
+            if row_scope != "CONVERSATION":
+                return None
+            row_conversation = row.get("conversation_id", metadata_value.get("conversation_id"))
+            if row_conversation != str(conversation_id):
+                return None
+        elif row_scope != "GLOBAL":
+            return None
+        memory = Mem0Adapter._parse_memory(row, user_id)
+        return memory
 
     @staticmethod
     def _parse_lifecycle_event(row: object) -> MemoryLifecycleEvent:

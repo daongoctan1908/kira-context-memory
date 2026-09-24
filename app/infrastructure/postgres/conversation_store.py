@@ -555,6 +555,10 @@ class PostgresConversationStoreAdapter:
 
     async def is_conversation_active(self, user_id: str, session_id: str) -> bool:
         """Check the authoritative owner/status immediately before context use."""
+        return await self.active_conversation_id(user_id, session_id) is not None
+
+    async def active_conversation_id(self, user_id: str, session_id: str) -> UUID | None:
+        """Return the active owned conversation ID, or ``None`` when unavailable."""
         self._require_conversation_management_schema()
         if not user_id.strip():
             raise ValueError("user_id must not be empty")
@@ -567,7 +571,7 @@ class PostgresConversationStoreAdapter:
         )
         try:
             async with self._engine.connect() as connection:
-                return await connection.scalar(statement) is not None
+                return await connection.scalar(statement)
         except (BuiltinTimeoutError, OSError, SQLAlchemyError) as error:
             self._raise_mapped(error)
 

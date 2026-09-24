@@ -243,6 +243,10 @@ class _Memory:
         del user_id, query, top_k, threshold
         return (LongTermMemory("memory-1", "Hà Nội", 0.9),)
 
+    async def search_scoped(self, user_id, query, *, conversation_id, scope, top_k, threshold):
+        del user_id, query, conversation_id, scope, top_k, threshold
+        return (LongTermMemory("memory-1", "Hà Nội", 0.9),)
+
     async def process_memory(self, source):
         self.processed.append(source)
         return "processed"
@@ -332,6 +336,10 @@ class _RecordingStore:
     async def is_conversation_active(self, user_id, session_id):
         del user_id, session_id
         return True
+
+    async def active_conversation_id(self, user_id, session_id):
+        del user_id, session_id
+        return UUID(int=1)
 
     async def read_recent(self, user_id, session_id, limit):
         del user_id, session_id, limit

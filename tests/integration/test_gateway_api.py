@@ -93,6 +93,7 @@ class FakeKiraClient:
 class FakeConversationStore:
     def __init__(self) -> None:
         self.schedule_requests: list[bool] = []
+        self.conversation_id = uuid4()
 
     async def read_recent(
         self,
@@ -104,6 +105,9 @@ class FakeConversationStore:
 
     async def is_conversation_active(self, user_id: str, session_id: str) -> bool:
         return True
+
+    async def active_conversation_id(self, user_id: str, session_id: str) -> UUID | None:
+        return self.conversation_id
 
     async def append_turn(
         self,
@@ -161,6 +165,19 @@ class FormationTrapLongTermMemory:
         user_id: str,
         query: str,
         *,
+        top_k: int,
+        threshold: float,
+    ) -> tuple[LongTermMemory, ...]:
+        self.searches.append((user_id, query, top_k, threshold))
+        return ()
+
+    async def search_scoped(
+        self,
+        user_id: str,
+        query: str,
+        *,
+        conversation_id: UUID,
+        scope: str,
         top_k: int,
         threshold: float,
     ) -> tuple[LongTermMemory, ...]:
@@ -451,7 +468,11 @@ async def test_gateway_schedules_reference_only_and_never_executes_memory_format
 
     assert response.status_code == 200
     assert store.schedule_requests == [True]
-    assert memory.searches == [("test-user", "question", 10, 0.1)]
+    # Two scoped branches (conversation + global) with identical parameters.
+    assert memory.searches == [
+        ("test-user", "question", 10, 0.1),
+        ("test-user", "question", 10, 0.1),
+    ]
     assert memory.process_calls == 0
     assert 'kira_memory_job_schedule_total{outcome="scheduled"} 1.0' in metrics.text
     for forbidden in ("test-user", "session-1", "question"):

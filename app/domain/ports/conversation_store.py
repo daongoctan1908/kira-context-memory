@@ -92,6 +92,10 @@ class ConversationStorePort(Protocol):
         """Return whether the owned conversation still accepts context and writes."""
         ...
 
+    async def active_conversation_id(self, user_id: str, session_id: str) -> UUID | None:
+        """Return the conversation ID of an owned active conversation, else ``None``."""
+        ...
+
     async def reserve_chat_request(
         self,
         user_id: str,

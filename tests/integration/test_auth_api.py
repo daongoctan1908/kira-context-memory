@@ -72,6 +72,10 @@ class FakeConversationStore:
         self.user_ids.append(user_id)
         return True
 
+    async def active_conversation_id(self, user_id, _session_id):
+        self.user_ids.append(user_id)
+        return UUID("33333333-3333-4333-8333-333333333333")
+
     async def append_turn(
         self,
         user_id,

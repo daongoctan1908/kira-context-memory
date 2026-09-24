@@ -191,6 +191,9 @@ class FakeConversationStore:
     async def is_conversation_active(self, *_args):
         return True
 
+    async def active_conversation_id(self, *_args):
+        return UUID("33333333-3333-4333-8333-333333333333")
+
     async def append_turn(self, *_args, **_kwargs):
         raise AssertionError("conversation API test must not append a chat turn")
 

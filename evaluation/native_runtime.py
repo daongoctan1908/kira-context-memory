@@ -264,6 +264,29 @@ class _RecordingMemory(LongTermMemoryPort):
             )
         return self.returned
 
+    async def search_scoped(
+        self,
+        user_id: str,
+        query: str,
+        *,
+        conversation_id: UUID,
+        scope: str,
+        top_k: int,
+        threshold: float,
+    ) -> tuple[LongTermMemory, ...]:
+        if self._memory is None:
+            self.returned = ()
+        else:
+            self.returned = await self._memory.search_scoped(
+                user_id,
+                query,
+                conversation_id=conversation_id,
+                scope=scope,
+                top_k=top_k,
+                threshold=threshold,
+            )
+        return self.returned
+
     async def process_memory(self, source: object):
         if self._memory is None:  # pragma: no cover - never used by Session B
             raise RuntimeError("memory disabled")

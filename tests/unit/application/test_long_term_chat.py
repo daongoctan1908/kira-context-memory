@@ -32,11 +32,14 @@ def memory(index: int) -> LongTermMemory:
 
 
 class FakeLongTermMemory:
-    def __init__(self, memories=(), *, error=None, on_search=None):
+    def __init__(self, memories=(), *, error=None, on_search=None, scoped_memories=None):
         self.memories = tuple(memories)
         self.error = error
         self.on_search = on_search
         self.searches = []
+        # Per-branch results for the scoped retriever; None falls back to ``memories``.
+        self.scoped_memories = scoped_memories
+        self.scoped_searches = []
 
     async def search(self, user_id, query, *, top_k, threshold):
         self.searches.append((user_id, query, top_k, threshold))
@@ -46,6 +49,16 @@ class FakeLongTermMemory:
             raise self.error
         return self.memories
 
+    async def search_scoped(self, user_id, query, *, conversation_id, scope, top_k, threshold):
+        self.scoped_searches.append((user_id, query, conversation_id, scope, top_k, threshold))
+        if self.on_search is not None:
+            await self.on_search()
+        if self.error is not None:
+            raise self.error
+        if self.scoped_memories is None:
+            return self.memories
+        return self.scoped_memories.get(scope, ())
+
 
 async def test_combines_ranked_ltm_with_recent_using_trusted_user_and_original_query():
     memories = (memory(1), memory(2))
@@ -53,11 +66,12 @@ async def test_combines_ranked_ltm_with_recent_using_trusted_user_and_original_q
     ltm = FakeLongTermMemory(memories)
     rewriter = FakeRewriter("rewritten with memory")
     client = FakeKiraClient()
+    store = MemoryStore(recent)
 
     telemetry = ContextTelemetry()
     await make_use_case(
         client,
-        conversation_store=MemoryStore(recent),
+        conversation_store=store,
         query_rewriter=rewriter,
         long_term_memory=ltm,
         memory_search_top_k=7,
@@ -65,7 +79,11 @@ async def test_combines_ranked_ltm_with_recent_using_trusted_user_and_original_q
         observer=telemetry,
     ).execute(COMMAND, principal=PRINCIPAL)
 
-    assert ltm.searches == [(PRINCIPAL.user_id, COMMAND.message, 7, 0.35)]
+    assert ltm.searches == []
+    assert ltm.scoped_searches == [
+        (PRINCIPAL.user_id, COMMAND.message, store.conversation_id, "conversation", 7, 0.35),
+        (PRINCIPAL.user_id, COMMAND.message, store.conversation_id, "global", 7, 0.35),
+    ]
     assert client.messages == ["rewritten with memory"]
     assert rewriter.contexts[0].recent_messages == recent
     assert rewriter.contexts[0].long_term_memories == memories
@@ -109,7 +127,8 @@ async def test_inactive_conversation_discards_loaded_context_before_builder():
         long_term_memory=ltm,
     ).execute(COMMAND, principal=PRINCIPAL)
 
-    assert ltm.searches
+    # Inactive conversations are detected before any branch search runs.
+    assert ltm.scoped_searches == []
     assert rewriter.contexts == []
     assert client.messages == [COMMAND.message]
 
@@ -126,7 +145,7 @@ async def test_empty_recent_and_ltm_bypasses_rewriter():
         long_term_memory=ltm,
     ).execute(COMMAND, principal=PRINCIPAL)
 
-    assert len(ltm.searches) == 1
+    assert len(ltm.scoped_searches) == 2
     assert rewriter.contexts == []
     assert client.messages == [COMMAND.message]
 
@@ -220,7 +239,7 @@ async def test_postgres_failure_discards_successful_ltm_and_uses_current_only():
         long_term_memory=ltm,
     ).execute(COMMAND, principal=PRINCIPAL)
 
-    assert len(ltm.searches) == 1
+    assert len(ltm.scoped_searches) == 2
     assert rewriter.contexts == []
     assert client.messages == [COMMAND.message]
 

@@ -215,6 +215,9 @@ class FakeStore:
     async def is_conversation_active(self, *_args):
         return True
 
+    async def active_conversation_id(self, *_args):
+        return _CONVERSATION_ID
+
 
 def _settings(**overrides) -> Settings:
     values = {

@@ -92,7 +92,14 @@ def score_and_rank(
         List of scored result dicts sorted by combined score descending.
     """
     has_bm25 = bool(bm25_scores)
-    has_entity = bool(entity_boosts)
+    # Only count entity boosts that actually apply to candidates in this result set;
+    # out-of-candidate boosts must not inflate the divisor and rescale other branches.
+    candidate_ids = {
+        str(result.get("id"))
+        for result in semantic_results
+        if result.get("id") is not None
+    }
+    has_entity = any(key in candidate_ids for key in entity_boosts)
 
     max_possible = 1.0
     if has_bm25:

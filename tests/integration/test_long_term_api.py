@@ -39,10 +39,17 @@ class FakeLongTermMemory:
         self.memories = tuple(memories)
         self.error = error
         self.searches = []
+        self.scoped_searches = []
         self.close_calls = 0
 
     async def search(self, user_id, query, *, top_k, threshold):
         self.searches.append((user_id, query, top_k, threshold))
+        if self.error is not None:
+            raise self.error
+        return self.memories
+
+    async def search_scoped(self, user_id, query, *, conversation_id, scope, top_k, threshold):
+        self.scoped_searches.append((user_id, query, scope, top_k, threshold))
         if self.error is not None:
             raise self.error
         return self.memories
@@ -140,7 +147,11 @@ async def test_injected_ltm_is_wired_but_remains_caller_owned():
         assert response.status_code == 200
         assert kira.messages == ["standalone using LTM"]
         assert rewriter.contexts[0].long_term_memories == (ranked_memory(),)
-        assert memory.searches == [("trusted-user", "follow-up", 10, 0.1)]
+        assert memory.searches == []
+        assert memory.scoped_searches == [
+            ("trusted-user", "follow-up", "conversation", 10, 0.1),
+            ("trusted-user", "follow-up", "global", 10, 0.1),
+        ]
         assert 'kira_memory_search_total{outcome="success"} 1.0' in metrics.text
         assert "kira_memory_search_results_sum 1.0" in metrics.text
         assert "provider-private" not in metrics.text

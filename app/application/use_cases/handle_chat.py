@@ -5,9 +5,10 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import UTC, datetime
 from time import perf_counter
 from typing import Self
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from app.application.services.context_builder import ContextBuilder
+from app.application.services.memory_retriever import ScopedMemoryRetriever
 from app.domain.errors.conversation import (
     ConversationSourceUnavailableError,
     ConversationStoreError,
@@ -154,6 +155,9 @@ class HandleChatUseCase:
         self._rewriter = query_rewriter
         self._builder = context_builder
         self._observer = observer
+        self._retriever = (
+            ScopedMemoryRetriever(long_term_memory) if long_term_memory is not None else None
+        )
         self._recent_limit = max_recent_messages
         self._store_timeout = store_timeout_seconds
         self._memory = long_term_memory
@@ -447,12 +451,18 @@ class HandleChatUseCase:
         user_id: str,
         correlation_id: str,
     ) -> str:
-        recent_result, memory_result = await self._load_context_inputs(
+        conversation_id, recent_result, memory_result = await self._load_context_inputs(
             user_id,
             command.session_id,
             command.message,
             correlation_id,
         )
+        if conversation_id is None:
+            self._observer.context_observed(0, 0)
+            self._observer.rewrite_observed("bypass", None)
+            self._record_bypass_stage("context.build")
+            self._record_bypass_stage("rewrite.generate", kind="client")
+            return command.message
 
         if isinstance(recent_result, (ConversationStoreError, TimeoutError)):
             self._observer.degraded(
@@ -467,12 +477,6 @@ class HandleChatUseCase:
             self._record_bypass_stage("rewrite.generate", kind="client")
             return command.message
 
-        if not await self._conversation_is_active(user_id, command.session_id, correlation_id):
-            self._observer.context_observed(0, 0)
-            self._observer.rewrite_observed("bypass", None)
-            self._record_bypass_stage("context.build")
-            self._record_bypass_stage("rewrite.generate", kind="client")
-            return command.message
 
         try:
             if any(message.session_id != command.session_id for message in recent_result):
@@ -581,12 +585,18 @@ class HandleChatUseCase:
         query: str,
         correlation_id: str,
     ) -> tuple[
+        UUID | None,
         tuple[ConversationMessage, ...] | ConversationStoreError | TimeoutError,
         tuple[LongTermMemory, ...] | LongTermMemoryError,
     ]:
+        conversation_id = await self._conversation_is_active(
+            user_id, session_id, correlation_id
+        )
         tasks = (
             asyncio.create_task(self._read_recent(user_id, session_id)),
-            asyncio.create_task(self._search_memory(user_id, query, correlation_id)),
+            asyncio.create_task(
+                self._search_memory(user_id, query, correlation_id, conversation_id)
+            ),
         )
         try:
             recent_result, memory_result = await asyncio.gather(*tasks)
@@ -595,21 +605,23 @@ class HandleChatUseCase:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
             raise
-        return recent_result, memory_result
+        return conversation_id, recent_result, memory_result
 
     async def _conversation_is_active(
         self,
         user_id: str,
         session_id: str,
         correlation_id: str,
-    ) -> bool:
+    ) -> UUID | None:
         with self._observer.stage(
             "conversation.check_active",
             kind="client",
         ) as observation:
             try:
                 async with asyncio.timeout(self._store_timeout):
-                    active = await self._store.is_conversation_active(user_id, session_id)
+                    conversation_id = await self._store.active_conversation_id(
+                        user_id, session_id
+                    )
             except (ConversationStoreError, TimeoutError) as error:
                 observation.set_outcome("error")
                 self._observer.degraded(
@@ -618,11 +630,11 @@ class HandleChatUseCase:
                     type(error).__name__,
                     "original_query",
                 )
-                return False
+                return None
             except BaseException:
                 observation.set_outcome("error")
                 raise
-            if not active:
+            if conversation_id is None:
                 observation.set_outcome("inactive")
                 self._observer.degraded(
                     correlation_id,
@@ -630,9 +642,9 @@ class HandleChatUseCase:
                     ConversationSourceUnavailableError.__name__,
                     "original_query",
                 )
-                return False
+                return None
             observation.set_outcome("active")
-            return True
+            return conversation_id
 
     async def _read_recent(
         self,
@@ -665,6 +677,7 @@ class HandleChatUseCase:
         user_id: str,
         query: str,
         correlation_id: str,
+        conversation_id: UUID | None,
     ) -> tuple[LongTermMemory, ...] | LongTermMemoryError:
         with self._observer.stage(
             "memory.search",
@@ -675,16 +688,21 @@ class HandleChatUseCase:
             },
         ) as observation:
             observation.set_input({"query": query})
-            if self._memory is None:
+            if self._retriever is None:
+                self._observer.memory_search_observed("bypass", None, None)
+                observation.set_outcome("bypass")
+                return ()
+            if conversation_id is None:
                 self._observer.memory_search_observed("bypass", None, None)
                 observation.set_outcome("bypass")
                 return ()
             started = perf_counter()
             try:
                 async with asyncio.timeout(self._memory_search_timeout):
-                    memories = await self._memory.search(
+                    memories = await self._retriever.search(
                         user_id,
                         query,
+                        conversation_id=conversation_id,
                         top_k=self._memory_search_top_k,
                         threshold=self._memory_search_threshold,
                     )
