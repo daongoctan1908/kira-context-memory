@@ -80,6 +80,24 @@ phần Phase 2 còn thiếu):
 - Gateway cũng nhận `formation_scope_observed` qua port mới, sẵn sàng nếu
   formation chạy in-process.
 
+## T0.5.2 — Evaluator DROP-negative & promotion semantics (spec, chưa code evaluator)
+
+`docs/evaluator-scope-semantics.md` — spec khóa semantics evaluator T5.2 consume,
+viết trước freeze vì chỉ phụ thuộc semantics chốt (vòng 3) + code hiện tại:
+
+- Negative case (DROP): false-ADD hard gate hiện có (`score_formation` gold rỗng
+  → mọi predicted fact là false positive → FAIL) mạnh hơn assert tối thiểu của
+  plan (chỉ cấm matching canonical_fact) — giữ cả hai, gate mạnh là nguồn FAIL.
+  Negative predicted GLOBAL KHÔNG tính promotion (không có gold scope) — chỉ
+  False-ADD + metric chẩn đoán.
+- Scope gates trên matched pair: `scope_false_global_promotion` (gold
+  CONVERSATION → predicted GLOBAL) hard gate = 0; `missed_global` (gold GLOBAL →
+  predicted CONVERSATION/MISSING) chỉ metric; `formation_persistence_miss` (match
+  text nhưng không có ADD lifecycle) hard gate — đóng lỗ hổng candidate bị drop
+  do scope invalid vẫn match text mà case vẫn PASS. Fallback MISSING ứng xử như
+  CONVERSATION (mirror `_enforce_memory_scopes`).
+- 14 unit test case (TC-1..TC-14) liệt kê sẵn cho T5.2.
+
 ## T6.1 — Rollout runbook (đã viết)
 
 `docs/scope-rollout-runbook.md` — 9 phase: freeze writes → backup → verify
