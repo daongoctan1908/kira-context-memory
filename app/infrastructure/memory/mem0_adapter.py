@@ -203,6 +203,7 @@ class Mem0Adapter:
                     response = await self._client.add(
                         messages,
                         user_id=reference.user_id,
+                        run_id=str(reference.conversation_id),
                         metadata={
                             "formation_event_id": str(source.formation_event_id),
                             "conversation_id": str(reference.conversation_id),

@@ -140,6 +140,43 @@ DELETE_ALL_BATCH_SIZE = 1000
 # creation or the update path (issues #4490, #6277, #6655).
 _IDENTITY_KEYS = ENTITY_PARAMS | {"actor_id"}
 
+# Retrieval-scope classification produced by the extraction LLM. A valid scope is
+# copied into the persisted payload; a missing scope falls back to CONVERSATION and
+# an invalid value drops the candidate before hashing/embedding/persisting.
+_MEMORY_SCOPES = ("CONVERSATION", "GLOBAL")
+_DEFAULT_SCOPE = "CONVERSATION"
+
+
+def _enforce_memory_scopes(extracted_memories):
+    """Validate the LLM-assigned scope of every extracted candidate in place.
+
+    Returns a dict of telemetry counts. Valid scopes are normalized onto the
+    candidate dict as "memory_scope"; missing scopes default to CONVERSATION
+    (counted as fallback); values outside the enum drop the candidate before any
+    hashing, embedding, or writing occurs (counted as invalid).
+    """
+    counts = {"fallback": 0, "invalid": 0}
+    kept = []
+    for mem in extracted_memories:
+        raw_scope = mem.get("scope")
+        if raw_scope is None or (isinstance(raw_scope, str) and not raw_scope.strip()):
+            mem["memory_scope"] = _DEFAULT_SCOPE
+            counts["fallback"] += 1
+            kept.append(mem)
+            continue
+        scope = raw_scope.strip().upper() if isinstance(raw_scope, str) else raw_scope
+        if scope in _MEMORY_SCOPES:
+            mem["memory_scope"] = scope
+            kept.append(mem)
+        else:
+            counts["invalid"] += 1
+            logger.warning(
+                "Dropping extraction candidate with invalid memory_scope: %r",
+                raw_scope,
+            )
+    extracted_memories[:] = kept
+    return counts
+
 
 def _strip_identity_keys(
     metadata: Dict[str, Any],
@@ -1047,6 +1084,17 @@ class Memory(MemoryBase):
             self.db.save_messages(messages, session_scope)
             return []
 
+        scope_counts = _enforce_memory_scopes(extracted_memories)
+        if scope_counts["fallback"] or scope_counts["invalid"]:
+            with observe("mem0.extract.scope") as scope_observation:
+                scope_observation.set_attribute("kira.memory.scope_fallback", scope_counts["fallback"])
+                scope_observation.set_attribute("kira.memory.scope_invalid", scope_counts["invalid"])
+                scope_observation.set_outcome("enforced")
+        if not extracted_memories:
+            # Every candidate had an invalid scope -- nothing to hash, embed, or write.
+            self.db.save_messages(messages, session_scope)
+            return []
+
         # Phase 3: Batch embed all extracted memory texts
         mem_texts = [m.get("text", "") for m in extracted_memories if m.get("text")]
         try:
@@ -1096,6 +1144,8 @@ class Memory(MemoryBase):
             mem_metadata["updated_at"] = mem_metadata["created_at"]
             if mem.get("attributed_to"):
                 mem_metadata["attributed_to"] = mem["attributed_to"]
+            if mem.get("memory_scope"):
+                mem_metadata["memory_scope"] = mem["memory_scope"]
 
             records.append((memory_id, text, embed_map[text], mem_metadata))
 
@@ -2816,6 +2866,38 @@ class AsyncMemory(MemoryBase):
             await asyncio.to_thread(self.db.save_messages, messages, session_scope)
             return []
 
+        scope_counts = _enforce_memory_scopes(extracted_memories)
+        if scope_counts["fallback"] or scope_counts["invalid"]:
+            with observe("mem0.extract.scope") as scope_observation:
+                scope_observation.set_attribute("kira.memory.scope_fallback", scope_counts["fallback"])
+                scope_observation.set_attribute("kira.memory.scope_invalid", scope_counts["invalid"])
+                scope_observation.set_outcome("enforced")
+        if not extracted_memories:
+            # Every candidate had an invalid scope -- nothing to hash, embed, or write.
+            if formation_identity is not None:
+                with observe(
+                    "mem0.persist",
+                    kind="client",
+                    attributes={"kira.memory.candidate_count": 0},
+                ) as persist_observation:
+                    created, committed = await asyncio.to_thread(
+                        _formation_method(self.vector_store, "insert_with_formation_receipt"),
+                        [],
+                        [],
+                        [],
+                        event_id=formation_identity[0],
+                        user_id=formation_identity[1],
+                        conversation_id=formation_identity[2],
+                        result=[],
+                    )
+                    persist_observation.set_attribute("kira.memory.receipt.created", created)
+                    persist_observation.set_output(committed)
+                    persist_observation.set_outcome("scope_dropped" if created else "receipt_replay")
+                await asyncio.to_thread(self.db.save_messages, messages, session_scope)
+                return committed
+            await asyncio.to_thread(self.db.save_messages, messages, session_scope)
+            return []
+
         # Phase 3: Batch embed all extracted memory texts
         mem_texts = [m.get("text", "") for m in extracted_memories if m.get("text")]
         with observe(
@@ -2880,6 +2962,8 @@ class AsyncMemory(MemoryBase):
                 mem_metadata["updated_at"] = mem_metadata["created_at"]
                 if mem.get("attributed_to"):
                     mem_metadata["attributed_to"] = mem["attributed_to"]
+                if mem.get("memory_scope"):
+                    mem_metadata["memory_scope"] = mem["memory_scope"]
 
                 records.append((memory_id, text, embed_map[text], mem_metadata))
             dedup_observation.set_attribute("kira.memory.retained_count", len(records))

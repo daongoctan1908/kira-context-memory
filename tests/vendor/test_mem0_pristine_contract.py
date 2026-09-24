@@ -333,9 +333,10 @@ async def test_application_adapter_preserves_creation_conversation_for_duplicate
     vector_store.insert.assert_not_called()
     vector_store.update.assert_not_called()
     vector_store.delete.assert_not_called()
+    # Formation lookup is conversation-scoped since run_id=conversation_id is passed.
     assert [call.kwargs["filters"] for call in vector_store.search.call_args_list] == [
-        {"user_id": "user-a"},
-        {"user_id": "user-a"},
-        {"user_id": "user-a"},
-        {"user_id": "user-b"},
+        {"user_id": "user-a", "run_id": str(conversation_a)},
+        {"user_id": "user-a", "run_id": str(conversation_b)},
+        {"user_id": "user-a", "run_id": str(conversation_b)},
+        {"user_id": "user-b", "run_id": str(conversation_c)},
     ]

@@ -944,7 +944,7 @@ Classify each memory's scope INDEPENDENTLY of extraction:
 
 - **Default to CONVERSATION when unsure.** CONVERSATION is the safe choice; GLOBAL widens where the memory can surface.
 - **GLOBAL only for durable, user-level facts**: stable preferences ("user prefers concise Vietnamese reports"), standing conventions ("when the user says 'so cùng kỳ' they mean same month last year"), long-term roles ("user is a team lead"), persistent personal context ("user has a dog named Max").
-- **Never GLOBAL for**: business figures, KPIs, targets, dates, deadlines, locations, project/task specifics, one-off plans, ephemeral task context, or anything that will be stale or irrelevant outside this conversation.
+- **Never GLOBAL for**: transient KPI values, query results, targets, dates, deadlines, locations, project/task specifics, one-off plans, ephemeral task context, or anything that will be stale or irrelevant outside this conversation. A user-defined metric definition or standing convention (a named formula, a reusable rule the user asked to keep) is durable and may be GLOBAL — a KPI value measured in this conversation is not.
 - **Do not upgrade a specific discussion detail to GLOBAL** just because it seems important — importance is not durability.
 
 ## Rules
