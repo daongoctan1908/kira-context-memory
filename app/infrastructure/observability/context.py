@@ -15,6 +15,8 @@ from prometheus_client import CollectorRegistry, Counter, Histogram
 from app.domain.models.telemetry_context import TelemetryContext
 from app.domain.ports.context_observer import (
     ContextOperation,
+    MemoryBranch,
+    MemoryBranchOutcome,
     MemoryJobScheduleOutcome,
     MemorySearchOutcome,
     RewriteOutcome,
@@ -163,6 +165,32 @@ class ContextTelemetry:
             buckets=(0, 1, 2, 3, 5, 10),
             registry=self.registry,
         )
+        self.memory_branches = Counter(
+            "kira_memory_branch_total",
+            "Scoped retrieval branch outcomes",
+            ["branch", "outcome"],
+            registry=self.registry,
+        )
+        self.memory_branch_latency = Histogram(
+            "kira_memory_branch_duration_seconds",
+            "Scoped retrieval branch latency",
+            ["branch", "outcome"],
+            buckets=(0.01, 0.05, 0.1, 0.5, 1, 2, 3, 5),
+            registry=self.registry,
+        )
+        self.memory_branch_results = Histogram(
+            "kira_memory_branch_results",
+            "Memories returned by one scoped retrieval branch",
+            ["branch"],
+            buckets=(0, 1, 2, 3, 5, 10),
+            registry=self.registry,
+        )
+        self.memory_scopes = Counter(
+            "kira_memory_scope_total",
+            "Formation scope classification outcomes per extracted candidate",
+            ["scope", "origin"],
+            registry=self.registry,
+        )
         self.memory_job_schedules = Counter(
             "kira_memory_job_schedule_total",
             "Gateway memory-job scheduling outcomes for eligible completed turns",
@@ -252,6 +280,44 @@ class ContextTelemetry:
         if result_count is not None:
             self.memory_search_results.observe(result_count)
         self._otel.memory_search_observed(outcome, result_count, seconds)
+
+    def memory_branch_observed(
+        self,
+        branch: MemoryBranch,
+        outcome: MemoryBranchOutcome,
+        result_count: int,
+        seconds: float,
+    ) -> None:
+        self.memory_branches.labels(branch, outcome).inc()
+        self.memory_branch_latency.labels(branch, outcome).observe(max(seconds, 0.0))
+        if outcome != "error":
+            self.memory_branch_results.labels(branch).observe(result_count)
+        self._otel.memory_branch_observed(branch, outcome, result_count, max(seconds, 0.0))
+
+    def formation_scope_observed(
+        self,
+        *,
+        conversation: int,
+        global_count: int,
+        fallback: int,
+        invalid: int,
+    ) -> None:
+        if conversation:
+            self.memory_scopes.labels("CONVERSATION", "valid").inc(conversation)
+            self._otel.formation_scope_observed(
+                scope="CONVERSATION", origin="valid", count=conversation
+            )
+        if global_count:
+            self.memory_scopes.labels("GLOBAL", "valid").inc(global_count)
+            self._otel.formation_scope_observed(scope="GLOBAL", origin="valid", count=global_count)
+        if fallback:
+            self.memory_scopes.labels("CONVERSATION", "fallback").inc(fallback)
+            self._otel.formation_scope_observed(
+                scope="CONVERSATION", origin="fallback", count=fallback
+            )
+        if invalid:
+            self.memory_scopes.labels("unknown", "invalid").inc(invalid)
+            self._otel.formation_scope_observed(scope="unknown", origin="invalid", count=invalid)
 
     def rewrite_observed(self, outcome: RewriteOutcome, seconds: float | None) -> None:
         self.rewrites.labels(outcome).inc()

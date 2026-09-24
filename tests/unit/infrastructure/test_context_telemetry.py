@@ -122,3 +122,76 @@ def test_phase5_dual_read_emits_equivalent_prometheus_and_otel_outcomes() -> Non
     assert otel_count.data.data_points[0].attributes == {"outcome": "success"}
     assert otel_count.data.data_points[0].value == 1
     provider.shutdown()
+
+
+def test_memory_branch_metrics_record_outcome_count_and_latency() -> None:
+    reader = InMemoryMetricReader()
+    provider = MeterProvider(metric_readers=[reader])
+    telemetry = ContextTelemetry(meter=provider.get_meter("gateway-test"))
+
+    telemetry.memory_branch_observed("conversation", "success", 3, 0.04)
+    telemetry.memory_branch_observed("global", "empty", 0, 0.01)
+    telemetry.memory_branch_observed("global", "error", 0, 0.02)
+
+    legacy = generate_latest(telemetry.registry).decode()
+    assert 'kira_memory_branch_total{branch="conversation",outcome="success"} 1.0' in legacy
+    assert 'kira_memory_branch_total{branch="global",outcome="empty"} 1.0' in legacy
+    assert 'kira_memory_branch_total{branch="global",outcome="error"} 1.0' in legacy
+    assert (
+        'kira_memory_branch_duration_seconds_count{branch="global",outcome="error"} 1.0' in legacy
+    )
+    assert 'kira_memory_branch_results_sum{branch="conversation"} 3.0' in legacy
+    assert 'kira_memory_branch_results_sum{branch="global"} 0.0' in legacy
+    data = reader.get_metrics_data()
+    assert data is not None
+    metrics = [
+        metric
+        for resource in data.resource_metrics
+        for scope in resource.scope_metrics
+        for metric in scope.metrics
+    ]
+    otel_count = next(metric for metric in metrics if metric.name == "kira.memory.branch.count")
+    points = {
+        tuple(sorted(point.attributes.items())): point.value
+        for point in otel_count.data.data_points
+    }
+    assert points == {
+        (("branch", "conversation"), ("outcome", "success")): 1,
+        (("branch", "global"), ("outcome", "empty")): 1,
+        (("branch", "global"), ("outcome", "error")): 1,
+    }
+    provider.shutdown()
+
+
+def test_formation_scope_metrics_split_valid_fallback_and_invalid() -> None:
+    reader = InMemoryMetricReader()
+    provider = MeterProvider(metric_readers=[reader])
+    telemetry = ContextTelemetry(meter=provider.get_meter("gateway-test"))
+
+    telemetry.formation_scope_observed(conversation=2, global_count=1, fallback=1, invalid=1)
+
+    legacy = generate_latest(telemetry.registry).decode()
+    assert 'kira_memory_scope_total{origin="valid",scope="CONVERSATION"} 2.0' in legacy
+    assert 'kira_memory_scope_total{origin="valid",scope="GLOBAL"} 1.0' in legacy
+    assert 'kira_memory_scope_total{origin="fallback",scope="CONVERSATION"} 1.0' in legacy
+    assert 'kira_memory_scope_total{origin="invalid",scope="unknown"} 1.0' in legacy
+    data = reader.get_metrics_data()
+    assert data is not None
+    metrics = [
+        metric
+        for resource in data.resource_metrics
+        for scope in resource.scope_metrics
+        for metric in scope.metrics
+    ]
+    otel_scope = next(metric for metric in metrics if metric.name == "kira.memory.scope.count")
+    points = {
+        tuple(sorted(point.attributes.items())): point.value
+        for point in otel_scope.data.data_points
+    }
+    assert points == {
+        (("origin", "valid"), ("scope", "CONVERSATION")): 2,
+        (("origin", "valid"), ("scope", "GLOBAL")): 1,
+        (("origin", "fallback"), ("scope", "CONVERSATION")): 1,
+        (("origin", "invalid"), ("scope", "unknown")): 1,
+    }
+    provider.shutdown()

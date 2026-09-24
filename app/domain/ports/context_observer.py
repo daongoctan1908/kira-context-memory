@@ -14,6 +14,9 @@ ContextOperation = Literal[
     "rewriter",
 ]
 MemorySearchOutcome = Literal["success", "error", "bypass"]
+MemoryBranch = Literal["conversation", "global"]
+MemoryBranchOutcome = Literal["success", "empty", "error"]
+MemoryScopeOrigin = Literal["valid", "fallback", "invalid"]
 MemoryJobScheduleOutcome = Literal["scheduled", "disabled", "duplicate", "error"]
 RewriteOutcome = Literal["success", "error", "bypass"]
 WriteOutcome = Literal["inserted", "duplicate", "error"]
@@ -64,6 +67,23 @@ class ContextObserverPort(Protocol):
         outcome: MemorySearchOutcome,
         result_count: int | None,
         seconds: float | None,
+    ) -> None: ...
+
+    def memory_branch_observed(
+        self,
+        branch: MemoryBranch,
+        outcome: MemoryBranchOutcome,
+        result_count: int,
+        seconds: float,
+    ) -> None: ...
+
+    def formation_scope_observed(
+        self,
+        *,
+        conversation: int,
+        global_count: int,
+        fallback: int,
+        invalid: int,
     ) -> None: ...
 
     def memory_job_schedule_observed(self, outcome: MemoryJobScheduleOutcome) -> None: ...

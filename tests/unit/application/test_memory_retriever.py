@@ -211,3 +211,102 @@ async def test_protocol_violation_fails_open_to_healthy_branch():
     )
 
     assert [item.memory_id for item in result] == ["g1"]
+
+
+class RecordingObserver:
+    def __init__(self):
+        self.observations = []
+
+    def memory_branch_observed(self, branch, outcome, result_count, seconds):
+        self.observations.append((branch, outcome, result_count, seconds))
+
+
+async def test_observer_records_per_branch_success_outcome_and_count():
+    observer = RecordingObserver()
+    retriever = ScopedMemoryRetriever(
+        branch_implementation(
+            [],
+            conversation=(memory("c1", "local", 0.5), memory("c2", "local 2", 0.7)),
+            global_memories=(),
+        ),
+        observer=observer,
+    )
+
+    await retriever.search(
+        "user-1", "query", conversation_id=CONVERSATION_ID, top_k=10, threshold=0.1
+    )
+
+    by_branch = {observation[0]: observation for observation in observer.observations}
+    assert by_branch["conversation"][1] == "success"
+    assert by_branch["conversation"][2] == 2
+    assert by_branch["conversation"][3] >= 0.0
+    assert by_branch["global"][1] == "empty"
+    assert by_branch["global"][2] == 0
+    assert len(observer.observations) == 2
+
+
+async def test_observer_records_error_outcome_for_failing_branch():
+    observer = RecordingObserver()
+    retriever = ScopedMemoryRetriever(
+        branch_implementation([], error=LongTermMemoryConnectionError()),
+        observer=observer,
+    )
+
+    with pytest.raises(LongTermMemoryConnectionError):
+        await retriever.search(
+            "user-1", "query", conversation_id=CONVERSATION_ID, top_k=10, threshold=0.1
+        )
+
+    assert {observation[0]: observation[1] for observation in observer.observations} == {
+        "conversation": "error",
+        "global": "error",
+    }
+    assert all(observation[2] == 0 for observation in observer.observations)
+
+
+async def test_observer_records_error_when_protocol_violation_raises():
+    class MalformedMemory:
+        async def search_scoped(self, user_id, query, *, conversation_id, scope, top_k, threshold):
+            return ("not-a-memory",)
+
+    observer = RecordingObserver()
+    retriever = ScopedMemoryRetriever(MalformedMemory(), observer=observer)
+
+    with pytest.raises(LongTermMemoryProtocolError):
+        await retriever.search(
+            "user-1", "query", conversation_id=CONVERSATION_ID, top_k=10, threshold=0.1
+        )
+
+    assert {observation[0]: observation[1] for observation in observer.observations} == {
+        "conversation": "success",
+        "global": "success",
+    }
+
+
+async def test_observer_failures_never_affect_search_results():
+    class BrokenObserver:
+        def memory_branch_observed(self, branch, outcome, result_count, seconds):
+            raise RuntimeError("observer exploded")
+
+    retriever = ScopedMemoryRetriever(
+        branch_implementation([], global_memories=(memory("g1", "global", 0.9),)),
+        observer=BrokenObserver(),
+    )
+
+    result = await retriever.search(
+        "user-1", "query", conversation_id=CONVERSATION_ID, top_k=10, threshold=0.1
+    )
+
+    assert [item.memory_id for item in result] == ["g1"]
+
+
+async def test_without_observer_search_remains_unchanged():
+    retriever = ScopedMemoryRetriever(
+        branch_implementation([], conversation=(memory("c1", "local", 0.5),), global_memories=())
+    )
+
+    result = await retriever.search(
+        "user-1", "query", conversation_id=CONVERSATION_ID, top_k=10, threshold=0.1
+    )
+
+    assert [item.memory_id for item in result] == ["c1"]

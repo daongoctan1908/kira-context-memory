@@ -70,6 +70,17 @@ METRIC_SPECS: Mapping[str, MetricSpec] = {
     "memory_search_results": MetricSpec(
         "kira.memory.search.result_count", "histogram", boundaries=(0, 1, 2, 3, 5, 10)
     ),
+    "memory_branch_count": MetricSpec("kira.memory.branch.count", "counter", "{search}"),
+    "memory_branch_duration": MetricSpec(
+        "kira.memory.branch.duration",
+        "histogram",
+        "s",
+        (0.01, 0.05, 0.1, 0.5, 1, 2, 3, 5),
+    ),
+    "memory_branch_results": MetricSpec(
+        "kira.memory.branch.result_count", "histogram", boundaries=(0, 1, 2, 3, 5, 10)
+    ),
+    "formation_scope": MetricSpec("kira.memory.scope.count", "counter", "{candidate}"),
     "memory_job_schedule": MetricSpec("kira.memory.job.schedule.count", "counter", "{schedule}"),
     "rewrite_count": MetricSpec("kira.context.rewrite.count", "counter", "{rewrite}"),
     "rewrite_duration": MetricSpec(
@@ -186,6 +197,9 @@ _ALLOWED_ATTRIBUTE_VALUES: Mapping[str, frozenset[str]] = {
     "dependency": frozenset({"identity", "mem0", "vllm", "postgresql", "kira", "otel"}),
     "status": frozenset({"pending", "processing", "completed", "dead"}),
     "kind": frozenset({"new", "reclaimed"}),
+    "branch": frozenset({"conversation", "global"}),
+    "scope": frozenset({"CONVERSATION", "GLOBAL", "unknown"}),
+    "origin": frozenset({"valid", "fallback", "invalid"}),
 }
 
 
@@ -256,6 +270,10 @@ class GatewayMetrics:
         self._search_count = _create_instrument(resolved, METRIC_SPECS["memory_search_count"])
         self._search_duration = _create_instrument(resolved, METRIC_SPECS["memory_search_duration"])
         self._search_results = _create_instrument(resolved, METRIC_SPECS["memory_search_results"])
+        self._branch_count = _create_instrument(resolved, METRIC_SPECS["memory_branch_count"])
+        self._branch_duration = _create_instrument(resolved, METRIC_SPECS["memory_branch_duration"])
+        self._branch_results = _create_instrument(resolved, METRIC_SPECS["memory_branch_results"])
+        self._formation_scope = _create_instrument(resolved, METRIC_SPECS["formation_scope"])
         self._schedule_count = _create_instrument(resolved, METRIC_SPECS["memory_job_schedule"])
         self._rewrite_count = _create_instrument(resolved, METRIC_SPECS["rewrite_count"])
         self._rewrite_duration = _create_instrument(resolved, METRIC_SPECS["rewrite_duration"])
@@ -266,6 +284,7 @@ class GatewayMetrics:
         self._stream_duration = _create_instrument(resolved, METRIC_SPECS["kira_stream_duration"])
         self._first_event = _create_instrument(resolved, METRIC_SPECS["kira_first_event"])
         self._first_content = _create_instrument(resolved, METRIC_SPECS["kira_first_content"])
+        self._formation_scope = _create_instrument(resolved, METRIC_SPECS["formation_scope"])
 
     def context_observed(self, message_count: int, estimated_tokens: int) -> None:
         _safe_record(self._recent_messages, message_count)
@@ -279,6 +298,18 @@ class GatewayMetrics:
             _safe_record(self._search_duration, seconds, outcome=outcome)
         if result_count is not None:
             _safe_record(self._search_results, result_count)
+
+    def memory_branch_observed(
+        self, branch: str, outcome: str, result_count: int, seconds: float
+    ) -> None:
+        _safe_add(self._branch_count, 1, branch=branch, outcome=outcome)
+        _safe_record(self._branch_duration, seconds, branch=branch, outcome=outcome)
+        if outcome != "error":
+            _safe_record(self._branch_results, result_count, branch=branch)
+
+    def formation_scope_observed(self, *, scope: str, origin: str, count: int) -> None:
+        if count > 0:
+            _safe_add(self._formation_scope, count, scope=scope, origin=origin)
 
     def rewrite_observed(self, outcome: str, seconds: float | None) -> None:
         _safe_add(self._rewrite_count, 1, outcome=outcome)
@@ -399,6 +430,7 @@ class WorkerMetrics:
         self._cleanup = _create_instrument(self._meter, METRIC_SPECS["cleanup_count"])
         self._queue_wait = _create_instrument(self._meter, METRIC_SPECS["queue_wait"])
         self._stage_duration = _create_instrument(self._meter, METRIC_SPECS["stage_duration"])
+        self._formation_scope = _create_instrument(self._meter, METRIC_SPECS["formation_scope"])
         self._register_gauges()
 
     @property
@@ -436,6 +468,10 @@ class WorkerMetrics:
 
     def stage_observed(self, stage: str, outcome: str, seconds: float) -> None:
         _safe_record(self._stage_duration, seconds, stage=stage, outcome=outcome)
+
+    def formation_scope_observed(self, *, scope: str, origin: str, count: int) -> None:
+        if count > 0:
+            _safe_add(self._formation_scope, count, scope=scope, origin=origin)
 
     def queue_stats_observed(
         self,

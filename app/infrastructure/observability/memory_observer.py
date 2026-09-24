@@ -35,10 +35,27 @@ _OBSERVATION_TYPES = {
 class MemoryStageMetricObserver(Protocol):
     def stage_observed(self, stage: str, outcome: str, seconds: float) -> None: ...
 
+    def formation_scope_observed(
+        self,
+        *,
+        conversation: int,
+        global_count: int,
+        fallback: int,
+        invalid: int,
+    ) -> None: ...
+
 
 class _MemoryObservation:
+    _SCOPE_ATTRIBUTE_COUNTS = {
+        "kira.memory.scope_conversation": "conversation",
+        "kira.memory.scope_global": "global_count",
+        "kira.memory.scope_fallback": "fallback",
+        "kira.memory.scope_invalid": "invalid",
+    }
+
     def __init__(self, span: Span) -> None:
         self._span = span
+        self._scope_counts: dict[str, int] = {}
         self._usage: dict[str, int] = {}
         self.outcome = "unknown"
 
@@ -46,6 +63,9 @@ class _MemoryObservation:
         set_span_attribute(self._span, key, value)
         if key == "gen_ai.request.model":
             set_span_attribute(self._span, OBSERVATION_MODEL, value)
+        field = self._SCOPE_ATTRIBUTE_COUNTS.get(key)
+        if field is not None and isinstance(value, int) and not isinstance(value, bool):
+            self._scope_counts[field] = value
 
     def set_outcome(self, outcome: str) -> None:
         self.outcome = outcome
@@ -113,6 +133,16 @@ class MemoryObserver:
                     )
                 raise
             finally:
+                if name == "mem0.extract.scope" and self._metric_observer is not None:
+                    try:
+                        self._metric_observer.formation_scope_observed(
+                            conversation=observation._scope_counts.get("conversation", 0),
+                            global_count=observation._scope_counts.get("global_count", 0),
+                            fallback=observation._scope_counts.get("fallback", 0),
+                            invalid=observation._scope_counts.get("invalid", 0),
+                        )
+                    except Exception:
+                        pass
                 if self._metric_observer is not None:
                     try:
                         self._metric_observer.stage_observed(

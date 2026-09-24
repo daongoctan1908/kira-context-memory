@@ -144,3 +144,50 @@ def test_phase5_maps_legacy_success_to_otel_completed_without_changing_old_scrap
     assert otel_count.data.data_points[0].attributes == {"outcome": "completed"}
     assert otel_count.data.data_points[0].value == 1
     provider.shutdown()
+
+
+def test_formation_scope_metrics_record_valid_fallback_and_invalid_counts() -> None:
+    reader = InMemoryMetricReader()
+    provider = MeterProvider(metric_readers=[reader])
+    telemetry = MemoryJobTelemetry(meter=provider.get_meter("worker-test"))
+
+    telemetry.formation_scope_observed(conversation=2, global_count=1, fallback=1, invalid=1)
+
+    payload = generate_latest(telemetry.registry).decode()
+    assert 'kira_memory_scope_total{origin="valid",scope="CONVERSATION"} 2.0' in payload
+    assert 'kira_memory_scope_total{origin="valid",scope="GLOBAL"} 1.0' in payload
+    assert 'kira_memory_scope_total{origin="fallback",scope="CONVERSATION"} 1.0' in payload
+    assert 'kira_memory_scope_total{origin="invalid",scope="unknown"} 1.0' in payload
+
+    data = reader.get_metrics_data()
+    assert data is not None
+    metrics = [
+        metric
+        for resource in data.resource_metrics
+        for scope in resource.scope_metrics
+        for metric in scope.metrics
+    ]
+    otel_scope = next(metric for metric in metrics if metric.name == "kira.memory.scope.count")
+    points = {
+        tuple(sorted(point.attributes.items())): point.value
+        for point in otel_scope.data.data_points
+    }
+    assert points == {
+        (("origin", "valid"), ("scope", "CONVERSATION")): 2,
+        (("origin", "valid"), ("scope", "GLOBAL")): 1,
+        (("origin", "fallback"), ("scope", "CONVERSATION")): 1,
+        (("origin", "invalid"), ("scope", "unknown")): 1,
+    }
+    provider.shutdown()
+
+
+def test_formation_scope_metrics_skip_zero_counts() -> None:
+    telemetry = MemoryJobTelemetry()
+
+    telemetry.formation_scope_observed(conversation=3, global_count=0, fallback=0, invalid=0)
+
+    payload = generate_latest(telemetry.registry).decode()
+    assert 'kira_memory_scope_total{origin="valid",scope="CONVERSATION"} 3.0' in payload
+    assert 'kira_memory_scope_total{origin="valid",scope="GLOBAL"} 0.0' in payload
+    assert 'kira_memory_scope_total{origin="fallback",scope="CONVERSATION"} 0.0' in payload
+    assert 'kira_memory_scope_total{origin="invalid",scope="unknown"} 0.0' in payload

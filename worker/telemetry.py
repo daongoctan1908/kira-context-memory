@@ -29,6 +29,12 @@ _QUEUE_STATUSES = ("pending", "processing", "completed", "dead")
 _CLAIM_KINDS = ("new", "reclaimed")
 _PROCESSING_OUTCOMES = ("success", "retry", "dead")
 _CLEANUP_STATUSES = ("completed", "dead")
+_SCOPE_DISTRIBUTIONS = (
+    ("CONVERSATION", "valid"),
+    ("GLOBAL", "valid"),
+    ("CONVERSATION", "fallback"),
+    ("unknown", "invalid"),
+)
 _STAGE_KINDS = {"internal": SpanKind.INTERNAL, "client": SpanKind.CLIENT}
 _STAGE_TYPES = {
     "conversation.read_boundary": "span",
@@ -153,6 +159,12 @@ class MemoryJobTelemetry:
             "Current runner database polling backoff",
             registry=self.registry,
         )
+        self.formation_scopes = Counter(
+            "kira_memory_scope_total",
+            "Formation scope classification outcomes per extracted candidate",
+            ["scope", "origin"],
+            registry=self.registry,
+        )
 
         for status in _QUEUE_STATUSES:
             self.queue_depth.labels(status).set(0)
@@ -163,6 +175,8 @@ class MemoryJobTelemetry:
             self.processing_latency.labels(outcome)
         for status in _CLEANUP_STATUSES:
             self.cleanup.labels(status)
+        for scope, origin in _SCOPE_DISTRIBUTIONS:
+            self.formation_scopes.labels(scope, origin)
 
     def configure_tracer(self, tracer: Tracer) -> None:
         """Attach the process tracer after the fail-open runtime has initialized."""
@@ -292,3 +306,29 @@ class MemoryJobTelemetry:
     def stage_observed(self, stage: str, outcome: str, seconds: float) -> None:
         """Accept internal Mem0 stage durations without coupling Mem0 to OTel."""
         self._otel.stage_observed(stage, outcome, seconds)
+
+    def formation_scope_observed(
+        self,
+        *,
+        conversation: int,
+        global_count: int,
+        fallback: int,
+        invalid: int,
+    ) -> None:
+        """Record per-candidate scope classification from one formation event."""
+        if conversation:
+            self.formation_scopes.labels("CONVERSATION", "valid").inc(conversation)
+            self._otel.formation_scope_observed(
+                scope="CONVERSATION", origin="valid", count=conversation
+            )
+        if global_count:
+            self.formation_scopes.labels("GLOBAL", "valid").inc(global_count)
+            self._otel.formation_scope_observed(scope="GLOBAL", origin="valid", count=global_count)
+        if fallback:
+            self.formation_scopes.labels("CONVERSATION", "fallback").inc(fallback)
+            self._otel.formation_scope_observed(
+                scope="CONVERSATION", origin="fallback", count=fallback
+            )
+        if invalid:
+            self.formation_scopes.labels("unknown", "invalid").inc(invalid)
+            self._otel.formation_scope_observed(scope="unknown", origin="invalid", count=invalid)

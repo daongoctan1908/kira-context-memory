@@ -155,7 +155,7 @@ def _enforce_memory_scopes(extracted_memories):
     (counted as fallback); values outside the enum drop the candidate before any
     hashing, embedding, or writing occurs (counted as invalid).
     """
-    counts = {"fallback": 0, "invalid": 0}
+    counts = {"conversation": 0, "global": 0, "fallback": 0, "invalid": 0}
     kept = []
     for mem in extracted_memories:
         raw_scope = mem.get("scope")
@@ -167,6 +167,7 @@ def _enforce_memory_scopes(extracted_memories):
         scope = raw_scope.strip().upper() if isinstance(raw_scope, str) else raw_scope
         if scope in _MEMORY_SCOPES:
             mem["memory_scope"] = scope
+            counts[scope.lower()] += 1
             kept.append(mem)
         else:
             counts["invalid"] += 1
@@ -1085,8 +1086,10 @@ class Memory(MemoryBase):
             return []
 
         scope_counts = _enforce_memory_scopes(extracted_memories)
-        if scope_counts["fallback"] or scope_counts["invalid"]:
+        if any(scope_counts.values()):
             with observe("mem0.extract.scope") as scope_observation:
+                scope_observation.set_attribute("kira.memory.scope_conversation", scope_counts["conversation"])
+                scope_observation.set_attribute("kira.memory.scope_global", scope_counts["global"])
                 scope_observation.set_attribute("kira.memory.scope_fallback", scope_counts["fallback"])
                 scope_observation.set_attribute("kira.memory.scope_invalid", scope_counts["invalid"])
                 scope_observation.set_outcome("enforced")
@@ -2867,8 +2870,10 @@ class AsyncMemory(MemoryBase):
             return []
 
         scope_counts = _enforce_memory_scopes(extracted_memories)
-        if scope_counts["fallback"] or scope_counts["invalid"]:
+        if any(scope_counts.values()):
             with observe("mem0.extract.scope") as scope_observation:
+                scope_observation.set_attribute("kira.memory.scope_conversation", scope_counts["conversation"])
+                scope_observation.set_attribute("kira.memory.scope_global", scope_counts["global"])
                 scope_observation.set_attribute("kira.memory.scope_fallback", scope_counts["fallback"])
                 scope_observation.set_attribute("kira.memory.scope_invalid", scope_counts["invalid"])
                 scope_observation.set_outcome("enforced")

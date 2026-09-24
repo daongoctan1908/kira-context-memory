@@ -156,7 +156,9 @@ class HandleChatUseCase:
         self._builder = context_builder
         self._observer = observer
         self._retriever = (
-            ScopedMemoryRetriever(long_term_memory) if long_term_memory is not None else None
+            ScopedMemoryRetriever(long_term_memory, observer=observer)
+            if long_term_memory is not None
+            else None
         )
         self._recent_limit = max_recent_messages
         self._store_timeout = store_timeout_seconds
@@ -477,7 +479,6 @@ class HandleChatUseCase:
             self._record_bypass_stage("rewrite.generate", kind="client")
             return command.message
 
-
         try:
             if any(message.session_id != command.session_id for message in recent_result):
                 raise ConversationStoreProtocolError()
@@ -589,9 +590,7 @@ class HandleChatUseCase:
         tuple[ConversationMessage, ...] | ConversationStoreError | TimeoutError,
         tuple[LongTermMemory, ...] | LongTermMemoryError,
     ]:
-        conversation_id = await self._conversation_is_active(
-            user_id, session_id, correlation_id
-        )
+        conversation_id = await self._conversation_is_active(user_id, session_id, correlation_id)
         tasks = (
             asyncio.create_task(self._read_recent(user_id, session_id)),
             asyncio.create_task(
@@ -619,9 +618,7 @@ class HandleChatUseCase:
         ) as observation:
             try:
                 async with asyncio.timeout(self._store_timeout):
-                    conversation_id = await self._store.active_conversation_id(
-                        user_id, session_id
-                    )
+                    conversation_id = await self._store.active_conversation_id(user_id, session_id)
             except (ConversationStoreError, TimeoutError) as error:
                 observation.set_outcome("error")
                 self._observer.degraded(

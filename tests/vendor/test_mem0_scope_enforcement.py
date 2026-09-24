@@ -21,6 +21,7 @@ from app.domain.models.conversation import (
 )
 from app.domain.models.memory import MemorySource
 from app.infrastructure.memory.mem0_adapter import Mem0Adapter
+from app.infrastructure.observability.memory_observer import MemoryObserver
 
 
 def _source() -> MemorySource:
@@ -62,7 +63,7 @@ def _setup_store():
     return store
 
 
-async def _process(store, embedder, llm, history, source=None):
+async def _process(store, embedder, llm, history, source=None, observer=None):
     with (
         patch("mem0.memory.main.MEM0_TELEMETRY", False),
         patch("mem0.memory.main.extract_entities_batch", return_value=[[]]),
@@ -72,16 +73,19 @@ async def _process(store, embedder, llm, history, source=None):
         patch("mem0.memory.main.SQLiteManager", return_value=history),
     ):
         memory = AsyncMemory(MemoryConfig())
-        adapter = Mem0Adapter(memory, search_timeout_seconds=2, operation_timeout_seconds=5)
+        adapter = Mem0Adapter(
+            memory,
+            search_timeout_seconds=2,
+            operation_timeout_seconds=5,
+            observer=observer,
+        )
         return await adapter.process_memory(source or _source())
 
 
 def _embedder_and_llm(llm_response: str):
     embedder = MagicMock()
     embedder.embed.return_value = [0.1, 0.2, 0.3]
-    embedder.embed_batch.side_effect = lambda texts, _operation: [
-        [0.4, 0.5, 0.6] for _ in texts
-    ]
+    embedder.embed_batch.side_effect = lambda texts, _operation: [[0.4, 0.5, 0.6] for _ in texts]
     llm = MagicMock()
     llm.generate_response.return_value = llm_response
     history = MagicMock()
@@ -217,3 +221,70 @@ async def test_receipt_replay_creates_no_new_write_and_keeps_persisted_scope():
     # Persisted payload scope is unchanged after replay (read from store, not response).
     assert [payload["memory_scope"] for payload in persisted] == ["GLOBAL", "CONVERSATION"]
     assert payloads_after_first == persisted
+
+
+class ScopeDistributionRecorder:
+    def __init__(self):
+        self.calls = []
+        self.stage_calls = []
+
+    def formation_scope_observed(self, *, conversation, global_count, fallback, invalid):
+        self.calls.append(
+            {
+                "conversation": conversation,
+                "global_count": global_count,
+                "fallback": fallback,
+                "invalid": invalid,
+            }
+        )
+
+    def stage_observed(self, stage, outcome, seconds):
+        self.stage_calls.append((stage, outcome, seconds))
+
+
+async def test_scope_distribution_flows_through_observer_bridge():
+    recorder = ScopeDistributionRecorder()
+    observer = MemoryObserver(metric_observer=recorder)
+    store = _setup_store()
+    response = json.dumps(
+        {
+            "memory": [
+                {"text": "User prefers short Vietnamese reports.", "scope": "GLOBAL"},
+                {"text": "This week focuses on Hanoi.", "scope": "CONVERSATION"},
+                {"text": "Fact without any scope field."},
+                {"text": "Fact with broken scope.", "scope": "galaxy"},
+            ]
+        }
+    )
+    embedder, llm, history = _embedder_and_llm(response)
+
+    await _process(store, embedder, llm, history, observer=observer)
+
+    # 2 valid (GLOBAL + CONVERSATION), 1 fallback, 1 invalid dropped before embed.
+    assert recorder.calls == [{"conversation": 1, "global_count": 1, "fallback": 1, "invalid": 1}]
+    assert ("mem0.extract.scope", "enforced") in [
+        (stage, outcome) for stage, outcome, _ in recorder.stage_calls
+    ]
+    # The invalid candidate still never reaches the embed batch.
+    embedded_texts = embedder.embed_batch.call_args.args[0]
+    assert "Fact with broken scope." not in embedded_texts
+
+
+async def test_all_valid_scope_formation_still_reports_zero_fallback_and_invalid():
+    recorder = ScopeDistributionRecorder()
+    observer = MemoryObserver(metric_observer=recorder)
+    store = _setup_store()
+    response = json.dumps(
+        {
+            "memory": [
+                {"text": "User prefers short Vietnamese reports.", "scope": "GLOBAL"},
+                {"text": "This week focuses on Hanoi.", "scope": "CONVERSATION"},
+            ]
+        }
+    )
+    embedder, llm, history = _embedder_and_llm(response)
+
+    await _process(store, embedder, llm, history, observer=observer)
+
+    # Valid-only batches still report so the scope distribution has a full denominator.
+    assert recorder.calls == [{"conversation": 1, "global_count": 1, "fallback": 0, "invalid": 0}]
