@@ -5,8 +5,8 @@ from app.application.services.memory_policy import (
 )
 
 
-def test_memory_policy_v5_has_the_approved_taxonomy() -> None:
-    assert MEMORY_POLICY_VERSION == "kira-memory-policy-v5"
+def test_memory_policy_v6_has_the_approved_taxonomy() -> None:
+    assert MEMORY_POLICY_VERSION == "kira-memory-policy-v6"
     assert MEMORY_TAXONOMY == (
         "USER_CONTEXT",
         "ANALYSIS_PREFERENCE",
@@ -73,3 +73,16 @@ def test_policy_has_no_few_shot_business_examples_or_duplicate_temporal_guidance
         "superseded",
     ):
         assert removed not in MEMORY_EXTRACTION_INSTRUCTIONS
+
+
+def test_policy_v6_defines_scope_classification_defaulting_to_conversation() -> None:
+    assert "CONVERSATION: the fact only matters inside the conversation" in (
+        MEMORY_EXTRACTION_INSTRUCTIONS
+    )
+    assert "GLOBAL: the fact stays useful across the user's future conversations" in (
+        MEMORY_EXTRACTION_INSTRUCTIONS
+    )
+    assert "Default to CONVERSATION when unsure" in MEMORY_EXTRACTION_INSTRUCTIONS
+    assert "Never widen a conversation-specific detail to GLOBAL" in (
+        MEMORY_EXTRACTION_INSTRUCTIONS
+    )

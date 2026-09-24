@@ -923,8 +923,8 @@ Return ONLY valid JSON parsable by json.loads(). No text, reasoning, explanation
 
 {
   "memory": [
-    {"id": "0", "text": "First extracted memory", "attributed_to": "user", "linked_memory_ids": ["uuid-of-related-existing-memory"]},
-    {"id": "1", "text": "Second extracted memory", "attributed_to": "assistant"}
+    {"id": "0", "text": "First extracted memory", "attributed_to": "user", "scope": "CONVERSATION", "linked_memory_ids": ["uuid-of-related-existing-memory"]},
+    {"id": "1", "text": "Second extracted memory", "attributed_to": "assistant", "scope": "GLOBAL"}
   ]
 }
 
@@ -933,7 +933,19 @@ Return ONLY valid JSON parsable by json.loads(). No text, reasoning, explanation
 - **id** (string, required): Sequential integers as strings starting at "0".
 - **text** (string, required): A contextually rich, self-contained factual statement (15-80 words).
 - **attributed_to** (string, required): Who this memory is about. Use "user" for facts stated by or about the user (preferences, plans, personal facts). Use "assistant" for information provided by the assistant (recommendations, confirmations, plans created, information researched).
+- **scope** (string, required): How widely this memory should be retrievable. Exactly one of:
+  - "CONVERSATION" — the memory is only meaningful within the conversation that produced it (specific events, tasks, numbers, deadlines, locations, project/work specifics, one-off plans, anything time-bound to this discussion).
+  - "GLOBAL" — the memory is a durable user-level fact useful across ALL of the user's future conversations (stable preferences, standing conventions, long-term roles, personal context like pets/family/chronic conditions).
 - **linked_memory_ids** (array of strings, optional): IDs of Existing Memories that this new memory relates to. Use the exact IDs from the Existing Memories list. Omit or pass [] if no existing memories are related.
+
+## Scope Classification Rules
+
+Classify each memory's scope INDEPENDENTLY of extraction:
+
+- **Default to CONVERSATION when unsure.** CONVERSATION is the safe choice; GLOBAL widens where the memory can surface.
+- **GLOBAL only for durable, user-level facts**: stable preferences ("user prefers concise Vietnamese reports"), standing conventions ("when the user says 'so cùng kỳ' they mean same month last year"), long-term roles ("user is a team lead"), persistent personal context ("user has a dog named Max").
+- **Never GLOBAL for**: business figures, KPIs, targets, dates, deadlines, locations, project/task specifics, one-off plans, ephemeral task context, or anything that will be stale or irrelevant outside this conversation.
+- **Do not upgrade a specific discussion detail to GLOBAL** just because it seems important — importance is not durability.
 
 ## Rules
 

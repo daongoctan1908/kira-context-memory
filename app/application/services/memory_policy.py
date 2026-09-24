@@ -1,6 +1,6 @@
 """Versioned domain guidance for long-term-memory extraction."""
 
-MEMORY_POLICY_VERSION = "kira-memory-policy-v5"
+MEMORY_POLICY_VERSION = "kira-memory-policy-v6"
 
 MEMORY_TAXONOMY: tuple[str, ...] = (
     "USER_CONTEXT",
@@ -80,6 +80,15 @@ units, variable names, and stated thresholds exactly.
 
 Use existing memories only for deduplication and linking, not as independent sources of new facts.
 This ADD pipeline does not delete old memories.
+
+Scope classification (one scope per fact, required by the output schema):
+- CONVERSATION: the fact only matters inside the conversation that produced it — reporting
+  requests, task specifics, KPI values, dated episodes, one-off plans, transient priorities.
+- GLOBAL: the fact stays useful across the user's future conversations — stable preferences,
+  standing conventions, explicit roles, durable business scope, persistent user context.
+- Default to CONVERSATION when unsure. Never widen a conversation-specific detail to GLOBAL
+  because it seems important; importance is not durability. Keep GLOBAL for preferences,
+  conventions, and standing context the user would expect to be remembered everywhere.
 
 Return each extracted fact as plain reusable memory text within the response format required by
 Mem0. Do not prefix facts with taxonomy names and do not emit taxonomy metadata. The taxonomy is a
