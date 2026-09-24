@@ -61,3 +61,31 @@ Probe: `tests/integration/postgres/test_scope_backfill_probe.py` — 3 test trê
 - Entity row phải mang `run_id` (production làm sẵn qua `**search_filters` khi insert entity) — nếu không, sau backfill filter `{user_id, run_id}` của `_compute_entity_boosts` sẽ không match entity cũ.
 - Không cần re-materialization: không đụng vector, không đụng id, transaction chuẩn PG đủ an toàn.
 - **T4.1 dùng in-place UPDATE** (1 transaction: `FOR UPDATE` → `jsonb_set` per-field → commit). Re-materialization không cần làm fallback runbook nữa.
+
+## T5.3 — Telemetry wiring (đã triển khai, commit 36cb868)
+
+Per-branch retrieval metrics + formation scope distribution counters (bổ trợ
+phần Phase 2 còn thiếu):
+
+- Retriever branch: `ScopedMemoryRetriever` đo từng branch (outcome
+  success/empty/error, count, latency) qua observer optional fail-open →
+  prometheus `kira_memory_branch_total{branch,outcome}` +
+  `kira_memory_branch_duration_seconds` + `kira_memory_branch_results`, OTel
+  mirror `kira.memory.branch.*` (bounded enums `branch`, `outcome`).
+- Formation scope: `_enforce_memory_scopes` đếm thêm valid theo scope và emit
+  4 attributes trên span `mem0.extract.scope` (emit cả khi batch all-valid để
+  denominator đầy đủ) → `MemoryObserver` bridge fail-open → Worker prometheus
+  `kira_memory_scope_total{scope,origin}` (valid CONVERSATION/GLOBAL, fallback
+  → CONVERSATION, invalid → unknown).
+- Gateway cũng nhận `formation_scope_observed` qua port mới, sẵn sàng nếu
+  formation chạy in-process.
+
+## T6.1 — Rollout runbook (đã viết)
+
+`docs/scope-rollout-runbook.md` — 9 phase: freeze writes → backup → verify
+artifact/pgvector version khớp probe → inventory (read-only) → dry-run →
+apply (gate unresolved = 0 nằm trong code, không có flag force — chủ đích) →
+deploy → smoke 6 bước (current recall, global cross-conversation, isolation,
+partial failure, deletion, scope distribution metrics) → mở traffic. Rollback:
+image cũ không đọc 2 field mới nên backfill không cần undo; restore-backup chỉ
+cho payload corruption.
