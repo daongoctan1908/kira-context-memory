@@ -71,6 +71,9 @@ class FormationStageCapture(EvalModel):
 class ExtractedFact(EvalModel):
     text: str = Field(min_length=1)
     attributed_to: str | None = Field(default=None, pattern=r"^(user|assistant)$")
+    # Raw LLM scope field, kept unvalidated so INVALID values remain scorable
+    # (docs/evaluator-scope-semantics.md section 2).
+    scope: object | None = None
 
 
 class FormationLifecycleRecord(EvalModel):
@@ -132,6 +135,8 @@ class PersistedFormationMemory(EvalModel):
     turn_id: Identifier
     boundary_message_id: int = Field(ge=1, strict=True)
     attributed_to: Literal["user", "assistant"] | None = None
+    # Enforcement guarantees only valid scopes persist, so the literal is strict.
+    memory_scope: Literal["CONVERSATION", "GLOBAL"] | None = None
 
 
 class FormationReceiptRecord(EvalModel):
@@ -368,7 +373,7 @@ def _facts(value: object) -> tuple[ExtractedFact, ...]:
             raise ValueError("native parse output contains an invalid fact")
         text = item.get("text")
         attribution = item.get("attributed_to")
-        facts.append(ExtractedFact(text=text, attributed_to=attribution))
+        facts.append(ExtractedFact(text=text, attributed_to=attribution, scope=item.get("scope")))
     return tuple(facts)
 
 
@@ -488,6 +493,7 @@ class PostgresFormationInspector:
             turn_id=payload.get("turn_id"),
             boundary_message_id=payload.get("boundary_message_id"),
             attributed_to=payload.get("attributed_to"),
+            memory_scope=payload.get("memory_scope"),
         )
 
     @staticmethod

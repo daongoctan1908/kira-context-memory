@@ -255,6 +255,8 @@ class FormationLifecycleGold(EvalModel):
     active_at_end: bool
     memory_family: Identifier
     related_event_ids: tuple[Identifier, ...] = ()
+    # Present only on persisted gold (T0.5.1 annotation); negatives carry none.
+    memory_scope: Literal["CONVERSATION", "GLOBAL"] | None = None
 
 
 class CaseEligibility(EvalModel):

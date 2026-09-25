@@ -95,6 +95,38 @@ class FormationScore(EvalModel):
     complete: bool
 
 
+ScopeRaw = Literal["CONVERSATION", "GLOBAL", "MISSING", "INVALID"]
+
+
+def classify_scope(raw: object) -> ScopeRaw:
+    """Mirror vendored ``_enforce_memory_scopes`` without mutating any candidate.
+
+    None/blank maps to MISSING (persist as CONVERSATION); case-insensitive enum
+    values normalize; anything else is INVALID (dropped before embed/persist).
+    """
+
+    if raw is None or (isinstance(raw, str) and not raw.strip()):
+        return "MISSING"
+    if not isinstance(raw, str):
+        return "INVALID"
+    normalized = raw.strip().upper()
+    if normalized in ("CONVERSATION", "GLOBAL"):
+        return normalized  # type: ignore[return-value]
+    return "INVALID"
+
+
+class ScopeSemanticsScore(EvalModel):
+    false_global_promotion: bool = False
+    persistence_miss: bool = False
+    missed_global_count: int = Field(default=0, ge=0, strict=True)
+    fallback_count: int = Field(default=0, ge=0, strict=True)
+    invalid_count: int = Field(default=0, ge=0, strict=True)
+
+    @property
+    def violated(self) -> bool:
+        return self.false_global_promotion or self.persistence_miss
+
+
 class RetrievalScore(EvalModel):
     recall_at_3: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
     reciprocal_rank: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
@@ -357,6 +389,56 @@ def score_task_success(
 def score_safety(violation_codes: Sequence[str]) -> SafetyScore:
     unique = tuple(dict.fromkeys(violation_codes))
     return SafetyScore(passed=not unique, violation_codes=unique)
+
+
+def score_scope_semantics(
+    *,
+    negative: bool,
+    gold_scope: Literal["CONVERSATION", "GLOBAL"] | None = None,
+    matched_pairs: Sequence[tuple[ScopeRaw, bool]] = (),
+    negative_predictions: Sequence[ScopeRaw] = (),
+) -> ScopeSemanticsScore:
+    """Scope layer over text-matched formation pairs (docs/evaluator-scope-semantics.md).
+
+    matched_pairs: one entry per (gold, predicted) text match — predicted scope
+    classified from the raw LLM field (or the persisted payload when a row
+    exists), and whether the pair has a corresponding persisted ADD. Negative
+    cases never match gold, so their scope diagnostics ride on
+    negative_predictions; the false-ADD gate itself stays in ``score_formation``
+    and counts every predicted fact regardless of scope.
+    """
+
+    if negative:
+        return ScopeSemanticsScore(
+            # Repurposed per spec: on a negative turn this is the diagnostic
+            # negative_global_prediction_count.
+            missed_global_count=sum(1 for scope in negative_predictions if scope == "GLOBAL"),
+            fallback_count=sum(1 for scope in negative_predictions if scope == "MISSING"),
+            invalid_count=sum(1 for scope in negative_predictions if scope == "INVALID"),
+        )
+    missed_global = 0
+    fallback = 0
+    invalid = 0
+    persistence_miss = False
+    promotion = False
+    for predicted, persisted in matched_pairs:
+        if predicted == "MISSING":
+            fallback += 1
+        if predicted == "INVALID":
+            invalid += 1
+        if not persisted:
+            persistence_miss = True
+        if gold_scope == "CONVERSATION" and predicted == "GLOBAL":
+            promotion = True
+        if gold_scope == "GLOBAL" and predicted in ("CONVERSATION", "MISSING"):
+            missed_global += 1
+    return ScopeSemanticsScore(
+        false_global_promotion=promotion,
+        persistence_miss=persistence_miss,
+        missed_global_count=missed_global,
+        fallback_count=fallback,
+        invalid_count=invalid,
+    )
 
 
 def mean_metric(values: Sequence[float | None]) -> float | None:

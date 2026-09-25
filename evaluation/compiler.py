@@ -371,6 +371,11 @@ def _formation_case(context: _BundleContext, memory: Mapping[str, Any]) -> EvalC
                 active_at_end=bool(memory["active_at_end"]),
                 memory_family=str(memory["memory_family"]),
                 related_event_ids=_related_memory_ids(bundle_id, memory),
+                memory_scope=(
+                    str(memory["memory_scope"])
+                    if should_store and "memory_scope" in memory
+                    else None
+                ),
             ),
         ),
         review=context.bundle.manifest.review,

@@ -1,13 +1,13 @@
 # Evaluator scope semantics — spec cho benchmark formation (T0.5.2)
 
-Spec này định nghĩa semantics mà evaluator Phase 5 (T5.2) phải implement cho
-feature memory scope (CONVERSATION | GLOBAL | DROP). Viết trước dataset freeze
-vì chỉ phụ thuộc semantics đã chốt trong plan (vòng 3) và code hiện tại — không
-phụ thuộc nội dung dataset, không tune prompt. T5.2 consume spec này nguyên văn;
-không định nghĩa lại khi implement.
+Spec này định nghĩa semantics mà evaluator Phase 5 (T5.2) implement cho feature
+memory scope (CONVERSATION | GLOBAL | DROP). Viết trước dataset freeze vì chỉ
+phụ thuộc semantics đã chốt trong plan (vòng 3) và code hiện tại — không phụ
+thuộc nội dung dataset, không tune prompt.
 
-Anchors code ghi tại thời điểm viết (commit sau `db451ba`); T5.2 đối chiếu lại
-trước khi hiện thực.
+**Trạng thái**: T5.2 đã hiện thực spec này (formation-side gates + TC-1..TC-14
+trong `tests/unit/evaluation/test_scope_semantics.py`); dataset freeze chỉ còn
+chặn phần case authoring T5.1 và chạy benchmark thật.
 
 ## 1. Gold contract mà evaluator consume (đích annotation T0.5.1)
 
@@ -97,8 +97,10 @@ unsupported candidate …" (compiler `_formation_case`).
   negative không có gold scope để so. Violation duy nhất là False-ADD (gate trên).
   Ghi thêm metric chẩn đoán `negative_global_prediction_count` (LLM vừa ADD sai
   vừa định raise GLOBAL — tín hiệu prompt lệch nặng).
-- **Negative + predicted INVALID scope**: DROP đúng — không FAIL, không metric
-  nào ngoài `scope_invalid_count`.
+- **Negative + predicted INVALID scope**: vẫn False-ADD FAIL — mọi extraction từ
+  evidence window của negative turn đều vi phạm, scope invalid không miễn trừ
+  (điểm duy nhất thực thi khác draft: gate false-ADD đếm mọi predicted fact,
+  không phân biệt scope). `scope_invalid_count` vẫn đếm để chẩn đoán.
 
 ### 3.4 Fallback MISSING
 
@@ -152,12 +154,12 @@ Mỗi dòng = 1 unit test trên evaluator layer (không cần provider):
 | TC-4 | matched pair gold GLOBAL, predicted CONVERSATION | PASS case, `missed_global_count` +1 |
 | TC-5 | matched pair gold GLOBAL, predicted raw scope missing | như TC-4 (fallback) + `scope_fallback_count` +1 |
 | TC-6 | matched pair gold persisted, predicted raw scope invalid, không ADD | FAIL `formation_persistence_miss` + `scope_invalid_count` +1 |
-| TC-7 | matched pair gold persisted, có ADD, raw scope invalid (dịu: dedup chặn write) | FAIL `formation_persistence_miss` |
+| TC-7 | matched pair gold persisted, scope hợp lệ nhưng không ADD (dedup chặn write) | FAIL `formation_persistence_miss` |
 | TC-8 | negative gold, 0 predicted | PASS |
 | TC-9 | negative gold, predicted fact text khác canonical_fact | FAIL `formation_quality_mismatch` (false-ADD) |
 | TC-10 | negative gold, predicted fact text trùng canonical_fact | FAIL false-ADD; KHÔNG tính promotion |
 | TC-11 | negative gold, predicted GLOBAL | FAIL false-ADD + `negative_global_prediction_count` +1, không promotion |
-| TC-12 | negative gold, predicted raw scope invalid | PASS (DROP đúng) + `scope_invalid_count` +1 |
+| TC-12 | negative gold, predicted raw scope invalid | FAIL false-ADD (scope invalid không miễn trừ) + `scope_invalid_count` +1 |
 | TC-13 | gold persisted match text, có ADD, persistent payload scope GLOBAL, gold CONVERSATION | FAIL `scope_false_global_promotion` (đường persistent đọc payload) |
 | TC-14 | judge-matched pair (không exact), gold CONVERSATION, predicted GLOBAL | FAIL promotion (judge match text vẫn so scope) |
 

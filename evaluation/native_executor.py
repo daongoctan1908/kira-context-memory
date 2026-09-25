@@ -23,7 +23,10 @@ from evaluation.runner import BenchmarkExecutionResult
 from evaluation.scoring import (
     FormationMatchDecision,
     FormationScore,
+    ScopeSemanticsScore,
+    classify_scope,
     score_formation,
+    score_scope_semantics,
 )
 
 
@@ -49,6 +52,7 @@ class NativeFormationCaseEvaluation(EvalModel):
     extraction: FormationExtractionResult | None = None
     persistence: PersistentFormationResult | None = None
     score: FormationScore | None = None
+    scope_semantics: ScopeSemanticsScore | None = None
     judge_decisions: tuple[FormationMatchDecision, ...] = ()
     reason_codes: tuple[Identifier, ...] = ()
 
@@ -143,15 +147,71 @@ class NativeFormationEvaluator:
         else:
             outcome = Outcome.PASS
             reasons = ()
+
+        scope_semantics, scope_reasons = self._scope_layer(case, extraction, persistence, score)
+        reasons = tuple(dict.fromkeys((*reasons, *scope_reasons)))
+        if scope_reasons and outcome is Outcome.PASS:
+            outcome = Outcome.FAIL
         return NativeFormationCaseEvaluation(
             case_id=case.case_id,
             outcome=outcome,
             extraction=extraction,
             persistence=persistence,
             score=score,
+            scope_semantics=scope_semantics,
             judge_decisions=decisions,
             reason_codes=reasons,
         )
+
+    @staticmethod
+    def _scope_layer(
+        case: EvalCase,
+        extraction: FormationExtractionResult,
+        persistence: PersistentFormationResult | None,
+        score: FormationScore,
+    ) -> tuple[ScopeSemanticsScore, tuple[Identifier, ...]]:
+        """Scope gates over text-matched pairs (docs/evaluator-scope-semantics.md)."""
+
+        gold = case.gold.lifecycle_event
+        if gold is None or not gold.should_store:
+            # Negative or un-annotated gold: no gold scope to compare. The
+            # false-ADD gate above already fails every predicted fact.
+            negative_predictions = tuple(
+                classify_scope(fact.scope) for fact in extraction.facts
+            )
+            return (
+                score_scope_semantics(negative=True, negative_predictions=negative_predictions),
+                (),
+            )
+
+        # On the persistent path the payload scope is the persisted truth (the
+        # raw LLM field was normalized/dropped before writing); on the
+        # write-free path reconciliation binds the receipt to lifecycle events,
+        # so a matched text with no ADD means the memory was never persisted.
+        payload_scopes: dict[str, str] = {}
+        if persistence is not None and persistence.persistence is not None:
+            payload_scopes = {
+                memory.content: memory.memory_scope
+                for memory in persistence.persistence.memories
+                if memory.memory_scope is not None
+            }
+        lifecycle_texts = {event.memory for event in extraction.lifecycle_events}
+        matched_pairs = []
+        for match in score.matches:
+            fact = extraction.facts[match.prediction_index]
+            raw = payload_scopes.get(fact.text, fact.scope)
+            matched_pairs.append((classify_scope(raw), fact.text in lifecycle_texts))
+        semantics = score_scope_semantics(
+            negative=False,
+            gold_scope=gold.memory_scope,
+            matched_pairs=matched_pairs,
+        )
+        reasons: list[Identifier] = []
+        if semantics.false_global_promotion:
+            reasons.append("scope_false_global_promotion")
+        if semantics.persistence_miss:
+            reasons.append("formation_persistence_miss")
+        return semantics, tuple(reasons)
 
 
 class NativeRetrievalEvaluator:

@@ -80,7 +80,7 @@ phần Phase 2 còn thiếu):
 - Gateway cũng nhận `formation_scope_observed` qua port mới, sẵn sàng nếu
   formation chạy in-process.
 
-## T0.5.2 — Evaluator DROP-negative & promotion semantics (spec, chưa code evaluator)
+## T0.5.2 — Evaluator DROP-negative & promotion semantics (spec + đã hiện thực T5.2)
 
 `docs/evaluator-scope-semantics.md` — spec khóa semantics evaluator T5.2 consume,
 viết trước freeze vì chỉ phụ thuộc semantics chốt (vòng 3) + code hiện tại:
@@ -97,6 +97,19 @@ viết trước freeze vì chỉ phụ thuộc semantics chốt (vòng 3) + code
   do scope invalid vẫn match text mà case vẫn PASS. Fallback MISSING ứng xử như
   CONVERSATION (mirror `_enforce_memory_scopes`).
 - 14 unit test case (TC-1..TC-14) liệt kê sẵn cho T5.2.
+
+**Hiện thực T5.2 (formation-side, 2026-09-25)** — `evaluation/scoring.py`
+(`classify_scope`/`ScopeSemanticsScore`/`score_scope_semantics`),
+`evaluation/native_executor.py` (`_scope_layer` sau text score, reason codes
+`scope_false_global_promotion` + `formation_persistence_miss`),
+`ExtractedFact.scope` (raw giữ nguyên để chấm INVALID),
+`PersistedFormationMemory.memory_scope` + `FormationLifecycleGold.memory_scope`,
+compiler đọc `memory_scope` từ gold. 24 test mới
+(`tests/unit/evaluation/test_scope_semantics.py`, TC-1..TC-14) — full suite 1282
+passed. 2 hiệu chỉnh so với draft spec: TC-7 đổi thành dedup-chặn-write (ADD và
+INVALID cùng lúc là trạng thái không thể có), TC-12 negative + INVALID vẫn FAIL
+false-ADD (mọi extraction từ negative window đều vi phạm). Còn lại của T5.2
+(retrieval Recall@3/MRR theo branch) consume khi làm T5.1 sau freeze.
 
 ## T6.1 — Rollout runbook (đã viết)
 
