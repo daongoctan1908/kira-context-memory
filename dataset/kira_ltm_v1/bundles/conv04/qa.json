@@ -1418,8 +1418,9 @@
       "expected_action": "execute",
       "gold_answer": "Em chưa xác định chính xác được chỉ tiêu Anh/chị muốn tra cứu. Anh/chị mô tả rõ hơn tên chỉ tiêu giúp Em nhé (ví dụ: chỉ tiêu về số lượng thuê bao, doanh thu, hay tỷ lệ cụ thể nào của Di động 5G?).",
       "notes": "",
-      "evaluation_tier": "hard_gate",
-      "hard_gate": true,
+      "architecture_note": "Observed KiRa failure (D14:2): the assistant could not resolve the alias '5G chính' even though D9:1 redefined it and D13:1 reinforced it after the temporary meeting override. No independent authoritative business answer exists for the final response, so the preserved observed clarification-request text must not gate a hard pass/fail; rewrite (gold_rewrite derived from user query + current alias state) and task-success (expected_action + expected_api from testcase CT_76) remain scoreable. Observed output is kept for audit/history and must not be used as a promotional final-answer gold.",
+      "evaluation_tier": "diagnostic_history",
+      "hard_gate": false,
       "scenario_group": "current_5g_main_growth",
       "memory_families": [
         "semantic_alias_5g"

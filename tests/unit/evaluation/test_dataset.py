@@ -101,9 +101,9 @@ def test_validator_accepts_canonical_dataset_and_cli_formats(capsys):
     assert report.valid
     assert report.errors == ()
     assert report.counts == {
-        "diagnostic_history": 70,
+        "diagnostic_history": 74,
         "fills": 140,
-        "hard_gate": 139,
+        "hard_gate": 135,
         "memory_events": 62,
         "pending_answers": 0,
         "qa": 209,

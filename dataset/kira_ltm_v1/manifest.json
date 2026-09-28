@@ -2,7 +2,7 @@
   "$schema": "schemas/manifest.schema.json",
   "schema_version": 1,
   "dataset_id": "kira_ltm_v1",
-  "dataset_version": "1.0.0-materialized.2",
+  "dataset_version": "1.0.0-materialized.5",
   "status": "materialized",
   "canonical_format": "json",
   "evaluation_scope": "full_corpus",
@@ -36,8 +36,8 @@
         "fills": 39,
         "memory_events": 17,
         "qa": 55,
-        "hard_gate": 36,
-        "diagnostic_history": 19,
+        "hard_gate": 35,
+        "diagnostic_history": 20,
         "pending_answers": 0
       },
       "files": {
@@ -51,11 +51,11 @@
         },
         "memories": {
           "name": "memories.json",
-          "sha256": "970670e542013f40e6db93dacbf4ba0ed1fc85dfd927092201f09f8f5a06cc30"
+          "sha256": "4a1cba868ee15ea4ceffd0f2b1c79b8219bf4c74e9dd189d424ed841fe4e0dca"
         },
         "qa": {
           "name": "qa.json",
-          "sha256": "1f765fff3528690135a144b02a1e63f100792fcfc662fe974d23f2083a590342"
+          "sha256": "69f89e6c736a36445f84cb081857b00be64d1b7fd2e8f73cb380592c44ecdb5f"
         }
       }
     },
@@ -118,8 +118,8 @@
         "fills": 33,
         "memory_events": 15,
         "qa": 52,
-        "hard_gate": 32,
-        "diagnostic_history": 20,
+        "hard_gate": 30,
+        "diagnostic_history": 22,
         "pending_answers": 0
       },
       "files": {
@@ -133,11 +133,11 @@
         },
         "memories": {
           "name": "memories.json",
-          "sha256": "56d537a87016d59c90bbf4d6ed7aba01f4ce7e0de8884959296e48806fa682d1"
+          "sha256": "c8fadcf2058c2b8631aa2d65d2a90a09f46a4870f86e9b39a2ebfeff1a302f1c"
         },
         "qa": {
           "name": "qa.json",
-          "sha256": "b6760cabb8a4c0eed8ea3327f9acefb8a11c1fc1263726c239b017f5afcba2b6"
+          "sha256": "366c3cdff8323d40f5baf3ad2aa9d29ff0e55bfbc7e6c3ddb574828664c728eb"
         }
       }
     },
@@ -159,8 +159,8 @@
         "fills": 32,
         "memory_events": 15,
         "qa": 52,
-        "hard_gate": 36,
-        "diagnostic_history": 16,
+        "hard_gate": 35,
+        "diagnostic_history": 17,
         "pending_answers": 0
       },
       "files": {
@@ -174,11 +174,11 @@
         },
         "memories": {
           "name": "memories.json",
-          "sha256": "582a074677e5ed6141af3898a118e2f67bc46be6beb504d22229423c471d26c4"
+          "sha256": "fcbd969ef29036dd04731ecbcd6a241b2dfaabff5dbe69ece0835ca3b872bb29"
         },
         "qa": {
           "name": "qa.json",
-          "sha256": "a158fd5c08cbe5ff19dca5537a234bcceb99a345073301ca992cd60f73253646"
+          "sha256": "88384d209f60ed6f5d3f77c22d07dfa6d8f19030d62f577a6067b6c7aeb81399"
         }
       }
     }

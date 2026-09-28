@@ -75,7 +75,7 @@
     {
       "memory_id": "M01",
       "key": "semantic.5g_main",
-      "canonical_fact": "Ban đầu, “5G chính” = Thuê bao Register 5G lũy kế.",
+      "canonical_fact": "“5G chính” = Thuê bao Register 5G lũy kế.",
       "source_turn_ids": [
         "D1:1"
       ],
