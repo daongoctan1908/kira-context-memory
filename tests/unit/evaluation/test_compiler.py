@@ -56,7 +56,7 @@ def test_compiler_emits_all_suites_namespaces_and_source_coverage():
         source.kind: (source.total, source.linked, source.accounted_not_selected)
         for source in compilation.coverage.sources
     } == {
-        "conversation": (506, 130, 376),
+        "conversation": (506, 122, 384),
         "fill": (140, 0, 140),
         "memory": (62, 62, 0),
         "qa": (209, 209, 0),
@@ -75,6 +75,29 @@ def test_compiler_emits_all_suites_namespaces_and_source_coverage():
         message.timestamp is not None and message.timestamp.utcoffset() is not None
         for message in formation.inputs.messages
     )
+
+
+def test_compiled_qa_cases_carry_source_tier_tag():
+    """Tier contract: every QA-derived case exposes its source evaluation_tier tag.
+
+    regression: Q_SINGLE_HOP_015 (known-corrupt observed answer) must compile to
+    tier:diagnostic_history so acceptance aggregation can exclude it by tier.
+    """
+
+    compilation = compile_dataset(seed=23)
+    diagnostic = next(
+        case
+        for case in compilation.cases
+        if case.case_id == "conv01:retrieval:Q_SINGLE_HOP_015"
+    )
+    assert "tier:diagnostic_history" in diagnostic.tags
+    assert "tier:hard_gate" not in diagnostic.tags
+
+    hard = next(case for case in compilation.cases if case.case_id == "conv01:retrieval:Q_SINGLE_HOP_001")
+    assert "tier:hard_gate" in hard.tags
+
+    tiered = [case for case in compilation.cases if any(t.startswith("tier:") for t in case.tags)]
+    assert len(tiered) == len(compilation.cases) - 62  # formation cases carry no tier tag
 
 
 def test_compiler_is_byte_deterministic_for_dataset_and_seed():

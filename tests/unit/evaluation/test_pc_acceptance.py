@@ -52,8 +52,21 @@ def _provenance(variant: BenchmarkVariant) -> RunProvenance:
 
 def _small_compilation():
     full = compile_dataset(seed=742)
-    selected = tuple(next(case for case in full.cases if case.suite is suite) for suite in Suite)
+    selected = list(
+        next(case for case in full.cases if case.suite is suite) for suite in Suite
+    )
     return full.model_copy(update={"dataset_sha256": _DATASET_HASH, "cases": selected})
+
+
+def _tiered_compilation():
+    """One case per suite; cross-session is diagnostic_history, rest hard_gate."""
+
+    compilation = _small_compilation()
+    cases = []
+    for case in compilation.cases:
+        tier = "diagnostic_history" if case.suite is Suite.CROSS_SESSION else "hard_gate"
+        cases.append(case.model_copy(update={"tags": (*case.tags, f"tier:{tier}")}))
+    return compilation.model_copy(update={"cases": tuple(cases)})
 
 
 def _write_store(
@@ -62,6 +75,8 @@ def _write_store(
     *,
     variant: BenchmarkVariant,
     safety: bool = False,
+    case_outcome: Outcome | None = None,
+    case_id: str | None = None,
 ) -> None:
     provenance = _provenance(variant)
     identity = ArtifactRunIdentity(
@@ -86,21 +101,39 @@ def _write_store(
         root, identity=identity, created_at=datetime(2026, 9, 18, tzinfo=UTC)
     )
     for index, case in enumerate(compilation.cases):
-        output = {
-            "diagnostic_metric": 0.1,
-            "safety_violation_codes": (
-                ["cross_session_user_leak"] if safety and index == 0 else []
-            ),
-        }
+        targeted = case_id is not None and case.case_id == case_id
+        execution_error = targeted and case_outcome in (
+            Outcome.DEPENDENCY_ERROR,
+            Outcome.PROTOCOL_ERROR,
+            Outcome.NOT_RUN,
+        )
+        if execution_error:
+            output = None
+            output_hash = None
+        else:
+            output = {
+                "diagnostic_metric": 0.1,
+                "safety_violation_codes": (
+                    ["cross_session_user_leak"] if safety and index == 0 else []
+                ),
+            }
+            output_hash = output_sha256(output)
         store.append_case_attempt(
             CaseAttemptArtifact(
                 case_id=case.case_id,
                 suite=case.suite,
                 attempt=1,
                 completed_at=datetime(2026, 9, 18, tzinfo=UTC),
-                outcome=Outcome.FAIL if safety and index == 0 else Outcome.PASS,
+                outcome=(
+                    case_outcome
+                    if targeted
+                    else Outcome.FAIL
+                    if safety and index == 0
+                    else Outcome.PASS
+                ),
                 output=output,
-                output_sha256=output_sha256(output),
+                output_sha256=output_hash,
+                reason_codes=("provider_unavailable",) if execution_error else (),
             )
         )
 
@@ -217,3 +250,121 @@ def test_pc_acceptance_safety_failure_blocks_handoff_but_does_not_promote(tmp_pa
     assert not result.technical_passed
     assert result.variants[1].safety_violation_codes == ("cross_session_user_leak",)
     assert result.quality_decision == "diagnostic_only_no_promotion"
+
+
+def test_diagnostic_semantic_fail_does_not_fail_pc_technical_acceptance(tmp_path, monkeypatch):
+    """Regression: a diagnostic_history semantic FAIL stays observable (in the
+    outcome counter) but PC acceptance is a technical gate — a judged quality
+    failure must not flip technical_passed or block the handoff."""
+
+    compilation = _tiered_compilation()
+    monkeypatch.setattr(
+        "evaluation.pc_acceptance.compile_dataset", lambda *_args, **_kwargs: compilation
+    )
+    diagnostic_case = next(
+        case for case in compilation.cases if case.suite is Suite.CROSS_SESSION
+    )
+    control = tmp_path / "control"
+    candidate = tmp_path / "candidate-a"
+    _write_store(control, compilation, variant=BenchmarkVariant.HISTORICAL_CONTROL)
+    _write_store(
+        candidate,
+        compilation,
+        variant=BenchmarkVariant.RELEASE_CANDIDATE,
+        case_outcome=Outcome.FAIL,
+        case_id=diagnostic_case.case_id,
+    )
+    image_manifest, preflight = _evidence(tmp_path, compilation)
+
+    result = build_pc_acceptance(
+        run_roots={"control": control, "candidate-a": candidate},
+        dataset_root=tmp_path,
+        image_manifest_path=image_manifest,
+        pc_preflight_path=preflight,
+    )
+
+    candidate_variant = result.variants[1]
+    assert result.technical_passed
+    assert candidate_variant.technical_passed
+    assert candidate_variant.outcomes[Outcome.FAIL] == 1  # observable, non-promotional
+    assert not candidate_variant.unresolved_case_ids
+    assert not candidate_variant.safety_violation_codes
+
+
+def test_diagnostic_safety_violation_still_fails_pc_technical_acceptance(tmp_path, monkeypatch):
+    """Regression: tier exclusion must never reach PC acceptance — a
+    diagnostic_history case with a safety violation blocks the handoff."""
+
+    compilation = _tiered_compilation()
+    monkeypatch.setattr(
+        "evaluation.pc_acceptance.compile_dataset", lambda *_args, **_kwargs: compilation
+    )
+    diagnostic_case = next(
+        case for case in compilation.cases if case.suite is Suite.CROSS_SESSION
+    )
+    control = tmp_path / "control"
+    candidate = tmp_path / "candidate-a"
+    _write_store(control, compilation, variant=BenchmarkVariant.HISTORICAL_CONTROL)
+    _write_store(candidate, compilation, variant=BenchmarkVariant.RELEASE_CANDIDATE)
+
+    # Rewrite the diagnostic attempt's persisted output to carry a violation code;
+    # _safety_codes recursively extracts codes regardless of the case's tier.
+    attempts_path = candidate / "cases.jsonl"
+    mutated = []
+    for line in attempts_path.read_text(encoding="utf-8").splitlines():
+        record = json.loads(line)
+        if record["case_id"] == diagnostic_case.case_id:
+            record["output"]["safety_violation_codes"] = ["cross_session_user_leak"]
+            record["output_sha256"] = output_sha256(record["output"])
+        mutated.append(json.dumps(record))
+    attempts_path.write_text("\n".join(mutated) + "\n", encoding="utf-8")
+
+    image_manifest, preflight = _evidence(tmp_path, compilation)
+    result = build_pc_acceptance(
+        run_roots={"control": control, "candidate-a": candidate},
+        dataset_root=tmp_path,
+        image_manifest_path=image_manifest,
+        pc_preflight_path=preflight,
+    )
+
+    candidate_variant = result.variants[1]
+    assert not result.technical_passed
+    assert not candidate_variant.technical_passed
+    assert candidate_variant.safety_violation_codes == ("cross_session_user_leak",)
+
+
+def test_diagnostic_dependency_error_still_leaves_run_incomplete(tmp_path, monkeypatch):
+    """Regression: a diagnostic_history case with DEPENDENCY_ERROR (no persisted
+    output) must count as unresolved — infrastructure failures are never
+    laundered out by the tier."""
+
+    compilation = _tiered_compilation()
+    monkeypatch.setattr(
+        "evaluation.pc_acceptance.compile_dataset", lambda *_args, **_kwargs: compilation
+    )
+    diagnostic_case = next(
+        case for case in compilation.cases if case.suite is Suite.CROSS_SESSION
+    )
+    control = tmp_path / "control"
+    candidate = tmp_path / "candidate-a"
+    _write_store(control, compilation, variant=BenchmarkVariant.HISTORICAL_CONTROL)
+    _write_store(
+        candidate,
+        compilation,
+        variant=BenchmarkVariant.RELEASE_CANDIDATE,
+        case_outcome=Outcome.DEPENDENCY_ERROR,
+        case_id=diagnostic_case.case_id,
+    )
+    image_manifest, preflight = _evidence(tmp_path, compilation)
+
+    result = build_pc_acceptance(
+        run_roots={"control": control, "candidate-a": candidate},
+        dataset_root=tmp_path,
+        image_manifest_path=image_manifest,
+        pc_preflight_path=preflight,
+    )
+
+    candidate_variant = result.variants[1]
+    assert not result.technical_passed
+    assert candidate_variant.unresolved_case_ids == (diagnostic_case.case_id,)
+    assert candidate_variant.completed_eligible_cases < candidate_variant.eligible_cases

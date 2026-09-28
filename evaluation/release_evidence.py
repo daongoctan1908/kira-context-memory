@@ -31,6 +31,7 @@ from evaluation.cross_session import CrossSessionCaseEvaluation
 from evaluation.models import (
     BENCHMARK_CONTRACT_ID,
     BenchmarkVariant,
+    EvalCase,
     EvalModel,
     Identifier,
     NonEmpty,
@@ -283,6 +284,24 @@ def _mean(values: Sequence[float]) -> QualityMetric:
     )
 
 
+def is_diagnostic_tier(case: EvalCase) -> bool:
+    """True when the source QA row is diagnostic_history, never acceptance-scored.
+
+    The dataset marks known-corrupt or archival observed answers as
+    diagnostic_history (Q_SINGLE_HOP_015 precedent). Their semantic verdicts are
+    still judged and reported per case for debugging, but they must not move
+    official acceptance aggregates whose denominators define hard gates.
+    """
+
+    return "tier:diagnostic_history" in case.tags
+
+
+def is_acceptance_case(case: EvalCase) -> bool:
+    """Official aggregate membership: eligible AND not a diagnostic-history case."""
+
+    return case.eligibility.status == "eligible" and not is_diagnostic_tier(case)
+
+
 def _formation_metrics(
     scores: Sequence[NativeFormationCaseEvaluation],
 ) -> dict[QualityMetricName, QualityMetric]:
@@ -442,6 +461,21 @@ def build_run_quality_evidence(
             continue
         if attempt.output is None:
             unresolved.add("missing_case_output")
+            continue
+        # Diagnostic-history cases stay fully executed and audited (outcomes,
+        # safety, unresolved coverage below), but their verdicts never enter an
+        # official quality aggregate; only acceptance-tier cases feed metrics.
+        if not is_acceptance_case(case):
+            if case.suite is Suite.CROSS_SESSION:
+                result = CrossSessionCaseEvaluation.model_validate(attempt.output)
+                if result.with_ltm is not None:
+                    safety.update(result.with_ltm.safety_violation_codes)
+                if result.no_ltm is not None:
+                    safety.update(result.no_ltm.safety_violation_codes)
+            elif case.suite is Suite.RETRIEVAL:
+                result = NativeRetrievalCaseEvaluation.model_validate(attempt.output)
+                if result.formation_produced:
+                    safety.update(result.formation_produced.safety_violation_codes)
             continue
         if case.suite is Suite.FORMATION:
             result = NativeFormationCaseEvaluation.model_validate(attempt.output)

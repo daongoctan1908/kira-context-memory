@@ -490,14 +490,14 @@ def _judge(
     )
 
 
-def _case(suite: Suite) -> EvalCase:
+def _case(suite: Suite, *, tags: tuple[str, ...] = ("bundle:conv01",), name: str = "case-1") -> EvalCase:
     common = dict(
-        case_id=f"conv01:{suite.value}:case-1",
+        case_id=f"conv01:{suite.value}:{name}",
         family_id=f"conv01:family:{suite.value}",
         evaluation_scope="full_corpus",
         provenance="synthetic",
-        tags=("bundle:conv01",),
-        source_row_ids=(f"conv01:{suite.value}:row-1",),
+        tags=tags,
+        source_row_ids=(f"conv01:{suite.value}:{name}",),
         eligibility=CaseEligibility(),
         gold=GoldSpecification(semantic_expectation="Expected behavior."),
     )
@@ -740,3 +740,251 @@ def test_quality_builder_rejects_nonofficial_and_stale_audit(monkeypatch, tmp_pa
             dataset_root=tmp_path,
             reconciliation=reconciliation,
         )
+
+
+_HARD_GATE = ("bundle:conv01", "tier:hard_gate")
+_DIAGNOSTIC = ("bundle:conv01", "tier:diagnostic_history")
+
+
+def _quality_harness(monkeypatch, tmp_path: Path, cases, attempts):
+    """Shared harness: one official internal_test run over fabricated cases."""
+
+    compilation_bytes = b"compiled\n"
+    identity = SimpleNamespace(
+        run_id=UUID(int=22),
+        profile=Profile.INTERNAL_TEST,
+        variant=BenchmarkVariant.RELEASE_CANDIDATE,
+        dataset_sha256="1" * 64,
+        compilation_sha256=release.sha256(compilation_bytes).hexdigest(),
+        selected_case_ids=tuple(case.case_id for case in cases),
+        seed=742,
+        suites=tuple(Suite),
+        config_sha256="2" * 64,
+        provenance=SimpleNamespace(
+            runtime=SimpleNamespace(sha="3" * 40),
+            harness=SimpleNamespace(sha="4" * 40),
+            candidate=SimpleNamespace(candidate_id="candidate-a"),
+        ),
+    )
+    (tmp_path / "manifest.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(
+        release.ArtifactRunManifest,
+        "model_validate_json",
+        classmethod(lambda _cls, _raw: SimpleNamespace(identity=identity, official=True)),
+    )
+    monkeypatch.setattr(
+        release.ArtifactStore,
+        "resume",
+        lambda *_args, **_kwargs: SimpleNamespace(latest_attempts=tuple(attempts)),
+    )
+    monkeypatch.setattr(
+        release, "compile_dataset", lambda *_args, **_kwargs: SimpleNamespace(cases=cases)
+    )
+    monkeypatch.setattr(release, "compilation_json_bytes", lambda _compilation: compilation_bytes)
+    monkeypatch.setattr(release, "build_audit_candidates", lambda **_kwargs: ())
+    return AuditReconciliation(
+        candidate_set_sha256=audit_candidate_set_sha256(()),
+        cases=(),
+        expansion=(),
+        pending_audit_ids=(),
+        insufficient_evidence_suites=(),
+        dataset_revision_case_ids=(),
+    )
+
+
+def _arm(
+    case_id: str,
+    verdict: JudgeVerdict,
+    condition: CrossSessionCondition = CrossSessionCondition.WITH_LTM,
+) -> CrossSessionArmEvaluation:
+    answer = "Hà Nội"
+    return CrossSessionArmEvaluation(
+        case_id=case_id,
+        condition=condition,
+        outcome=Outcome.REVIEW_REQUIRED
+        if verdict is JudgeVerdict.UNCERTAIN
+        else Outcome[verdict.value],
+        rewritten_query="Hà Nội ở đâu?",
+        final_answer=answer,
+        rewrite_constraints=ConstraintScore(passed=True),
+        final_judgment=_judge(case_id, Suite.CROSS_SESSION, answer, verdict),
+        task_success=TaskSuccessScore(passed=True, action_matches=True),
+    )
+
+
+def test_diagnostic_history_never_enters_acceptance_aggregates(monkeypatch, tmp_path: Path):
+    """Regression: diagnostic_history cases are judged but excluded from official metrics.
+
+    Fabricated two-case corpus, independent of any bundle: one hard-gate
+    cross-session case that passes, one diagnostic_history case that semantically
+    FAILs (the known-corrupt-gold shape). The diagnostic failure must appear in
+    per-case evidence but must not move FINAL_QA_SEMANTIC_PASS_RATE or its
+    acceptance denominator.
+    """
+
+    hard_case = _case(Suite.CROSS_SESSION, tags=_HARD_GATE, name="hard-1")
+    diagnostic_case = _case(Suite.CROSS_SESSION, tags=_DIAGNOSTIC, name="diag-1")
+    cross_hard = CrossSessionCaseEvaluation(
+        case_id=hard_case.case_id,
+        outcome=Outcome.PASS,
+        no_ltm=_arm(hard_case.case_id, JudgeVerdict.PASS, CrossSessionCondition.NO_LTM),
+        with_ltm=_arm(hard_case.case_id, JudgeVerdict.PASS),
+    )
+    cross_diagnostic = CrossSessionCaseEvaluation(
+        case_id=diagnostic_case.case_id,
+        outcome=Outcome.FAIL,
+        no_ltm=_arm(diagnostic_case.case_id, JudgeVerdict.FAIL, CrossSessionCondition.NO_LTM),
+        with_ltm=_arm(diagnostic_case.case_id, JudgeVerdict.FAIL),
+    )
+    attempts = [
+        _attempt(hard_case, cross_hard),
+        _attempt(diagnostic_case, cross_diagnostic),
+    ]
+    cases = (hard_case, diagnostic_case)
+    reconciliation = _quality_harness(monkeypatch, tmp_path, cases, attempts)
+
+    scorecard = build_run_quality_evidence(
+        run_root=tmp_path,
+        dataset_root=tmp_path,
+        reconciliation=reconciliation,
+    )
+
+    # B: diagnostic FAIL is recorded per case but the headline metric counts
+    # only the acceptance-tier case (denominator 1, value 1.0).
+    metric = scorecard.metrics[QualityMetricName.FINAL_QA_SEMANTIC_PASS_RATE]
+    assert metric.value == 1.0
+    assert metric.denominator == 1
+    no_ltm_metric = scorecard.metrics[QualityMetricName.NO_LTM_FINAL_QA_SEMANTIC_PASS_RATE]
+    assert no_ltm_metric.value == 1.0
+    assert no_ltm_metric.denominator == 1
+    assert scorecard.evidence_complete
+
+
+def test_diagnostic_history_pass_still_reported_per_case(monkeypatch, tmp_path: Path):
+    """C: a diagnostic_history case judged PASS stays fully executed/audited."""
+
+    diagnostic_case = _case(Suite.CROSS_SESSION, tags=_DIAGNOSTIC)
+    cross = CrossSessionCaseEvaluation(
+        case_id=diagnostic_case.case_id,
+        outcome=Outcome.PASS,
+        no_ltm=_arm(diagnostic_case.case_id, JudgeVerdict.PASS, CrossSessionCondition.NO_LTM),
+        with_ltm=_arm(diagnostic_case.case_id, JudgeVerdict.PASS),
+    )
+    cases = (diagnostic_case,)
+    reconciliation = _quality_harness(
+        monkeypatch, tmp_path, cases, [_attempt(diagnostic_case, cross)]
+    )
+
+    scorecard = build_run_quality_evidence(
+        run_root=tmp_path,
+        dataset_root=tmp_path,
+        reconciliation=reconciliation,
+    )
+
+    # No acceptance-tier case: headline metric is N/A (empty denominator), not 1.0.
+    metric = scorecard.metrics[QualityMetricName.FINAL_QA_SEMANTIC_PASS_RATE]
+    assert metric.value is None
+    assert metric.denominator == 0
+    assert scorecard.evidence_complete
+
+
+def test_diagnostic_history_safety_violations_still_fail_the_run(monkeypatch, tmp_path: Path):
+    """Tier exclusion must never launder safety evidence out of official evidence."""
+
+    diagnostic_case = _case(Suite.CROSS_SESSION, tags=_DIAGNOSTIC)
+    arm = _arm(diagnostic_case.case_id, JudgeVerdict.PASS)
+    violating_arm = arm.model_copy(
+        update={"safety_violation_codes": ("cross_user_memory",), "outcome": Outcome.FAIL}
+    )
+    cross = CrossSessionCaseEvaluation(
+        case_id=diagnostic_case.case_id,
+        outcome=Outcome.FAIL,
+        no_ltm=violating_arm.model_copy(update={"condition": CrossSessionCondition.NO_LTM}),
+        with_ltm=violating_arm,
+    )
+    cases = (diagnostic_case,)
+    reconciliation = _quality_harness(
+        monkeypatch, tmp_path, cases, [_attempt(diagnostic_case, cross)]
+    )
+
+    scorecard = build_run_quality_evidence(
+        run_root=tmp_path,
+        dataset_root=tmp_path,
+        reconciliation=reconciliation,
+    )
+
+    assert "cross_user_memory" in scorecard.safety_violation_codes
+
+
+def test_hard_gate_semantic_fail_still_reduces_headline_metric(monkeypatch, tmp_path: Path):
+    """Regression: tier exclusion must not blunt the acceptance tier itself.
+
+    A hard-gate cross-session case whose semantic judge FAILs must drive the
+    official FINAL_QA_SEMANTIC_PASS_RATE down to 0.0 with a full denominator,
+    exactly as designed before diagnostic-history exclusion existed.
+    """
+
+    hard_case = _case(Suite.CROSS_SESSION, tags=_HARD_GATE)
+    cross = CrossSessionCaseEvaluation(
+        case_id=hard_case.case_id,
+        outcome=Outcome.FAIL,
+        no_ltm=_arm(hard_case.case_id, JudgeVerdict.FAIL, CrossSessionCondition.NO_LTM),
+        with_ltm=_arm(hard_case.case_id, JudgeVerdict.FAIL),
+    )
+    cases = (hard_case,)
+    reconciliation = _quality_harness(monkeypatch, tmp_path, cases, [_attempt(hard_case, cross)])
+
+    scorecard = build_run_quality_evidence(
+        run_root=tmp_path,
+        dataset_root=tmp_path,
+        reconciliation=reconciliation,
+    )
+
+    metric = scorecard.metrics[QualityMetricName.FINAL_QA_SEMANTIC_PASS_RATE]
+    assert metric.value == 0.0
+    assert metric.denominator == 1
+    no_ltm_metric = scorecard.metrics[QualityMetricName.NO_LTM_FINAL_QA_SEMANTIC_PASS_RATE]
+    assert no_ltm_metric.value == 0.0
+    assert no_ltm_metric.denominator == 1
+
+
+def test_diagnostic_infrastructure_error_still_marks_evidence_incomplete(monkeypatch, tmp_path: Path):
+    """Regression: a diagnostic_history case with DEPENDENCY_ERROR must surface
+    as an unresolved suite — infrastructure failures are never tier-excluded."""
+
+    diagnostic_case = _case(Suite.CROSS_SESSION, tags=_DIAGNOSTIC)
+    attempt = CaseAttemptArtifact(
+        case_id=diagnostic_case.case_id,
+        suite=Suite.CROSS_SESSION,
+        attempt=1,
+        completed_at=_NOW,
+        outcome=Outcome.DEPENDENCY_ERROR,
+        reason_codes=("provider_unavailable",),
+    )
+    cases = (diagnostic_case,)
+    reconciliation = _quality_harness(monkeypatch, tmp_path, cases, [attempt])
+
+    scorecard = build_run_quality_evidence(
+        run_root=tmp_path,
+        dataset_root=tmp_path,
+        reconciliation=reconciliation,
+    )
+
+    assert not scorecard.evidence_complete
+    assert "cross_session_unresolved" in scorecard.unresolved_reason_codes
+
+
+def test_is_acceptance_case_excludes_blocked_and_diagnostic_rows():
+    from evaluation.release_evidence import is_acceptance_case, is_diagnostic_tier
+
+    hard = _case(Suite.CROSS_SESSION, tags=_HARD_GATE)
+    diagnostic = _case(Suite.CROSS_SESSION, tags=_DIAGNOSTIC)
+    blocked_diagnostic = diagnostic.model_copy(
+        update={"eligibility": CaseEligibility(status="blocked", blocked_reasons=("pending",))}
+    )
+
+    assert is_diagnostic_tier(diagnostic)
+    assert not is_diagnostic_tier(hard)
+    assert is_acceptance_case(hard)
+    assert not is_acceptance_case(diagnostic)
+    assert not is_acceptance_case(blocked_diagnostic)
