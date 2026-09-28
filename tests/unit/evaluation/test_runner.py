@@ -50,7 +50,19 @@ def _approved_dataset(tmp_path: Path) -> Path:
     return root
 
 
-def test_pc_profile_rejects_unreviewed_or_unapproved_canonical_dataset():
+def test_pc_profile_rejects_unreviewed_or_unapproved_canonical_dataset(tmp_path):
+    # The canonical dataset is frozen benchmark-ready; fabricate the unapproved
+    # pre-review state (materialized + draft bundles, external approval withheld).
+    root = tmp_path / "dataset"
+    shutil.copytree(default_dataset_root(), root)
+    path = root / "manifest.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    manifest["status"] = "materialized"
+    manifest["data_policy"]["external_provider_allowed"] = False
+    for bundle in manifest["bundles"]:
+        bundle["review"] = {"status": "draft", "reviewer": None, "revision": None}
+    path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
     config = load_config(
         profile=Profile.PC_OPENAI_ACCEPTANCE,
         suites=(Suite.REWRITE,),
@@ -61,7 +73,7 @@ def test_pc_profile_rejects_unreviewed_or_unapproved_canonical_dataset():
             run_id=_RUN_ID,
             config=config,
             provenance=_provenance(),
-            dataset_root=default_dataset_root(),
+            dataset_root=root,
             seed=742,
         )
 

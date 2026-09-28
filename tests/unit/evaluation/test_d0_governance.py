@@ -26,7 +26,10 @@ import d0_dry_run as runner  # noqa: E402
 
 
 def _fabricated_manifest(tmp_path: Path, *, ready: bool, external: bool) -> Path:
-    """Copy the canonical dataset and rewrite ONLY manifest policy fields."""
+    """Copy the canonical dataset and rewrite ONLY manifest policy fields.
+
+    ``ready=False`` fabricates a pre-review draft manifest: the canonical dataset
+    is frozen benchmark-ready, so the draft state must be produced explicitly."""
     root = tmp_path / "dataset"
     shutil.copytree(default_dataset_root(), root)
     path = root / "manifest.json"
@@ -40,6 +43,14 @@ def _fabricated_manifest(tmp_path: Path, *, ready: bool, external: bool) -> Path
                 "status": "reviewed",
                 "reviewer": "mentor",
                 "revision": "gold-v1",
+            }
+    else:
+        document["status"] = "materialized"
+        for bundle in document["bundles"]:
+            bundle["review"] = {
+                "status": "draft",
+                "reviewer": None,
+                "revision": None,
             }
     document["data_policy"]["external_provider_allowed"] = ready and external
     path.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -75,8 +86,9 @@ def test_exposure_profile_mismatch_fails_closed():
     assert any("does not match" in reason for reason in decision.blocking_reasons)
 
 
-def test_dry_run_on_draft_reports_blockers_without_raising():
-    manifest = _manifest_at(default_dataset_root())
+def test_dry_run_on_draft_reports_blockers_without_raising(tmp_path):
+    root = _fabricated_manifest(tmp_path, ready=False, external=False)
+    manifest = _manifest_at(root)
     decision = evaluate_d0_policy(
         manifest,
         Profile.INTERNAL_TEST,

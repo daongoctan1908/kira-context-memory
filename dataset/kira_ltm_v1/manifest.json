@@ -2,8 +2,8 @@
   "$schema": "schemas/manifest.schema.json",
   "schema_version": 1,
   "dataset_id": "kira_ltm_v1",
-  "dataset_version": "1.0.0-materialized.5",
-  "status": "materialized",
+  "dataset_version": "1.0.0-benchmark-ready.1",
+  "status": "benchmark_ready",
   "canonical_format": "json",
   "evaluation_scope": "full_corpus",
   "id_namespace": "{bundle_id}:{local_id}",
@@ -26,9 +26,9 @@
       "materialization_status": "materialized",
       "path": "bundles/conv01",
       "review": {
-        "status": "draft",
-        "reviewer": null,
-        "revision": null
+        "status": "reviewed",
+        "reviewer": "tandn16",
+        "revision": "tandn16-review-2026-09-28-r1"
       },
       "counts": {
         "sessions": 22,
@@ -67,9 +67,9 @@
       "materialization_status": "materialized",
       "path": "bundles/conv02",
       "review": {
-        "status": "draft",
-        "reviewer": null,
-        "revision": null
+        "status": "reviewed",
+        "reviewer": "tandn16",
+        "revision": "tandn16-review-2026-09-28-r1"
       },
       "counts": {
         "sessions": 20,
@@ -108,9 +108,9 @@
       "materialization_status": "materialized",
       "path": "bundles/conv03",
       "review": {
-        "status": "draft",
-        "reviewer": null,
-        "revision": null
+        "status": "reviewed",
+        "reviewer": "tandn16",
+        "revision": "tandn16-review-2026-09-28-r1"
       },
       "counts": {
         "sessions": 22,
@@ -149,9 +149,9 @@
       "materialization_status": "materialized",
       "path": "bundles/conv04",
       "review": {
-        "status": "draft",
-        "reviewer": null,
-        "revision": null
+        "status": "reviewed",
+        "reviewer": "tandn16",
+        "revision": "tandn16-review-2026-09-28-r1"
       },
       "counts": {
         "sessions": 22,
