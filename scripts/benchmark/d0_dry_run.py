@@ -19,6 +19,7 @@ import contextlib
 import json
 import subprocess
 import sys
+from dataclasses import asdict
 from hashlib import sha256
 from pathlib import Path
 
@@ -297,13 +298,13 @@ def real_run(
             kb = tier_metrics(sub_outcomes, "KEEP_BOTH")
             safety = safety_metrics(sub_outcomes)
             report[f"{name}_{cid}"] = {
-                "supersede": sup.model_dump(),
-                "duplicate": dup.model_dump(),
-                "keep_both": kb.model_dump(),
-                "safety": safety.model_dump(),
+                "supersede": asdict(sup),
+                "duplicate": asdict(dup),
+                "keep_both": asdict(kb),
+                "safety": asdict(safety),
             }
         sched_safety = safety_metrics(sched_outcomes)
-        report[f"{name}_pooled_safety"] = sched_safety.model_dump()
+        report[f"{name}_pooled_safety"] = asdict(sched_safety)
     # False-supersede and wrong-target case dump for manual review.
     false_cases = [o.event_id for o in outcomes if o.model_false_supersede]
     wrong_cases = [o.event_id for o in outcomes if o.wrong_target]
