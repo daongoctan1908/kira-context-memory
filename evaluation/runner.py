@@ -55,7 +55,14 @@ class BenchmarkRunPreparation(EvalModel):
     selected_cases: tuple[EvalCase, ...] = Field(min_length=1)
 
 
-def _validate_canonical_policy(manifest: DatasetManifest, profile: Profile) -> None:
+def validate_canonical_policy(manifest: DatasetManifest, profile: Profile) -> None:
+    """Canonical dataset policy for any quality-profile evaluation consumer.
+
+    MOCK bypasses dataset maturity; EXTERNAL_SYNTHETIC can never consume the
+    canonical dataset; PC and INTERNAL_TEST both require a benchmark-ready dataset
+    with frozen, materialized, reviewed bundles, and PC additionally requires the
+    dataset-level external-provider approval. Evaluation-side consumers (including
+    the D0-local runner) must reuse this function instead of restating policy."""
     if profile is Profile.EXTERNAL_SYNTHETIC:
         raise ValueError("external_synthetic cannot consume the canonical dataset")
     if profile is Profile.MOCK:
@@ -74,6 +81,10 @@ def _validate_canonical_policy(manifest: DatasetManifest, profile: Profile) -> N
         and not manifest.data_policy.external_provider_allowed
     ):
         raise ValueError("canonical dataset is not approved for the PC external provider")
+
+
+# Historical private name kept as an alias so existing callers are untouched.
+_validate_canonical_policy = validate_canonical_policy
 
 
 def prepare_benchmark_run(
