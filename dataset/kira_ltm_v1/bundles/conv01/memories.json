@@ -46,13 +46,7 @@
       "primary_source_turn_ids": [
         "D1:9"
       ],
-      "supporting_turn_ids": [
-        "D2:2",
-        "D15:8",
-        "D17:2",
-        "D17:6",
-        "D22:2"
-      ],
+      "supporting_turn_ids": [],
       "provenance_scoring": {
         "semantic_fact_match": "A formed preference matching M02 is semantically correct even if extraction was reinforced by an assistant echo.",
         "primary_provenance_metric": "Separately score whether D1:9, the user-origin primary source, was captured."
@@ -60,8 +54,8 @@
     },
     {
       "memory_id": "M03",
-      "key": "kpi.frequent.initial",
-      "canonical_fact": "Khi rà báo cáo giai đoạn đầu, user thường mở Doanh thu tiêu dùng di động và Thuê bao Di động 4G thực Lũy kế.",
+      "key": "kpi.frequent",
+      "canonical_fact": "Khi rà báo cáo, user thường mở Doanh thu tiêu dùng di động và Thuê bao Di động 4G thực Lũy kế.",
       "source_turn_ids": [
         "D2:7"
       ],
@@ -69,8 +63,7 @@
       "supersedes_memory_id": null,
       "memory_type": "preference",
       "expected_operation": "add",
-      "active_at_end": false,
-      "inactive_reason": "later KPI-priority updates make this an initial preference",
+      "active_at_end": true,
       "qa_reference_status": "formation_only",
       "memory_family": "kpi_usage",
       "primary_source_turn_ids": [
@@ -183,7 +176,7 @@
     {
       "memory_id": "M09",
       "key": "growth.short_report",
-      "canonical_fact": "Trong báo cáo ngắn, khi user chỉ nói \"so cùng kỳ\", mặc định hiểu là cùng kỳ tháng.",
+      "canonical_fact": "Trong báo cáo ngắn, khi user chỉ nói \"so cùng kỳ\", mặc định hiểu là cùng kỳ tháng; nếu muốn so cùng kỳ năm, user sẽ ghi rõ.",
       "source_turn_ids": [
         "D12:7"
       ],
@@ -243,7 +236,7 @@
     {
       "memory_id": "M12",
       "key": "scope.primary",
-      "canonical_fact": "Thượng Long, Phú Thọ",
+      "canonical_fact": "Thượng Long là phạm vi theo dõi chính",
       "source_turn_ids": [
         "D16:1"
       ],
@@ -306,7 +299,7 @@
     {
       "memory_id": "M15",
       "key": "kpi.explicit_precedence",
-      "canonical_fact": "KPI được gọi rõ phải giữ nguyên dù KPI khác được xem nhiều hơn",
+      "canonical_fact": "Khi user gọi rõ tên chỉ tiêu cũ thì lấy đúng chỉ tiêu đó, dù các KPI khác đang được xem nhiều hơn.",
       "source_turn_ids": [
         "D21:7"
       ],
@@ -397,6 +390,7 @@
   },
   "active_memory_event_ids_at_end": [
     "M02",
+    "M03",
     "M04",
     "M09",
     "M11",
@@ -409,6 +403,7 @@
   ],
   "expected_active_memory_row_source_event_ids": [
     "M02",
+    "M03",
     "M04",
     "M09",
     "M11",
@@ -418,7 +413,7 @@
     "M15",
     "M16"
   ],
-  "expected_active_memory_row_count": 9,
+  "expected_active_memory_row_count": 10,
   "event_vs_row_contract": {
     "memory_event": "Annotation of a formation/update/reinforcement/no-persist event.",
     "active_memory_row": "Distinct durable semantic memory expected to exist in final active memory state.",
@@ -429,10 +424,10 @@
     "gold_events_exhaustive_for_required_events": false,
     "extra_valid_memory_policy": "A semantically valid extra memory is not automatically a false positive merely because it is absent from the 17 annotated gold events.",
     "precision_penalty_rule": "Penalize extra memories only when they are contradicted, clearly ephemeral despite persistence policy, malformed, or otherwise semantically invalid.",
-    "example_unannotated_fact": "D22:7 mentions mobile remains the group opened first during review; absence from gold is not by itself a false-positive label."
+    "unannotated_example_policy": "No single unannotated turn in this bundle is both user-origin and clearly durable without being covered by an existing gold event or by ephemeral-session scope, so no concrete example is asserted; reviewers must judge each extra memory on its own durability and validity evidence."
   },
   "expected_active_memory_row_count_semantics": {
-    "value": 9,
+    "value": 10,
     "role": "reference_only",
     "hard_exact_gate": false,
     "reason": "Formation evaluation is open-world semantic: valid extra memories, merges, or equivalent row structures must not fail solely because the final distinct row count differs from this reference count."

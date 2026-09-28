@@ -48,7 +48,7 @@
     {
       "memory_id": "M01",
       "key": "comparison.province_pair_default",
-      "canonical_fact": "Ban đầu, khi user nói “cặp tỉnh chuẩn”, mặc định so Phú Thọ với Đà Nẵng.",
+      "canonical_fact": "Khi user nói “cặp tỉnh chuẩn”, mặc định so Phú Thọ với Đà Nẵng.",
       "source_turn_ids": [
         "D1:1"
       ],
@@ -70,7 +70,7 @@
     {
       "memory_id": "M02",
       "key": "metric.core_bundle",
-      "canonical_fact": "Ban đầu, “bộ lõi” gồm hai chỉ tiêu theo thứ tự: Doanh thu dịch vụ (VTT+VTS+VDS), rồi Doanh thu IOT.",
+      "canonical_fact": "“Bộ lõi” gồm hai chỉ tiêu theo thứ tự: Doanh thu dịch vụ (VTT+VTS+VDS), rồi Doanh thu IOT.",
       "source_turn_ids": [
         "D1:3"
       ],
@@ -190,7 +190,7 @@
     {
       "memory_id": "M08",
       "key": "metric.core_bundle",
-      "canonical_fact": "Trước khi được mở rộng, bộ lõi vẫn chỉ gồm Doanh thu dịch vụ và IOT, chưa có chỉ tiêu thuê bao.",
+      "canonical_fact": "Bộ lõi hiện vẫn chỉ gồm Doanh thu dịch vụ và IOT, chưa có chỉ tiêu thuê bao.",
       "source_turn_ids": [
         "D7:1"
       ],
