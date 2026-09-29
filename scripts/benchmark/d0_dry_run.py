@@ -45,10 +45,9 @@ from evaluation.d0_metrics import (  # noqa: E402
     tier_metrics,
 )
 from evaluation.d0_ports import (  # noqa: E402
-    D0_CONFLICT_PROMPT_VERSION,
-    D0_CONFLICT_SYSTEM_PROMPT,
     D0DecisionPort,
     D0EmbeddingPort,
+    resolve_conflict_prompt,
 )
 from evaluation.dataset import DatasetManifest, load_bundle, load_manifest  # noqa: E402
 from evaluation.models import D0Decision, D0Schedule, Profile  # noqa: E402
@@ -156,6 +155,7 @@ def _governance_fields(manifest_doc: DatasetManifest, decision) -> dict[str, obj
 
 
 def dry_run(exposure: D0Exposure, config_ids: tuple[str, ...]) -> Path:
+    prompt_version, system_prompt = resolve_conflict_prompt("d0-conflict-v1")
     manifest_doc = _load_manifest()
     profile = _PROFILE_BY_EXPOSURE[exposure]
     decision = evaluate_d0_policy(
@@ -183,8 +183,8 @@ def dry_run(exposure: D0Exposure, config_ids: tuple[str, ...]) -> Path:
         "embedding_dimensions": 0,
         "decision_provider": "NOT_WIRED_IN_DRY_RUN",
         "decision_model": "NOT_WIRED_IN_DRY_RUN",
-        "prompt_version": D0_CONFLICT_PROMPT_VERSION,
-        "prompt_sha256": sha256(D0_CONFLICT_SYSTEM_PROMPT.encode("utf-8")).hexdigest(),
+        "prompt_version": prompt_version,
+        "prompt_sha256": sha256(system_prompt.encode("utf-8")).hexdigest(),
         "response_schema_sha256": response_schema_fingerprint(),
         "decoding_params": {"temperature": 0.0, "max_tokens": 512},
         "schedules": ["early", "late"],
@@ -220,11 +220,13 @@ def real_run(
     exposure: D0Exposure,
     config_ids: tuple[str, ...],
     *,
+    prompt_version: str = "d0-conflict-v1",
     ports=None,
 ) -> Path:
     """Execute the real characterization. ``ports`` is an injection seam for tests:
     (embeddings, decisions) factories taking the EvalConfig; production callers
     never pass it. Policy is enforced before any transport is constructed."""
+    prompt_version, system_prompt = resolve_conflict_prompt(prompt_version)
     manifest_doc = _load_manifest()
     profile = _PROFILE_BY_EXPOSURE[exposure]
     decision = evaluate_d0_policy(
@@ -246,10 +248,14 @@ def real_run(
         import httpx
 
         embeddings = D0EmbeddingPort(httpx.AsyncClient(follow_redirects=False), config)
-        decisions = D0DecisionPort(httpx.AsyncClient(follow_redirects=False), config)
+        decisions = D0DecisionPort(
+            httpx.AsyncClient(follow_redirects=False), config, prompt_version=prompt_version
+        )
     else:
         embeddings, decisions = ports(config)
-    executor = D0LocalExecutor(timeline, embeddings, decisions, top_k=10)
+    executor = D0LocalExecutor(
+        timeline, embeddings, decisions, prompt_version=prompt_version, top_k=10
+    )
     predictions = asyncio.run(executor.evaluate_all(_configs(config_ids)))
 
     out_dir = _artifact_dir("real-run")
@@ -346,8 +352,8 @@ def real_run(
         "embedding_dimensions": config.embedding_dimensions,
         "decision_provider": "openai_compatible_extraction_endpoint",
         "decision_model": str(config.extraction.model),
-        "prompt_version": D0_CONFLICT_PROMPT_VERSION,
-        "prompt_sha256": sha256(D0_CONFLICT_SYSTEM_PROMPT.encode("utf-8")).hexdigest(),
+        "prompt_version": prompt_version,
+        "prompt_sha256": sha256(system_prompt.encode("utf-8")).hexdigest(),
         "response_schema_sha256": response_schema_fingerprint(),
         "decoding_params": {"temperature": 0.0, "max_tokens": config.judge_max_tokens},
         "schedules": ["early", "late"],
@@ -381,13 +387,20 @@ def main() -> None:
         default="S0,S1",
         help="Comma-separated subset of S0,S1,S_SWEEP",
     )
+    parser.add_argument(
+        "--prompt-version",
+        type=str,
+        default="d0-conflict-v1",
+        help="Registered D0 conflict prompt version (d0-conflict-v1 or d0-conflict-v2); "
+        "feeds the request hash, the manifest prompt identity, and the system prompt.",
+    )
     args = parser.parse_args()
     exposure: D0Exposure = args.exposure  # type: ignore[assignment]
     config_ids = tuple(cid.strip().upper() for cid in args.configs.split(",") if cid.strip())
     if args.dry_run:
         dry_run(exposure, config_ids)
     elif args.real_run:
-        real_run(args.env_file, exposure, config_ids)
+        real_run(args.env_file, exposure, config_ids, prompt_version=args.prompt_version)
     else:
         parser.error("choose --dry-run or --real-run")
 

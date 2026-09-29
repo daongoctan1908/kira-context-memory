@@ -35,6 +35,8 @@ from evaluation.shadow_lifecycle import GoldEvent, ScheduleBundle, ShadowTimelin
 EMBEDDING_BATCH_LIMIT = 100
 
 D0_CONFLICT_PROMPT_VERSION = "d0-conflict-v1"
+D0_CONFLICT_PROMPT_VERSION_V1 = "d0-conflict-v1"
+D0_CONFLICT_PROMPT_VERSION_V2 = "d0-conflict-v2"
 
 D0_CONFLICT_SYSTEM_PROMPT = """You are the conflict-resolution stage of a long-term
 memory system for a Vietnamese chat assistant. A NEW candidate memory fact is about to
@@ -64,6 +66,89 @@ Decide SUPERSEDE only when the candidate makes the existing memory's current-tru
 claim outdated, such that keeping both would leave contradictory current state.
 Choose exactly one existing memory per decision; never invent ids. Return only JSON
 matching the response schema."""
+
+D0_CONFLICT_SYSTEM_PROMPT_V2 = """You are the conflict-resolution stage of a long-term
+memory system for a Vietnamese chat assistant. A NEW candidate memory fact is about to
+be stored. You receive it together with the existing ACTIVE memories that a semantic
+search found as possible conflicts. Decide how the candidate relates to them.
+
+Decisions:
+- DUPLICATE: the candidate expresses the same current fact as exactly one existing
+  memory (paraphrase, restatement, confirmation, clarification, or an added detail
+  that does not change the fact). Keeping both rows would create a redundant
+  duplicate. Respond with the id of that one existing memory.
+- SUPERSEDE: the candidate makes exactly one existing memory's claim about how things
+  are NOW no longer true (the value, preference, plan, role, or state changed).
+  Respond with the id of that one existing memory.
+- KEEP_BOTH: the candidate and the existing memories can all be true as current
+  facts at the same time, or the candidate is about a different subject. Respond
+  with target null.
+
+Counterfactual test, applied to every candidate target before deciding: "If the
+existing memory and the candidate were BOTH kept as current facts, would they
+describe an inconsistent present?" If YES, choose SUPERSEDE. If NO, never choose
+SUPERSEDE: choose DUPLICATE when both state the same current fact, otherwise
+KEEP_BOTH.
+
+SUPERSEDE requires BOTH conditions:
+1. Same semantic slot: the candidate and the target describe the same role, value,
+   preference, plan, or state of the same subject.
+2. Invalidated current truth: after the candidate, the target's claim about how
+   things are now is no longer correct.
+
+Role and state evolution can require SUPERSEDE even when the new sentence sounds
+additive. Example: the target says "X is only a supporting view; Y remains the main
+scope", and the candidate says "X is now tracked in parallel with Y". The target's
+exclusivity claim is invalidated, so the correct decision is SUPERSEDE.
+
+Confirmation is not change. Cues that mark something as UNCHANGED - "still", "is
+still", "remains", "as before", "continues to be", "currently still", "after the
+temporary exception, still", "has not changed", "does not yet include" - make the
+candidate a confirmation, restatement, or clarification of the existing fact, never
+an update; the same holds for their Vietnamese equivalents. A detail that extends or
+clarifies while leaving the target's current fact fully true is DUPLICATE, not
+SUPERSEDE. When the target would remain completely true after the candidate, prefer
+DUPLICATE over SUPERSEDE.
+
+KEEP_BOTH covers coexisting facts:
+- same entity, acronym, or term with a DIFFERENT predicate: a definition of a term
+  and a separate usage rule about that term can coexist;
+- same topic family but a different attribute, role, or convention: the candidate
+  adds an independent rule without changing the target's current truth;
+- different subjects entirely.
+
+Lexical similarity alone never justifies SUPERSEDE: shared entities, shared
+acronyms, or similar wording without an invalidated current-truth claim means
+KEEP_BOTH or DUPLICATE.
+
+These traps are false supersedes (in all of them the existing memory stays true):
+- different time periods (a 2024 fact and a 2026 fact can coexist);
+- multi-valued preferences (liking both tea and coffee is additive, not a change);
+- same entity, different attribute (address vs phone vs job are separate facts);
+- additive information (a new detail that extends, not replaces);
+- historical facts that remain true even when something newer also exists;
+- confirmations of an unchanged fact ("still X") misread as a change to X.
+
+Choose exactly one existing memory for each target-bearing decision: SUPERSEDE and
+DUPLICATE each name exactly one target; KEEP_BOTH always has a null target. Never
+invent ids. Return only JSON matching the response schema."""
+
+D0_CONFLICT_PROMPTS: dict[str, str] = {
+    D0_CONFLICT_PROMPT_VERSION_V1: D0_CONFLICT_SYSTEM_PROMPT,
+    D0_CONFLICT_PROMPT_VERSION_V2: D0_CONFLICT_SYSTEM_PROMPT_V2,
+}
+
+
+def resolve_conflict_prompt(version: str) -> tuple[str, str]:
+    """(prompt_version, system_prompt) for a registered version; fail-closed on
+    unknown versions so a typo can never silently run under the wrong prompt."""
+    try:
+        return version, D0_CONFLICT_PROMPTS[version]
+    except KeyError:
+        raise ValueError(
+            f"unknown D0 conflict prompt version: {version!r}; "
+            f"known: {sorted(D0_CONFLICT_PROMPTS)}"
+        ) from None
 
 
 class D0ProviderError(RuntimeError):
@@ -181,13 +266,23 @@ class D0DecisionPort(DecisionPort):
     production selects for formation LLM#1) with temperature 0 and a strict JSON
     schema. Semantic-invalid outputs raise InvalidDecision (executor caches them);
     infrastructure failures raise DecisionPortError (never faked as a decision).
+    ``prompt_version`` selects a registered D0 conflict prompt; the version string
+    also feeds the executor's request hash, so different prompts never share cache
+    entries.
     """
 
-    def __init__(self, client: httpx.AsyncClient, config: EvalConfig) -> None:
+    def __init__(
+        self,
+        client: httpx.AsyncClient,
+        config: EvalConfig,
+        *,
+        prompt_version: str = D0_CONFLICT_PROMPT_VERSION,
+    ) -> None:
         if not config.extraction.configured:
             raise ValueError("D0 decision port requires a configured extraction provider")
         self._client = client
         self._config = config
+        self._prompt_version, self._system_prompt = resolve_conflict_prompt(prompt_version)
 
     async def decide(
         self, request_hash: str, request: Mapping[str, object]
@@ -222,7 +317,7 @@ class D0DecisionPort(DecisionPort):
                 },
             },
             "messages": [
-                {"role": "system", "content": D0_CONFLICT_SYSTEM_PROMPT},
+                {"role": "system", "content": self._system_prompt},
                 {"role": "user", "content": user_payload},
             ],
         }
@@ -320,7 +415,7 @@ def d0_manifest(
     from evaluation.d0_local_executor import response_schema_fingerprint
     from hashlib import sha256 as _sha256
 
-    prompt_hash = _sha256(D0_CONFLICT_SYSTEM_PROMPT.encode("utf-8")).hexdigest()
+    prompt_hash = _sha256(resolve_conflict_prompt(prompt_version)[1].encode("utf-8")).hexdigest()
     from evaluation.models import D0RunManifest
 
     manifest = D0RunManifest(
