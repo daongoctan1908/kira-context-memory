@@ -15,7 +15,13 @@ from evaluation.shadow_lifecycle import ShadowTimeline
 
 @dataclass(frozen=True, slots=True)
 class PointOutcome:
-    """Per-point adjudication; gold drives scoring, never execution."""
+    """Per-point adjudication; gold drives scoring, never execution.
+
+    ``model_false_supersede``/``pipeline_false_supersede`` are only meaningful on
+    points where LLM#2 actually executed (``llm_executed``); deterministic
+    pool-empty fallbacks carry None for every safety flag. ``decision_mismatch``
+    and ``target_mismatch`` are orthogonal: a wrong decision kind is a decision
+    mismatch; a wrong target identity given the right kind is a target mismatch."""
 
     event_id: str
     schedule: D0Schedule
@@ -25,13 +31,41 @@ class PointOutcome:
     retrieved_ids: tuple[str, ...]
     pool_empty: bool
     retrieval_failure: bool
+    # True only when LLM#2 actually ran (request hash present); deterministic
+    # pool-empty fallbacks are excluded from execution denominators.
+    llm_executed: bool
     decision_valid: bool
     decision: D0ConflictDecision | None
     # Safety flags, computed for every executed LLM#2 call.
     model_false_supersede: bool | None
-    wrong_target: bool | None
+    decision_mismatch: bool | None
+    target_mismatch: bool | None
     # End-to-end adjudication.
     end_to_end_success: bool | None
+
+
+def _gold_kind(prediction: D0Prediction) -> str:
+    """Single-target headline tier of a gold point.
+
+    Multi-target reinforcements (len(gold_target_ids) > 1) cannot represent the
+    one-target DUPLICATE contract cleanly; callers route them to the
+    multi-target diagnostic instead of the headline tier."""
+    if prediction.gold_operation == "update" and prediction.gold_target_ids:
+        return "SUPERSEDE"
+    if prediction.gold_operation == "reinforce_existing":
+        return "DUPLICATE"
+    if prediction.gold_operation == "add":
+        return "KEEP_BOTH"
+    return "NEGATIVE"
+
+
+def is_multi_target_reinforcement(prediction: D0Prediction) -> bool:
+    """Generic condition: reinforcement confirming more than one existing memory
+    (the LLM#2 contract carries exactly one target per decision)."""
+    return (
+        prediction.gold_operation == "reinforce_existing"
+        and len(prediction.gold_target_ids) > 1
+    )
 
 
 def _allowed_duplicate_targets(prediction: D0Prediction) -> frozenset[str]:
@@ -42,62 +76,75 @@ def adjudicate(prediction: D0Prediction) -> PointOutcome:
     """Adjudicate one prediction. Gold target presence gates conditional metrics
     only; execution already happened (deterministic KEEP_BOTH or LLM#2).
 
-    Gold target identity: update events carry exactly one supersedes target
-    (first element of gold_target_ids by construction); reinforce events carry
-    one-or-more allowed duplicate targets."""
-    if prediction.gold_operation == "update" and prediction.gold_target_ids:
-        gold_kind = "SUPERSEDE"
-        gold_target = prediction.gold_target_ids[0]
-    elif prediction.gold_operation == "reinforce_existing":
-        gold_kind = "DUPLICATE"
-        gold_target = None
-    elif prediction.gold_operation == "add":
-        gold_kind = "KEEP_BOTH"
-        gold_target = None
-    else:
-        gold_kind = "NEGATIVE"
-        gold_target = None
+    Semantics:
+    - ``model_false_supersede``: the MODEL actually returned SUPERSEDE while the
+      gold operation does not justify any destructive supersede (gold add or
+      reinforce). A missed supersede (model keeps both on a gold update) is NOT
+      a false supersede — it is a decision mismatch.
+    - ``decision_mismatch``: the returned decision kind is wrong for the gold
+      operation (applies when a decision exists).
+    - ``target_mismatch``: the decision kind was right but the chosen target is
+      not the gold target (SUPERSEDE) / outside the allowed set (DUPLICATE).
+    - End-to-end requires the gold target to actually be retrieved (fail-closed:
+      a correct target ID out of pool is not an observable success)."""
+    gold_kind = _gold_kind(prediction)
+    gold_target = prediction.gold_target_ids[0] if prediction.gold_target_ids else None
 
     decision = prediction.decision
     decision_valid = decision is not None
     pool_empty = prediction.pool.pool_size == 0
+    llm_executed = prediction.llm_request_hash is not None
 
     model_false_supersede: bool | None = None
-    wrong_target: bool | None = None
+    decision_mismatch: bool | None = None
+    target_mismatch: bool | None = None
     end_to_end: bool | None = None
 
+    def _retrieved(target: str | None) -> bool:
+        return target is not None and target in prediction.pool.retrieved_ids
+
+    if llm_executed and decision is not None:
+        model_false_supersede = (
+            decision.decision is D0Decision.SUPERSEDE
+            and prediction.gold_operation != "update"
+        )
+        if gold_kind == "SUPERSEDE":
+            decision_mismatch = decision.decision is not D0Decision.SUPERSEDE
+            target_mismatch = (
+                decision.decision is D0Decision.SUPERSEDE
+                and decision.target_memory_id != gold_target
+            )
+        elif gold_kind == "DUPLICATE":
+            decision_mismatch = decision.decision is not D0Decision.DUPLICATE
+            target_mismatch = (
+                decision.decision is D0Decision.DUPLICATE
+                and decision.target_memory_id not in _allowed_duplicate_targets(prediction)
+            )
+        else:  # KEEP_BOTH gold
+            decision_mismatch = decision.decision is not D0Decision.KEEP_BOTH
+            # A target-bearing decision on a target-less gold is a target error.
+            target_mismatch = decision.target_memory_id is not None
+
     if gold_kind == "SUPERSEDE":
-        if decision is not None:
-            model_false_supersede = decision.decision is not D0Decision.SUPERSEDE
-            if decision.decision is D0Decision.SUPERSEDE:
-                wrong_target = decision.target_memory_id != gold_target
-            else:
-                wrong_target = True
         end_to_end = (
             decision is not None
             and decision.decision is D0Decision.SUPERSEDE
             and decision.target_memory_id == gold_target
+            and _retrieved(gold_target)
         )
     elif gold_kind == "DUPLICATE":
-        if decision is not None:
-            model_false_supersede = decision.decision is D0Decision.SUPERSEDE
-            if decision.decision is D0Decision.DUPLICATE:
-                wrong_target = decision.target_memory_id not in _allowed_duplicate_targets(
-                    prediction
-                )
-            else:
-                wrong_target = True
         end_to_end = (
             decision is not None
             and decision.decision is D0Decision.DUPLICATE
             and decision.target_memory_id in _allowed_duplicate_targets(prediction)
+            and _retrieved(decision.target_memory_id)
         )
-    else:
-        if decision is not None:
-            model_false_supersede = decision.decision is D0Decision.SUPERSEDE
-            if decision.decision is D0Decision.SUPERSEDE:
-                wrong_target = True
-        end_to_end = decision is None or decision.decision is not D0Decision.SUPERSEDE
+    else:  # KEEP_BOTH gold (add): only an exact, valid KEEP_BOTH is success.
+        end_to_end = (
+            decision is not None
+            and decision.decision is D0Decision.KEEP_BOTH
+            and decision.target_memory_id is None
+        )
 
     return PointOutcome(
         event_id=prediction.event_id,
@@ -108,10 +155,12 @@ def adjudicate(prediction: D0Prediction) -> PointOutcome:
         retrieved_ids=prediction.pool.retrieved_ids,
         pool_empty=pool_empty,
         retrieval_failure=prediction.retrieval_failure,
+        llm_executed=llm_executed,
         decision_valid=decision_valid,
         decision=decision,
         model_false_supersede=model_false_supersede,
-        wrong_target=wrong_target,
+        decision_mismatch=decision_mismatch,
+        target_mismatch=target_mismatch,
         end_to_end_success=end_to_end,
     )
 
@@ -128,33 +177,48 @@ class TierMetrics:
 
 @dataclass(frozen=True, slots=True)
 class SafetyMetrics:
+    """Safety counters. ``llm_executed_total`` denominates every flag: only
+    points where LLM#2 actually executed (request hash present) enter the
+    denominator; deterministic pool-empty fallbacks never called LLM#2 and are
+    excluded. ``decision_mismatch_total``/``target_mismatch_total`` replace the
+    former conflated ``wrong_target`` counter (kept below as a legacy union)."""
+
+    llm_executed_total: int
     model_false_supersede_rate: float
     model_false_supersede_total: int
     pipeline_false_supersede_rate: float
     pipeline_false_supersede_total: int
-    wrong_target_rate: float
-    wrong_target_total: int
+    decision_mismatch_rate: float
+    decision_mismatch_total: int
+    target_mismatch_rate: float
+    target_mismatch_total: int
     invalid_output_rate: float
     invalid_output_total: int
 
 
 @dataclass(frozen=True, slots=True)
 class ScheduleDelta:
-    """Five-class schedule sensitivity per event; most-severe class wins.
+    """Schedule sensitivity per event, in two groups with different semantics.
 
-    Classes are cumulative in specificity: boundary_moved (schedule assigns a
-    different formation boundary) implies nothing about bank/pool yet; bank_sensitive
-    (pre-batch ACTIVE bank differs) may or may not change retrieval;
-    retrieval_sensitive (retrieved pool differs) may or may not change the decision
-    input; decision_input_sensitive (the ordered LLM#2 candidate payload differs)
-    may or may not change the outcome. outcome_sensitive means the observed decision
-    differs across schedules. robust means none of the above applies. Only robust
-    events support invariant-across-schedules conclusions."""
+    Mutually exclusive effective classes (exactly one per event, worst wins):
+    ``outcome_sensitive`` (observed decision differs across schedules) >
+    ``decision_input_sensitive`` (ordered LLM#2 candidate payload differs) >
+    ``robust`` (identical decision AND decision input everywhere). These three
+    partition every evaluated event.
+
+    Diagnostic annotations that OVERLAP with the classes above and never
+    redefine them: ``boundary_moved`` (schedules assign different formation
+    boundaries; structural, from annotations only), ``bank_sensitive``
+    (pre-batch ACTIVE row bank differs; structural), ``scored_order_sensitive``
+    (retrieved pool identical but the scored ordering beyond top-k moved).
+    Only ``robust`` events support invariant-across-schedules conclusions;
+    boundary/bank movement with an unchanged effective decision input is still
+    robust."""
 
     robust_events: tuple[str, ...] = ()
     boundary_moved_events: tuple[str, ...] = ()
     bank_sensitive_events: tuple[str, ...] = ()
-    retrieval_sensitive_events: tuple[str, ...] = ()
+    scored_order_sensitive_events: tuple[str, ...] = ()
     decision_input_sensitive_events: tuple[str, ...] = ()
     outcome_sensitive_events: tuple[str, ...] = ()
 
@@ -166,7 +230,9 @@ def _ratio(numerator: int, denominator: int) -> float | None:
 
 
 def tier_metrics(outcomes: Sequence[PointOutcome], kind: str) -> TierMetrics:
-    """kind: SUPERSEDE | DUPLICATE | KEEP_BOTH."""
+    """kind: SUPERSEDE | DUPLICATE | KEEP_BOTH. Multi-target reinforcements are
+    excluded from the DUPLICATE headline tier (single-target contract); route
+    them to :func:`multi_target_reinforcement_metrics` for diagnostics."""
     if kind == "KEEP_BOTH":
         relevant = [o for o in outcomes if o.gold_operation == "add"]
         correct = [o for o in relevant if o.end_to_end_success]
@@ -197,10 +263,18 @@ def tier_metrics(outcomes: Sequence[PointOutcome], kind: str) -> TierMetrics:
             decision_total=len(retrieved),
             end_to_end_total=len(relevant),
         )
-    # DUPLICATE
-    relevant = [o for o in outcomes if o.gold_operation == "reinforce_existing"]
+    # DUPLICATE — single-target reinforcements only.
+    relevant = [
+        o
+        for o in outcomes
+        if o.gold_operation == "reinforce_existing" and len(o.gold_target_ids) == 1
+    ]
     allowed = {o.event_id: o.gold_target_ids for o in relevant}
-    retrieved = [o for o in relevant if allowed[o.event_id] and any(t in o.retrieved_ids for t in allowed[o.event_id])]
+    retrieved = [
+        o
+        for o in relevant
+        if allowed[o.event_id] and any(t in o.retrieved_ids for t in allowed[o.event_id])
+    ]
     decided_correct = [
         o
         for o in retrieved
@@ -219,18 +293,38 @@ def tier_metrics(outcomes: Sequence[PointOutcome], kind: str) -> TierMetrics:
     )
 
 
-def safety_metrics(outcomes: Sequence[PointOutcome]) -> SafetyMetrics:
-    """Safety scoring over every executed LLM#2 call; retrieval failures included.
-
-    pipeline_false_supersede additionally counts supersede transitions that would
-    enter state without gold justification (wrong-target SUPERSEDE on gold SUPERSEDE
-    points is a pipeline false supersede too)."""
-    executed = [o for o in outcomes if o.decision is not None]
-    model_false = [o for o in executed if o.model_false_supersede]
-    wrong_target = [o for o in executed if o.wrong_target]
-    invalid = [
-        o for o in outcomes if o.decision is None and not o.pool_empty
+def multi_target_reinforcement_diagnostic(outcomes: Sequence[PointOutcome]) -> dict[str, object]:
+    """Diagnostic summary for multi-target reinforcement points: excluded from
+    the single-target DUPLICATE headline tier, fully retained here for audit."""
+    relevant = [
+        o
+        for o in outcomes
+        if o.gold_operation == "reinforce_existing" and len(o.gold_target_ids) > 1
     ]
+    correct = [o for o in relevant if o.end_to_end_success]
+    return {
+        "point_total": len(relevant),
+        "event_ids": sorted({o.event_id for o in relevant}),
+        "end_to_end_success": _ratio(len(correct), len(relevant)),
+        "decision_mismatch_total": sum(1 for o in relevant if o.decision_mismatch),
+    }
+
+
+def safety_metrics(outcomes: Sequence[PointOutcome]) -> SafetyMetrics:
+    """Safety scoring over every ACTUAL LLM#2 execution; deterministic pool-empty
+    fallbacks (no request hash) never called the model and are excluded from the
+    denominator. Invalid outputs (executed but no decision) are counted as
+    invalid; they cannot count as any decision-kind safety flag.
+
+    pipeline_false_supersede additionally counts destructive supersede
+    transitions that would enter state without full gold justification: a
+    SUPERSEDE on gold add/reinforce, or a wrong-target SUPERSEDE on a gold
+    update (the target row would be deleted without gold basis)."""
+    executed = [o for o in outcomes if o.llm_executed]
+    model_false = [o for o in executed if o.model_false_supersede]
+    decision_mismatch = [o for o in executed if o.decision_mismatch]
+    target_mismatch = [o for o in executed if o.target_mismatch]
+    invalid = [o for o in outcomes if o.llm_executed and o.decision is None]
     pipeline_false = [
         o
         for o in executed
@@ -243,12 +337,15 @@ def safety_metrics(outcomes: Sequence[PointOutcome]) -> SafetyMetrics:
         )
     ]
     return SafetyMetrics(
+        llm_executed_total=len(executed),
         model_false_supersede_rate=_ratio(len(model_false), len(executed)) or 0.0,
         model_false_supersede_total=len(model_false),
         pipeline_false_supersede_rate=_ratio(len(pipeline_false), len(executed)) or 0.0,
         pipeline_false_supersede_total=len(pipeline_false),
-        wrong_target_rate=_ratio(len(wrong_target), len(executed)) or 0.0,
-        wrong_target_total=len(wrong_target),
+        decision_mismatch_rate=_ratio(len(decision_mismatch), len(executed)) or 0.0,
+        decision_mismatch_total=len(decision_mismatch),
+        target_mismatch_rate=_ratio(len(target_mismatch), len(executed)) or 0.0,
+        target_mismatch_total=len(target_mismatch),
         invalid_output_rate=_ratio(len(invalid), len(outcomes)) or 0.0,
         invalid_output_total=len(invalid),
     )
@@ -284,11 +381,10 @@ def schedule_delta(
     The robust set is defined by the *effective* retrieval/decision input, never by
     the boundary timestamp: an event is robust when every config yields the same
     ordered retrieved pool and the same decision across schedules, even if the
-    boundary moved or the bank differs elsewhere. decision_input_sensitive and
-    outcome_sensitive are mutually exclusive with robust; boundary_moved,
-    bank_sensitive and retrieval_sensitive are diagnostic annotations that may
-    overlap with robust (structural or sub-cut movement with unchanged effective
-    decision input)."""
+    boundary moved or the bank differs elsewhere. The effective classes are
+    mutually exclusive and exhaustive; boundary_moved/bank_sensitive/
+    scored_order_sensitive are overlapping diagnostic annotations (see
+    ScheduleDelta)."""
     early_by_event = {(p.event_id, p.config_id): p for p in predictions_early}
     late_by_event = {(p.event_id, p.config_id): p for p in predictions_late}
     effective: dict[str, str] = {}
@@ -329,7 +425,7 @@ def schedule_delta(
         robust_events=tuple(sorted(k for k, v in effective.items() if v == "robust")),
         boundary_moved_events=boundary_moved,
         bank_sensitive_events=bank_sensitive,
-        retrieval_sensitive_events=tuple(sorted(scored_moved)),
+        scored_order_sensitive_events=tuple(sorted(scored_moved)),
         decision_input_sensitive_events=tuple(
             sorted(k for k, v in effective.items() if v == "decision_input_sensitive")
         ),

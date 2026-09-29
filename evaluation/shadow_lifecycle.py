@@ -70,7 +70,12 @@ class _TurnIndex:
 
 
 class GoldEvent:
-    """One persisted gold memory event with its evidence turns."""
+    """One persisted gold memory event with its evidence turns.
+
+    Event != row: ``reinforce_existing`` events confirm existing durable rows and
+    never materialize one (dataset ``event_vs_row_contract``); only ``add`` and
+    ``update`` events become durable ACTIVE rows, and ``update`` additionally
+    removes its superseded target row."""
 
     __slots__ = (
         "bundle_id",
@@ -171,28 +176,42 @@ class ScheduleBundle:
             for key, batch in groupby(ordered, key=self.batch_key)
         ]
 
+    @staticmethod
+    def _apply_batch(active: set[str], batch: tuple[GoldEvent, ...]) -> None:
+        """Apply one batch of gold events as durable row transitions, atomically.
+
+        Row semantics follow the dataset ``event_vs_row_contract``: ``add``
+        materializes a durable row; ``update`` removes the superseded row and
+        materializes its own; ``reinforce_existing`` is a no-op on the row set
+        (a confirmation never becomes a distinct row). Atomicity: callers pass a
+        pre-batch snapshot, and every event in the batch is resolved against that
+        same snapshot state — an update and its superseded target never split
+        across read/write phases within the batch."""
+        for event in batch:
+            if event.expected_operation == "add":
+                active.add(event.event_id)
+            elif event.expected_operation == "update":
+                if event.supersedes_memory_id is not None:
+                    active.discard(event.supersedes_memory_id)
+                active.add(event.event_id)
+            # reinforce_existing: no-op on the durable row set.
+
     def pre_batch_active_ids(self, event: GoldEvent) -> tuple[str, ...]:
-        """ACTIVE bank the candidate sees: every event whose boundary precedes
-        this event's batch, minus superseded targets applied before the batch."""
+        """Durable ACTIVE rows the candidate sees: rows materialized by batches
+        strictly before this event's batch, under row (not event) semantics."""
         key = self.batch_key(event)
         active: set[str] = set()
         for batch_key, batch in self.batches():
             if batch_key >= key:
                 break
-            active.update(e.event_id for e in batch)
-            for prior in batch:
-                if prior.supersedes_memory_id is not None:
-                    active.discard(prior.supersedes_memory_id)
+            self._apply_batch(active, batch)
         return tuple(sorted(active))
 
     def post_batch_active_ids(self, batch_key: int) -> tuple[str, ...]:
-        """ACTIVE bank after applying every gold transition of the batch atomically."""
+        """Durable ACTIVE rows after applying every gold transition of the batch."""
         active: set[str] = set()
         for key, batch in self.batches():
-            active.update(e.event_id for e in batch)
-            for prior in batch:
-                if prior.supersedes_memory_id is not None:
-                    active.discard(prior.supersedes_memory_id)
+            self._apply_batch(active, batch)
             if key == batch_key:
                 break
         return tuple(sorted(active))
@@ -202,10 +221,7 @@ class ScheduleBundle:
         active: set[str] = set()
         for key, batch in self.batches():
             yield key, batch, tuple(sorted(active))
-            active.update(e.event_id for e in batch)
-            for event in batch:
-                if event.supersedes_memory_id is not None:
-                    active.discard(event.supersedes_memory_id)
+            self._apply_batch(active, batch)
 
 
 class ShadowTimeline:

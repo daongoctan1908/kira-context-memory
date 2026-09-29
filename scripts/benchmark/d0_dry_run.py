@@ -38,6 +38,7 @@ from evaluation.d0_local_executor import (  # noqa: E402
 from evaluation.d0_metrics import (  # noqa: E402
     adjudicate,
     dataset_limitations,
+    multi_target_reinforcement_diagnostic,
     safety_metrics,
     schedule_delta,
     structural_sensitivity,
@@ -50,7 +51,7 @@ from evaluation.d0_ports import (  # noqa: E402
     D0EmbeddingPort,
 )
 from evaluation.dataset import DatasetManifest, load_bundle, load_manifest  # noqa: E402
-from evaluation.models import D0Schedule, Profile  # noqa: E402
+from evaluation.models import D0Decision, D0Schedule, Profile  # noqa: E402
 from evaluation.shadow_lifecycle import ShadowTimeline  # noqa: E402
 
 DATASET_ROOT = REPOSITORY_ROOT / "dataset" / "kira_ltm_v1"
@@ -279,7 +280,7 @@ def real_run(
             "robust": list(delta.robust_events),
             "boundary_moved": list(delta.boundary_moved_events),
             "bank_sensitive": list(delta.bank_sensitive_events),
-            "retrieval_sensitive": list(delta.retrieval_sensitive_events),
+            "scored_order_sensitive": list(delta.scored_order_sensitive_events),
             "decision_input_sensitive": list(delta.decision_input_sensitive_events),
             "outcome_sensitive": list(delta.outcome_sensitive_events),
         },
@@ -305,11 +306,29 @@ def real_run(
             }
         sched_safety = safety_metrics(sched_outcomes)
         report[f"{name}_pooled_safety"] = asdict(sched_safety)
-    # False-supersede and wrong-target case dump for manual review.
+        report[f"{name}_multi_target_reinforcement_diagnostic"] = (
+            multi_target_reinforcement_diagnostic(sched_outcomes)
+        )
+    # Case dumps for manual review, by corrected semantics.
     false_cases = [o.event_id for o in outcomes if o.model_false_supersede]
-    wrong_cases = [o.event_id for o in outcomes if o.wrong_target]
+    decision_mismatch_cases = [o.event_id for o in outcomes if o.decision_mismatch]
+    target_mismatch_cases = [o.event_id for o in outcomes if o.target_mismatch]
+    pipeline_false_cases = [
+        o.event_id
+        for o in outcomes
+        if o.llm_executed
+        and o.decision is not None
+        and o.decision.decision is D0Decision.SUPERSEDE
+        and (
+            o.gold_operation != "update"
+            or not o.gold_target_ids
+            or o.decision.target_memory_id != o.gold_target_ids[0]
+        )
+    ]
     report["model_false_supersede_case_ids"] = sorted(set(false_cases))
-    report["wrong_target_case_ids"] = sorted(set(wrong_cases))
+    report["decision_mismatch_case_ids"] = sorted(set(decision_mismatch_cases))
+    report["target_mismatch_case_ids"] = sorted(set(target_mismatch_cases))
+    report["pipeline_false_supersede_case_ids"] = sorted(set(pipeline_false_cases))
     _write(out_dir / "report.json", report)
 
     manifest = {

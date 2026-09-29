@@ -27,6 +27,7 @@ from evaluation.d0_local_executor import (
 )
 from evaluation.d0_metrics import (
     adjudicate,
+    multi_target_reinforcement_diagnostic,
     safety_metrics,
     schedule_delta,
     tier_metrics,
@@ -142,18 +143,22 @@ def test_ambiguous_aggregate_events_are_computed_not_hardcoded():
 # ---------------------------------------------------------------------------
 
 
-def test_bank_delta_differs_between_schedules():
+def test_bank_rows_identical_across_schedules_despite_boundary_move():
     timeline = _timeline()
     early = timeline.bundle(D0Schedule.EARLY, "conv02")
     late = timeline.bundle(D0Schedule.LATE, "conv02")
     m14 = next(event for event in early.events if event.event_id == "M14")
     early_bank = set(early.pre_batch_active_ids(m14))
     late_bank = set(late.pre_batch_active_ids(m14))
-    # M14's late boundary (D20:4) lands after M13's batch, so the LATE bank
-    # additionally contains M13; EARLY (D20:2) precedes it.
-    assert "M13" not in early_bank
-    assert "M13" in late_bank
-    assert late_bank - early_bank == {"M13"}
+    # M14's late boundary (D20:4) lands after M13's batch while EARLY (D20:2)
+    # precedes it, but M13 only REINFORCES M01: under event-vs-row semantics it
+    # never materializes a row, so the durable bank is identical across schedules.
+    assert early.boundaries["M14"] != late.boundaries["M14"]
+    assert early_bank == late_bank
+    assert "M13" not in early_bank and "M13" not in late_bank
+    # M11 (update) is a durable row present in both banks; M14 itself is not.
+    assert "M11" in early_bank
+    assert "M14" not in early_bank
 
 
 def test_shared_pre_batch_snapshot_for_same_boundary_batch():
@@ -355,6 +360,7 @@ def _prediction(
     retrieved: tuple[str, ...] = ("M01",),
     decision: D0ConflictDecision | None = None,
     pool_size: int = 1,
+    llm_request_hash: str | None = "a" * 64,
 ) -> D0Prediction:
     return D0Prediction(
         event_id=event_id,
@@ -366,6 +372,7 @@ def _prediction(
         candidate_text="fact",
         pool=D0RetrievalResult(retrieved_ids=retrieved, scored_ids=retrieved, pool_size=pool_size),
         decision=decision,
+        llm_request_hash=llm_request_hash,  # type: ignore[arg-type]
         retrieval_failure=not any(t in retrieved for t in gold_targets),
     )
 
@@ -386,19 +393,24 @@ def test_supersede_metric_factorization_does_not_double_count():
 
 
 def test_duplicate_multi_target_semantics():
-    outcomes = [
-        adjudicate(
-            _prediction(
-                event_id="conv02:M14",
-                gold_operation="reinforce_existing",
-                gold_targets=("M03", "M10", "M11"),
-                retrieved=("M10",),
-                decision=D0ConflictDecision(decision="DUPLICATE", target_memory_id="M10"),
-            )
-        ),
-    ]
+    prediction = _prediction(
+        event_id="conv02:M14",
+        gold_operation="reinforce_existing",
+        gold_targets=("M03", "M10", "M11"),
+        retrieved=("M10",),
+        decision=D0ConflictDecision(decision="DUPLICATE", target_memory_id="M10"),
+    )
+    outcomes = [adjudicate(prediction)]
+    # Multi-target reinforcements are excluded from the single-target DUPLICATE
+    # headline tier and routed to the diagnostic instead.
     tiers = tier_metrics(outcomes, "DUPLICATE")
-    assert tiers.end_to_end_success == 1
+    assert tiers.end_to_end_total == 0
+    assert tiers.end_to_end_success is None
+    diagnostic = multi_target_reinforcement_diagnostic(outcomes)
+    assert diagnostic["point_total"] == 1
+    assert diagnostic["event_ids"] == ["conv02:M14"]
+    assert diagnostic["end_to_end_success"] == 1.0
+    assert diagnostic["decision_mismatch_total"] == 0
 
 
 def test_false_supersede_safety_scoring():
@@ -434,11 +446,24 @@ def test_false_supersede_safety_scoring():
                 decision=D0ConflictDecision(decision="DUPLICATE", target_memory_id="M01"),
             )
         ),
+        # Gold update, model keeps both: a missed supersede (decision mismatch),
+        # NOT a false supersede — no destructive transition occurred.
+        adjudicate(
+            _prediction(
+                event_id="conv01:M10",
+                gold_operation="update",
+                gold_targets=("M05",),
+                retrieved=("M05",),
+                decision=D0ConflictDecision(decision="KEEP_BOTH", target_memory_id=None),
+            )
+        ),
     ]
     safety = safety_metrics(outcomes)
+    assert safety.llm_executed_total == 4
     assert safety.model_false_supersede_total == 2
     assert safety.pipeline_false_supersede_total == 2
-    assert safety.model_false_supersede_rate == pytest.approx(2 / 3)
+    assert safety.model_false_supersede_rate == pytest.approx(2 / 4)
+    assert safety.decision_mismatch_total == 3  # both false supersedes + the miss
 
 
 def test_retrieval_failure_is_not_conditional_reasoning_failure():
@@ -457,7 +482,12 @@ def test_retrieval_failure_is_not_conditional_reasoning_failure():
     assert tiers.decision_total == 0  # excluded from conditional reasoning
     assert tiers.end_to_end_success == 0  # included as end-to-end failure
     safety = safety_metrics([outcome])
-    assert safety.wrong_target_total == 1
+    assert safety.llm_executed_total == 1
+    # Right decision kind, wrong target identity: target mismatch; the supersede
+    # would still delete an untargeted row, so the pipeline-side violation holds.
+    assert safety.target_mismatch_total == 1
+    assert safety.decision_mismatch_total == 0
+    assert safety.model_false_supersede_total == 0
     assert safety.pipeline_false_supersede_total == 1
 
 
@@ -661,7 +691,9 @@ def test_structural_sensitivity_annotations_from_timeline():
     # conv03:M14 moves boundary within one turn with no intervening batch, so its
     # pre-batch bank is identical: moved does not imply bank_sensitive.
     assert "conv03:M14" not in bank_sensitive
-    assert bank_sensitive == ["conv02:M14"]
+    # Under row semantics reinforcements never materialize rows, so no boundary
+    # move in this corpus changes the durable bank between schedules anymore.
+    assert bank_sensitive == []
 
 
 def test_schedule_delta_robust_requires_same_effective_input():
