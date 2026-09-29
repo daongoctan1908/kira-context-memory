@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "case_id": "H12",
+  "theme": "defaults-preferences",
+  "existing_active_memories": [
+    {
+      "memory_id": "t1201",
+      "text": "Báo cáo tuần doanh số mặc định xuất file Excel gửi phòng tài chính."
+    },
+    {
+      "memory_id": "t1202",
+      "text": "Báo cáo tuần doanh số gửi đi sáng thứ Hai hằng tuần."
+    }
+  ],
+  "candidate": "Kể từ kỳ tuần này, phòng tài chính chỉ nhận bản CSV của báo cáo doanh số, không nhận định dạng nào khác.",
+  "gold_decision": "SUPERSEDE",
+  "gold_target_id": "t1201",
+  "rationale": "Cùng slot 'định dạng file mặc định của báo cáo tuần doanh số'. 'Chỉ nhận CSV, không nhận định dạng khác' làm claim 'mặc định Excel' hết đúng → giữ cả hai là mâu thuẫn về mặc định hiện tại → SUPERSEDE.",
+  "adversarial_property": "Thay thế ẩn trong 'chỉ nhận… không nhận định dạng nào khác', không có cụm 'đổi từ Excel sang CSV'; mốc thời gian 'kể từ kỳ này' một mình không đủ (trap thời gian) — nhưng truth format thực sự bị thay ở đây."
+}

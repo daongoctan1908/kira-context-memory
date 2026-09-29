@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "case_id": "H15",
+  "theme": "temporary-exception-vs-durable-truth",
+  "existing_active_memories": [
+    {
+      "memory_id": "t1501",
+      "text": "Sau ngoại lệ cao điểm, khung bảo trì hiện tại của hệ thống hóa đơn điện tử là 2:00 sáng Chủ nhật."
+    },
+    {
+      "memory_id": "t1502",
+      "text": "Bản ghi hóa đơn điện tử lưu giữ tối thiểu 5 năm."
+    }
+  ],
+  "candidate": "Ngoại lệ tạm đã qua; khung bảo trì hiện vẫn là 2:00 sáng Chủ nhật như lịch thường lệ.",
+  "gold_decision": "DUPLICATE",
+  "gold_target_id": "t1501",
+  "rationale": "Same current maintenance-window proposition: target đã phát biểu trạng thái hiện tại SAU ngoại lệ là 2:00 sáng Chủ nhật; candidate xác nhận đúng điều đó. Temporary-exception wording ('Ngoại lệ tạm đã qua') chỉ contextualize confirmation, không tạo durable slot mới. Target vẫn hoàn toàn đúng sau candidate. Giữ cả hai là redundant current fact. Không SUPERSEDE vì không truth nào bị vô hiệu. Không KEEP_BOTH vì chỉ có một proposition hiện tại được phát biểu hai lần.",
+  "adversarial_property": "Target và candidate cùng phát biểu 'hiện trạng sau ngoại lệ' — candidate dùng cấu trúc 'đã qua / hiện vẫn là' nghe như state transition, nhưng target đã encode chính trạng thái đó; cue 'hiện vẫn' đúng hướng confirmation."
+}

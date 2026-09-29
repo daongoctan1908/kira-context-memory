@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "case_id": "H14",
+  "theme": "temporary-exception-vs-durable-truth",
+  "existing_active_memories": [
+    {
+      "memory_id": "t1401",
+      "text": "Hóa đơn trên 50 triệu đồng hiện vẫn phải phê duyệt thủ công bằng giấy tờ."
+    },
+    {
+      "memory_id": "t1402",
+      "text": "Hệ thống hóa đơn điện tử bật xác thực hai lớp cho mọi tài khoản."
+    }
+  ],
+  "candidate": "Từ đầu tháng, hóa đơn trên 50 triệu đồng vẫn bắt buộc phê duyệt, nhưng duyệt trực tiếp trên cổng nội bộ, không còn qua giấy tờ.",
+  "gold_decision": "SUPERSEDE",
+  "gold_target_id": "t1401",
+  "rationale": "Slot bị đổi là CÁCH duyệt. 'Vẫn bắt buộc phê duyệt' đúng, nhưng 'thủ công bằng giấy tờ' của target hết đúng khi duyệt chuyển lên cổng nội bộ. Giữ cả hai ACTIVE = hai cách duyệt hiện tại mâu thuẫn, không thể cùng là current facts → SUPERSEDE.",
+  "adversarial_property": "Cả candidate lẫn target đều chứa 'vẫn' — cue family xuất hiện hai phía; SUPERSEDE nằm trong bán phần sau của câu, không phải phần có cue."
+}

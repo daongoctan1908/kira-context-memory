@@ -1,0 +1,98 @@
+{
+  "$schema": "schemas/manifest.schema.json",
+  "schema_version": 1,
+  "slice_id": "d0_holdout_v1",
+  "slice_version": "1.0.0-holdout-frozen.1",
+  "status": "approved_frozen",
+  "canonical_format": "json",
+  "evaluation_scope": "holdout_slice",
+  "case_count": 15,
+  "label_distribution": {
+    "DUPLICATE": 5,
+    "KEEP_BOTH": 5,
+    "SUPERSEDE": 5
+  },
+  "review": {
+    "status": "approved_frozen",
+    "reviewer": "tandn16",
+    "revision": "tandn16-holdout-review-2026-09-29-r2"
+  },
+  "provenance": {
+    "prompt_versions_evaluated": [
+      "d0-conflict-v1",
+      "d0-conflict-v2"
+    ],
+    "frozen_prompt_pin": {
+      "prompt_version": "d0-conflict-v2",
+      "git_commit": "83d6b71246b9b05944ba2cc45a1e7854119a339f",
+      "prompt_sha256_prefix": "1771c500"
+    },
+    "authoring": {
+      "author": "tandn16 + Claude (draft) / tandn16 (human review, revision 2)",
+      "review_protocol": "Two-round human review: draft table (HOLDOUT_DRAFT_AWAITING_REVIEW), targeted revision of 5 flagged cases plus leakage cleanup (HOLDOUT_DRAFT_AWAITING_FINAL_REVIEW), then human approval of revision 2 before freeze."
+    }
+  },
+  "files": [
+    {
+      "name": "cases/H01.json",
+      "sha256": "812bdc2d493276301694e54e65fdd4671022f87fdd97b8e7d46dc5ef9e3c6140"
+    },
+    {
+      "name": "cases/H02.json",
+      "sha256": "f7e1f5cf450e044b749f3efa23821275ea0c0b953a133f681a19039d71423005"
+    },
+    {
+      "name": "cases/H03.json",
+      "sha256": "7b431fbf6ae6585baf7b21fd1253de59ee28f098c76ba2f24cbcaa19c5e8c0ea"
+    },
+    {
+      "name": "cases/H04.json",
+      "sha256": "53ff67e2ec78a2aac1d264d6f972a60a24f59a628fb0c7670f1b62c17d0c5418"
+    },
+    {
+      "name": "cases/H05.json",
+      "sha256": "cdccea3d55871bd528ef3008431886c3cabb85d96f0e4775d4c2611da6bcc0aa"
+    },
+    {
+      "name": "cases/H06.json",
+      "sha256": "54cc228691f4646fd843e3629e3d60c5ee94df451cc59018d84686dce0dd58f1"
+    },
+    {
+      "name": "cases/H07.json",
+      "sha256": "d8bda406f435144cb1e22278d07d3cc0177490f70ea9478d1602785486836163"
+    },
+    {
+      "name": "cases/H08.json",
+      "sha256": "f37411bef003ef376544fbaa6c4dc00f527eabb8b23bc281341220dcc816d44a"
+    },
+    {
+      "name": "cases/H09.json",
+      "sha256": "ecee6fd26890173ee6818735b93d9bba77fa511d9e333511df7bc2a40dc15c86"
+    },
+    {
+      "name": "cases/H10.json",
+      "sha256": "fb8158164baefc7cd17be8da8fcec00daedbbb66283e48c92f963e49fd723804"
+    },
+    {
+      "name": "cases/H11.json",
+      "sha256": "2db71d1b606376cceab152a6a99ca6d67b342a4308eb699105f4184c6aa2f9a1"
+    },
+    {
+      "name": "cases/H12.json",
+      "sha256": "8347638ebc1fbe55d8235274d9e0a27c6bcbee55ca3595fc1633c6648163596a"
+    },
+    {
+      "name": "cases/H13.json",
+      "sha256": "ef5ebfbbaa26a6d9bc0c0979b805b49141b6767afcf7b8590c5cefb8d8849987"
+    },
+    {
+      "name": "cases/H14.json",
+      "sha256": "ed2339a572ad5b6355c88b53d24cbe510b97952689c1092a2f8912b8edaeb377"
+    },
+    {
+      "name": "cases/H15.json",
+      "sha256": "8faf5c49e5ebfb4a8e131e8bf017a585064b2d6ac75257b3db35d4f59af6fa25"
+    }
+  ],
+  "slice_sha256": "ab8b3c394ae06bc1d1fd66fce9658daff798ed4178f5b1cbdcce5df4fcc01cf8"
+}

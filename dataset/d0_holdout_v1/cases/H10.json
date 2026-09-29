@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "case_id": "H10",
+  "theme": "defaults-preferences",
+  "existing_active_memories": [
+    {
+      "memory_id": "t1001",
+      "text": "Báo cáo tuần doanh số mặc định xuất file Excel gửi phòng tài chính."
+    },
+    {
+      "memory_id": "t1002",
+      "text": "Báo cáo tuần doanh số gửi đi sáng thứ Hai hằng tuần."
+    }
+  ],
+  "candidate": "Bản slide tóm tắt đi kèm báo cáo tuần doanh số hiện vẫn mặc định xuất PDF để trình ban giám đốc.",
+  "gold_decision": "KEEP_BOTH",
+  "gold_target_id": null,
+  "rationale": "Hai slot khác nhau trên cùng chủ đề: file dữ liệu cho tài chính (Excel) và slide tóm tắt cho ban giám đốc (PDF) — hai artifact, hai mặc định, cùng đúng. Giữ cả hai ACTIVE → nhất quán → KEEP_BOTH. Excel không hết đúng vì candidate nói về artifact khác.",
+  "adversarial_property": "Cùng cụm 'báo cáo tuần doanh số' + 'mặc định' + 'xuất' cả hai phía; cue 'hiện vẫn' trong candidate nhưng gold là KEEP_BOTH — dễ nhầm SUPERSEDE (định dạng Excel→PDF)."
+}

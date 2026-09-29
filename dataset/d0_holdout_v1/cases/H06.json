@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "case_id": "H06",
+  "theme": "definition-vs-usage-rule",
+  "existing_active_memories": [
+    {
+      "memory_id": "t0601",
+      "text": "'Nhịp lưới' là tên gọi nội bộ của chu kỳ triển khai hai tuần một lần."
+    },
+    {
+      "memory_id": "t0602",
+      "text": "Chuẩn tên nhánh là feature/ma-ticket."
+    }
+  ],
+  "candidate": "Quy định năm nay: chu kỳ 'nhịp lưới' chạy ba tuần một lần; tên gọi giữ nguyên.",
+  "gold_decision": "SUPERSEDE",
+  "gold_target_id": "t0601",
+  "rationale": "Slot bị đổi là tần suất trong định nghĩa (hai tuần → ba tuần). 'Tên gọi giữ nguyên' chỉ giữ nhãn; truth của định nghĩa ('hai tuần một lần') hết đúng. Giữ cả hai ACTIVE = hai định nghĩa tần suất của cùng tên gọi → mâu thuẫn, không thể cùng là current facts → SUPERSEDE.",
+  "adversarial_property": "'Tên gọi giữ nguyên' nghe như xác nhận không đổi; cái bị vô hiệu là giá trị của định nghĩa, không phải tên; không có cụm 'thay đổi từ… thành…'."
+}

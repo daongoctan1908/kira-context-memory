@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kira.local/schemas/d0-holdout-manifest-v1.json",
+  "title": "D0 conflict holdout slice manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "slice_id",
+    "slice_version",
+    "status",
+    "canonical_format",
+    "evaluation_scope",
+    "case_count",
+    "label_distribution",
+    "review",
+    "provenance",
+    "files",
+    "slice_sha256"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema_version": { "const": 1 },
+    "slice_id": { "const": "d0_holdout_v1" },
+    "slice_version": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["draft", "approved_frozen"] },
+    "canonical_format": { "const": "json" },
+    "evaluation_scope": { "const": "holdout_slice" },
+    "case_count": { "type": "integer", "minimum": 1 },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reviewer", "revision"],
+      "properties": {
+        "status": { "enum": ["draft", "approved_frozen"] },
+        "reviewer": { "type": ["string", "null"] },
+        "revision": { "type": ["string", "null"] }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prompt_versions_evaluated", "frozen_prompt_pin", "authoring"],
+      "properties": {
+        "prompt_versions_evaluated": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "frozen_prompt_pin": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["prompt_version", "git_commit", "prompt_sha256_prefix"],
+          "properties": {
+            "prompt_version": { "type": "string" },
+            "git_commit": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+            "prompt_sha256_prefix": { "type": "string", "pattern": "^[a-f0-9]{8,64}$" }
+          }
+        },
+        "authoring": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["author", "review_protocol"],
+          "properties": {
+            "author": { "type": "string" },
+            "review_protocol": { "type": "string" }
+          }
+        }
+      }
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "sha256"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^cases/[A-Za-z0-9_.-]+\\.json$" },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    },
+    "slice_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

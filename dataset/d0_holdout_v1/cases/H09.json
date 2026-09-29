@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "case_id": "H09",
+  "theme": "role-state-evolution",
+  "existing_active_memories": [
+    {
+      "memory_id": "t0901",
+      "text": "SignHub hiện chỉ phục vụ ký hợp đồng với đối tác bên ngoài."
+    },
+    {
+      "memory_id": "t0902",
+      "text": "Chi phí SignHub tính theo số lần ký mỗi tháng."
+    }
+  ],
+  "candidate": "Đến thời điểm này, chức năng duy nhất của SignHub vẫn là ký hợp đồng với đối tác bên ngoài — chưa mở rộng mục đích nào khác.",
+  "gold_decision": "DUPLICATE",
+  "gold_target_id": "t0901",
+  "rationale": "Candidate nhắc lại đúng claim độc quyền hiện tại của target ('chỉ/duy nhất'). Hai row nói một truth → giữ cả hai là redundant → DUPLICATE. Cả hai là current facts, nhưng là cùng một fact phát biểu hai lần.",
+  "adversarial_property": "'Duy nhất… chưa mở rộng mục đích nào khác' tái khẳng định exclusivity bằng từ khác; cue 'vẫn' đúng hướng confirmation."
+}

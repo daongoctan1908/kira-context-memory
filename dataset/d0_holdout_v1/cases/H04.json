@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "case_id": "H04",
+  "theme": "definition-vs-usage-rule",
+  "existing_active_memories": [
+    {
+      "memory_id": "t0401",
+      "text": "'Nhịp lưới' là tên gọi nội bộ của chu kỳ triển khai hai tuần một lần."
+    },
+    {
+      "memory_id": "t0402",
+      "text": "Nhà bếp tầng 6 đóng cửa 20:00 các ngày trong tuần."
+    },
+    {
+      "memory_id": "t0403",
+      "text": "Nhóm QA phân loại bug trên kênh #qa-triage mỗi sáng."
+    }
+  ],
+  "candidate": "Trong mỗi 'nhịp lưới', nhánh chính đóng merge từ tối thứ Sáu đến sáng thứ Hai để ổn định bản phát hành.",
+  "gold_decision": "KEEP_BOTH",
+  "gold_target_id": null,
+  "rationale": "t0401 trả lời câu hỏi 'nhịp lưới là gì?' (định nghĩa); candidate trả lời 'trong nhịp lưới thì vận hành thế nào?' (quy tắc sử dụng). Đây là hai predicate khác nhau trên cùng một thuật ngữ. Target vẫn hoàn toàn đúng sau candidate — candidate không thay đổi định nghĩa. Giữ cả hai ACTIVE → cả hai là current facts cùng đúng → KEEP_BOTH.",
+  "adversarial_property": "Lexical overlap chỉ còn ở chính thuật ngữ ('nhịp lưới') — không còn cadence lặp lại ở cả hai phía; kiểm tra ranh giới definition/usage-rule với thuật ngữ và quy tắc hoàn toàn mới."
+}

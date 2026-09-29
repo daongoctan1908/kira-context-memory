@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "case_id": "H07",
+  "theme": "role-state-evolution",
+  "existing_active_memories": [
+    {
+      "memory_id": "t0701",
+      "text": "SignHub hiện chỉ phục vụ ký hợp đồng với đối tác bên ngoài."
+    },
+    {
+      "memory_id": "t0702",
+      "text": "Hồ sơ ký qua SignHub lưu trữ bắt buộc 10 năm."
+    }
+  ],
+  "candidate": "Từ tháng này, SignHub cũng được dùng để ký biên bản nghiệm thu nội bộ.",
+  "gold_decision": "SUPERSEDE",
+  "gold_target_id": "t0701",
+  "rationale": "Row hiện tại claim độc quyền ('chỉ phục vụ' ký HĐ đối tác ngoài). Candidate thêm mục đích thứ hai → claim 'chỉ' hết đúng. Giữ cả hai ACTIVE = mâu thuẫn về phạm vi hiện tại: 'chỉ có một mục đích' và 'có hai mục đích' không thể cùng đúng → SUPERSEDE.",
+  "adversarial_property": "Candidate thuần additive ('cũng được dùng'), không có từ thay thế nào — SUPERSEDE đến từ việc phá claim exclusivity của target, không từ động từ 'đổi'."
+}

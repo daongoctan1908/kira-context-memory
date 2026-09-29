@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "case_id": "H08",
+  "theme": "role-state-evolution",
+  "existing_active_memories": [
+    {
+      "memory_id": "t0801",
+      "text": "SignHub phục vụ ký hợp đồng với đối tác bên ngoài."
+    },
+    {
+      "memory_id": "t0802",
+      "text": "Ký nhanh trên SignHub mất chừng 2 phút mỗi tài liệu."
+    }
+  ],
+  "candidate": "Từ tháng này, SignHub cũng được dùng để ký biên bản nghiệm thu nội bộ.",
+  "gold_decision": "KEEP_BOTH",
+  "gold_target_id": null,
+  "rationale": "Row hiện tại không claim độc quyền. SignHub vừa ký HĐ đối tác ngoài, vừa ký biên bản nghiệm thu nội bộ là hai usage scope cùng đúng. Giữ cả hai ACTIVE → nhất quán → KEEP_BOTH. Cả hai row là current facts cùng lúc vì không có claim bị vô hiệu.",
+  "adversarial_property": "Candidate y hệt từng chữ H07 (gold SUPERSEDE) — chỉ một chữ 'chỉ' trong row hiện tại quyết định label; lexical similarity không được phép quyết định."
+}

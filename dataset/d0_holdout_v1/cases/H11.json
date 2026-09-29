@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "case_id": "H11",
+  "theme": "defaults-preferences",
+  "existing_active_memories": [
+    {
+      "memory_id": "t1101",
+      "text": "Báo cáo tuần doanh số mặc định xuất file Excel gửi phòng tài chính."
+    },
+    {
+      "memory_id": "t1102",
+      "text": "File báo cáo sau khi xuất được đặt tên theo số tuần: sales_W{tuần}."
+    }
+  ],
+  "candidate": "Phòng tài chính vẫn nhận báo cáo tuần doanh số ở định dạng Excel; định dạng mặc định không đổi.",
+  "gold_decision": "DUPLICATE",
+  "gold_target_id": "t1101",
+  "rationale": "Same slot = định dạng xuất mặc định của báo cáo tuần doanh số dành cho phòng tài chính; same current value = Excel. Candidate không thêm schedule predicate mới — người nhận và định dạng đều đã nằm trong target. Đây là redundant current proposition: hai row, một fact. Không SUPERSEDE vì Excel vẫn là mặc định. Không KEEP_BOTH vì không có predicate thứ hai nào.",
+  "adversarial_property": "Diễn đạt lại từ góc người nhận ('phòng tài chính vẫn nhận') thay vì góc hệ thống ('xuất file gửi'); cue 'vẫn' + 'không đổi' xác nhận đúng nghĩa confirmation."
+}

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "case_id": "H02",
+  "theme": "current-state-confirmation",
+  "existing_active_memories": [
+    {
+      "memory_id": "t0201",
+      "text": "ZDesk vẫn đang chạy phiên bản 3.8."
+    },
+    {
+      "memory_id": "t0202",
+      "text": "Báo cáo ticket ZDesk gửi tự động vào 8:00 mỗi sáng."
+    }
+  ],
+  "candidate": "Đêm qua đội hạ tầng đã lên ZDesk bản 3.9; dữ liệu ticket cũ giữ nguyên, phiên bản hệ thống hiện là 3.9.",
+  "gold_decision": "SUPERSEDE",
+  "gold_target_id": "t0201",
+  "rationale": "Cùng slot 'phiên bản ZDesk hiện tại'. Giữ cả hai ACTIVE → 3.8 và 3.9 cùng là truth hiện tại → mâu thuẫn. 'Dữ liệu cũ giữ nguyên' chỉ là chi tiết đi kèm, không giải trừ mâu thuẫn slot. Cả hai row không thể cùng là current facts vì cùng slot mang hai giá trị khác nhau.",
+  "adversarial_property": "Không có cụm 'đổi từ X sang Y'; 'giữ nguyên' dễ bị đọc thành additive; row target chứa cue 'vẫn' — quyết định nằm ở truth bị vô hiệu, không nằm ở cue."
+}

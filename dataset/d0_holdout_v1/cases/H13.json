@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "case_id": "H13",
+  "theme": "temporary-exception-vs-durable-truth",
+  "existing_active_memories": [
+    {
+      "memory_id": "t1301",
+      "text": "Trong hai tuần cao điểm cuối quý, cửa sổ bảo trì hệ thống hóa đơn điện tử tạm dời sang 22:00 thứ Sáu."
+    },
+    {
+      "memory_id": "t1302",
+      "text": "Thông báo bảo trì hệ thống hóa đơn điện tử được gửi qua email."
+    }
+  ],
+  "candidate": "Trong đợt cao điểm, thông báo bảo trì vẫn phải được gửi trước ít nhất 24 giờ.",
+  "gold_decision": "KEEP_BOTH",
+  "gold_target_id": null,
+  "rationale": "Ba fact liên quan đến bảo trì, ba predicate khác nhau: t1301 = timing của cửa sổ bảo trì (khi nào, giờ nào); t1302 = kênh gửi thông báo (email); candidate = lead time tối thiểu của thông báo (ít nhất 24 giờ trước). Cả ba đều có thể cùng đúng trong cùng một đợt cao điểm. Không DUPLICATE vì 'gửi qua email' và 'gửi trước ít nhất 24 giờ' là hai thuộc tính khác nhau của cùng thông báo. Không SUPERSEDE vì không fact hiện tại nào bị invalidated — candidate không đụng vào giờ bảo trì lẫn kênh email.",
+  "adversarial_property": "Cùng entity, cùng maintenance context, strong lexical overlap ('thông báo bảo trì', 'đợt cao điểm'), cue 'vẫn' — nhưng gold KEEP_BOTH; test whether confirmation cue bị over-applied: candidate có 'vẫn' nhưng không restatement của row nào."
+}

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "case_id": "H05",
+  "theme": "definition-vs-usage-rule",
+  "existing_active_memories": [
+    {
+      "memory_id": "t0501",
+      "text": "'Nhịp lưới' là tên gọi nội bộ của chu kỳ triển khai hai tuần một lần."
+    },
+    {
+      "memory_id": "t0502",
+      "text": "Kênh #release-notes được cập nhật sau mỗi lần phát hành."
+    }
+  ],
+  "candidate": "Theo sổ tay quy trình vừa công bố, 'nhịp lưới' nghĩa là chu kỳ ra bản định kỳ lặp lại mỗi hai tuần một lần — trùng với tên gọi nội bộ đã thống nhất.",
+  "gold_decision": "DUPLICATE",
+  "gold_target_id": "t0501",
+  "rationale": "Cùng một định nghĩa của cùng fact hiện tại, chỉ khác nguồn trích và cách diễn đạt. Giữ cả hai là redundant → DUPLICATE. Cả hai row có thể cùng là current facts? Có, nhưng chúng phát biểu cùng một định nghĩa — giữ cả hai tạo redundant duplicate.",
+  "adversarial_property": "Surface form khác xa target ('sổ tay quy trình', 'ra bản định kỳ', 'trùng với tên gọi đã thống nhất') — DUPLICATE phải nhận qua nghĩa, không qua từ khóa."
+}

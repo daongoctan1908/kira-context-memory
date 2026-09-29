@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "case_id": "H01",
+  "theme": "current-state-confirmation",
+  "existing_active_memories": [
+    {
+      "memory_id": "t0101",
+      "text": "Hệ thống xử lý ticket ZDesk vẫn đang chạy phiên bản 3.8."
+    },
+    {
+      "memory_id": "t0102",
+      "text": "Cuối tuần trước phòng kỹ thuật đã sao lưu toàn bộ dữ liệu ticket của ZDesk."
+    },
+    {
+      "memory_id": "t0103",
+      "text": "Đề xuất đổi tên nhóm hỗ trợ ZDesk thành 'đài một cửa' vẫn đang chờ phê duyệt."
+    }
+  ],
+  "candidate": "Đến giờ trạng thái phiên bản của ZDesk vẫn là 3.8; phiên bản hiện tại không thay đổi.",
+  "gold_decision": "DUPLICATE",
+  "gold_target_id": "t0101",
+  "rationale": "Candidate và t0101 cùng một proposition hiện tại (phiên bản ZDesk hiện tại là 3.8). Candidate không thêm historical fact độc lập nào. Giữ cả hai ACTIVE chỉ tạo ra một row redundant, trạng thái vẫn nhất quán. Không SUPERSEDE vì target vẫn hoàn toàn đúng sau candidate. Không KEEP_BOTH vì candidate không đưa predicate mới nào — chỉ restatement + confirmation. Cả hai row có thể cùng là current fact? Có, nhưng chúng là cùng một fact; giữ cả hai tạo redundant duplicate, không phải trạng thái mâu thuẫn.",
+  "adversarial_property": "Pure confirmation restatement với cue 'vẫn'; gold DUPLICATE sạch — không có lớp lịch sử gây nhập nhằng giữa fact hiện tại và fact lịch sử."
+}

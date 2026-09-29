@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kira.local/schemas/d0-holdout-case-v1.json",
+  "title": "D0 conflict holdout case",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "theme",
+    "existing_active_memories",
+    "candidate",
+    "gold_decision",
+    "gold_target_id",
+    "adversarial_property"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "case_id": {
+      "type": "string",
+      "pattern": "^H(0[1-9]|1[0-5])$"
+    },
+    "theme": {
+      "enum": [
+        "current-state-confirmation",
+        "definition-vs-usage-rule",
+        "role-state-evolution",
+        "defaults-preferences",
+        "temporary-exception-vs-durable-truth"
+      ]
+    },
+    "existing_active_memories": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["memory_id", "text"],
+        "properties": {
+          "memory_id": { "type": "string", "pattern": "^t[0-9]{4}$" },
+          "text": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "candidate": { "type": "string", "minLength": 1 },
+    "gold_decision": {
+      "enum": ["DUPLICATE", "KEEP_BOTH", "SUPERSEDE"]
+    },
+    "gold_target_id": { "type": ["string", "null"], "pattern": "^t[0-9]{4}$" },
+    "rationale": { "type": "string", "minLength": 1 },
+    "adversarial_property": { "type": "string", "minLength": 1 }
+  }
+}

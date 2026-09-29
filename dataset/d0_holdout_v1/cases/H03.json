@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "case_id": "H03",
+  "theme": "current-state-confirmation",
+  "existing_active_memories": [
+    {
+      "memory_id": "t0301",
+      "text": "ZDesk vẫn đang chạy phiên bản 3.8."
+    },
+    {
+      "memory_id": "t0302",
+      "text": "Cửa sổ bảo trì ZDesk định kỳ 1:00 sáng Chủ nhật."
+    }
+  ],
+  "candidate": "Team vận hành ZDesk hiện tại ngồi tầng 4 tòa B, ngay cạnh phòng kính lớn.",
+  "gold_decision": "KEEP_BOTH",
+  "gold_target_id": null,
+  "rationale": "Cùng entity 'ZDesk' nhưng candidate thuộc slot khác (vị trí làm việc của team), không đụng slot phiên bản hay cửa sổ bảo trì. Giữ cả hai ACTIVE → trạng thái nhất quán, cả hai đều là current facts đúng → KEEP_BOTH.",
+  "adversarial_property": "Cùng entity + cue 'hiện tại' (thường gắn với SUPERSEDE) nhưng gold là KEEP_BOTH — 'hiện tại' không phải lúc nào cũng supersede."
+}
