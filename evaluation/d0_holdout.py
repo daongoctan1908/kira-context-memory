@@ -1,4 +1,4 @@
-"""Typed, fail-closed access to the D0 conflict holdout slice (d0_holdout_v1).
+"""Validation-only access to the archived D0 conflict holdout slice (d0_holdout_v1).
 
 The holdout is a separately authored adversarial slice for out-of-sample evaluation
 of registered D0 conflict prompts; it is NOT part of the kira_ltm_v1 full-corpus
@@ -6,7 +6,8 @@ dataset and never replaces it. Case bytes are frozen: the manifest pins the SHA-
 of every case file plus a whole-slice checksum over the sorted (name, sha256) pairs,
 and loading fails closed on any byte or metadata drift.
 
-Model-visible payload contract: an evaluation run may hand the LLM only
+The D0 runner and provider calls have been retired. This module only validates the
+frozen dataset and exposes its historical payload contract. The payload contains only
 ``existing_active_memories`` and ``candidate``. Gold and review metadata exist for
 offline adjudication only and are excluded from the payload builder below.
 """
@@ -18,12 +19,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, StringConstraints, model_validator
 
-from evaluation.d0_local_executor import (
-    InvalidDecision,
-    _parse_decision,
-    decision_request,
-)
-from evaluation.models import D0ConflictDecision, EvalModel, NonEmpty, Sha256
+from evaluation.models import EvalModel, NonEmpty, Sha256
 
 HOLDOUT_SLICE_ID = "d0_holdout_v1"
 HOLDOUT_ROOT = Path(__file__).resolve().parents[1] / "dataset" / HOLDOUT_SLICE_ID
@@ -214,146 +210,3 @@ def load_holdout(root: Path = HOLDOUT_ROOT) -> tuple[HoldoutManifest, tuple[Hold
 
 
 _CASE_IDS = tuple(f"H{index:02d}" for index in range(1, HOLDOUT_CASE_COUNT + 1))
-
-
-# ---------------------------------------------------------------------------
-# Holdout evaluation: per-case prediction over the model-visible payload only,
-# reusing the D0 request identity, response schema, and strict parser.
-# ---------------------------------------------------------------------------
-
-
-class HoldoutPrediction(EvalModel):
-    """One frozen case under one prompt version; adjudication-only metadata excluded."""
-
-    schema_version: Literal[1] = 1
-    prompt_version: str
-    case_id: CaseId
-    pool_ids: tuple[MemoryId, ...]
-    decision: D0ConflictDecision | None = None
-    llm_request_hash: Sha256 | None = None
-    cache_hit: bool = False
-    invalid_reason: str | None = None
-
-    @model_validator(mode="after")
-    def decision_shape(self) -> "HoldoutPrediction":
-        if self.decision is None and self.invalid_reason is None:
-            raise ValueError(f"{self.case_id}: prediction needs a decision or invalid_reason")
-        if self.decision is not None and self.invalid_reason is not None:
-            raise ValueError(f"{self.case_id}: decision and invalid_reason are exclusive")
-        return self
-
-    @property
-    def decision_label(self) -> str | None:
-        return None if self.decision is None else self.decision.decision
-
-
-def holdout_request_hash(
-    model_id: str,
-    prompt_version: str,
-    case: HoldoutCase,
-    *,
-    schema_fingerprint: str | None = None,
-) -> tuple[str, dict[str, object]]:
-    """Request identity over the model-visible payload only. Reuses the D0
-    ``decision_request`` canonicalization; the pool is the case's existing rows
-    in their frozen order (holdout runs have no retrieval stage)."""
-    from evaluation.d0_local_executor import D0RetrievalResult
-
-    pool = D0RetrievalResult(
-        retrieved_ids=tuple(row.memory_id for row in case.existing_active_memories),
-        scored_ids=tuple(row.memory_id for row in case.existing_active_memories),
-        pool_size=len(case.existing_active_memories),
-    )
-    bank_texts = {row.memory_id: row.text for row in case.existing_active_memories}
-    return decision_request(
-        model_id,
-        prompt_version,
-        case.candidate,
-        pool,
-        bank_texts,
-        schema_fingerprint=schema_fingerprint,
-    )
-
-
-async def decide_holdout_case(
-    decisions,
-    model_id: str,
-    prompt_version: str,
-    case: HoldoutCase,
-    cache: dict[str, D0ConflictDecision | InvalidDecision],
-) -> HoldoutPrediction:
-    """One LLM#2 call over the model-visible payload; fail-closed like D0."""
-    request_hash, request = holdout_request_hash(model_id, prompt_version, case)
-    cached = cache.get(request_hash)
-    if cached is not None:
-        if isinstance(cached, InvalidDecision):
-            return HoldoutPrediction(
-                prompt_version=prompt_version,
-                case_id=case.case_id,
-                pool_ids=tuple(row.memory_id for row in case.existing_active_memories),
-                llm_request_hash=request_hash,
-                cache_hit=True,
-                invalid_reason=cached.args[0],
-            )
-        return HoldoutPrediction(
-            prompt_version=prompt_version,
-            case_id=case.case_id,
-            pool_ids=tuple(row.memory_id for row in case.existing_active_memories),
-            decision=cached,
-            llm_request_hash=request_hash,
-            cache_hit=True,
-        )
-    try:
-        raw = await decisions.decide(request_hash, request)
-        pool_ids = tuple(row.memory_id for row in case.existing_active_memories)
-        decision = _parse_decision(raw, pool_ids)
-    except InvalidDecision as error:
-        cache[request_hash] = error
-        return HoldoutPrediction(
-            prompt_version=prompt_version,
-            case_id=case.case_id,
-            pool_ids=tuple(row.memory_id for row in case.existing_active_memories),
-            llm_request_hash=request_hash,
-            invalid_reason=error.args[0],
-        )
-    cache[request_hash] = decision
-    return HoldoutPrediction(
-        prompt_version=prompt_version,
-        case_id=case.case_id,
-        pool_ids=tuple(row.memory_id for row in case.existing_active_memories),
-        decision=decision,
-        llm_request_hash=request_hash,
-        cache_hit=False,
-    )
-
-
-def adjudicate_holdout(prediction: HoldoutPrediction, case: HoldoutCase) -> dict[str, object]:
-    """Offline adjudication of one prediction against frozen gold. Never touches
-    the model-visible payload; called only after the model has answered."""
-    decision = prediction.decision
-    predicted = None if decision is None else decision.decision
-    exact = None if decision is None else predicted == case.gold_decision
-    decision_mismatch = decision is not None and predicted != case.gold_decision
-    target_mismatch = (
-        decision is not None
-        and case.gold_decision in ("DUPLICATE", "SUPERSEDE")
-        and predicted == case.gold_decision
-        and decision.target_memory_id != case.gold_target_id
-    )
-    false_supersede = (
-        decision is not None and predicted == "SUPERSEDE" and case.gold_decision != "SUPERSEDE"
-    )
-    return {
-        "case_id": case.case_id,
-        "theme": case.theme,
-        "gold_decision": case.gold_decision,
-        "gold_target_id": case.gold_target_id,
-        "predicted_decision": predicted,
-        "predicted_target": None if decision is None else decision.target_memory_id,
-        "exact": exact,
-        "decision_mismatch": decision_mismatch,
-        "target_mismatch": target_mismatch,
-        "false_supersede": false_supersede,
-        "invalid": prediction.decision is None,
-        "invalid_reason": prediction.invalid_reason,
-    }

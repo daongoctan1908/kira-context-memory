@@ -25,6 +25,10 @@ ty, sau đó control/candidate mới được chạy với internal models trên
 - [Internal K8s acceptance](docs/benchmark-k8s-acceptance.md)
 - [Production deployment handoff](docs/production-deployment.md)
 
+D0 conflict experiments đã được bỏ; formation dùng luồng Mem0 ADD-only trước D1.
+Dataset `kira_ltm_v1` và holdout `d0_holdout_v1` vẫn giữ nguyên bản freeze. Module
+`evaluation.d0_holdout` chỉ còn kiểm tra tính toàn vẹn của holdout, không gọi model.
+
 ## Kiến trúc
 
 ```text

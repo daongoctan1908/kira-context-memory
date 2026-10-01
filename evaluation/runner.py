@@ -61,8 +61,8 @@ def validate_canonical_policy(manifest: DatasetManifest, profile: Profile) -> No
     MOCK bypasses dataset maturity; EXTERNAL_SYNTHETIC can never consume the
     canonical dataset; PC and INTERNAL_TEST both require a benchmark-ready dataset
     with frozen, materialized, reviewed bundles, and PC additionally requires the
-    dataset-level external-provider approval. Evaluation-side consumers (including
-    the D0-local runner) must reuse this function instead of restating policy."""
+    dataset-level external-provider approval. Evaluation-side consumers must reuse
+    this function instead of restating policy."""
     if profile is Profile.EXTERNAL_SYNTHETIC:
         raise ValueError("external_synthetic cannot consume the canonical dataset")
     if profile is Profile.MOCK:
