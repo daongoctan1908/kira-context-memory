@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 import tempfile
+from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
 from typing import Literal
@@ -82,6 +83,26 @@ class DatasetFreezeReport(EvalModel):
     output_root: NonEmpty
 
 
+class DatasetPolicyReport(EvalModel):
+    """Policy-only authorization receipt; payload hashes and human review remain intact."""
+
+    schema_version: Literal[1] = 1
+    operation: Literal["external_provider_policy"] = "external_provider_policy"
+    created_at: datetime
+    dataset_id: Identifier
+    previous_version: NonEmpty
+    dataset_version: NonEmpty
+    actor: Identifier
+    authorization_reference: NonEmpty
+    notes: NonEmpty
+    previous_external_provider_allowed: bool
+    external_provider_allowed: bool
+    before_manifest_sha256: Sha256
+    after_manifest_sha256: Sha256
+    payload_files: dict[str, Sha256]
+    output_root: NonEmpty
+
+
 def _digest(path: Path) -> str:
     return sha256(path.read_bytes()).hexdigest()
 
@@ -118,6 +139,90 @@ def dataset_review_source_sha256(root: Path, manifest: DatasetManifest) -> str:
         separators=(",", ":"),
     ).encode("utf-8")
     return sha256(payload).hexdigest()
+
+
+def update_external_provider_policy(
+    root: Path,
+    *,
+    dataset_version: str,
+    allow_pc_openai: bool,
+    actor: str,
+    authorization_reference: str,
+    notes: str,
+    audit_path: Path,
+    output_root: Path | None = None,
+    now: datetime | None = None,
+) -> DatasetPolicyReport:
+    """Authorize or revoke access without rematerializing or replacing bundle review."""
+
+    source = root.resolve()
+    manifest = load_manifest(source)
+    if manifest.status != "benchmark_ready" or any(
+        bundle.review.status != "reviewed"
+        or bundle.contract_status != "frozen"
+        or bundle.materialization_status != "materialized"
+        or bundle.counts.pending_answers
+        for bundle in manifest.bundles
+    ):
+        raise ValueError("policy update requires the fully reviewed frozen dataset")
+    if not dataset_version.strip() or dataset_version.strip() == manifest.dataset_version:
+        raise ValueError("policy update requires a new nonblank dataset version")
+    if allow_pc_openai == manifest.data_policy.external_provider_allowed:
+        raise ValueError("external provider policy is unchanged")
+    _source_payload(source, manifest)  # Verify every manifest-pinned byte before staging.
+    destination = output_root.resolve() if output_root is not None else source
+    audit = audit_path.resolve()
+    if audit == source or source in audit.parents or destination in audit.parents:
+        raise ValueError("policy audit must be outside the dataset")
+    if audit.exists() or (output_root is not None and destination.exists()):
+        raise FileExistsError("policy output already exists")
+    payload_files = {
+        f"{bundle.path}/{descriptor.name}": descriptor.sha256
+        for bundle in manifest.bundles
+        for _, descriptor in bundle.files.items()
+    }
+    before = (source / "manifest.json").read_bytes()
+    document = json.loads(before)
+    document["dataset_version"] = dataset_version.strip()
+    document["data_policy"]["external_provider_allowed"] = allow_pc_openai
+    after = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    report = DatasetPolicyReport(
+        created_at=now or datetime.now(UTC),
+        dataset_id=manifest.dataset_id,
+        previous_version=manifest.dataset_version,
+        dataset_version=dataset_version.strip(),
+        actor=actor,
+        authorization_reference=authorization_reference,
+        notes=notes,
+        previous_external_provider_allowed=manifest.data_policy.external_provider_allowed,
+        external_provider_allowed=allow_pc_openai,
+        before_manifest_sha256=sha256(before).hexdigest(),
+        after_manifest_sha256=sha256(after).hexdigest(),
+        payload_files=payload_files,
+        output_root=str(destination),
+    )
+    with tempfile.TemporaryDirectory(prefix="kira-policy-", dir=source.parent) as raw:
+        staged = Path(raw) / source.name
+        shutil.copytree(source, staged)
+        (staged / "manifest.json").write_bytes(after)
+        from scripts.benchmark.validate_dataset import validate_dataset
+
+        if not validate_dataset(staged).valid:
+            raise ValueError("policy dataset failed deterministic validation")
+        if (source / "manifest.json").read_bytes() != before:
+            raise ValueError("source policy changed during authorization")
+        _source_payload(source, manifest)
+        # Write a durable create-only authorization receipt before publishing the policy.
+        audit.parent.mkdir(parents=True, exist_ok=True)
+        with audit.open("x", encoding="utf-8", newline="\n") as stream:
+            stream.write(report.model_dump_json(indent=2) + "\n")
+        if output_root is None:
+            temporary = source / "manifest.json.policy-updating"
+            temporary.write_bytes(after)
+            temporary.replace(source / "manifest.json")
+        else:
+            shutil.copytree(staged, destination)
+    return report
 
 
 def build_review_packet(root: Path) -> DatasetReviewPacket:

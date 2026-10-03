@@ -242,6 +242,43 @@ def test_retrieval_settings_load_and_are_fingerprinted():
     )
 
 
+def test_real_kira_config_requires_explicit_identity_isolation_and_redacts_auth():
+    environment = {
+        "KIRA_BASE_URL": "http://kira.example.test",
+        "KIRA_USERNAME": "approved_benchmark_identity",
+        "KIRA_DOMAIN": "VBI",
+        "KIRA_BASIC_AUTH": "synthetic-kira-secret",
+        "KIRA_SERVICE_ID": "5",
+    }
+    disabled = load_config(
+        profile=Profile.PC_OPENAI_ACCEPTANCE,
+        suites=(Suite.CROSS_SESSION,),
+        environment=environment,
+    )
+    assert not disabled.kira_configured
+    enabled = load_config(
+        profile=Profile.PC_OPENAI_ACCEPTANCE,
+        suites=(Suite.CROSS_SESSION,),
+        environment={**environment, "BENCHMARK_KIRA_CONTEXT_ISOLATION": "unique_username"},
+    )
+    assert enabled.kira_configured
+    assert enabled.kira_service_id == 5
+    assert enabled.kira_basic_auth.get_secret_value() == "synthetic-kira-secret"
+    assert enabled.fingerprint() != disabled.fingerprint()
+    changed_secret = enabled.model_copy(update={"kira_basic_auth": SecretStr("another-secret")})
+    assert changed_secret.fingerprint() == enabled.fingerprint()
+    for output in (repr(enabled), enabled.model_dump_json()):
+        assert "synthetic-kira-secret" not in output
+    assert not enabled.model_copy(update={"kira_domain": None}).kira_configured
+
+
+def test_kira_endpoint_and_isolation_mode_validate_before_network():
+    with pytest.raises(ValidationError):
+        EvalConfig(kira_base_url="http://user:secret@kira.example.test")
+    with pytest.raises(ValidationError):
+        EvalConfig(kira_context_isolation="new_token")
+
+
 def test_internal_profile_does_not_inherit_openai_and_missing_is_not_config_error():
     config = load_config(
         profile=Profile.INTERNAL_TEST,

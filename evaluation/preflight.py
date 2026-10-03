@@ -1,4 +1,4 @@
-"""Suite-scoped preflight orchestration. No benchmark, formation or persistent writes."""
+"""Suite-scoped probes; real KiRa readiness creates only an isolated synthetic chat."""
 
 import asyncio
 import time
@@ -49,7 +49,7 @@ def required_probes(
         return retrieval
     if suite == Suite.REWRITE:
         return (Probe.REWRITE_CHAT, *semantic)
-    kira_probe = (Probe.KIRA,) if profile is Profile.MOCK else ()
+    kira_probe = (Probe.KIRA,) if profile is Profile.MOCK else (Probe.KIRA_CHAT,)
     return (
         *persistent,
         Probe.REWRITE_CHAT,
@@ -138,6 +138,8 @@ async def run_preflight(
 
                     async def operation() -> dict:
                         return await providers.kira_mock(str(config.kira_mock_url))
+                case Probe.KIRA_CHAT if config.kira_configured:
+                    operation = providers.kira_real
 
             if operation is None:
                 results[probe] = ProbeResult(

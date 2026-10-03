@@ -15,6 +15,7 @@ from evaluation.isolation import (
     create_isolation_plan,
     database_fingerprint,
     isolation_plan_sha256,
+    kira_benchmark_username,
     new_isolation_ledger,
     register_case_resources,
     register_memory_ids,
@@ -52,6 +53,24 @@ def test_plan_uses_run_scoped_names_and_credential_free_database_fingerprints():
     serialized = plan.model_dump_json()
     assert "conversation-secret" not in serialized
     assert "memory-secret" not in serialized
+
+
+def test_kira_identity_is_stable_within_attempt_and_distinct_per_case_arm_attempt():
+    plan = _plan()
+    first = kira_benchmark_username(plan, case_id="case-1", attempt=1, arm="no_ltm")
+    assert first == kira_benchmark_username(plan, case_id="case-1", attempt=1, arm="no_ltm")
+    variants = (
+        kira_benchmark_username(plan, case_id="case-1", attempt=1, arm="with_ltm"),
+        kira_benchmark_username(plan, case_id="case-1", attempt=2, arm="no_ltm"),
+        kira_benchmark_username(plan, case_id="case-2", attempt=1, arm="no_ltm"),
+    )
+    assert len({first, *variants}) == 4
+    assert "case-1" not in first
+    assert len(first) == 38
+    with pytest.raises(ValueError, match="valid case"):
+        kira_benchmark_username(plan, case_id="case-1", attempt=0, arm="no_ltm")
+    with pytest.raises(ValueError, match="valid case"):
+        kira_benchmark_username(plan, case_id="case-1", attempt=1, arm="invalid")
 
 
 def test_plan_rejects_names_not_derived_from_run_and_invalid_database_is_sanitized():

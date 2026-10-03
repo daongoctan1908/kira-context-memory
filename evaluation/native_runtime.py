@@ -9,8 +9,10 @@ global runtime flags or race another worker.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Iterator, Mapping, Sequence
+import hashlib
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 from uuid import UUID, uuid4
@@ -18,7 +20,7 @@ from uuid import UUID, uuid4
 import httpx
 import psycopg
 from psycopg import sql
-from sqlalchemy import delete
+from sqlalchemy import delete, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.application.services.context_builder import ContextBuilder
@@ -30,11 +32,14 @@ from app.application.use_cases.process_memory_job import (
 )
 from app.config.settings import Settings
 from app.domain.models.chat import ChatCommand
-from app.domain.models.conversation import ConversationMessage, ConversationRole
+from app.domain.models.conversation import (
+    CompletedTurnReference,
+    ConversationMessage,
+    ConversationRole,
+)
 from app.domain.models.identity import AuthenticatedPrincipal
 from app.domain.models.kira import KiraStreamEvent
 from app.domain.models.memory import LongTermMemory
-from app.domain.models.memory_job import MemoryJob
 from app.domain.ports.context_observer import StageName
 from app.domain.ports.kira_client import KiraClientPort
 from app.domain.ports.long_term_memory import LongTermMemoryPort
@@ -74,6 +79,7 @@ from evaluation.formation import (
     PersistentFormationResult,
     PostgresFormationInspector,
     build_formed_corpus,
+    receipt_provenance_matches,
 )
 from evaluation.isolation import (
     IsolationLedger,
@@ -81,11 +87,19 @@ from evaluation.isolation import (
     allocate_case_resources,
     claim_case_resources,
     isolation_plan_sha256,
+    kira_benchmark_username,
     register_case_resources,
     register_memory_ids,
 )
 from evaluation.judge import InternalSemanticJudge, JudgeError
-from evaluation.models import CrossSessionInput, EvalCase, FormationInput, Outcome, RetrievalInput
+from evaluation.models import (
+    CrossSessionInput,
+    EvalCase,
+    FormationInput,
+    Outcome,
+    RetrievalInput,
+    Suite,
+)
 from evaluation.native_executor import NativeFormationCaseEvaluation
 from evaluation.retrieval import (
     FormationRetrievalFixture,
@@ -96,7 +110,7 @@ from evaluation.retrieval import (
     RetrievalCaseEvaluation,
     RetrievalEvaluator,
 )
-from evaluation.scoring import score_formation
+from evaluation.scoring import normalize_exact, score_formation
 
 _FALLBACK_TIME = datetime(2000, 1, 1, tzinfo=UTC)
 
@@ -180,6 +194,19 @@ def settings_for_native_runtime(base: Settings, config: EvalConfig) -> Settings:
             "memory_search_threshold": config.retrieval_threshold,
             "memory_search_timeout_seconds": config.read_timeout_seconds,
             "otel_enabled": False,
+            **(
+                {
+                    "kira_base_url": config.kira_base_url,
+                    "kira_username": config.kira_username,
+                    "kira_domain": config.kira_domain,
+                    "kira_basic_auth": config.kira_basic_auth,
+                    "kira_service_id": config.kira_service_id,
+                    "kira_device": config.kira_device,
+                    "kira_message_type": config.kira_message_type,
+                }
+                if config.kira_configured
+                else {}
+            ),
         }
     )
 
@@ -482,6 +509,14 @@ class PersistentRetrievalRuntime:
             raise RuntimeError("retrieval_fixture_cleanup_failed")
 
 
+@dataclass(frozen=True, slots=True)
+class _PendingTrajectory:
+    case: EvalCase
+    attempt: int
+    user_id: str
+    references: Mapping[UUID, CompletedTurnReference]
+
+
 class NativeCrossSessionRuntime(CrossSessionRuntimePort):
     """Own one exact queue delivery and two isolated Session-B application executions."""
 
@@ -498,9 +533,11 @@ class NativeCrossSessionRuntime(CrossSessionRuntimePort):
         process_job: ProcessMemoryJobUseCase,
         inspector: PostgresFormationInspector,
         rewriter: VllmQueryRewriterAdapter,
-        kira: KiraHttpAdapter,
+        kira_factory: Callable[[str], KiraClientPort],
         judge: InternalSemanticJudge,
         gold_fact_text: Mapping[str, str],
+        gold_fact_source_ids: Mapping[str, Sequence[str]] | None = None,
+        failed_source_cleanup: Callable[[str, Sequence[str]], Awaitable[None]] | None = None,
     ) -> None:
         self.plan = plan
         self.ledger = ledger
@@ -512,12 +549,19 @@ class NativeCrossSessionRuntime(CrossSessionRuntimePort):
         self._process_job = process_job
         self._inspector = inspector
         self._rewriter = rewriter
-        self._kira = kira
+        self._kira_factory = kira_factory
         self._judge = judge
         self._gold_fact_text = dict(gold_fact_text)
-        self._pending: dict[UUID, tuple[EvalCase, MemoryJob, str]] = {}
+        self._gold_fact_source_ids = (
+            dict(gold_fact_source_ids) if gold_fact_source_ids is not None else None
+        )
+        self._pending: dict[UUID, _PendingTrajectory] = {}
+        self._abort_cleanup_failed = False
+        self._failed_source_cleanup = failed_source_cleanup
 
     async def persist_session_a(self, case: EvalCase) -> MemoryJobHandle:
+        if self._abort_cleanup_failed:
+            raise CrossSessionDependencyError
         if not isinstance(case.inputs, CrossSessionInput):
             raise ValueError("cross-session runtime accepts cross-session cases only")
         attempt = self.artifacts.next_attempt_number(case.case_id)
@@ -525,33 +569,85 @@ class NativeCrossSessionRuntime(CrossSessionRuntimePort):
         allocated = allocate_case_resources(self.plan, case_id=case.case_id, attempt=attempt)
         self.ledger = register_case_resources(self.ledger, self.plan, allocated)
         self.artifacts.write_isolation_ledger(self.ledger)
-        reference = await _persist_message_pairs(
-            self._store,
-            user_id=allocated.user_id,
-            session_id=allocated.session_id,
-            messages=case.inputs.session_a_messages,
-            schedule_last=True,
+        references: dict[UUID, CompletedTurnReference] = {}
+        source_sessions: set[str] = set()
+        pairs = _message_pairs(case.inputs.session_a_messages)
+        # The fixture records source time; insertion/completion time must never reorder it.
+        ordered_pairs = sorted(
+            enumerate(pairs), key=lambda pair: (pair[1][0].timestamp or _FALLBACK_TIME, pair[0])
         )
-        jobs = await self._queue.claim_due(
-            lease_owner=uuid4(),
-            limit=1,
-            lease_seconds=max(self._settings.memory_operation_timeout_seconds + 10, 30),
-            max_attempts=1,
-        )
-        if len(jobs) != 1 or jobs[0].reference != reference:
-            raise CrossSessionProtocolError
-        job = jobs[0]
+        try:
+            for index, (user, assistant) in ordered_pairs:
+                source_session = user.session_id or case.inputs.session_a
+                digest = hashlib.sha256(source_session.encode()).hexdigest()[:16]
+                session_id = f"{allocated.session_id}:{digest}"
+                source_sessions.add(session_id)
+                base_time = user.timestamp or (_FALLBACK_TIME + timedelta(microseconds=index * 2))
+                appended = await self._store.append_turn(
+                    allocated.user_id,
+                    ConversationMessage(
+                        session_id, user.message_id, ConversationRole.USER, user.content, base_time
+                    ),
+                    ConversationMessage(
+                        session_id,
+                        user.message_id,
+                        ConversationRole.ASSISTANT,
+                        assistant.content,
+                        assistant.timestamp or (base_time + timedelta(microseconds=1)),
+                    ),
+                    schedule_memory=True,
+                )
+                if not appended.inserted or appended.memory_job_event_id is None:
+                    raise CrossSessionProtocolError
+                references[appended.memory_job_event_id] = appended.reference
+        except BaseException:
+            await self._clear_failed_sources(allocated.user_id, source_sessions)
+            raise
+        event_id, reference = next(reversed(references.items()))
         resource = claim_case_resources(
             self.plan,
             case_id=case.case_id,
             attempt=attempt,
             conversation_id=reference.conversation_id,
-            event_id=job.event_id,
+            event_id=event_id,
         )
         self.ledger = register_case_resources(self.ledger, self.plan, resource)
         self.artifacts.write_isolation_ledger(self.ledger)
-        self._pending[job.event_id] = (case, job, allocated.user_id)
-        return MemoryJobHandle(event_id=job.event_id)
+        self._pending[event_id] = _PendingTrajectory(case, attempt, allocated.user_id, references)
+        return MemoryJobHandle(event_id=event_id, source_event_ids=tuple(references))
+
+    async def _clear_failed_sources(
+        self, user_id: str, session_ids: Sequence[str] | set[str]
+    ) -> None:
+        """Use native deletion/fencing so abandoned jobs cannot contaminate the next case."""
+
+        try:
+            resource = next(
+                (item for item in self.ledger.resources if item.user_id == user_id), None
+            )
+            if resource is None or any(
+                not session_id.startswith(f"{resource.session_id}:") for session_id in session_ids
+            ):
+                raise CrossSessionProtocolError
+            if not callable(getattr(self._store, "mark_deletion_pending", None)) or not callable(
+                getattr(self._store, "purge_deletion_pending", None)
+            ):
+                # The frozen historical runtime predates conversation-deletion ports. Its
+                # shared-harness SQL callback erases only this disposable case's exact owner.
+                if self._failed_source_cleanup is None:
+                    raise CrossSessionDependencyError
+                await self._failed_source_cleanup(user_id, tuple(session_ids))
+                return
+            # Fence every source before purging any, including a potentially delayed formation
+            # call that was cancelled while its provider thread was still finishing.
+            for session_id in sorted(set(session_ids)):
+                await self._store.mark_deletion_pending(user_id, session_id)
+            for session_id in sorted(set(session_ids)):
+                await self._store.purge_deletion_pending(user_id, session_id)
+        except BaseException:
+            # No further case may claim from this queue until run cleanup/resume succeeds.
+            self._abort_cleanup_failed = True
+            raise CrossSessionDependencyError from None
 
     async def wait_for_memory(
         self,
@@ -559,49 +655,102 @@ class NativeCrossSessionRuntime(CrossSessionRuntimePort):
         *,
         timeout_seconds: float,
     ) -> MemoryReadiness:
-        del timeout_seconds
         pending = self._pending.pop(handle.event_id, None)
         if pending is None:
             raise CrossSessionProtocolError
-        case, job, persisted_user = pending
-        result = await self._process_job.execute(job)
-        if result.outcome is MemoryJobProcessOutcome.DEAD:
-            return MemoryReadiness(event_id=handle.event_id, status=MemoryReadinessStatus.DEAD)
-        if result.outcome is not MemoryJobProcessOutcome.COMPLETED:
-            raise CrossSessionDependencyError
-        snapshot = await self._inspector.inspect(
-            event_id=handle.event_id,
-            user_id=persisted_user,
-        )
-        if snapshot.receipt is None:
-            raise CrossSessionProtocolError
-        mapping = await self._map_gold(case, snapshot.receipt.events)
-        memory_ids = tuple(memory.memory_id for memory in snapshot.memories)
-        resource = next(
-            item
-            for item in self.ledger.resources
-            if item.case_id == case.case_id
-            and item.attempt == self.artifacts.next_attempt_number(case.case_id)
-        )
-        self.ledger = register_memory_ids(
-            self.ledger,
-            self.plan,
-            case_id=resource.case_id,
-            attempt=resource.attempt,
-            memory_ids=memory_ids,
-        )
-        self.artifacts.write_isolation_ledger(self.ledger)
-        return MemoryReadiness(
-            event_id=handle.event_id,
-            status=MemoryReadinessStatus.COMPLETED,
-            gold_ids_by_memory_id=mapping,
-        )
+        remaining = dict(pending.references)
+        mapping: dict[str, tuple[str, ...]] = {}
+        memory_ids = []
+        completed = False
+        try:
+            async with asyncio.timeout(timeout_seconds):
+                while remaining:
+                    # Lease exactly the job being processed, so later jobs cannot expire while a
+                    # preceding provider call is running. The database/worker must be run-owned.
+                    jobs = await self._queue.claim_due(
+                        lease_owner=uuid4(),
+                        limit=1,
+                        lease_seconds=max(self._settings.memory_operation_timeout_seconds + 10, 30),
+                        max_attempts=1,
+                    )
+                    if len(jobs) != 1:
+                        raise CrossSessionProtocolError
+                    job = jobs[0]
+                    if remaining.pop(job.event_id, None) != job.reference:
+                        raise CrossSessionProtocolError
+                    result = await self._process_job.execute(job)
+                    if result.outcome is MemoryJobProcessOutcome.DEAD:
+                        return MemoryReadiness(
+                            event_id=handle.event_id, status=MemoryReadinessStatus.DEAD
+                        )
+                    if result.outcome is not MemoryJobProcessOutcome.COMPLETED:
+                        raise CrossSessionDependencyError
+                    snapshot = await self._inspector.inspect(
+                        event_id=job.event_id, user_id=pending.user_id
+                    )
+                    if (
+                        snapshot.event_id != job.event_id
+                        or snapshot.user_id != pending.user_id
+                        or snapshot.receipt is None
+                        or not receipt_provenance_matches(
+                            snapshot.receipt,
+                            job.reference,
+                            historical_control_runtime=(
+                                getattr(self._inspector, "historical_control_runtime", False)
+                                is True
+                            ),
+                        )
+                        or snapshot.receipt.memory_count != result.lifecycle_event_count
+                        or any(
+                            memory.conversation_id != job.reference.conversation_id
+                            or memory.turn_id != job.reference.turn_id
+                            or memory.boundary_message_id != job.reference.boundary_message_id
+                            for memory in snapshot.memories
+                        )
+                        or {memory.memory_id for memory in snapshot.memories}
+                        != {event.memory_id for event in snapshot.receipt.events}
+                    ):
+                        raise CrossSessionProtocolError
+                    mapping.update(
+                        await self._map_gold(
+                            pending.case,
+                            snapshot.receipt.events,
+                            source_turn_id=job.reference.turn_id,
+                        )
+                    )
+                    memory_ids.extend(memory.memory_id for memory in snapshot.memories)
+            self.ledger = register_memory_ids(
+                self.ledger,
+                self.plan,
+                case_id=pending.case.case_id,
+                attempt=pending.attempt,
+                memory_ids=tuple(dict.fromkeys(memory_ids)),
+            )
+            self.artifacts.write_isolation_ledger(self.ledger)
+            completed = True
+            return MemoryReadiness(
+                event_id=handle.event_id,
+                status=MemoryReadinessStatus.COMPLETED,
+                gold_ids_by_memory_id=mapping,
+            )
+        finally:
+            if not completed:
+                await self._clear_failed_sources(
+                    pending.user_id,
+                    tuple(reference.session_id for reference in pending.references.values()),
+                )
 
-    async def _map_gold(self, case: EvalCase, events) -> dict[str, tuple[str, ...]]:
+    async def _map_gold(
+        self, case: EvalCase, events, *, source_turn_id: str | None = None
+    ) -> dict[str, tuple[str, ...]]:
         relevant = {
             gold_id: self._gold_fact_text[gold_id]
             for gold_id in case.gold.relevant_memory_ids
             if gold_id in self._gold_fact_text
+            and (
+                self._gold_fact_source_ids is None
+                or source_turn_id in self._gold_fact_source_ids.get(gold_id, ())
+            )
         }
         predictions = tuple(event.memory for event in events)
         score = score_formation(relevant, predictions)
@@ -618,9 +767,18 @@ class NativeCrossSessionRuntime(CrossSessionRuntimePort):
                 raise CrossSessionProtocolError from None
             score = score_formation(relevant, predictions, judge_decisions=decisions)
         by_prediction = {match.prediction_index: match.gold_id for match in score.matches}
+        # ID mapping is classification, not one-to-one formation scoring. Independent source
+        # assertions with the same text must each remain visible in retrieval diagnostics.
+        mapped_text: dict[str, list[str]] = {}
+        for index, gold_id in by_prediction.items():
+            mapped_text.setdefault(normalize_exact(predictions[index]), []).append(gold_id)
         return {
-            str(event.memory_id): ((by_prediction[index],) if index in by_prediction else ())
-            for index, event in enumerate(events)
+            str(event.memory_id): (
+                tuple(mapped_text[normalize_exact(event.memory)])
+                if normalize_exact(event.memory) in mapped_text
+                else ()
+            )
+            for event in events
         }
 
     async def run_session_b(
@@ -643,7 +801,13 @@ class NativeCrossSessionRuntime(CrossSessionRuntimePort):
         )
         memory = _RecordingMemory(self._memory if enable_ltm else None)
         rewriter = _RecordingRewriter(self._rewriter)
-        kira = _RecordingKira(self._kira)
+        username = kira_benchmark_username(
+            self.plan,
+            case_id=case.case_id,
+            attempt=resource.attempt,
+            arm=condition.value,
+        )
+        kira = _RecordingKira(self._kira_factory(username))
         use_case = HandleChatUseCase(
             kira,
             conversation_store=self._store,
@@ -688,6 +852,7 @@ class NativeCrossSessionRuntime(CrossSessionRuntimePort):
             session_id=case.inputs.session_b,
             current_query=case.inputs.session_b_query,
             provider_id=f"kira-service-{self._settings.kira_service_id}",
+            kira_context_identity_sha256=hashlib.sha256(username.encode()).hexdigest(),
             retrieved_memories=tuple(
                 RetrievedMemory(
                     memory_id=item.memory_id,
@@ -710,13 +875,9 @@ async def _persist_message_pairs(
     messages: Sequence,
     schedule_last: bool,
 ):
-    if not messages or len(messages) % 2:
-        raise ValueError("native formation needs complete user/assistant pairs")
     reference = None
-    for index in range(0, len(messages), 2):
-        user, assistant = messages[index : index + 2]
-        if user.role != "user" or assistant.role != "assistant":
-            raise ValueError("native formation messages must be ordered pairs")
+    for pair_index, (user, assistant) in enumerate(_message_pairs(messages)):
+        index = pair_index * 2
         turn_id = user.message_id
         base_time = user.timestamp or (_FALLBACK_TIME + timedelta(microseconds=index))
         assistant_time = assistant.timestamp or (base_time + timedelta(microseconds=1))
@@ -743,6 +904,18 @@ async def _persist_message_pairs(
         reference = appended.reference
     assert reference is not None
     return reference
+
+
+def _message_pairs(messages: Sequence):
+    if not messages or len(messages) % 2:
+        raise ValueError("native formation needs complete user/assistant pairs")
+    pairs = tuple(zip(messages[::2], messages[1::2], strict=True))
+    for user, assistant in pairs:
+        if user.role != "user" or assistant.role != "assistant":
+            raise ValueError("native formation messages must be ordered pairs")
+        if user.session_id != assistant.session_id:
+            raise ValueError("native formation pairs must belong to one source conversation")
+    return pairs
 
 
 class NativeRuntimeResources:
@@ -797,6 +970,8 @@ async def create_native_runtime(
 ) -> NativeRuntimeResources:
     """Validate and compose exact native adapters; no provider fallback is permitted."""
 
+    if Suite.CROSS_SESSION in config.suites and not config.kira_configured:
+        raise ValueError("cross-session runtime requires explicit KiRa unique_username isolation")
     settings = settings_for_native_runtime(base_settings, config)
     await _reset_owned_state(config, plan, ledger)
     await _write_owner_marker(config, plan)
@@ -829,6 +1004,7 @@ async def create_native_runtime(
         config.memory_database_url,
         schema_name=config.memory_schema,
         collection_name=config.memory_collection,
+        runtime_provenance=artifacts.manifest.identity.provenance,
     )
     formation = PersistentFormationRuntime(
         plan=plan,
@@ -843,7 +1019,52 @@ async def create_native_runtime(
     kira_http = httpx.AsyncClient(follow_redirects=False)
     rewriter = VllmQueryRewriterAdapter(rewrite_http, settings)
     judge = InternalSemanticJudge(judge_http, config)
-    kira = KiraHttpAdapter(kira_http, settings)
+
+    def kira_factory(username: str) -> KiraClientPort:
+        return KiraHttpAdapter(kira_http, settings.model_copy(update={"kira_username": username}))
+
+    async def failed_source_cleanup(user_id: str, session_ids: Sequence[str]) -> None:
+        # Each case/attempt owns its entire user ID. Historical receipts have no conversation
+        # column, so owner-scoped deletion also works without changing the frozen schema.
+        memory_engine = create_postgres_engine(SimplePostgresSettings(settings.memory_database_url))
+        try:
+            async with memory_engine.begin() as connection:
+                marker = (
+                    await connection.execute(
+                        text(
+                            "SELECT run_id, owner_token, plan_sha256 FROM "
+                            f'"{plan.memory_schema}"."benchmark_owner"'
+                        )
+                    )
+                ).one_or_none()
+                if marker is None or tuple(marker) != (
+                    plan.run_id,
+                    plan.owner_token,
+                    isolation_plan_sha256(plan),
+                ):
+                    raise CrossSessionProtocolError
+                for table, owner_column in (
+                    (f"{settings.memory_collection_name}_formation_receipts", "user_id"),
+                    (settings.memory_collection_name, "payload->>'user_id'"),
+                    (f"{settings.memory_collection_name}_entities", "payload->>'user_id'"),
+                ):
+                    await connection.execute(
+                        text(
+                            f'DELETE FROM "{settings.memory_schema}"."{table}" '
+                            f"WHERE {owner_column} = :user_id"
+                        ),
+                        {"user_id": user_id},
+                    )
+            async with engine.begin() as connection:
+                await connection.execute(
+                    delete(conversations).where(
+                        conversations.c.user_id == user_id,
+                        conversations.c.session_id.in_(session_ids),
+                    )
+                )
+        finally:
+            await memory_engine.dispose()
+
     retrieval_evaluator = RetrievalEvaluator(
         memory,
         profile=config.profile,
@@ -866,6 +1087,9 @@ async def create_native_runtime(
         retry_delays_seconds=(),
     )
     gold_fact_text = {fact.gold_id: fact.text for case in cases for fact in case.gold.facts}
+    gold_fact_source_ids = {
+        fact.gold_id: fact.evidence_message_ids for case in cases for fact in case.gold.facts
+    }
     cross_session = NativeCrossSessionRuntime(
         plan=plan,
         ledger=ledger,
@@ -877,9 +1101,11 @@ async def create_native_runtime(
         process_job=process_job,
         inspector=inspector,
         rewriter=rewriter,
-        kira=kira,
+        kira_factory=kira_factory,
         judge=judge,
         gold_fact_text=gold_fact_text,
+        gold_fact_source_ids=gold_fact_source_ids,
+        failed_source_cleanup=failed_source_cleanup,
     )
     return NativeRuntimeResources(
         settings=settings,

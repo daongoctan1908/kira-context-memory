@@ -12,7 +12,7 @@ from evaluation.compiler import compile_dataset
 from evaluation.dataset import load_manifest
 from evaluation.models import BENCHMARK_CONTRACT_ID, EvalModel, Identifier, Sha256
 from evaluation.pc_acceptance import PcAcceptanceManifest
-from evaluation.pc_preflight import PcPreflightFreeze
+from evaluation.pc_preflight import PcPreflightRunSet
 
 
 class HandoffEvidence(EvalModel):
@@ -66,11 +66,17 @@ def build_handoff_evidence(
     if acceptance.dataset_sha256 != compilation.dataset_sha256:
         raise ValueError("PC acceptance is bound to another dataset")
 
-    preflight = PcPreflightFreeze.model_validate_json(pc_preflight_path.read_text(encoding="utf-8"))
-    if not preflight.ready or preflight.dataset_sha256 != compilation.dataset_sha256:
+    preflight = PcPreflightRunSet.model_validate_json(pc_preflight_path.read_text(encoding="utf-8"))
+    if preflight.dataset_sha256 != compilation.dataset_sha256:
         raise ValueError("PC preflight is not ready for this dataset")
-    if acceptance.config_sha256 != preflight.config_sha256:
-        raise ValueError("PC acceptance and preflight configs differ")
+    if {item.variant_id for item in acceptance.variants} != set(preflight.variants):
+        raise ValueError("PC acceptance and preflight variants differ")
+    if any(
+        item.config_sha256 != preflight.variants[item.variant_id].config_sha256
+        or item.runtime_revision != preflight.variants[item.variant_id].provenance.runtime.sha
+        for item in acceptance.variants
+    ):
+        raise ValueError("PC acceptance and variant preflight config/runtime differ")
 
     image_manifest_sha256 = file_sha256(image_manifest_path)
     pc_preflight_sha256 = file_sha256(pc_preflight_path)

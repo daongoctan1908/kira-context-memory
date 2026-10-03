@@ -56,8 +56,8 @@ def test_compiler_emits_all_suites_namespaces_and_source_coverage():
         source.kind: (source.total, source.linked, source.accounted_not_selected)
         for source in compilation.coverage.sources
     } == {
-        "conversation": (506, 122, 384),
-        "fill": (140, 0, 140),
+        "conversation": (506, 506, 0),
+        "fill": (140, 140, 0),
         "memory": (62, 62, 0),
         "qa": (209, 209, 0),
     }
@@ -75,6 +75,29 @@ def test_compiler_emits_all_suites_namespaces_and_source_coverage():
         message.timestamp is not None and message.timestamp.utcoffset() is not None
         for message in formation.inputs.messages
     )
+
+
+def test_canonical_formation_uses_explicit_open_world_contract_and_negative_target():
+    formation = [case for case in compile_dataset().cases if case.suite is Suite.FORMATION]
+    assert all(case.gold.formation_contract == "open_world" for case in formation)
+    for case in formation:
+        lifecycle = case.gold.lifecycle_event
+        assert lifecycle is not None
+        assert bool(case.gold.forbidden_facts) is not lifecycle.should_store
+        assert case.inputs.source_message_ids
+        assert set(case.inputs.source_message_ids).issubset(
+            message.message_id for message in case.inputs.messages
+        )
+
+
+def test_formation_amendment_uses_source_pair_and_never_future_supporting_turn():
+    case = next(case for case in compile_dataset().cases if case.case_id == "conv01:formation:M09")
+    assert case.inputs.source_message_ids == ("conv01:D12:7", "conv01:D12:8")
+    ids = [message.message_id for message in case.inputs.messages]
+    assert "conv01:D12:9" not in ids
+    assert ids[-2:] == list(case.inputs.source_message_ids)
+    assert "conv01:D12:1" in ids  # Original alias definition is preceding context.
+    assert len({message.session_id for message in case.inputs.messages}) == 1
 
 
 def test_compiled_qa_cases_carry_source_tier_tag():
@@ -119,14 +142,19 @@ def test_pending_kira_answers_are_blocked_without_silent_case_loss(tmp_path):
     compilation = compile_dataset(copy_draft_dataset(tmp_path / "dataset"))
     blocked = [case for case in compilation.cases if case.eligibility.status == "blocked"]
 
-    assert len(blocked) == 54
-    assert all(case.suite is Suite.CROSS_SESSION for case in blocked)
-    assert all(
-        case.eligibility.blocked_reasons == ("pending_kira_final_answer",) for case in blocked
-    )
-    assert [(reason.reason, reason.cases) for reason in compilation.coverage.blocked_reasons] == [
-        ("pending_kira_final_answer", 54)
+    pending_final = [
+        case for case in blocked if "pending_kira_final_answer" in case.eligibility.blocked_reasons
     ]
+    assert len(pending_final) == 54
+    assert all(case.suite is Suite.CROSS_SESSION for case in pending_final)
+    assert all("pending_kira_assistant" in case.eligibility.blocked_reasons for case in blocked)
+    # Full-prefix replay exposes unmaterialized earlier responses instead of silently dropping
+    # them. All cross-session cases requiring those prefixes must remain blocked and present.
+    cross_cases = [case for case in compilation.cases if case.suite is Suite.CROSS_SESSION]
+    assert all(case.eligibility.status == "blocked" for case in cross_cases)
+    reason_counts = {reason.reason: reason.cases for reason in compilation.coverage.blocked_reasons}
+    assert reason_counts["pending_kira_final_answer"] == len(pending_final)
+    assert reason_counts["pending_kira_assistant"] == len(blocked)
 
 
 def test_pending_evidence_assistant_blocks_formation_case(tmp_path):

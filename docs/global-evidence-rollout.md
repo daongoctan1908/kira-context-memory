@@ -69,8 +69,23 @@ assertion owned by another source conversation survives deletion of the first co
 
 ## Validation and window selection
 
+The benchmark harness now replays every source pair in its original conversation and waits for
+all formation receipts before Session B. Formation fixtures end at their source boundary. KiRa
+identities are separate per case/arm/attempt; real permission equivalence and history isolation
+remain PC gates. Canonical formation uses versioned open-world scoring, while the local scope
+diagnostic has 38 cases covering aliases, cancellation and reassertion. Current preflight uses
+live authentication/SSE evidence rather than a historical materialization checkpoint. See the
+[current PC harness gates](company-pc-ai-handoff.md#current-harness-gates-trước-paid-corpus-2026-10-03).
+These harness checks do not change the model acceptance or rollout hold below.
+
+Harness validation on 2026-10-03: 1,677 tests passed with two provider-gated skips, followed by two
+additional real-PostgreSQL legacy-receipt tests; combined coverage is 90.85%. Ruff, lock verification,
+dataset validation and 534-case mock acceptance passed. PostgreSQL 16/pgvector 0.6.0 used the local
+portable validation runtime; Docker's exact 0.8.6 image and live PC/K8s providers remain environment
+gates. Frozen dataset payloads and manifest are unchanged by this harness fix.
+
 Implementation is complete; model and product acceptance are separate release evidence.
-The final deterministic suite passed with disposable PostgreSQL/pgvector: 1,503 tests, two skips,
+The earlier deterministic suite passed with disposable PostgreSQL/pgvector: 1,503 tests, two skips,
 90.73% coverage. The checkout byte contract is pinned by eight dataset attributes; all sixteen
 declared bundle hashes match without temporary rewriting or changing JSON/manifests.
 Use the following environment boundary, confirmed by the user:

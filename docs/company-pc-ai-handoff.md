@@ -40,6 +40,58 @@ Không đặt Qwen preflight thành điều kiện của PC acceptance. Handoff 
 chronology/Last-k nằm trong [global-evidence-rollout.md](global-evidence-rollout.md), gồm command
 rewrite/window độc lập KiRa và các gate phải chạy tiếp trên PC/K8s.
 
+### Current harness gates trước paid corpus (2026-10-03)
+
+Các snapshot SHA, coverage và materialization bên dưới là lịch sử; kiểm tra revision đang checkout.
+Memory runtime giữ native Mem0, hai scope, receipts và deletion/fencing. Harness hiện replay từng
+source event và conversation gốc; preceding context không trở thành New Messages. Cross-session
+QA dùng toàn bộ source bundle vì gold được khai báo theo corpus cuối bundle, không claim query-at-time.
+Formation case chỉ dùng prefix đến source boundary; supporting turn tương lai không được đưa vào.
+Control frozen `75deb1d8` chỉ lưu event/owner trong receipt. Harness đọc đúng schema cũ theo pinned
+provenance và ghi `conversation_id=null`, không bịa provenance hoặc migration. Candidate tiếp tục
+require receipt conversation ID; cả hai kiểm tra source conversation/turn/boundary của persisted
+memories. Case thất bại xóa jobs/state của đúng owner trước case kế tiếp. Control cũ chưa có native
+deletion fencing: cleanup của harness không được diễn giải là đã bổ sung guarantee đó cho baseline.
+
+1. Validate dataset frozen; không collect/apply KiRa lại khi `pending_answers=0`.
+2. Ghi nhận quyền OpenAI bằng thao tác policy-only dưới đây khi đã có authorization thật. Thao tác
+   này đổi manifest policy/version và tạo audit, giữ nguyên 16 payload hashes và bundle review.
+3. Xác minh username benchmark mới có cùng quyền truy cập nghiệp vụ và context KiRa độc lập. Sau đó
+   đặt `BENCHMARK_KIRA_CONTEXT_ISOLATION=unique_username` trong env local. Mặc định `disabled` chặn
+   paired run. Mỗi case/arm/attempt dùng identity riêng; đổi token/client không phải reset history.
+4. Live preflight hiện gọi KiRa thật qua authentication + bounded SSE trên identity mới. Freeze
+   từng variant dùng evidence của lần gọi hiện tại và được gom thành run-set artifact; không cần
+   checkpoint materialization lịch sử 80/80. Không dùng config hash của candidate để đối chiếu control.
+5. Compile offline và xem `cross_session_source_pairs` trước khi dự toán paid calls. Replay đầy đủ
+   tăng workload; số source pairs không phải cam kết exact số provider calls. Giữ run-owned isolation,
+   không âm thầm chạy subset hoặc reuse state giữa case attempts để giảm chi phí.
+
+Ở dataset frozen hiện tại, compile có 534 cases tổng; riêng 209 cross-session cases replay 13.301
+source pairs và thực hiện 418 KiRa chats mỗi variant nếu chạy hết không retry. Control + một candidate
+tương ứng 26.602 source deliveries và 836 KiRa chats; đây chưa phải exact provider API call count.
+Compile lại revision/dataset đang chạy trước khi lập ngân sách, vì assertion extraction và retries
+có thể phát sinh thêm calls.
+
+```powershell
+uv run python -m scripts.benchmark.review_dataset policy `
+  --root dataset/kira_ltm_v1 --dataset-version <new-policy-version> `
+  --allow-pc-openai --actor <authorizer-id> `
+  --authorization-reference <explicit-user-approval-reference> `
+  --notes <authorization-scope> `
+  --audit artifacts/benchmark/dataset-policy-authorization.json --in-place
+
+uv run python -m scripts.benchmark.validate_dataset dataset/kira_ltm_v1
+uv run python -m scripts.benchmark.run compile `
+  --root dataset/kira_ltm_v1 --output artifacts/benchmark/compilation.json
+```
+
+Commit policy/version change và build từ clean exact revision trước chạy. Không tự điền reviewer giả
+hoặc sửa gold theo output. Formation canonical dùng open-world scoring: valid extras được đánh giá
+bằng source evidence, không mặc nhiên là FP; missing required gold vẫn được tính. Score/judge contract
+mới ghi version rõ. Canonical chưa có scope labels: chạy scope policy diagnostics và chronology fixture
+riêng, không claim canonical đã chứng minh scope accuracy. Recent-window dùng current prompt với
+4/6/10 recent messages; Mem0 formation window vẫn 10. PC technical PASS không approve Qwen rollout.
+
 ## 2. Trạng thái repository khi bàn giao
 
 Nhánh làm việc là `main`. Trước khi thao tác, tự xác minh thay vì tin SHA ghi trong tài liệu:
@@ -271,9 +323,10 @@ hội thoại. Header `KIRA_BASIC_AUTH` không được validate và username c�
 không; chỉ sai `KIRA_DOMAIN` mới bị từ chối (`errorCode 01`). Username mới
 được tự động cấp token với context trống.
 
-Khuyến nghị: dùng username riêng cho mỗi lần chạy tạo dữ liệu/benchmark
-(ví dụ `benchmark_run_<date>_<seq>`), không dùng chung với chat tay trên
-web, để đảm bảo response không nhiễm context cũ và tái lập được.
+Materialization lịch sử dùng username riêng mỗi run. Paired benchmark hiện cần identity riêng
+cho từng case/arm/attempt; username riêng mỗi run chưa cách ly được các calls bên trong run.
+Không dùng chung identity với chat tay trên web. Phải xác minh các identity có quyền tương đương
+trên endpoint thật trước khi bật `BENCHMARK_KIRA_CONTEXT_ISOLATION=unique_username`.
 
 Kiểm tra không lộ secret:
 
@@ -619,8 +672,8 @@ docker compose --env-file .env.benchmark.pc.local -f compose.benchmark.yaml `
 ```
 
 Required probes: extraction JSON, embedding dimension, rewrite, judge schema, pgvector/memory schema,
-conversation DB, Gateway, Worker. KiRa real evidence lấy từ complete materialization checkpoint, không
-dùng mock `/_test/requests`.
+conversation DB, Gateway, Worker và real KiRa authentication/SSE trên identity riêng. Không dùng
+materialization checkpoint cũ hoặc mock `/_test/requests` làm bằng chứng current readiness.
 
 Sau khi preflight của variant đó PASS, **dừng đúng Worker của variant trước native benchmark**. Runner
 tự claim/process job cross-session trong eval-controller để dùng đúng run-owned Mem0 schema; để
@@ -643,21 +696,22 @@ docker compose --env-file .env.benchmark.pc.local -f compose.benchmark.yaml `
 Xác minh container Worker đã stopped. Không dừng PostgreSQL. Gateway có thể giữ chạy nhưng native
 runner không phụ thuộc Gateway cho case execution.
 
-Freeze preflight dùng một run-set provider artifact đã xác minh đồng nhất (hoặc mở rộng freeze để
-hash tất cả variant preflights nếu native executor implementation yêu cầu):
+Sau khi mọi variant preflight PASS, freeze cả run-set. Config của control/candidate có database,
+Gateway và Worker targets riêng; mỗi run phải khớp exact config của preflight cùng variant.
+Run-set artifact giữ từng freeze schema 2, không normalize các targets khác nhau thành một hash:
 
 ```powershell
 docker compose --env-file .env.benchmark.pc.local -f compose.benchmark.yaml `
   --profile tools run --rm --entrypoint python eval-controller `
   -m scripts.benchmark.freeze_pc_preflight `
-  --provider-preflight /artifacts/pc-preflight/candidate-a-provider-preflight.json `
-  --materialization-checkpoint /materialization/kira-materialization.json `
+  --provider-preflight control=/artifacts/pc-preflight/control-provider-preflight.json `
+  --provider-preflight candidate-a=/artifacts/pc-preflight/candidate-a-provider-preflight.json `
   --dataset-root /app/dataset/kira_ltm_v1 `
   --output /artifacts/pc-preflight/freeze.json
 ```
 
 Không rerun paid preflight vào cùng output; output create-only. Freeze chỉ chứa hashes/identity đã
-sanitize.
+sanitize. Nếu có candidate-b, thêm `--provider-preflight candidate-b=<artifact-path>`.
 
 ## 12. T4.5 — full PC OpenAI acceptance
 
@@ -839,9 +893,10 @@ TP/FP/FN và audit artifact cùng nhất quán. Tool sẽ fail-closed với
 
 ```text
 artifacts/benchmark/
-  kira-materialization.json                 # local sensitive, không handoff/commit
-  dataset-review-packet.json                # local review evidence
-  dataset-review-decisions.json             # local review evidence
+  kira-materialization.json                 # historical/local sensitive, không bắt buộc khi pending=0
+  dataset-review-packet.json                # historical local review evidence
+  dataset-review-decisions.json             # historical local review evidence
+  dataset-policy-authorization.json         # audit của policy-only authorization hiện tại
   pc-preflight/
     <variant>-provider-preflight.json
     freeze.json
@@ -870,7 +925,7 @@ artifacts/benchmark/
 
 Chỉ báo Phase 4 complete khi có bằng chứng thật:
 
-- materialization 80/80 và canonical validator PASS;
+- dataset frozen/materialized/reviewed, `pending_answers=0` và canonical validator PASS;
 - named human review, version/hash frozen, external approval explicit;
 - native full runner (không mock) chạy đủ bốn suites;
 - exact image pair cho control và mọi candidate;

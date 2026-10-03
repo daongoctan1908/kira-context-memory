@@ -115,7 +115,8 @@ async def run_mock_acceptance(
         "case_count": len(compilation.cases),
         "suite_outcomes": suite_outcomes,
         "seed": seed,
-        "materialization_checkpoint": "artifacts/benchmark/kira-materialization.json",
+        "pc_preflight_schema_version": 2,
+        "pc_preflight_run_set_schema_version": 1,
         "benchmark_artifact_root": "artifacts/benchmark/benchmark",
     }
     _write_new(

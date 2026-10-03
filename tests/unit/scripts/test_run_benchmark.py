@@ -123,6 +123,11 @@ def test_validate_and_compile_canonical_dataset_offline(tmp_path: Path, capsys):
     status = json.loads(capsys.readouterr().out)
     payload = json.loads(compilation.read_text(encoding="utf-8"))
     assert status["case_count"] == len(payload["cases"]) == 534
+    assert status["cross_session_source_pairs"] == sum(
+        len(case["inputs"]["session_a_messages"]) // 2
+        for case in payload["cases"]
+        if case["inputs"]["kind"] == "cross_session" and case["eligibility"]["status"] == "eligible"
+    )
     assert payload["seed"] == 742
     assert payload["contract_id"] == "kira-week5-benchmark-v4"
 

@@ -38,7 +38,7 @@ def case(name: str):
 def test_acceptance_matrix_covers_taxonomy_and_negative_rules() -> None:
     validate_case_matrix()
 
-    assert len(CASES) == 34
+    assert len(CASES) == 38
     negative_tags = {
         tag for item in CASES if not item.expectation.should_extract for tag in item.tags
     }
@@ -55,6 +55,43 @@ def test_build_messages_uses_exact_mem0_v3_prompt_and_policy_precedence() -> Non
     assert user_prompt.index("## New Messages") < user_prompt.index("## Custom Instructions")
     assert user_prompt.index("## Custom Instructions") < user_prompt.index("# Output:")
     assert "## Observation Date\n2026-09-07" in user_prompt
+
+
+@pytest.mark.parametrize(
+    ("name", "text", "scope"),
+    [
+        ("scope_standing_alias", "Khu vực nhà mình nghĩa là Huế.", "GLOBAL"),
+        (
+            "scope_local_convention",
+            "Bảng A là báo cáo FTTH Đà Nẵng tháng 8/2026 trong cuộc trò chuyện này.",
+            "CONVERSATION",
+        ),
+        ("scope_cancel_standing_alias", "Bỏ quy ước khu vực nhà mình là Huế.", "GLOBAL"),
+        (
+            "scope_reassert_same_text_new_event",
+            "R98: tỷ lệ thành công dưới 98% là vi phạm.",
+            "GLOBAL",
+        ),
+    ],
+)
+async def test_policy_scope_gate_checks_native_returned_scope(name, text, scope):
+    fixture = case(name)
+
+    def response(request):
+        del request
+        envelope = json.dumps(
+            {"memory": [{"id": "0", "text": text, "attributed_to": "user", "scope": scope}]}
+        )
+        return httpx.Response(200, json={"choices": [{"message": {"content": envelope}}]})
+
+    results = await evaluate_cases(
+        PolicyEvalOptions(base_url="https://scope.example.test/v1", model="synthetic"),
+        (fixture,),
+        transport=httpx.MockTransport(response),
+    )
+    assert results[0].passed
+    wrong_scope = "CONVERSATION" if scope == "GLOBAL" else "GLOBAL"
+    assert "scope_mismatch" in score_case(fixture, (text,), scopes=(wrong_scope,)).reason_codes
 
 
 def test_build_messages_passes_existing_memories_with_runtime_style_ids() -> None:

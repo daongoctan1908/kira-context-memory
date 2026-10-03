@@ -17,7 +17,7 @@ from evaluation.formation import (
     PersistentFormationResult,
 )
 from evaluation.judge import InternalSemanticJudge, JudgeError
-from evaluation.models import EvalCase, EvalModel, Identifier, Outcome, Suite
+from evaluation.models import EvalCase, EvalModel, FormationInput, Identifier, Outcome, Suite
 from evaluation.retrieval import RetrievalCaseEvaluation
 from evaluation.runner import BenchmarkExecutionResult
 from evaluation.scoring import (
@@ -111,16 +111,60 @@ class NativeFormationEvaluator:
 
         predicted = tuple(fact.text for fact in extraction.facts)
         gold = {fact.gold_id: fact.text for fact in case.gold.facts}
-        score = score_formation(gold, predicted)
+        contract = case.gold.formation_contract
+        score = score_formation(gold, predicted, contract=contract)
         decisions: tuple[FormationMatchDecision, ...] = ()
         if score.needs_judge_prediction_indexes:
             try:
+                assert isinstance(case.inputs, FormationInput)
+                source_ids = set(case.inputs.source_message_ids)
+                source = tuple(
+                    message
+                    for message in case.inputs.messages
+                    if not source_ids or message.message_id in source_ids
+                )
+                context = tuple(
+                    message
+                    for message in case.inputs.messages
+                    if source_ids and message.message_id not in source_ids
+                )[-10:]
+                matched_gold = {match.gold_id for match in score.matches}
                 decisions = await self._judge.formation(
                     predicted_facts=predicted,
-                    gold_facts=gold,
+                    gold_facts={key: text for key, text in gold.items() if key not in matched_gold},
                     prediction_indexes=score.needs_judge_prediction_indexes,
+                    contract=contract,
+                    source_messages=tuple(message.model_dump(mode="json") for message in source),
+                    context_messages=tuple(message.model_dump(mode="json") for message in context),
+                    prediction_details=tuple(
+                        {
+                            "attributed_to": fact.attributed_to,
+                            "memory_scope": (
+                                "CONVERSATION"
+                                if classify_scope(fact.scope) == "MISSING"
+                                else classify_scope(fact.scope)
+                            ),
+                        }
+                        for fact in extraction.facts
+                    ),
+                    gold_details={
+                        fact.gold_id: {
+                            "attributed_to": fact.attributed_to,
+                            "evidence_message_ids": fact.evidence_message_ids,
+                            "memory_scope": (
+                                case.gold.lifecycle_event.memory_scope
+                                if case.gold.lifecycle_event is not None
+                                else None
+                            ),
+                        }
+                        for fact in case.gold.facts
+                    },
+                    semantic_expectation=case.gold.semantic_expectation,
+                    forbidden_facts=case.gold.forbidden_facts,
                 )
-                score = score_formation(gold, predicted, judge_decisions=decisions)
+                score = score_formation(
+                    gold, predicted, judge_decisions=decisions, contract=contract
+                )
             except JudgeError as error:
                 return NativeFormationCaseEvaluation(
                     case_id=case.case_id,
@@ -174,9 +218,14 @@ class NativeFormationEvaluator:
 
         gold = case.gold.lifecycle_event
         if gold is None or not gold.should_store:
-            # Negative or un-annotated gold: no gold scope to compare. The
-            # false-ADD gate above already fails every predicted fact.
-            negative_predictions = tuple(classify_scope(fact.scope) for fact in extraction.facts)
+            # Negative or un-annotated gold has no scope target. In open-world cases, valid
+            # assertions outside the negative target may still be formed; text scoring decides.
+            valid_extras = set(score.valid_extra_prediction_indexes)
+            negative_predictions = tuple(
+                classify_scope(fact.scope)
+                for index, fact in enumerate(extraction.facts)
+                if index not in valid_extras
+            )
             return (
                 score_scope_semantics(negative=True, negative_predictions=negative_predictions),
                 (),

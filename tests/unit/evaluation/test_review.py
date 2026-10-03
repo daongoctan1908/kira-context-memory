@@ -1,11 +1,13 @@
 """Human review packet binding and atomic dataset freeze tests."""
 
+import json
+import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
-from evaluation.dataset import load_manifest
+from evaluation.dataset import default_dataset_root, load_manifest
 from evaluation.materialization import (
     apply_materialization,
     build_materialization_checkpoint,
@@ -17,6 +19,7 @@ from evaluation.review import (
     ReviewChecklist,
     build_review_packet,
     freeze_reviewed_dataset,
+    update_external_provider_policy,
 )
 from scripts.benchmark.validate_dataset import validate_dataset
 from tests.support.draft_dataset import copy_draft_dataset
@@ -137,3 +140,85 @@ def test_approved_decision_requires_every_manual_check():
             checklist=ReviewChecklist(materialized_kira_answers=True),
             notes="Incomplete review must not freeze the dataset.",
         )
+
+
+def test_policy_authorization_preserves_payload_and_existing_review(tmp_path):
+    root = tmp_path / "dataset"
+    shutil.copytree(default_dataset_root(), root)
+    before = json.loads((root / "manifest.json").read_bytes())
+    payloads = {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in (root / "bundles").rglob("*.json")
+    }
+    audit = tmp_path / "policy-audit.json"
+    report = update_external_provider_policy(
+        root,
+        dataset_version="1.0.0-pc-authorized.1",
+        allow_pc_openai=True,
+        actor="dataset-owner",
+        authorization_reference="user-message-2026-10-03",
+        notes="Owner explicitly authorizes this frozen corpus for OpenAI PC benchmark.",
+        audit_path=audit,
+    )
+    after = json.loads((root / "manifest.json").read_bytes())
+    assert len(report.payload_files) == 16
+    assert all((root / relative).read_bytes() == content for relative, content in payloads.items())
+    assert before["bundles"] == after["bundles"]
+    assert after["data_policy"]["external_provider_allowed"]
+    assert report.before_manifest_sha256 != report.after_manifest_sha256
+    assert json.loads(audit.read_text(encoding="utf-8"))["actor"] == "dataset-owner"
+    assert validate_dataset(root).valid
+
+
+@pytest.mark.parametrize("failure", ["stale", "unchanged", "invalid_actor", "audit_exists"])
+def test_policy_authorization_fails_closed_before_dataset_write(tmp_path, failure):
+    root = tmp_path / "dataset"
+    shutil.copytree(default_dataset_root(), root)
+    before = (root / "manifest.json").read_bytes()
+    audit = tmp_path / "policy-audit.json"
+    if failure == "stale":
+        target = next((root / "bundles").rglob("*.json"))
+        target.write_bytes(target.read_bytes() + b"\n")
+    if failure == "audit_exists":
+        audit.write_text("existing evidence", encoding="utf-8")
+    with pytest.raises((ValueError, FileExistsError)):
+        update_external_provider_policy(
+            root,
+            dataset_version="1.0.0-pc-authorized.1",
+            allow_pc_openai=failure != "unchanged",
+            actor="" if failure == "invalid_actor" else "dataset-owner",
+            authorization_reference="user-message-2026-10-03",
+            notes="Explicit owner authorization.",
+            audit_path=audit,
+        )
+    assert (root / "manifest.json").read_bytes() == before
+
+
+def test_policy_authorization_copy_and_revocation_do_not_replace_human_review(tmp_path):
+    source = tmp_path / "dataset"
+    shutil.copytree(default_dataset_root(), source)
+    before = (source / "manifest.json").read_bytes()
+    output = tmp_path / "approved"
+    kwargs = {
+        "actor": "dataset-owner",
+        "authorization_reference": "owner-policy-update",
+        "notes": "Explicit policy change, content review remains valid.",
+    }
+    update_external_provider_policy(
+        source,
+        dataset_version="pc-authorized.1",
+        allow_pc_openai=True,
+        audit_path=tmp_path / "allow.json",
+        output_root=output,
+        **kwargs,
+    )
+    assert (source / "manifest.json").read_bytes() == before
+    update_external_provider_policy(
+        output,
+        dataset_version="pc-revoked.1",
+        allow_pc_openai=False,
+        audit_path=tmp_path / "revoke.json",
+        **kwargs,
+    )
+    assert not load_manifest(output).data_policy.external_provider_allowed
+    assert load_manifest(output).bundles == load_manifest(source).bundles

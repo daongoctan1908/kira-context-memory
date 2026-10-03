@@ -6,7 +6,7 @@ from typing import Literal
 
 from app.application.services.memory_policy import MEMORY_TAXONOMY
 
-MEMORY_POLICY_EVAL_VERSION = "kira-memory-policy-eval-v5"
+MEMORY_POLICY_EVAL_VERSION = "kira-memory-policy-eval-v6"
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +29,7 @@ class PolicyExpectation:
     min_facts: int = 0
     max_facts: int = 0
     required_fact_terms: tuple[tuple[str, ...], ...] = ()
+    expected_scope: Literal["CONVERSATION", "GLOBAL"] | None = None
 
     def __post_init__(self) -> None:
         if self.min_facts < 0 or self.max_facts < self.min_facts:
@@ -620,6 +621,80 @@ TELECOM_CASES: tuple[MemoryPolicyCase, ...] = (
 )
 
 CASES = (*CASES, *TELECOM_CASES)
+
+# Scope is not annotated in the frozen canonical corpus. These independent synthetic
+# source assertions exercise native extraction without changing canonical gold.
+SCOPE_CASES = (
+    MemoryPolicyCase(
+        name="scope_standing_alias",
+        taxonomy="USER_DEFINED_CONVENTION",
+        tags=("positive", "scope", "standing_alias"),
+        messages=(
+            user("Từ giờ trong các cuộc trò chuyện, khi tôi nói khu vực nhà mình thì hiểu là Huế."),
+            assistant("Đã ghi nhận quy ước của bạn."),
+        ),
+        expectation=PolicyExpectation(
+            True, required_terms=("Huế",), min_facts=1, max_facts=1, expected_scope="GLOBAL"
+        ),
+    ),
+    MemoryPolicyCase(
+        name="scope_local_convention",
+        taxonomy="USER_DEFINED_CONVENTION",
+        tags=("positive", "scope", "task_context"),
+        messages=(
+            user("Chỉ trong cuộc trò chuyện này, gọi báo cáo FTTH Đà Nẵng tháng 8/2026 là bảng A."),
+            assistant("Đã hiểu tên gọi trong cuộc trò chuyện này."),
+        ),
+        expectation=PolicyExpectation(
+            True,
+            required_terms=("FTTH", "Đà Nẵng", "8/2026", "A"),
+            min_facts=1,
+            max_facts=1,
+            expected_scope="CONVERSATION",
+        ),
+    ),
+    MemoryPolicyCase(
+        name="scope_cancel_standing_alias",
+        taxonomy="USER_DEFINED_CONVENTION",
+        tags=("positive", "scope", "cancellation"),
+        existing_memories=("Trong các cuộc trò chuyện, khu vực nhà mình nghĩa là Huế.",),
+        messages=(
+            user("Từ giờ bỏ quy ước khu vực nhà mình là Huế trong các cuộc trò chuyện."),
+            assistant("Đã ghi nhận việc bỏ quy ước."),
+        ),
+        expectation=PolicyExpectation(
+            True,
+            required_terms=("Huế",),
+            required_any_terms=(("bỏ", "hủy", "không còn", "ngừng"),),
+            min_facts=1,
+            max_facts=1,
+            expected_scope="GLOBAL",
+        ),
+    ),
+    MemoryPolicyCase(
+        name="scope_reassert_same_text_new_event",
+        taxonomy="USER_DEFINED_CONVENTION",
+        tags=("positive", "scope", "correction", "existing_memory", "reassertion"),
+        existing_memories=(
+            "Quy ước R98 trong báo cáo: tỷ lệ thành công dưới 98% là vi phạm.",
+            "Người dùng đổi quy ước R98 trong báo cáo: tỷ lệ thành công dưới 99% là vi phạm.",
+        ),
+        messages=(
+            user("Từ giờ đổi lại R98 cho các báo cáo: tỷ lệ thành công dưới 98% là vi phạm."),
+            assistant("Đã ghi nhận quy ước mới."),
+        ),
+        expectation=PolicyExpectation(
+            True,
+            required_terms=("R98", "tỷ lệ thành công", "98%"),
+            forbidden_terms=("99%",),
+            min_facts=1,
+            max_facts=1,
+            expected_scope="GLOBAL",
+        ),
+    ),
+)
+
+CASES = (*CASES, *SCOPE_CASES)
 
 
 REQUIRED_NEGATIVE_TAGS = frozenset(

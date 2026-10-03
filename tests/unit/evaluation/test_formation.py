@@ -27,8 +27,10 @@ from app.domain.models.conversation import (
 from app.infrastructure.memory.mem0_adapter import Mem0Adapter
 from evaluation.artifacts import ArtifactRunIdentity, ArtifactStore
 from evaluation.formation import (
+    ExtractedFact,
     FormationCaptureObserver,
     FormationExecutionStatus,
+    FormationExtractionResult,
     FormationPersistenceSnapshot,
     FormationReceiptRecord,
     PersistedFormationMemory,
@@ -36,8 +38,10 @@ from evaluation.formation import (
     PostgresFormationInspector,
     WriteFreeFormationEvaluator,
     build_formed_corpus,
+    receipt_provenance_matches,
 )
 from evaluation.models import (
+    HISTORICAL_CONTROL_SHA,
     BenchmarkVariant,
     FormationInput,
     GitSource,
@@ -602,3 +606,178 @@ def test_postgres_inspector_parses_only_exact_provenance_and_receipt_contract():
             expected_event_id=_EVENT_ID,
             expected_user_id="another-user",
         )
+
+
+def _control_provenance() -> RunProvenance:
+    return RunProvenance(
+        variant=BenchmarkVariant.HISTORICAL_CONTROL,
+        runtime=GitSource(sha=HISTORICAL_CONTROL_SHA, dirty=False),
+        harness=GitSource(sha="a" * 40, dirty=False),
+        prompt_sha256={"memory_extraction": "a" * 64, "rewrite_system": "b" * 64},
+        package_versions={"kira-context-memory": "0.4.1", "viettel-mem0": "2.0.20+viettel.3"},
+    )
+
+
+def _legacy_receipt_row(*, user_id="eval:run:user-1", result=()):
+    return (_EVENT_ID, user_id, list(result), len(result), _NOW)
+
+
+def test_legacy_receipt_contract_requires_explicit_control_and_never_infers_conversation():
+    row = _legacy_receipt_row()
+    with pytest.raises(ValueError, match="invalid formation receipt row"):
+        PostgresFormationInspector._parse_receipt(
+            row, expected_event_id=_EVENT_ID, expected_user_id="eval:run:user-1"
+        )
+    receipt = PostgresFormationInspector._parse_receipt(
+        row,
+        expected_event_id=_EVENT_ID,
+        expected_user_id="eval:run:user-1",
+        historical_control_runtime=True,
+    )
+    assert receipt.conversation_id is None
+    assert receipt.receipt_contract == "historical_control_75deb1d8"
+    assert receipt.memory_count == 0
+    with pytest.raises(ValueError, match="identity"):
+        PostgresFormationInspector._parse_receipt(
+            row,
+            expected_event_id=_EVENT_ID,
+            expected_user_id="another-user",
+            historical_control_runtime=True,
+        )
+    with pytest.raises(ValueError, match="conversation provenance"):
+        FormationReceiptRecord(
+            event_id=_EVENT_ID,
+            user_id="eval:run:user-1",
+            conversation_id=None,
+            events=(),
+            memory_count=0,
+            committed_at=_NOW,
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("historical_control", [False, True])
+async def test_inspector_sql_uses_only_the_receipt_columns_of_declared_runtime(historical_control):
+    inspector = PostgresFormationInspector(
+        "postgresql://local.invalid/test",
+        schema_name="eval_schema",
+        collection_name="memories",
+        runtime_provenance=_control_provenance() if historical_control else None,
+    )
+    user_id = "eval:run:user-1"
+    row = (
+        _legacy_receipt_row()
+        if historical_control
+        else (_EVENT_ID, user_id, _CONVERSATION_ID, [], 0, _NOW)
+    )
+    connection = MagicMock()
+    connection.__enter__.return_value = connection
+    cursor = connection.cursor.return_value
+    cursor.__enter__.return_value = cursor
+    cursor.fetchall.return_value = []
+    cursor.fetchone.return_value = row
+    with patch("evaluation.formation.psycopg.connect", return_value=connection) as connect:
+        snapshot = await inspector.inspect(event_id=_EVENT_ID, user_id=user_id)
+    receipt_sql = cursor.execute.call_args_list[-1].args[0].as_string()
+    assert ("conversation_id" in receipt_sql) is not historical_control
+    assert "default_transaction_read_only=on" in connect.call_args.kwargs["options"]
+    assert snapshot.receipt.conversation_id == (None if historical_control else _CONVERSATION_ID)
+    assert inspector.historical_control_runtime is historical_control
+    working_tree = _control_provenance().model_copy(
+        update={"variant": BenchmarkVariant.WORKING_TREE}
+    )
+    strict = PostgresFormationInspector(
+        "postgresql://local.invalid/test",
+        schema_name="eval_schema",
+        collection_name="memories",
+        runtime_provenance=working_tree,
+    )
+    assert not strict.historical_control_runtime
+
+
+def test_legacy_empty_receipt_reconciliation_checks_actual_event_owner_contract():
+    reference = _persistent_runtime('{"memory":[]}')[3]
+    receipt = PostgresFormationInspector._parse_receipt(
+        _legacy_receipt_row(user_id=reference.user_id),
+        expected_event_id=_EVENT_ID,
+        expected_user_id=reference.user_id,
+        historical_control_runtime=True,
+    )
+    snapshot = FormationPersistenceSnapshot(
+        event_id=_EVENT_ID, user_id=reference.user_id, receipt=receipt
+    )
+    extraction = FormationExtractionResult(
+        case_id="conv01:formation:negative",
+        outcome=Outcome.REVIEW_REQUIRED,
+        status=FormationExecutionStatus.VALID_EMPTY,
+        provider_calls=1,
+        stages=(),
+    )
+    assert not receipt_provenance_matches(receipt, reference)
+    assert receipt_provenance_matches(receipt, reference, historical_control_runtime=True)
+    assert (
+        PersistentFormationEvaluator._reconciliation_failure(
+            extraction=extraction, persistence=snapshot, reference=reference
+        )
+        == "formation_receipt_provenance_mismatch"
+    )
+    assert (
+        PersistentFormationEvaluator._reconciliation_failure(
+            extraction=extraction,
+            persistence=snapshot,
+            reference=reference,
+            historical_control_runtime=True,
+        )
+        is None
+    )
+
+
+def test_legacy_compatibility_does_not_relax_persisted_memory_provenance():
+    from evaluation.formation import FormationLifecycleRecord
+
+    reference = _persistent_runtime('{"memory":[]}')[3]
+    text = "Ưu tiên Hà Nội"
+    event = FormationLifecycleRecord(event="ADD", memory_id=_MEMORY_ID, memory=text)
+    receipt = PostgresFormationInspector._parse_receipt(
+        _legacy_receipt_row(
+            user_id=reference.user_id,
+            result=({"id": str(_MEMORY_ID), "event": "ADD", "memory": text},),
+        ),
+        expected_event_id=_EVENT_ID,
+        expected_user_id=reference.user_id,
+        historical_control_runtime=True,
+    )
+    snapshot = FormationPersistenceSnapshot(
+        event_id=_EVENT_ID,
+        user_id=reference.user_id,
+        receipt=receipt,
+        memories=(
+            PersistedFormationMemory(
+                memory_id=_MEMORY_ID,
+                content=text,
+                user_id=reference.user_id,
+                formation_event_id=_EVENT_ID,
+                conversation_id=UUID(int=9),
+                turn_id=reference.turn_id,
+                boundary_message_id=reference.boundary_message_id,
+            ),
+        ),
+    )
+    extraction = FormationExtractionResult(
+        case_id="conv01:formation:M01",
+        outcome=Outcome.REVIEW_REQUIRED,
+        status=FormationExecutionStatus.VALID_FACTS,
+        facts=(ExtractedFact(text=text),),
+        lifecycle_events=(event,),
+        provider_calls=1,
+        stages=(),
+    )
+    assert (
+        PersistentFormationEvaluator._reconciliation_failure(
+            extraction=extraction,
+            persistence=snapshot,
+            reference=reference,
+            historical_control_runtime=True,
+        )
+        == "formation_pgvector_provenance_mismatch"
+    )

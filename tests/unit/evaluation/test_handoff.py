@@ -18,7 +18,7 @@ from evaluation.models import (
     RunProvenance,
 )
 from evaluation.pc_acceptance import PcAcceptanceManifest, PcVariantAcceptance
-from evaluation.pc_preflight import PcPreflightFreeze, PcProviderIdentity
+from evaluation.pc_preflight import PcPreflightFreeze, PcPreflightRunSet, PcProviderIdentity
 
 _DATASET_HASH = "d" * 64
 _CONFIG_HASH = "c" * 64
@@ -77,17 +77,30 @@ def _write_evidence(tmp_path: Path, compilation) -> tuple[Path, Path, Path]:
         encoding="utf-8",
     )
     preflight_path = tmp_path / "pc-preflight.json"
-    preflight = PcPreflightFreeze(
+    variants = {}
+    for name, variant in (
+        ("control", BenchmarkVariant.HISTORICAL_CONTROL),
+        ("candidate-a", BenchmarkVariant.RELEASE_CANDIDATE),
+    ):
+        variants[name] = PcPreflightFreeze(
+            created_at=datetime(2026, 9, 18, tzinfo=UTC),
+            dataset_id=compilation.dataset_id,
+            dataset_version=compilation.dataset_version,
+            dataset_sha256=_DATASET_HASH,
+            config_sha256=_CONFIG_HASH,
+            provider_preflight_sha256="f" * 64,
+            provider_run_id="00000000-0000-0000-0000-000000000001",
+            kira_response_sha256="9" * 64,
+            kira_identity_sha256="8" * 64,
+            kira_event_count=1,
+            kira_text_bytes=20,
+            providers={"extraction_json": PcProviderIdentity(requested_model="model")},
+            provenance=_provenance(variant),
+        )
+    preflight = PcPreflightRunSet(
         created_at=datetime(2026, 9, 18, tzinfo=UTC),
-        dataset_id=compilation.dataset_id,
-        dataset_version=compilation.dataset_version,
         dataset_sha256=_DATASET_HASH,
-        config_sha256=_CONFIG_HASH,
-        provider_preflight_sha256="f" * 64,
-        materialization_checkpoint_sha256="9" * 64,
-        kira_completed_tasks=80,
-        providers={"extraction_json": PcProviderIdentity(requested_model="model")},
-        provenance=_provenance(BenchmarkVariant.RELEASE_CANDIDATE),
+        variants=variants,
     )
     preflight_path.write_text(
         preflight.model_dump_json(exclude_computed_fields=True), encoding="utf-8"
@@ -96,7 +109,6 @@ def _write_evidence(tmp_path: Path, compilation) -> tuple[Path, Path, Path]:
     acceptance = PcAcceptanceManifest(
         created_at=datetime(2026, 9, 18, tzinfo=UTC),
         dataset_sha256=_DATASET_HASH,
-        config_sha256=_CONFIG_HASH,
         image_manifest_sha256=file_sha256(image),
         pc_preflight_sha256=file_sha256(preflight_path),
         variants=(
@@ -104,6 +116,7 @@ def _write_evidence(tmp_path: Path, compilation) -> tuple[Path, Path, Path]:
                 variant_id="control",
                 benchmark_variant=BenchmarkVariant.HISTORICAL_CONTROL,
                 runtime_revision=_CONTROL_SHA,
+                config_sha256=_CONFIG_HASH,
                 run_id="control-run",
                 eligible_cases=1,
                 completed_eligible_cases=1,
@@ -114,6 +127,7 @@ def _write_evidence(tmp_path: Path, compilation) -> tuple[Path, Path, Path]:
                 variant_id="candidate-a",
                 benchmark_variant=BenchmarkVariant.RELEASE_CANDIDATE,
                 runtime_revision=_CANDIDATE_SHA,
+                config_sha256=_CONFIG_HASH,
                 run_id="candidate-run",
                 eligible_cases=1,
                 completed_eligible_cases=1,

@@ -163,13 +163,19 @@ trên corpus draft chỉ là provisional. Zero denominator hiển thị `N/A`, k
 ### Formation
 
 Tách output thành atomic claims và match với gold IDs: normalized exact trước, semantic leftovers
-qua internal judge. Một gold claim chỉ được một TP; unsupported hoặc lặp claims là FP, gold thiếu
-là FN. Một output chứa hai gold claims
-có thể credit hai claim, nhưng chỉ sau khi phân rã và kiểm tra evidence, không theo số string trả về.
+qua internal judge. Một gold claim chỉ được một TP; unsupported hoặc lặp claims trong cùng source
+event là FP, required gold thiếu là FN. Canonical gold là tập required claims, không phải danh sách
+đầy đủ mọi assertion hợp lệ. Với contract `formation-open-world-v2`, unmatched claims cần judge
+đánh giá theo source messages và preceding context: `VALID_EXTRA`, invalid hoặc `UNCERTAIN`.
+Valid extra không tăng recall và không bù required gold bị thiếu. Các source events độc lập có cùng
+text không bị gộp thành duplicate. Một output chứa hai gold claims chỉ được credit sau khi phân rã
+và kiểm tra evidence, không theo số string trả về.
 
-- Headline chỉ gồm Precision = TP/(TP+FP), Recall = TP/(TP+FN), và F1. Per-family chỉ là failure
-  drilldown, không phải promotion metric riêng.
-- Negative case không có claim được xử lý trong cùng confusion counts; zero denominator là `N/A`.
+- Open-world Precision = (TP + valid extras)/(TP + valid extras + FP), Recall = TP/(TP+FN), và F1.
+  Legacy `formation-closed-world-v1` giữ Precision = TP/(TP+FP). Report ghi rõ scoring contract và
+  không gộp hai contract trong cùng run hoặc official comparison. Per-family là failure drilldown.
+- Negative case kiểm tra assertion bị cấm; assertion khác có source evidence không tự động là FP.
+  Zero denominator là `N/A`; `UNCERTAIN` cần review và không được tính thành semantic PASS.
 - Formula preservation chấm expression có evidence; chỉ normalize whitespace đã được gold cho
   phép. Không normalize operators, variable names, units hoặc thresholds thành nghĩa khác.
 - Attribution, unsupported fact và secret/authorization failures có case-level evidence riêng.

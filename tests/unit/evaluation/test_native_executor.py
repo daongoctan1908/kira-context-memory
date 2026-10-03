@@ -204,6 +204,69 @@ async def test_native_formation_fails_closed_when_judge_fails():
     assert unexpected.reason_codes == ("judge_unexpected_error",)
 
 
+async def test_open_world_formation_judge_gets_source_boundary_and_qualified_context():
+    base = _formation_case()
+    case = base.model_copy(
+        update={
+            "inputs": FormationInput(
+                user_id="conv01:user",
+                messages=(
+                    Message(message_id="conv01:prior", role="user", content="Ngưỡng 99%"),
+                    Message(message_id="conv01:t1", role="user", content="Quay lại ngưỡng 98%"),
+                ),
+                source_message_ids=("conv01:t1",),
+            ),
+            "gold": GoldSpecification(
+                formation_contract="open_world",
+                forbidden_facts=("Một mật khẩu",),
+                semantic_expectation="Keep threshold reassertion as event evidence.",
+            ),
+        }
+    )
+
+    class SourceJudge:
+        async def formation(self, **kwargs):
+            assert kwargs["contract"] == "open_world"
+            assert kwargs["source_messages"][0]["content"] == "Quay lại ngưỡng 98%"
+            assert kwargs["context_messages"][0]["content"] == "Ngưỡng 99%"
+            assert kwargs["prediction_details"][0]["attributed_to"] == "user"
+            assert kwargs["forbidden_facts"] == ("Một mật khẩu",)
+            return (
+                FormationMatchDecision(
+                    prediction_index=0,
+                    verdict=FormationMatchVerdict.VALID_EXTRA,
+                    reason_code="source_reassertion",
+                    judge=_judge_provenance(),
+                ),
+            )
+
+    result = await NativeFormationEvaluator(
+        _FormationRuntime("Ngưỡng 98%"),
+        SourceJudge(),  # type: ignore[arg-type]
+    ).evaluate(case)
+    assert result.outcome is Outcome.PASS
+    assert result.score is not None and result.score.valid_extra == 1
+    assert result.score.false_positive == 0
+
+
+async def test_native_exact_match_keeps_semantic_credit_for_assistant_reinforcement():
+    class AssistantReinforcementRuntime(_FormationRuntime):
+        async def evaluate(self, case):
+            result = await super().evaluate(case)
+            return result.model_copy(
+                update={"facts": (ExtractedFact(text=self.fact, attributed_to="assistant"),)}
+            )
+
+    result = await NativeFormationEvaluator(
+        AssistantReinforcementRuntime("Ưu tiên Hà Nội"),
+        _NeverJudge(),  # type: ignore[arg-type]
+    ).evaluate(_formation_case())
+    # Canonical M02 explicitly accepts assistant reinforcement of a user's stated preference;
+    # the compiler's generic attributed_to=user must not create a new hard gate against that.
+    assert result.outcome is Outcome.PASS
+    assert result.score.true_positive == 1
+
+
 async def test_native_retrieval_keeps_both_modes_and_combines_quality_failure():
     result = await NativeRetrievalEvaluator(_RetrievalRuntime()).evaluate(_retrieval_case())
 

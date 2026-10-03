@@ -41,7 +41,16 @@ from evaluation.artifacts import (
     FormedCorpusCaseArtifact,
     FormedMemoryArtifact,
 )
-from evaluation.models import EvalModel, FormationInput, Identifier, NonEmpty, Outcome
+from evaluation.models import (
+    HISTORICAL_CONTROL_SHA,
+    BenchmarkVariant,
+    EvalModel,
+    FormationInput,
+    Identifier,
+    NonEmpty,
+    Outcome,
+    RunProvenance,
+)
 
 
 class FormationExecutionStatus(StrEnum):
@@ -142,7 +151,10 @@ class PersistedFormationMemory(EvalModel):
 class FormationReceiptRecord(EvalModel):
     event_id: UUID
     user_id: Identifier
-    conversation_id: UUID
+    conversation_id: UUID | None
+    receipt_contract: Literal["event_owner_conversation", "historical_control_75deb1d8"] = (
+        "event_owner_conversation"
+    )
     events: tuple[FormationLifecycleRecord, ...]
     memory_count: int = Field(ge=0, strict=True)
     committed_at: datetime
@@ -158,7 +170,36 @@ class FormationReceiptRecord(EvalModel):
     def count_matches_events(self) -> "FormationReceiptRecord":
         if self.memory_count != len(self.events):
             raise ValueError("formation receipt count does not match its result")
+        if (self.conversation_id is None) != (
+            self.receipt_contract == "historical_control_75deb1d8"
+        ):
+            raise ValueError(
+                "formation receipt conversation provenance does not match its contract"
+            )
         return self
+
+
+def receipt_provenance_matches(
+    receipt: FormationReceiptRecord,
+    reference: CompletedTurnReference,
+    *,
+    historical_control_runtime: bool = False,
+) -> bool:
+    """Validate the provenance actually recorded by the selected runtime.
+
+    The frozen 75deb1d8 control records event/owner only, including empty receipts. Never infer a
+    conversation UUID for those receipts. Persisted memory provenance must still be validated by
+    the caller; current-runtime receipts always require their real conversation identity.
+    """
+
+    if receipt.user_id != reference.user_id:
+        return False
+    if receipt.conversation_id is not None:
+        return receipt.conversation_id == reference.conversation_id
+    return (
+        historical_control_runtime is True
+        and receipt.receipt_contract == "historical_control_75deb1d8"
+    )
 
 
 class FormationPersistenceSnapshot(EvalModel):
@@ -387,6 +428,7 @@ class PostgresFormationInspector:
         schema_name: str,
         collection_name: str,
         statement_timeout_ms: int = 5_000,
+        runtime_provenance: RunProvenance | None = None,
     ) -> None:
         if not schema_name.strip() or not collection_name.strip():
             raise ValueError("formation inspector identifiers must not be blank")
@@ -399,6 +441,11 @@ class PostgresFormationInspector:
         self._schema_name = schema_name
         self._collection_name = collection_name
         self._statement_timeout_ms = statement_timeout_ms
+        self.historical_control_runtime = (
+            runtime_provenance is not None
+            and runtime_provenance.variant is BenchmarkVariant.HISTORICAL_CONTROL
+            and runtime_provenance.runtime.sha == HISTORICAL_CONTROL_SHA
+        )
 
     async def inspect(
         self,
@@ -426,6 +473,7 @@ class PostgresFormationInspector:
                 receipt_row,
                 expected_event_id=event_id,
                 expected_user_id=user_id,
+                historical_control_runtime=self.historical_control_runtime,
             )
             if receipt_row is not None
             else None
@@ -456,13 +504,14 @@ class PostgresFormationInspector:
             memory_rows = list(cursor.fetchall())
             cursor.execute(
                 sql.SQL(
-                    "SELECT event_id, user_id, conversation_id, result, memory_count, committed_at "
+                    "SELECT event_id, user_id, {}result, memory_count, committed_at "
                     "FROM {} WHERE event_id = %s"
                 ).format(
+                    sql.SQL("" if self.historical_control_runtime else "conversation_id, "),
                     sql.Identifier(
                         self._schema_name,
                         formation_receipt_table_name(self._collection_name),
-                    )
+                    ),
                 ),
                 (event_id,),
             )
@@ -502,10 +551,16 @@ class PostgresFormationInspector:
         *,
         expected_event_id: UUID,
         expected_user_id: str,
+        historical_control_runtime: bool = False,
     ) -> FormationReceiptRecord:
-        if not isinstance(row, Sequence) or len(row) != 6:
+        expected_length = 5 if historical_control_runtime else 6
+        if not isinstance(row, Sequence) or len(row) != expected_length:
             raise ValueError("invalid formation receipt row")
-        event_id, user_id, conversation_id, raw_result, memory_count, committed_at = row
+        if historical_control_runtime:
+            event_id, user_id, raw_result, memory_count, committed_at = row
+            conversation_id = None
+        else:
+            event_id, user_id, conversation_id, raw_result, memory_count, committed_at = row
         if event_id != expected_event_id or user_id != expected_user_id:
             raise ValueError("formation receipt identity does not match")
         events = _safe_lifecycle({"results": raw_result})
@@ -513,6 +568,11 @@ class PostgresFormationInspector:
             event_id=event_id,
             user_id=user_id,
             conversation_id=conversation_id,
+            receipt_contract=(
+                "historical_control_75deb1d8"
+                if historical_control_runtime
+                else "event_owner_conversation"
+            ),
             events=events,
             memory_count=memory_count,
             committed_at=committed_at,
@@ -788,6 +848,9 @@ class PersistentFormationEvaluator:
                 extraction=extraction,
                 persistence=after,
                 reference=reference,
+                historical_control_runtime=(
+                    getattr(self._inspector, "historical_control_runtime", False) is True
+                ),
             )
             if extraction.outcome is not Outcome.REVIEW_REQUIRED:
                 reason = extraction.reason_codes[0]
@@ -859,11 +922,14 @@ class PersistentFormationEvaluator:
         extraction: FormationExtractionResult,
         persistence: FormationPersistenceSnapshot,
         reference: CompletedTurnReference,
+        historical_control_runtime: bool = False,
     ) -> str | None:
         receipt = persistence.receipt
         if receipt is None:
             return "formation_receipt_missing"
-        if receipt.conversation_id != reference.conversation_id:
+        if not receipt_provenance_matches(
+            receipt, reference, historical_control_runtime=historical_control_runtime
+        ):
             return "formation_receipt_provenance_mismatch"
         if receipt.events != extraction.lifecycle_events:
             return "formation_receipt_lifecycle_mismatch"

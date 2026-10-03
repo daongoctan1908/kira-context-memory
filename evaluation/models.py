@@ -194,6 +194,18 @@ class FormationInput(EvalModel):
     kind: Literal["formation"] = "formation"
     user_id: Identifier
     messages: tuple[Message, ...] = Field(min_length=1)
+    source_message_ids: tuple[Identifier, ...] = ()
+
+    @model_validator(mode="after")
+    def source_messages_are_known(self) -> "FormationInput":
+        message_ids = [message.message_id for message in self.messages]
+        if len(message_ids) != len(set(message_ids)):
+            raise ValueError("formation message IDs must be unique")
+        if len(self.source_message_ids) != len(set(self.source_message_ids)):
+            raise ValueError("formation source message IDs must be unique")
+        if not set(self.source_message_ids).issubset(message_ids):
+            raise ValueError("formation source messages must belong to input messages")
+        return self
 
 
 class RetrievalInput(EvalModel):
@@ -246,6 +258,9 @@ class GoldSpecification(EvalModel):
     expected_api: dict[str, Any] | None = None
     no_hit_fpr_eligible: bool | None = None
     lifecycle_event: "FormationLifecycleGold | None" = None
+    # Canonical memory gold is a required subset, not an exhaustive inventory of valid facts.
+    formation_contract: Literal["closed_world", "open_world"] = "closed_world"
+    forbidden_facts: tuple[NonEmpty, ...] = ()
 
 
 class FormationLifecycleGold(EvalModel):
@@ -327,6 +342,7 @@ class Probe(StrEnum):
     GATEWAY = "gateway"
     WORKER = "worker"
     KIRA = "kira_mock_identity"
+    KIRA_CHAT = "kira_real_chat"
 
 
 class Reason(StrEnum):
@@ -371,6 +387,11 @@ class ProbeResult(EvalModel):
     extracted_fact_count: int | None = Field(default=None, ge=0)
     judge_verdict: Literal["PASS", "FAIL", "UNCERTAIN"] | None = None
     usage: TokenUsage | None = None
+    kira_response_sha256: Sha256 | None = None
+    kira_event_count: int | None = Field(default=None, ge=1, strict=True)
+    kira_text_bytes: int | None = Field(default=None, ge=1, strict=True)
+    kira_context_isolation: Literal["unique_username"] | None = None
+    kira_identity_sha256: Sha256 | None = None
 
 
 class SuiteReadiness(EvalModel):

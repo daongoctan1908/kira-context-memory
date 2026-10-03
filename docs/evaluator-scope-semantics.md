@@ -1,20 +1,21 @@
 # Evaluator scope semantics — spec cho benchmark formation (T0.5.2)
 
-Spec này định nghĩa semantics mà evaluator Phase 5 (T5.2) implement cho feature
-memory scope (CONVERSATION | GLOBAL | DROP). Viết trước dataset freeze vì chỉ
-phụ thuộc semantics đã chốt trong plan (vòng 3) và code hiện tại — không phụ
-thuộc nội dung dataset, không tune prompt.
+Evaluator giữ hai scope `CONVERSATION | GLOBAL`; DROP là không persist assertion,
+không phải scope thứ ba. GLOBAL là reusable interpretation evidence, không mặc nhiên
+là current truth. Formation scorer có contract riêng cho required-subset gold của
+canonical dataset; không dùng empty gold để cấm mọi assertion khác trong cùng event.
 
-**Trạng thái**: T5.2 đã hiện thực spec này (formation-side gates + TC-1..TC-14
-trong `tests/unit/evaluation/test_scope_semantics.py`); dataset freeze chỉ còn
-chặn phần case authoring T5.1 và chạy benchmark thật.
+**Trạng thái**: canonical dataset đã reviewed/frozen và hiện chưa annotate scope.
+Các gates scope dưới đây chỉ có hiệu lực khi gold mang scope; unit cases bổ sung
+kiểm tra các guarantee đó. Không suy ra scope acceptance từ canonical gold thiếu nhãn.
 
 ## 1. Gold contract mà evaluator consume (đích annotation T0.5.1)
 
-Sau khi T0.5.1 annotate xong, `memories.json` của mỗi bundle có:
+Gold model hỗ trợ các annotation sau:
 
 - Persisted gold event (`expected_operation` ∈ `add | update | reinforce_existing`,
-  `should_store: true`): bắt buộc có field `memory_scope` ∈ `{"CONVERSATION", "GLOBAL"}`.
+  `should_store: true`): field `memory_scope` tùy chọn ∈ `{"CONVERSATION", "GLOBAL"}`.
+  Thiếu field này không tạo ra scope target; không mặc định gold là CONVERSATION.
 - Negative gold event (`should_store: false`, `expected_operation: "do_not_persist"`):
   KHÔNG được có `memory_scope` — DROP proxy, không có gold scope để so sánh.
 - Chuỗi update/reinforce (liên kết qua `supersedes_memory_id` /
@@ -48,15 +49,40 @@ nên dùng Literal chặt.
 
 ## 3. Semantics scoring per formation case
 
-Case formation = 1 gold memory row (compiler `_formation_case`): gold facts 0 hoặc
-1 fact, evidence window chỉ gồm source turns + supporting turns của memory đó.
+Case formation = 1 gold memory event (compiler `_formation_case`): gold facts 0 hoặc
+1 fact. Input giữ prefix của conversation nguồn đến boundary event, với
+`source_message_ids` chỉ định cặp New Messages. Preceding messages là context;
+supporting turn sau boundary không được trở thành source hoặc future context.
 
-### 3.1 Text score — giữ nguyên
+### 3.1 Required-subset formation score
 
-`score_formation` (evaluation/scoring.py) match text `canonical_fact` bằng
-exact-normalized trước, judge semantic cho phần dư. Không đổi gì. Scope layer
-NÂNG phía trên, chỉ so scope trên các cặp (gold, predicted) đã MATCH (cả
-`exact_normalized` lẫn `internal_judge` — judge chỉ match text, scope vẫn so được).
+`score_formation` match text `canonical_fact` exact-normalized trước, sau đó judge
+semantic cho phần dư. Canonical cases khai báo `formation_contract=open_world`;
+legacy/custom cases không khai báo vẫn dùng closed-world như trước.
+
+- `MATCH`: một prediction tương đương toàn bộ một required gold; match một-một.
+- `VALID_EXTRA`: assertion ngoài gold nhưng được source event hỗ trợ, attribution,
+  scope và qualifiers đúng, được phép lưu. Không bù cho required gold bị thiếu.
+- `NO_MATCH`: assertion sai, unsupported, sai attribution/applicability, hoặc thuộc
+  target `forbidden_facts` của negative case.
+- `UNCERTAIN`: thiếu evidence để chốt; case `REVIEW_REQUIRED`, không tự tính là đúng.
+
+Open-world judge nhận New Messages, last-10 preceding context, metadata prediction,
+gold attribution/scope và forbidden target. Mọi extra đều phải được judge, kể cả khi
+gold đã match hết hoặc gold rỗng. Context chỉ resolve references trong source; không
+được tạo assertion mới từ một phát biểu cũ không được source nhắc lại.
+
+`true_positive` và recall chỉ đếm required gold. Precision dùng
+`(true_positive + valid_extra) / (true_positive + valid_extra + false_positive)`.
+Artifact lưu riêng counts/indexes của valid extras và
+`scoring_contract=formation-open-world-v2`; điểm cũ dùng `formation-closed-world-v1`.
+Judge prompt/schema hashes phân biệt rubric mới, không trộn với judgments cũ.
+Chuỗi 98 → 99 → 98 được xét theo event: không loại 98 cũ chỉ vì không còn current,
+nhưng cũng không coi 98 trong preceding context là assertion mới nếu source không nói lại.
+
+Scope layer so scope trên các cặp gold/predicted đã match. Attribution được cấp cho
+judge cùng source; không tạo hard gate từ generic `GoldFact.attributed_to=user` vì
+canonical M02 cho phép assistant reinforcement của preference user đã phát biểu.
 
 ### 3.2 Scope gates (mới, T5.2)
 
@@ -81,26 +107,17 @@ Trên từng cặp matched:
 
 ### 3.3 Negative case semantics (DROP)
 
-Negative gold: `facts = ()`, `semantic_expectation` = "Do not persist the
-unsupported candidate …" (compiler `_formation_case`).
+Canonical negative gold có `facts=()` và `forbidden_facts=(canonical_fact,)`.
+Judge đánh giá target bị cấm cụ thể; assertion khác hợp lệ trong cùng source vẫn có
+thể là VALID_EXTRA. Ví dụ source chứa mật khẩu và standing location preference:
+preference được lưu không làm negative case fail, mật khẩu được extract vẫn fail.
+Scope INVALID không miễn trừ assertion bị cấm; prediction GLOBAL không tự là
+false promotion vì negative không có gold scope. Scope counters là diagnostics;
+không diễn giải mọi GLOBAL trong negative case là invalid assertion.
 
-- **False-ADD hard gate (đã có sẵn, giữ nguyên)**: gold rỗng → mọi predicted fact
-  là false positive → `score_formation` trả `false_positive > 0` → executor FAIL
-  với `formation_quality_mismatch` (evaluation/native_executor.py). Tức là chuẩn
-  hiện tại đã khắt khe hơn assert tối thiểu: KHÔNG ĐƯỢC extract BẤT KỲ fact nào
-  từ evidence window của turn negative, không chỉ fact trùng canonical_fact.
-- **Assert lifecycle tối thiểu (canonical của plan)**: không lifecycle event nào
-  có `memory` matching `canonical_fact` của negative gold (so bằng
-  `normalize_exact`). Được bao bởi false-ADD gate ở trên — spec giữ cả hai, gate
-  mạnh là nguồn FAIL.
-- **Negative + predicted GLOBAL**: KHÔNG tính `scope_false_global_promotion` —
-  negative không có gold scope để so. Violation duy nhất là False-ADD (gate trên).
-  Ghi thêm metric chẩn đoán `negative_global_prediction_count` (LLM vừa ADD sai
-  vừa định raise GLOBAL — tín hiệu prompt lệch nặng).
-- **Negative + predicted INVALID scope**: vẫn False-ADD FAIL — mọi extraction từ
-  evidence window của negative turn đều vi phạm, scope invalid không miễn trừ
-  (điểm duy nhất thực thi khác draft: gate false-ADD đếm mọi predicted fact,
-  không phân biệt scope). `scope_invalid_count` vẫn đếm để chẩn đoán.
+Legacy closed-world negative cases giữ behavior cũ: mọi prediction là false positive.
+TC-9..TC-12 dưới đây là regression tests cho contract legacy đó. Open-world tests
+bổ sung xác minh valid extra, forbidden target và uncertainty riêng biệt.
 
 ### 3.4 Fallback MISSING
 

@@ -35,7 +35,8 @@ async def test_mock_acceptance_builds_complete_offline_bundle(tmp_path: Path):
     assert summary["contract_id"] == "kira-week5-benchmark-v4"
     assert summary["network_required"] is False
     assert summary["quality_claim"] is False
-    assert summary["materialization_checkpoint"] == "artifacts/benchmark/kira-materialization.json"
+    assert summary["pc_preflight_schema_version"] == 2
+    assert summary["pc_preflight_run_set_schema_version"] == 1
 
     serialized = "\n".join(path.read_text(encoding="utf-8") for path in output.iterdir())
     for forbidden in ("api_key", "password", "Authorization", "Bearer ", "sk-"):

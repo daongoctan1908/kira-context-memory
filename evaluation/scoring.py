@@ -30,6 +30,7 @@ class JudgeVerdict(StrEnum):
 class FormationMatchVerdict(StrEnum):
     MATCH = "MATCH"
     NO_MATCH = "NO_MATCH"
+    VALID_EXTRA = "VALID_EXTRA"
     UNCERTAIN = "UNCERTAIN"
 
 
@@ -83,7 +84,13 @@ class FormationMatch(EvalModel):
 
 
 class FormationScore(EvalModel):
+    scoring_contract: Literal["formation-closed-world-v1", "formation-open-world-v2"] = (
+        "formation-closed-world-v1"
+    )
     true_positive: int = Field(ge=0, strict=True)
+    valid_extra: int = Field(default=0, ge=0, strict=True)
+    valid_extra_prediction_indexes: tuple[int, ...] = ()
+    duplicate_prediction_indexes: tuple[int, ...] = ()
     false_positive: int | None = Field(default=None, ge=0, strict=True)
     false_negative: int | None = Field(default=None, ge=0, strict=True)
     precision: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
@@ -183,20 +190,35 @@ def score_formation(
     predicted_facts: Sequence[str],
     *,
     judge_decisions: Sequence[FormationMatchDecision] = (),
+    contract: Literal["closed_world", "open_world"] = "closed_world",
 ) -> FormationScore:
-    """One-to-one exact-first fact matching, with explicit decisions for semantic leftovers."""
+    """Match required gold once; open-world extras require source-validity judgment.
+
+    Valid extras contribute to precision, never required-gold recall. The legacy closed-world
+    contract remains the default and still treats unmatched facts as false positives.
+    """
 
     if len(gold_facts) != len(set(gold_facts)):
         raise ValueError("formation gold IDs must be unique")
 
     unmatched_gold = set(gold_facts)
     unmatched_predictions = set(range(len(predicted_facts)))
+    seen_predictions: set[str] = set()
+    duplicates: set[int] = set()
+    if contract == "open_world":
+        for index, text in enumerate(predicted_facts):
+            normalized = normalize_exact(text)
+            if normalized in seen_predictions:
+                duplicates.add(index)
+            seen_predictions.add(normalized)
     matches: list[FormationMatch] = []
     normalized_gold: dict[str, list[str]] = {}
     for gold_id, text in gold_facts.items():
         normalized_gold.setdefault(normalize_exact(text), []).append(gold_id)
 
     for prediction_index, text in enumerate(predicted_facts):
+        if prediction_index in duplicates:
+            continue
         candidates = normalized_gold.get(normalize_exact(text), [])
         gold_id = next((candidate for candidate in candidates if candidate in unmatched_gold), None)
         if gold_id is None:
@@ -213,6 +235,7 @@ def score_formation(
 
     decisions_by_prediction: dict[int, FormationMatchDecision] = {}
     uncertain: list[int] = []
+    valid_extras: list[int] = []
     for decision in judge_decisions:
         index = decision.prediction_index
         if index in decisions_by_prediction:
@@ -221,6 +244,8 @@ def score_formation(
             raise ValueError("formation judge decision references an unknown prediction")
         if index not in unmatched_predictions:
             raise ValueError("formation judge cannot override an exact match")
+        if index in duplicates:
+            raise ValueError("formation duplicate prediction must remain a false positive")
         decisions_by_prediction[index] = decision
         if decision.verdict is FormationMatchVerdict.MATCH:
             assert decision.gold_id is not None
@@ -237,20 +262,33 @@ def score_formation(
             )
         elif decision.verdict is FormationMatchVerdict.UNCERTAIN:
             uncertain.append(index)
+        elif decision.verdict is FormationMatchVerdict.VALID_EXTRA:
+            if contract != "open_world":
+                raise ValueError("VALID_EXTRA requires the open-world formation contract")
+            valid_extras.append(index)
+            unmatched_predictions.remove(index)
 
-    # A semantic decision is useful only while both sides have candidates. If no gold remains,
-    # leftover predictions are deterministically false positives; if no prediction remains,
-    # leftover gold is deterministically false negative.
+    # Closed-world leftovers are false positives once gold is exhausted. Open-world leftovers
+    # still need source-validity judgment; normalized repeats within this event are always FP.
     needs_judge = (
-        sorted(index for index in unmatched_predictions if index not in decisions_by_prediction)
-        if unmatched_gold
+        sorted(
+            index
+            for index in unmatched_predictions
+            if index not in decisions_by_prediction and index not in duplicates
+        )
+        if unmatched_gold or contract == "open_world"
         else []
     )
     complete = not needs_judge and not uncertain
     true_positive = len(matches)
+    version = "formation-open-world-v2" if contract == "open_world" else "formation-closed-world-v1"
     if not complete:
         return FormationScore(
+            scoring_contract=version,
             true_positive=true_positive,
+            valid_extra=len(valid_extras),
+            valid_extra_prediction_indexes=tuple(sorted(valid_extras)),
+            duplicate_prediction_indexes=tuple(sorted(duplicates)),
             matches=tuple(sorted(matches, key=lambda match: match.prediction_index)),
             needs_judge_prediction_indexes=tuple(needs_judge),
             uncertain_prediction_indexes=tuple(sorted(uncertain)),
@@ -259,9 +297,10 @@ def score_formation(
 
     false_positive = len(unmatched_predictions)
     false_negative = len(unmatched_gold)
-    precision_denominator = true_positive + false_positive
+    valid_predictions = true_positive + len(valid_extras)
+    precision_denominator = valid_predictions + false_positive
     recall_denominator = true_positive + false_negative
-    precision = true_positive / precision_denominator if precision_denominator else None
+    precision = valid_predictions / precision_denominator if precision_denominator else None
     recall = true_positive / recall_denominator if recall_denominator else None
     f1 = (
         2 * precision * recall / (precision + recall)
@@ -269,7 +308,11 @@ def score_formation(
         else (0.0 if precision is not None and recall is not None else None)
     )
     return FormationScore(
+        scoring_contract=version,
         true_positive=true_positive,
+        valid_extra=len(valid_extras),
+        valid_extra_prediction_indexes=tuple(sorted(valid_extras)),
+        duplicate_prediction_indexes=tuple(sorted(duplicates)),
         false_positive=false_positive,
         false_negative=false_negative,
         precision=precision,
@@ -403,9 +446,9 @@ def score_scope_semantics(
     matched_pairs: one entry per (gold, predicted) text match — predicted scope
     classified from the raw LLM field (or the persisted payload when a row
     exists), and whether the pair has a corresponding persisted ADD. Negative
-    cases never match gold, so their scope diagnostics ride on
-    negative_predictions; the false-ADD gate itself stays in ``score_formation``
-    and counts every predicted fact regardless of scope.
+    cases never match gold, so their invalid/uncertain assertion diagnostics ride on
+    negative_predictions. The caller excludes open-world VALID_EXTRA facts; false positives
+    remain a text/source-validity decision in ``score_formation``.
     """
 
     if negative:

@@ -6,20 +6,23 @@ provider or published outside the approved repository without a separate data re
 
 ## Current status
 
-- Dataset status: `contract_frozen`
-- Materialization status: `pending`
+- Dataset status: `benchmark_ready` (`1.0.0-benchmark-ready.1`)
+- Materialization status: `materialized`; all four bundles reviewed/frozen
 - Bundles: 4
 - Sessions: 86
 - Turns: 506
 - KiRa fill slots: 140
 - Gold memory events: 62
 - QA rows: 209
-- Pending KiRa-backed answers: 54
+- Pending KiRa-backed answers: 0
 
-`contract_frozen` means that the conversations, fill mappings, memory lifecycle gold and QA gold
-have been frozen. It does **not** mean that the dataset is ready for a final benchmark run. The
-blank assistant turns must first be materialized using the pinned KiRa system, and the remaining
-`TBD_AFTER_KIRA_FILL` answers must be populated from those responses.
+The canonical payloads have already been materialized and reviewed. Validate the checked-out
+manifest/checksums before running. Do not materialize or refill them again when no pending targets
+remain. Benchmark readiness does not establish model quality or external-provider authorization;
+the manifest currently keeps `external_provider_allowed=false`.
+For an approved PC OpenAI run, use the policy-only authorization command in the
+[PC handoff](../../docs/company-pc-ai-handoff.md). It records a new policy/version and audit without
+replacing reviewed payloads or rematerializing KiRa answers.
 
 ## Layout
 
@@ -80,8 +83,9 @@ uv run python -m scripts.benchmark.validate_dataset dataset/kira_ltm_v1
 The validator checks the manifest and checksums, full-corpus scope, counts, IDs, references, fill
 pairing, lifecycle links, pending/materialized state and normalized exact duplicates.
 
-The manifest deliberately keeps gold review status as `draft` until a named reviewer approves a
-specific revision. A schema pass is not human review.
+The current manifest records a named reviewer/revision for each bundle. A schema pass is not human
+review. The materialization commands below describe the workflow for a future pending revision,
+not a prerequisite to rerun on this already-reviewed corpus.
 
 ## Materialize with KiRa Test
 

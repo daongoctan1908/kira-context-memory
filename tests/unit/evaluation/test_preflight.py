@@ -8,7 +8,7 @@ import pytest
 from pydantic import SecretStr
 
 from evaluation.config import EvalConfig, ProviderConfig, load_config
-from evaluation.mock import mock_response
+from evaluation.mock import mock_database, mock_response
 from evaluation.models import Outcome, Probe, Profile, Reason, Suite
 from evaluation.preflight import run_preflight
 from evaluation.providers import (
@@ -468,7 +468,7 @@ async def test_all_mock_suites_are_simulated_and_do_not_use_real_transports():
     report = await run_preflight(config)
     assert report.simulated
     assert all(c.outcome == Outcome.PASS for c in report.checks)
-    assert len(report.checks) == len(Probe)
+    assert len(report.checks) == len(Probe) - 1  # Real KiRa is separate from the mock identity.
 
 
 @pytest.mark.parametrize("path", ["/ready", "/_test/requests"])
@@ -494,6 +494,166 @@ def test_endpoint_normalization_and_dual_source_envelope():
         )
         == 1
     )
+
+
+def _real_kira_config(**changes):
+    return configured(
+        (Suite.CROSS_SESSION,),
+        database_url="postgresql://local/eval",
+        memory_database_url="postgresql://local/eval",
+        gateway_url="https://gateway.test",
+        worker_url="https://worker.test",
+        kira_base_url="https://kira.test",
+        kira_username="shared-operational-user",
+        kira_domain="VBI",
+        kira_basic_auth=SecretStr("synthetic-basic-secret"),
+        kira_context_isolation="unique_username",
+    ).model_copy(update=changes)
+
+
+def _sse_reply(text="synthetic answer"):
+    return (
+        "data: "
+        + json.dumps({"data": {"response": [{"type": "text", "content": {"text": text}}]}})
+        + "\n\n"
+    )
+
+
+async def test_real_kira_readiness_authenticates_fresh_identity_and_exhausts_bounded_sse():
+    identities = []
+    calls = []
+
+    def handle(request):
+        calls.append(request.url.path)
+        if request.url.path == "/authenticate":
+            identities.append(json.loads(request.content)["username"])
+            assert request.headers["authorization"] == "Basic synthetic-basic-secret"
+            return httpx.Response(200, json={"errorCode": "00", "content": "synthetic-token"})
+        if request.url.path == "/api/v1/chat":
+            assert json.loads(request.content)["token"] == "synthetic-token"
+            return httpx.Response(200, content=_sse_reply())
+        return mock_response(request)
+
+    reports = []
+    for _ in range(2):
+        reports.append(
+            await run_preflight(
+                _real_kira_config(),
+                transport=httpx.MockTransport(handle),
+                database_probe=mock_database,
+            )
+        )
+    assert len(set(identities)) == 2
+    assert all(identity.startswith("benchmark_preflight_") for identity in identities)
+    check = next(c for c in reports[0].checks if c.probe is Probe.KIRA_CHAT)
+    assert check.outcome is Outcome.PASS and check.attempted and not check.simulated
+    assert check.kira_event_count == 1 and check.kira_text_bytes == 16
+    serialized = reports[0].model_dump_json()
+    for forbidden in ["synthetic-token", "synthetic-basic-secret", "synthetic answer", *identities]:
+        assert forbidden not in serialized
+
+
+@pytest.mark.parametrize(
+    "failure,reason",
+    [
+        ("auth", Reason.AUTH),
+        ("token", Reason.AUTH),
+        ("http", Reason.HTTP_STATUS),
+        ("empty", Reason.INVALID_CHAT),
+        ("whitespace", Reason.INVALID_CHAT),
+        ("malformed", Reason.INVALID_CHAT),
+        ("oversized_auth", Reason.RESPONSE_TOO_LARGE),
+        ("oversized_chat", Reason.RESPONSE_TOO_LARGE),
+        ("timeout", Reason.TIMEOUT),
+    ],
+)
+async def test_real_kira_readiness_fails_closed_without_answer_or_credentials(failure, reason):
+    def handle(request):
+        if request.url.path == "/authenticate":
+            if failure == "auth":
+                return httpx.Response(403, text="synthetic-basic-secret")
+            if failure == "token":
+                return httpx.Response(200, json={"errorCode": "99", "content": "secret"})
+            if failure == "oversized_auth":
+                return httpx.Response(200, content=b"x" * 1025)
+            return httpx.Response(200, json={"errorCode": "00", "content": "synthetic-token"})
+        if request.url.path == "/api/v1/chat":
+            if failure == "http":
+                return httpx.Response(500, text="synthetic-basic-secret")
+            if failure == "timeout":
+                raise httpx.ReadTimeout("synthetic-basic-secret")
+            content = (
+                ""
+                if failure == "empty"
+                else "data: bad\n"
+                if failure == "malformed"
+                else _sse_reply("   ")
+                if failure == "whitespace"
+                else _sse_reply("x" * 1025)
+            )
+            return httpx.Response(200, content=content)
+        return mock_response(request)
+
+    report = await run_preflight(
+        _real_kira_config(max_response_bytes=1024),
+        transport=httpx.MockTransport(handle),
+        database_probe=mock_database,
+    )
+    check = next(c for c in report.checks if c.probe is Probe.KIRA_CHAT)
+    assert check.outcome in {Outcome.DEPENDENCY_ERROR, Outcome.PROTOCOL_ERROR}
+    assert check.reason is reason and check.attempted
+    assert check.kira_response_sha256 is None
+    assert "synthetic-basic-secret" not in report.model_dump_json()
+
+
+async def test_real_kira_requires_explicit_isolated_identity_approval():
+    calls = []
+
+    def handle(request):
+        calls.append(request.url.path)
+        return mock_response(request)
+
+    report = await run_preflight(
+        _real_kira_config(kira_context_isolation="disabled"),
+        transport=httpx.MockTransport(handle),
+        database_probe=mock_database,
+    )
+    assert not any(path in {"/authenticate", "/api/v1/chat"} for path in calls)
+    check = next(c for c in report.checks if c.probe is Probe.KIRA_CHAT)
+    assert check.outcome is Outcome.NOT_RUN and not check.attempted
+
+
+@pytest.mark.parametrize("path", ["/authenticate", "/api/v1/chat"])
+async def test_real_kira_bounds_unread_network_stream_and_closes_on_failure(path):
+    streams = []
+
+    class ChunkedStream(httpx.AsyncByteStream):
+        closed = False
+
+        async def __aiter__(self):
+            yield b"x" * 700
+            yield b"x" * 700
+
+        async def aclose(self):
+            self.closed = True
+
+    def handle(request):
+        if request.url.path == path:
+            stream = ChunkedStream()
+            streams.append(stream)
+            return httpx.Response(200, stream=stream)
+        if request.url.path == "/authenticate":
+            return httpx.Response(200, json={"errorCode": "00", "content": "synthetic-token"})
+        return mock_response(request)
+
+    report = await run_preflight(
+        _real_kira_config(max_response_bytes=1024),
+        transport=httpx.MockTransport(handle),
+        database_probe=mock_database,
+    )
+    check = next(c for c in report.checks if c.probe is Probe.KIRA_CHAT)
+    assert check.outcome is Outcome.PROTOCOL_ERROR and check.reason is Reason.RESPONSE_TOO_LARGE
+    assert all(stream.closed for stream in streams)
 
 
 @pytest.mark.parametrize(

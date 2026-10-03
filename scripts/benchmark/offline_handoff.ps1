@@ -324,7 +324,8 @@ switch ($Action) {
                 [ordered]@{ variant_id = $_.variant_id; runtime_revision = $_.revision }
             })
             variants = $variants
-            materialization_checkpoint = "artifacts/benchmark/kira-materialization.json"
+            pc_preflight_schema_version = 2
+            pc_preflight_run_set_schema_version = 1
             benchmark_artifact_root = "artifacts/benchmark/benchmark"
             images = $images
         }

@@ -115,6 +115,9 @@ class RunQualityEvidence(EvalModel):
     runtime_sha: str = Field(pattern=r"^[a-f0-9]{40,64}$")
     harness_sha: str = Field(pattern=r"^[a-f0-9]{40,64}$")
     config_sha256: Sha256
+    formation_scoring_contract: (
+        Literal["formation-closed-world-v1", "formation-open-world-v2"] | None
+    ) = "formation-closed-world-v1"
     metrics: dict[QualityMetricName, QualityMetric]
     families: tuple[FamilyQuality, ...]
     safety_violation_codes: tuple[Identifier, ...] = ()
@@ -306,7 +309,10 @@ def _formation_metrics(
     scores: Sequence[NativeFormationCaseEvaluation],
 ) -> dict[QualityMetricName, QualityMetric]:
     complete = [item.score for item in scores if item.score is not None and item.score.complete]
+    if len({item.scoring_contract for item in complete}) > 1:
+        raise ValueError("formation quality evidence mixes scoring contracts")
     tp = sum(item.true_positive for item in complete)
+    valid_extra = sum(item.valid_extra for item in complete)
     fp = sum(item.false_positive or 0 for item in complete)
     fn = sum(item.false_negative or 0 for item in complete)
 
@@ -315,10 +321,24 @@ def _formation_metrics(
             value=numerator / denominator if denominator else None, denominator=denominator
         )
 
+    precision = ratio(tp + valid_extra, tp + valid_extra + fp)
+    recall = ratio(tp, tp + fn)
+    if valid_extra:
+        f1_denominator = tp + valid_extra + fp + tp + fn if tp + fn else 0
+        f1_value = (
+            2 * precision.value * recall.value / (precision.value + recall.value)
+            if precision.value is not None
+            and recall.value is not None
+            and precision.value + recall.value > 0
+            else (0.0 if f1_denominator else None)
+        )
+        f1 = QualityMetric(value=f1_value, denominator=f1_denominator)
+    else:
+        f1 = ratio(2 * tp, 2 * tp + fp + fn)
     return {
-        QualityMetricName.FORMATION_PRECISION: ratio(tp, tp + fp),
-        QualityMetricName.FORMATION_RECALL: ratio(tp, tp + fn),
-        QualityMetricName.FORMATION_F1: ratio(2 * tp, 2 * tp + fp + fn),
+        QualityMetricName.FORMATION_PRECISION: precision,
+        QualityMetricName.FORMATION_RECALL: recall,
+        QualityMetricName.FORMATION_F1: f1,
     }
 
 
@@ -570,6 +590,10 @@ def build_run_quality_evidence(
         runtime_sha=identity.provenance.runtime.sha,
         harness_sha=identity.provenance.harness.sha,
         config_sha256=identity.config_sha256,
+        formation_scoring_contract=next(
+            (result.score.scoring_contract for result in formation if result.score is not None),
+            None,
+        ),
         metrics=metrics,
         families=tuple(families),
         safety_violation_codes=tuple(sorted(safety)),
@@ -628,6 +652,8 @@ def build_confirmation_report(
         ):
             raise ValueError("confirmation repetitions are not paired on corpus and seed")
     all_runs = (*controls, *candidates)
+    if len({run.formation_scoring_contract for run in all_runs}) > 1:
+        raise ValueError("confirmation repetitions mix formation scoring contracts")
     if (
         len({run.dataset_sha256 for run in all_runs}) != 1
         or len({run.compilation_sha256 for run in all_runs}) != 1

@@ -131,6 +131,83 @@ async def test_formation_judge_requires_exact_one_to_one_decision_set():
     assert decisions[1].verdict is FormationMatchVerdict.NO_MATCH
 
 
+@pytest.mark.asyncio
+async def test_open_world_judge_receives_boundary_attribution_scope_and_forbidden_target():
+    requests = []
+
+    def handler(request):
+        requests.append(json.loads(request.content))
+        return _chat(
+            {
+                "decisions": [
+                    {
+                        "prediction_index": 0,
+                        "verdict": "VALID_EXTRA",
+                        "gold_id": None,
+                        "reason_code": "source_reassertion",
+                    }
+                ]
+            }
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        decisions = await InternalSemanticJudge(client, _config()).formation(
+            predicted_facts=("Ngưỡng 98%, chỉ cho FTTH",),
+            gold_facts={},
+            prediction_indexes=(0,),
+            contract="open_world",
+            source_messages=({"role": "user", "content": "Quay lại 98%, chỉ FTTH"},),
+            context_messages=({"role": "user", "content": "Ngưỡng 99%"},),
+            prediction_details=({"attributed_to": "user", "memory_scope": "GLOBAL"},),
+            semantic_expectation="Keep reusable conventions and change statements.",
+            forbidden_facts=("Mật khẩu",),
+        )
+    payload = json.loads(requests[0]["messages"][1]["content"])
+    assert payload["formation_contract"] == "open_world"
+    assert payload["source_messages"][0]["content"] == "Quay lại 98%, chỉ FTTH"
+    assert payload["context_messages"][0]["content"] == "Ngưỡng 99%"
+    assert payload["predictions"][0]["memory_scope"] == "GLOBAL"
+    assert payload["predictions"][0]["attributed_to"] == "user"
+    assert payload["forbidden_facts"] == ["Mật khẩu"]
+    assert "final current truth" in requests[0]["messages"][0]["content"]
+    assert decisions[0].verdict is FormationMatchVerdict.VALID_EXTRA
+
+
+@pytest.mark.asyncio
+async def test_judge_rejects_valid_extra_for_closed_world_and_missing_open_world_source():
+    response = {
+        "decisions": [
+            {
+                "prediction_index": 0,
+                "verdict": "VALID_EXTRA",
+                "gold_id": None,
+                "reason_code": "unexpected_extra",
+            }
+        ]
+    }
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda _: _chat(response))
+    ) as client:
+        judge = InternalSemanticJudge(client, _config())
+        with pytest.raises(JudgeError) as captured:
+            await judge.formation(predicted_facts=("A",), gold_facts={}, prediction_indexes=(0,))
+        assert captured.value.reason_code == "judge_invalid_extra_contract"
+        with pytest.raises(ValueError, match="source messages"):
+            await judge.formation(
+                predicted_facts=("A",),
+                gold_facts={},
+                prediction_indexes=(0,),
+                contract="open_world",
+            )
+        with pytest.raises(ValueError, match="metadata must align"):
+            await judge.formation(
+                predicted_facts=("A",),
+                gold_facts={},
+                prediction_indexes=(0,),
+                prediction_details=({}, {}),
+            )
+
+
 @pytest.mark.parametrize("profile", [Profile.MOCK, Profile.EXTERNAL_SYNTHETIC])
 def test_judge_refuses_non_internal_profiles(profile):
     client = httpx.AsyncClient(transport=httpx.MockTransport(lambda _: _chat({})))

@@ -78,10 +78,31 @@ class EvalConfig(EvalModel):
     gateway_url: AnyHttpUrl | None = None
     worker_url: AnyHttpUrl | None = None
     kira_mock_url: AnyHttpUrl | None = None
+    kira_base_url: AnyHttpUrl | None = None
+    kira_username: str | None = Field(default=None, min_length=1, max_length=128)
+    kira_domain: str | None = Field(default=None, min_length=1, max_length=128)
+    kira_basic_auth: SecretStr | None = Field(default=None, exclude=True, repr=False)
+    kira_service_id: int = Field(default=5, ge=1, strict=True)
+    kira_device: str = Field(default="Browser", min_length=1)
+    kira_message_type: str = Field(default="text", min_length=1)
+    # Selecting this mode explicitly approves equivalent-permission disposable KiRa identities.
+    # The PC live isolation check is still required; a different token is not a history reset.
+    kira_context_isolation: Literal["disabled", "unique_username"] = "disabled"
 
-    _clean_service_urls = field_validator("gateway_url", "worker_url", "kira_mock_url")(
-        ProviderConfig.clean_endpoint.__func__
-    )
+    _clean_service_urls = field_validator(
+        "gateway_url", "worker_url", "kira_mock_url", "kira_base_url"
+    )(ProviderConfig.clean_endpoint.__func__)
+
+    @property
+    def kira_configured(self) -> bool:
+        return bool(
+            self.kira_base_url
+            and self.kira_username
+            and self.kira_domain
+            and self.kira_basic_auth
+            and self.kira_basic_auth.get_secret_value().strip()
+            and self.kira_context_isolation == "unique_username"
+        )
 
     @field_validator("database_url", "memory_database_url")
     @classmethod
@@ -191,6 +212,14 @@ def load_config(
         gateway_url=get("BENCHMARK_GATEWAY_URL"),
         worker_url=get("BENCHMARK_WORKER_URL"),
         kira_mock_url=get("BENCHMARK_KIRA_MOCK_URL"),
+        kira_base_url=get("KIRA_BASE_URL"),
+        kira_username=get("KIRA_USERNAME"),
+        kira_domain=get("KIRA_DOMAIN"),
+        kira_basic_auth=SecretStr(value) if (value := get("KIRA_BASIC_AUTH")) else None,
+        kira_service_id=int(get("KIRA_SERVICE_ID") or "5"),
+        kira_device=get("KIRA_DEVICE") or "Browser",
+        kira_message_type=get("KIRA_MESSAGE_TYPE") or "text",
+        kira_context_isolation=get("BENCHMARK_KIRA_CONTEXT_ISOLATION") or "disabled",
         memory_schema=get("BENCHMARK_MEMORY_SCHEMA") or "memory",
         memory_collection=get("BENCHMARK_MEMORY_COLLECTION") or "memories",
         **secrets,

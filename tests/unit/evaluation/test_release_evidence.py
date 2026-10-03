@@ -66,6 +66,8 @@ from evaluation.retrieval import RetrievalCaseEvaluation, RetrievalMode
 from evaluation.rewrite import RewriteCaseEvaluation
 from evaluation.scoring import (
     ConstraintScore,
+    FormationMatchDecision,
+    FormationMatchVerdict,
     JudgeProvenance,
     JudgeVerdict,
     RetrievalScore,
@@ -192,6 +194,69 @@ def test_confirmation_enforces_all_quality_gates_without_weighted_score():
         "zero_safety_hard_fail",
         "with_ltm_beats_no_ltm",
     }
+
+
+def test_release_formation_aggregate_includes_valid_extras_only_in_precision():
+    provenance = JudgeProvenance(
+        provider="internal",
+        model="judge",
+        prompt_sha256="a" * 64,
+        response_schema_sha256="b" * 64,
+    )
+    score = score_formation(
+        {"g1": "A", "g2": "missing"},
+        ["A", "valid extra", "unsupported"],
+        contract="open_world",
+        judge_decisions=(
+            FormationMatchDecision(
+                prediction_index=1,
+                verdict=FormationMatchVerdict.VALID_EXTRA,
+                reason_code="supported_source",
+                judge=provenance,
+            ),
+            FormationMatchDecision(
+                prediction_index=2,
+                verdict=FormationMatchVerdict.NO_MATCH,
+                reason_code="unsupported_source",
+                judge=provenance,
+            ),
+        ),
+    )
+    case_id = "conv01:formation:test"
+    evaluation = NativeFormationCaseEvaluation(
+        case_id=case_id,
+        outcome=Outcome.FAIL,
+        extraction=FormationExtractionResult(
+            case_id=case_id,
+            outcome=Outcome.REVIEW_REQUIRED,
+            status=FormationExecutionStatus.VALID_FACTS,
+            facts=tuple(ExtractedFact(text=text) for text in ("A", "valid extra", "unsupported")),
+            provider_calls=1,
+            stages=(),
+        ),
+        score=score,
+    )
+    metrics = release._formation_metrics((evaluation,))
+    assert metrics[QualityMetricName.FORMATION_PRECISION].value == pytest.approx(2 / 3)
+    assert metrics[QualityMetricName.FORMATION_RECALL].value == 0.5
+    assert metrics[QualityMetricName.FORMATION_F1].value == pytest.approx(score.f1)
+    legacy = evaluation.model_copy(update={"score": score_formation({"g1": "A"}, ["A"])})
+    with pytest.raises(ValueError, match="mixes scoring contracts"):
+        release._formation_metrics((evaluation, legacy))
+
+
+def test_confirmation_rejects_different_formation_scoring_contracts():
+    controls, candidates = _paired_runs()
+    candidates = tuple(
+        candidate.model_copy(update={"formation_scoring_contract": "formation-open-world-v2"})
+        for candidate in candidates
+    )
+    with pytest.raises(ValueError, match="mix formation scoring contracts"):
+        build_confirmation_report(
+            component=ConfirmationComponent.FORMATION,
+            controls=controls,
+            candidates=candidates,
+        )
 
 
 def test_confirmation_fails_regression_and_marks_missing_evidence_insufficient():

@@ -207,6 +207,35 @@ def _evaluator(runtime: _Runtime, judge: _Judge | None = None) -> CrossSessionEv
     )
 
 
+async def test_readiness_budget_covers_all_source_events_in_native_trajectory():
+    class TrajectoryRuntime(_Runtime):
+        async def persist_session_a(self, case):
+            return MemoryJobHandle(
+                event_id=_EVENT_ID,
+                source_event_ids=(_EVENT_ID, UUID(int=2), UUID(int=3)),
+            )
+
+    runtime = TrajectoryRuntime()
+    result = await _evaluator(runtime).evaluate(_case())
+    assert result.outcome is Outcome.PASS
+    assert runtime.calls[0] == ("wait", _EVENT_ID, 15.0)
+
+
+async def test_shared_kira_context_identity_is_a_hard_pair_failure():
+    runtime = _Runtime(
+        no_ltm=_execution(CrossSessionCondition.NO_LTM).model_copy(
+            update={"kira_context_identity_sha256": "a" * 64}
+        ),
+        with_ltm=_execution(CrossSessionCondition.WITH_LTM).model_copy(
+            update={"kira_context_identity_sha256": "a" * 64}
+        ),
+    )
+    result = await _evaluator(runtime).evaluate(_case())
+    assert result.outcome is Outcome.FAIL
+    assert result.no_ltm is not None
+    assert "cross_session_kira_context_not_isolated" in result.no_ltm.safety_violation_codes
+
+
 @pytest.mark.asyncio
 async def test_required_flow_runs_formation_then_paired_session_b_without_writes():
     runtime = _Runtime()

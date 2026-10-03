@@ -174,6 +174,15 @@ def _resource_digest(plan: IsolationPlan, case_id: str, attempt: int) -> str:
     return hashlib.sha256(value).hexdigest()[:16]
 
 
+def kira_benchmark_username(plan: IsolationPlan, *, case_id: str, attempt: int, arm: str) -> str:
+    """Fresh server-side context per case/arm/attempt with no user-provided text in the name."""
+
+    if attempt < 1 or isinstance(attempt, bool) or arm not in {"no_ltm", "with_ltm"}:
+        raise ValueError("KiRa isolation requires a valid case attempt and arm")
+    value = f"{plan.run_id}\0{plan.owner_token}\0{case_id}\0{attempt}\0{arm}".encode()
+    return f"bench_{hashlib.sha256(value).hexdigest()[:32]}"
+
+
 def allocate_case_resources(
     plan: IsolationPlan,
     *,

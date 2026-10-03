@@ -1,25 +1,29 @@
 """Provider-free tests for native runtime composition and crash ownership."""
 
-from datetime import UTC, datetime
+import asyncio
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
 
+from app.application.use_cases.process_memory import ProcessMemoryUseCase
 from app.application.use_cases.process_memory_job import (
     MemoryJobProcessOutcome,
     ProcessMemoryJobResult,
+    ProcessMemoryJobUseCase,
 )
 from app.config.settings import Settings
 from app.domain.models.conversation import AppendTurnResult, CompletedTurnReference
 from app.domain.models.kira import KiraEventKind, KiraStreamEvent
-from app.domain.models.memory import LongTermMemory
+from app.domain.models.memory import LongTermMemory, MemoryLifecycleEvent, MemoryProcessResult
 from app.domain.models.memory_job import MemoryJob
 from evaluation.artifacts import ArtifactRunIdentity, ArtifactStore
 from evaluation.config import EvalConfig, ProviderConfig, load_config
 from evaluation.cross_session import (
     CrossSessionCondition,
+    CrossSessionDependencyError,
     CrossSessionProtocolError,
     MemoryReadinessStatus,
 )
@@ -62,6 +66,7 @@ from evaluation.native_runtime import (
     _RecordingKira,
     _RecordingMemory,
     _RecordingRewriter,
+    create_native_runtime,
     reconcile_interrupted_attempts,
     settings_for_native_runtime,
 )
@@ -183,7 +188,9 @@ def _cross_case() -> EvalCase:
     )
 
 
-def _isolated_store(tmp_path: Path, case: EvalCase) -> tuple[ArtifactStore, IsolationPlan]:
+def _isolated_store(
+    tmp_path: Path, case: EvalCase, *, additional_case_ids: tuple[str, ...] = ()
+) -> tuple[ArtifactStore, IsolationPlan]:
     plan = create_isolation_plan(
         run_id=_RUN_ID,
         owner_token=UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
@@ -203,7 +210,7 @@ def _isolated_store(tmp_path: Path, case: EvalCase) -> tuple[ArtifactStore, Isol
         isolation_sha256=isolation_plan_sha256(plan),
         seed=742,
         suites=(case.suite,),
-        selected_case_ids=(case.case_id,),
+        selected_case_ids=(case.case_id, *additional_case_ids),
     )
     store = ArtifactStore.create(
         tmp_path / "owned-run",
@@ -326,6 +333,13 @@ class _RecordingStore:
         self.schedule_flags: list[bool] = []
         self.last_reference: CompletedTurnReference | None = None
         self.created_sessions: list[str] = []
+        self.queued: list[tuple[UUID, CompletedTurnReference]] = []
+        self.appended: list[tuple[object, object]] = []
+        self.source_conversations: dict[str, UUID] = {}
+        self.source_owners: dict[str, str] = {}
+        self.deletion_pending: set[tuple[str, str]] = set()
+        self.deleted: list[tuple[str, str]] = []
+        self.formed_memory = None
 
     async def create_conversation(self, user_id, *, title=None):
         del user_id, title
@@ -347,19 +361,51 @@ class _RecordingStore:
 
     async def append_turn(self, user_id, user_message, assistant_message, *, schedule_memory):
         self.schedule_flags.append(schedule_memory)
+        self.appended.append((user_message, assistant_message))
+        self.source_owners[user_message.session_id] = user_id
+        conversation_id = self.source_conversations.setdefault(
+            user_message.session_id, UUID(int=len(self.source_conversations) + 1)
+        )
         result = AppendTurnResult(
             inserted=True,
             reference=CompletedTurnReference(
                 user_id=user_id,
                 session_id=user_message.session_id,
-                conversation_id=UUID(int=len(self.schedule_flags)),
+                conversation_id=conversation_id,
                 turn_id=user_message.turn_id,
                 boundary_message_id=len(self.schedule_flags) * 2,
             ),
-            memory_job_event_id=UUID(int=99) if schedule_memory else None,
+            memory_job_event_id=UUID(int=299 + len(self.schedule_flags))
+            if schedule_memory
+            else None,
         )
         self.last_reference = result.reference
+        if result.memory_job_event_id:
+            self.queued.append((result.memory_job_event_id, result.reference))
         return result
+
+    async def mark_deletion_pending(self, user_id, session_id):
+        if self.source_owners.get(session_id) != user_id:
+            return False
+        self.deletion_pending.add((user_id, session_id))
+        return True
+
+    async def purge_deletion_pending(self, user_id, session_id):
+        if (user_id, session_id) not in self.deletion_pending:
+            return False
+        self.queued[:] = [
+            (event_id, reference)
+            for event_id, reference in self.queued
+            if (reference.user_id, reference.session_id) != (user_id, session_id)
+        ]
+        if self.formed_memory is not None:
+            for event_id, (source, _result) in tuple(self.formed_memory.results.items()):
+                if (source.reference.user_id, source.reference.session_id) == (user_id, session_id):
+                    del self.formed_memory.results[event_id]
+        del self.source_owners[session_id]
+        self.deletion_pending.remove((user_id, session_id))
+        self.deleted.append((user_id, session_id))
+        return True
 
 
 class _PersistentEvaluator:
@@ -402,12 +448,12 @@ class _Queue:
         self.store = store
 
     async def claim_due(self, **kwargs):
-        del kwargs
-        assert self.store.last_reference is not None
+        assert kwargs["limit"] == 1
+        event_id, reference = self.store.queued.pop(0)
         return (
             MemoryJob(
-                event_id=UUID(int=300),
-                reference=self.store.last_reference,
+                event_id=event_id,
+                reference=reference,
                 attempt_count=1,
                 lease_token=UUID(int=301),
                 lease_expires_at=datetime(2026, 9, 19, 1, tzinfo=UTC),
@@ -417,7 +463,7 @@ class _Queue:
 
 class _JobProcessor:
     async def execute(self, job):
-        assert job.event_id == UUID(int=300)
+        assert job.event_id.int >= 300
         return ProcessMemoryJobResult(MemoryJobProcessOutcome.COMPLETED, 1)
 
 
@@ -476,7 +522,7 @@ async def test_cross_session_runtime_owns_job_and_disables_session_b_formation(t
         process_job=_JobProcessor(),  # type: ignore[arg-type]
         inspector=_Inspector(),  # type: ignore[arg-type]
         rewriter=_Rewriter(),  # type: ignore[arg-type]
-        kira=backend_kira,  # type: ignore[arg-type]
+        kira_factory=lambda _username: backend_kira,  # type: ignore[return-value]
         judge=_NeverFormationJudge(),  # type: ignore[arg-type]
         gold_fact_text={"conv01:M01": "Ưu tiên Hà Nội"},
     )
@@ -515,6 +561,409 @@ async def test_cross_session_runtime_owns_job_and_disables_session_b_formation(t
             condition=CrossSessionCondition.WITH_LTM,
             enable_ltm=True,
             schedule_memory=True,
+        )
+
+
+class _BoundaryStore(_RecordingStore):
+    async def read_through_boundary(self, user_id, conversation_id, boundary_message_id, limit):
+        del user_id
+        selected = [
+            message
+            for index, pair in enumerate(self.appended)
+            if (index + 1) * 2 <= boundary_message_id
+            and self.source_conversations[pair[0].session_id] == conversation_id
+            for message in pair
+        ]
+        return tuple(selected[-limit:])
+
+
+class _BoundaryMemory(_Memory):
+    def __init__(self):
+        super().__init__()
+        self.results = {}
+
+    async def process_memory(self, source):
+        self.processed.append(source)
+        # One additive assertion per source event, deliberately keeping repeated text.
+        result = MemoryProcessResult(
+            events=(
+                MemoryLifecycleEvent(
+                    action="ADD",
+                    memory_id=str(UUID(int=source.formation_event_id.int + 100)),
+                    content=source.messages[-2].content,
+                ),
+            )
+        )
+        self.results[source.formation_event_id] = (source, result)
+        return result
+
+
+class _ReceiptQueue(_Queue):
+    def __init__(self, store):
+        super().__init__(store)
+        self.completed = []
+        self.timeline = []
+
+    async def claim_due(self, **kwargs):
+        result = await super().claim_due(**kwargs)
+        self.timeline.append(("claim", result[0].event_id))
+        return result
+
+    async def complete(self, event_id, lease_token, *, lifecycle_event_count):
+        del lease_token, lifecycle_event_count
+        self.completed.append(event_id)
+        self.timeline.append(("complete", event_id))
+
+
+class _ReceiptInspector:
+    def __init__(self, memory, queue):
+        self.memory = memory
+        self.queue = queue
+
+    async def inspect(self, *, event_id, user_id):
+        assert event_id in self.queue.completed
+        source, result = self.memory.results[event_id]
+        ref = source.reference
+        return FormationPersistenceSnapshot(
+            event_id=event_id,
+            user_id=user_id,
+            memories=tuple(
+                PersistedFormationMemory(
+                    memory_id=UUID(event.memory_id),
+                    content=event.content,
+                    user_id=user_id,
+                    formation_event_id=event_id,
+                    conversation_id=ref.conversation_id,
+                    turn_id=ref.turn_id,
+                    boundary_message_id=ref.boundary_message_id,
+                )
+                for event in result.events
+            ),
+            receipt=FormationReceiptRecord(
+                event_id=event_id,
+                user_id=user_id,
+                conversation_id=ref.conversation_id,
+                events=tuple(
+                    FormationLifecycleRecord(
+                        event="ADD", memory_id=UUID(event.memory_id), memory=event.content
+                    )
+                    for event in result.events
+                ),
+                memory_count=len(result.events),
+                committed_at=datetime.now(UTC),
+            ),
+        )
+
+
+@pytest.mark.parametrize(
+    "delivery",
+    (
+        "ordered",
+        "reversed",
+        "dead",
+        "missing_receipt",
+        "timeout",
+        "outer_timeout",
+        "legacy_dead",
+        "cleanup_failure",
+        "persist_failure",
+    ),
+)
+async def test_source_trajectory_uses_all_receipts_and_preserves_context_boundaries(
+    tmp_path, delivery
+):
+    case = _cross_case()
+    base = datetime(2026, 10, 3, tzinfo=UTC)
+    messages = tuple(
+        Message(
+            message_id=f"turn-{index}-{role}",
+            session_id=session,
+            role=role,
+            content=text if role == "user" else "Đã ghi nhận",
+            timestamp=base + timedelta(seconds=index, microseconds=offset),
+        )
+        for index, (session, text) in enumerate(
+            (("source-a", "98"), ("source-a", "99"), ("source-b", "98")), start=1
+        )
+        for offset, role in enumerate(("user", "assistant"))
+    )
+    case = case.model_copy(
+        update={"inputs": case.inputs.model_copy(update={"session_a_messages": messages})}
+    )
+    artifacts, plan = _isolated_store(
+        tmp_path, case, additional_case_ids=("conv01:cross-session:Q02",)
+    )
+
+    class SourceStore(_BoundaryStore):
+        def __init__(self):
+            super().__init__()
+            self.persist_fault_used = False
+
+        async def append_turn(self, *args, **kwargs):
+            if (
+                delivery == "persist_failure"
+                and len(self.appended) == 1
+                and not self.persist_fault_used
+            ):
+                self.persist_fault_used = True
+                raise OSError("test append failure")
+            return await super().append_turn(*args, **kwargs)
+
+        async def mark_deletion_pending(self, user_id, session_id):
+            if delivery == "cleanup_failure":
+                raise OSError("test cleanup failure")
+            return await super().mark_deletion_pending(user_id, session_id)
+
+    store = SourceStore()
+    memory = _BoundaryMemory()
+    store.formed_memory = memory
+    foreign_source = SimpleNamespace(
+        reference=SimpleNamespace(user_id="foreign-user", session_id="foreign-session")
+    )
+    store.source_owners["foreign-session"] = "foreign-user"
+    memory.results[UUID(int=777)] = (foreign_source, MemoryProcessResult())
+    queue = _ReceiptQueue(store)
+    processor = ProcessMemoryJobUseCase(
+        ProcessMemoryUseCase(store, memory), queue, max_attempts=1, retry_delays_seconds=()
+    )
+    inspector = _ReceiptInspector(memory, queue)
+
+    class DeliveredProcessor:
+        async def execute(self, job):
+            if delivery in {"dead", "legacy_dead", "cleanup_failure"} and job.event_id == UUID(
+                int=301
+            ):
+                return ProcessMemoryJobResult(MemoryJobProcessOutcome.DEAD)
+            if delivery in {"timeout", "outer_timeout"} and job.event_id == UUID(int=301):
+                await asyncio.sleep(10)
+            return await processor.execute(job)
+
+    class DeliveredInspector:
+        async def inspect(self, *, event_id, user_id):
+            snapshot = await inspector.inspect(event_id=event_id, user_id=user_id)
+            if delivery == "missing_receipt" and event_id == UUID(int=301):
+                return snapshot.model_copy(update={"receipt": None})
+            return snapshot
+
+    native_mark = store.mark_deletion_pending
+    native_purge = store.purge_deletion_pending
+    legacy_cleanup_calls = []
+
+    async def legacy_cleanup(user_id, session_ids):
+        legacy_cleanup_calls.append((user_id, session_ids))
+        for session_id in session_ids:
+            await native_mark(user_id, session_id)
+        for session_id in session_ids:
+            await native_purge(user_id, session_id)
+
+    if delivery == "legacy_dead":
+        store.mark_deletion_pending = None
+        store.purge_deletion_pending = None
+
+    runtime = NativeCrossSessionRuntime(
+        plan=plan,
+        ledger=artifacts.load_isolation_ledger(),
+        artifacts=artifacts,
+        settings=_base_settings(),
+        conversation_store=store,
+        memory=memory,
+        memory_queue=queue,
+        process_job=DeliveredProcessor(),
+        inspector=DeliveredInspector(),
+        rewriter=_Rewriter(),
+        kira_factory=lambda _: _Kira(),
+        judge=_NeverFormationJudge(),
+        gold_fact_text={"conv01:M01": "98"},
+        gold_fact_source_ids={"conv01:M01": ("turn-3-user",)},
+        failed_source_cleanup=legacy_cleanup if delivery == "legacy_dead" else None,
+    )
+
+    if delivery == "persist_failure":
+        with pytest.raises(OSError, match="append failure"):
+            await runtime.persist_session_a(case)
+        handle = None
+        assert not store.queued
+        assert set(memory.results) == {UUID(int=777)}
+    else:
+        handle = await runtime.persist_session_a(case)
+        assert len(handle.source_event_ids) == 3
+    assert not queue.timeline  # No leases expire while later source turns are being persisted.
+
+    async def next_case_survives_without_deleting_another_owner():
+        next_case = case.model_copy(update={"case_id": "conv01:cross-session:Q02"})
+        next_handle = await runtime.persist_session_a(next_case)
+        next_readiness = await runtime.wait_for_memory(next_handle, timeout_seconds=2)
+        assert next_readiness.status is MemoryReadinessStatus.COMPLETED
+        assert not store.queued
+        assert store.source_owners["foreign-session"] == "foreign-user"
+        assert memory.results[UUID(int=777)][0] is foreign_source
+        assert all(user_id != "foreign-user" for user_id, _session in store.deleted)
+
+    if delivery == "persist_failure":
+        await next_case_survives_without_deleting_another_owner()
+        return
+    if delivery == "cleanup_failure":
+        with pytest.raises(CrossSessionDependencyError):
+            await runtime.wait_for_memory(handle, timeout_seconds=2)
+        before = tuple(queue.timeline)
+        with pytest.raises(CrossSessionDependencyError):
+            await runtime.persist_session_a(
+                case.model_copy(update={"case_id": "conv01:cross-session:Q02"})
+            )
+        assert tuple(queue.timeline) == before
+        assert len(store.queued) == 1
+        return
+
+    if delivery == "reversed":
+        store.queued.reverse()
+    if delivery == "missing_receipt":
+        with pytest.raises(CrossSessionProtocolError):
+            await runtime.wait_for_memory(handle, timeout_seconds=2)
+        assert not store.queued
+        assert set(memory.results) == {UUID(int=777)}
+        await next_case_survives_without_deleting_another_owner()
+        return
+    if delivery == "timeout":
+        with pytest.raises(TimeoutError):
+            await runtime.wait_for_memory(handle, timeout_seconds=0.01)
+        assert not store.queued
+        assert set(memory.results) == {UUID(int=777)}
+        await next_case_survives_without_deleting_another_owner()
+        return
+    if delivery == "outer_timeout":
+        with pytest.raises(TimeoutError):
+            async with asyncio.timeout(0.01):
+                await runtime.wait_for_memory(handle, timeout_seconds=2)
+        assert not store.queued
+        assert set(memory.results) == {UUID(int=777)}
+        await next_case_survives_without_deleting_another_owner()
+        return
+    readiness = await runtime.wait_for_memory(handle, timeout_seconds=2)
+    if delivery in {"dead", "legacy_dead"}:
+        assert readiness.status is MemoryReadinessStatus.DEAD
+        assert not readiness.gold_ids_by_memory_id
+        assert not store.queued
+        assert set(memory.results) == {UUID(int=777)}
+        await next_case_survives_without_deleting_another_owner()
+        assert bool(legacy_cleanup_calls) is (delivery == "legacy_dead")
+        return
+
+    delivered_ids = (
+        tuple(reversed(handle.source_event_ids))
+        if delivery == "reversed"
+        else handle.source_event_ids
+    )
+    assert queue.timeline == [
+        entry
+        for event_id in delivered_ids
+        for entry in (("claim", event_id), ("complete", event_id))
+    ]
+    by_event = {source.formation_event_id: source for source in memory.processed}
+    assert [
+        tuple(message.content for message in by_event[event_id].messages[::2])
+        for event_id in handle.source_event_ids
+    ] == [("98",), ("98", "99"), ("98",)]
+    assert [by_event[event_id].messages[-2].timestamp for event_id in handle.source_event_ids] == [
+        messages[0].timestamp,
+        messages[2].timestamp,
+        messages[4].timestamp,
+    ]
+    assert len(artifacts.load_isolation_ledger().resources[0].memory_ids) == 3
+    assert readiness.gold_ids_by_memory_id == {
+        str(UUID(int=400)): (),
+        str(UUID(int=401)): (),
+        str(UUID(int=402)): ("conv01:M01",),
+    }
+
+
+async def test_kira_history_is_independent_for_each_case_arm_and_attempt(tmp_path, monkeypatch):
+    case = _cross_case()
+    artifacts, plan = _isolated_store(tmp_path, case)
+    store = _RecordingStore()
+    history = {}
+    issued = []
+
+    class HistoryKira(_Kira):
+        def __init__(self, username):
+            super().__init__()
+            self.username = username
+
+        async def chat_stream(self, message):
+            previous = history.setdefault(self.username, [])
+            output = f"history={len(previous)};{message}"
+            previous.append(message)
+            return await super().chat_stream(output)
+
+    def factory(username):
+        issued.append(username)
+        return HistoryKira(username)
+
+    runtime = NativeCrossSessionRuntime(
+        plan=plan,
+        ledger=artifacts.load_isolation_ledger(),
+        artifacts=artifacts,
+        settings=_base_settings(),
+        conversation_store=store,
+        memory=_Memory(),
+        memory_queue=_Queue(store),
+        process_job=_JobProcessor(),
+        inspector=_Inspector(),
+        rewriter=_Rewriter(),
+        kira_factory=factory,
+        judge=_NeverFormationJudge(),
+        gold_fact_text={"conv01:M01": "Ưu tiên Hà Nội"},
+    )
+    handle = await runtime.persist_session_a(case)
+    await runtime.wait_for_memory(handle, timeout_seconds=1)
+    outputs = [
+        await runtime.run_session_b(case, condition=arm, enable_ltm=enabled, schedule_memory=False)
+        for arm, enabled in (
+            (CrossSessionCondition.WITH_LTM, True),
+            (CrossSessionCondition.NO_LTM, False),
+        )
+    ]
+    assert all(output.final_answer.startswith("history=0;") for output in outputs)
+    assert len(set(issued)) == 2
+    assert outputs[0].kira_context_identity_sha256 != outputs[1].kira_context_identity_sha256
+    assert all(len(username) == 38 and username.startswith("bench_") for username in issued)
+    for case_id, attempt in ((case.case_id, 2), ("conv01:cross-session:Q02", 1)):
+        next_case = case.model_copy(update={"case_id": case_id})
+        runtime.ledger = register_case_resources(
+            runtime.ledger,
+            plan,
+            allocate_case_resources(plan, case_id=case_id, attempt=attempt),
+        )
+        monkeypatch.setattr(artifacts, "next_attempt_number", lambda _case_id, n=attempt: n)
+        for arm in (CrossSessionCondition.NO_LTM, CrossSessionCondition.WITH_LTM):
+            execution = await runtime.run_session_b(
+                next_case,
+                condition=arm,
+                enable_ltm=arm is CrossSessionCondition.WITH_LTM,
+                schedule_memory=False,
+            )
+            assert execution.final_answer.startswith("history=0;")
+    assert len(set(issued)) == 6
+
+
+async def test_cross_session_runtime_blocks_unapproved_kira_mode_before_db_mutation(
+    tmp_path, monkeypatch
+):
+    case = _cross_case()
+    artifacts, plan = _isolated_store(tmp_path, case)
+
+    async def unexpected_reset(*_args):
+        raise AssertionError("unapproved runtime must not reset benchmark state")
+
+    monkeypatch.setattr("evaluation.native_runtime._reset_owned_state", unexpected_reset)
+    config = _native_config().model_copy(update={"suites": (Suite.CROSS_SESSION,)})
+    with pytest.raises(ValueError, match="unique_username"):
+        await create_native_runtime(
+            config=config,
+            base_settings=_base_settings(),
+            plan=plan,
+            ledger=artifacts.load_isolation_ledger(),
+            artifacts=artifacts,
+            cases=(case,),
         )
 
 

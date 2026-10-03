@@ -118,6 +118,103 @@ def test_negative_formation_case_is_complete_with_na_precision_recall():
     assert score.f1 is None
 
 
+def _decision(index, verdict, gold_id=None):
+    return FormationMatchDecision(
+        prediction_index=index,
+        verdict=verdict,
+        gold_id=gold_id,
+        reason_code="source_evidence",
+        judge=_judge(),
+    )
+
+
+def test_open_world_extra_requires_judge_even_after_all_gold_matches():
+    pending = score_formation({"g1": "A"}, ["A", "B"], contract="open_world")
+    assert not pending.complete
+    assert pending.needs_judge_prediction_indexes == (1,)
+    assert pending.scoring_contract == "formation-open-world-v2"
+    score = score_formation(
+        {"g1": "A"},
+        ["A", "B"],
+        contract="open_world",
+        judge_decisions=(_decision(1, FormationMatchVerdict.VALID_EXTRA),),
+    )
+    assert score.complete
+    assert (score.true_positive, score.valid_extra, score.false_positive) == (1, 1, 0)
+    assert score.valid_extra_prediction_indexes == (1,)
+    assert score.precision == score.recall == 1
+
+
+def test_open_world_valid_extra_does_not_replace_missing_gold_or_hide_invalid_extra():
+    score = score_formation(
+        {"g1": "A"},
+        ["B", "unsupported"],
+        contract="open_world",
+        judge_decisions=(
+            _decision(0, FormationMatchVerdict.VALID_EXTRA),
+            _decision(1, FormationMatchVerdict.NO_MATCH),
+        ),
+    )
+    assert (score.true_positive, score.valid_extra, score.false_positive, score.false_negative) == (
+        0,
+        1,
+        1,
+        1,
+    )
+    assert score.precision == 0.5
+    assert score.recall == 0
+    assert score.f1 == 0
+
+
+def test_open_world_negative_uses_source_validity_instead_of_blanket_empty_gold():
+    pending = score_formation({}, ["valid convention"], contract="open_world")
+    assert pending.needs_judge_prediction_indexes == (0,)
+    accepted = score_formation(
+        {},
+        ["valid convention"],
+        contract="open_world",
+        judge_decisions=(_decision(0, FormationMatchVerdict.VALID_EXTRA),),
+    )
+    assert accepted.complete
+    assert accepted.false_positive == accepted.false_negative == 0
+    assert accepted.valid_extra == 1
+    assert accepted.precision == 1
+    assert accepted.recall is None
+    uncertain = score_formation(
+        {},
+        ["ambiguous"],
+        contract="open_world",
+        judge_decisions=(_decision(0, FormationMatchVerdict.UNCERTAIN),),
+    )
+    assert not uncertain.complete
+    assert uncertain.uncertain_prediction_indexes == (0,)
+    with pytest.raises(ValueError, match="open-world"):
+        score_formation(
+            {},
+            ["valid convention"],
+            judge_decisions=(_decision(0, FormationMatchVerdict.VALID_EXTRA),),
+        )
+
+
+def test_open_world_same_event_duplicate_cannot_gain_valid_extra_credit():
+    pending = score_formation({"g1": "A"}, ["A", " a "], contract="open_world")
+    assert pending.complete
+    assert pending.true_positive == 1
+    assert pending.false_positive == 1
+    assert pending.duplicate_prediction_indexes == (1,)
+    assert pending.needs_judge_prediction_indexes == ()
+    with pytest.raises(ValueError, match="duplicate prediction"):
+        score_formation(
+            {"g1": "A"},
+            ["A", " a "],
+            contract="open_world",
+            judge_decisions=(_decision(1, FormationMatchVerdict.VALID_EXTRA),),
+        )
+    # Independent events are scored independently; text equality across events is irrelevant.
+    assert score_formation({"e1": "A"}, ["A"], contract="open_world").true_positive == 1
+    assert score_formation({"e2": "A"}, ["A"], contract="open_world").true_positive == 1
+
+
 def test_retrieval_uses_recall_at_3_and_mrr_at_10_only():
     score = score_retrieval(["m1", "m2"], ["noise", "m2", "m2", "m1"])
     assert score.recall_at_3 == pytest.approx(0.5)

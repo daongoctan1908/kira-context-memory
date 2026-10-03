@@ -136,6 +136,7 @@ BENCHMARK_MEMORY_DATABASE_URL
 BENCHMARK_GATEWAY_URL
 BENCHMARK_WORKER_URL
 KIRA_*
+BENCHMARK_KIRA_CONTEXT_ISOLATION=unique_username
 ```
 
 Acceptance T5.2:
@@ -144,6 +145,7 @@ Acceptance T5.2:
 - extraction envelope và judge schema PASS;
 - embedding dimension/model khớp memory metadata;
 - pgvector, migrations, Gateway, Worker và KiRa route PASS;
+- username mới có quyền tương đương và history độc lập; case/arm/attempt không reuse KiRa context;
 - không endpoint nào trỏ external Internet;
 - missing/unsupported dependency giữ `NOT_RUN`/typed error;
 - telemetry backend tắt hoặc unreachable vẫn không làm readiness/business fail.

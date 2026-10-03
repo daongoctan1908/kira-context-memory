@@ -14,6 +14,7 @@ from evaluation.review import (
     build_review_packet,
     decision_template,
     freeze_reviewed_dataset,
+    update_external_provider_policy,
 )
 
 _DECISIONS = TypeAdapter(tuple[BundleReviewDecision, ...])
@@ -45,6 +46,21 @@ def _parser() -> argparse.ArgumentParser:
     destination = freeze.add_mutually_exclusive_group(required=True)
     destination.add_argument("--in-place", action="store_true")
     destination.add_argument("--output-root", type=Path)
+    policy = commands.add_parser(
+        "policy", help="record explicit external authorization for an already frozen dataset"
+    )
+    policy.add_argument("--root", type=Path, default=default_dataset_root())
+    policy.add_argument("--dataset-version", required=True)
+    access = policy.add_mutually_exclusive_group(required=True)
+    access.add_argument("--allow-pc-openai", action="store_true")
+    access.add_argument("--revoke-external-provider", action="store_true")
+    policy.add_argument("--actor", required=True)
+    policy.add_argument("--authorization-reference", required=True)
+    policy.add_argument("--notes", required=True)
+    policy.add_argument("--audit", type=Path, required=True)
+    policy_destination = policy.add_mutually_exclusive_group(required=True)
+    policy_destination.add_argument("--in-place", action="store_true")
+    policy_destination.add_argument("--output-root", type=Path)
     return parser
 
 
@@ -60,6 +76,24 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"PASS bundles={len(packet.bundles)} source_sha256={packet.source_sha256} "
                 f"packet={args.packet} decisions={args.decisions}"
+            )
+            return 0
+
+        if args.command == "policy":
+            report = update_external_provider_policy(
+                args.root,
+                dataset_version=args.dataset_version,
+                allow_pc_openai=args.allow_pc_openai,
+                actor=args.actor,
+                authorization_reference=args.authorization_reference,
+                notes=args.notes,
+                audit_path=args.audit,
+                output_root=None if args.in_place else args.output_root,
+            )
+            print(
+                f"PASS version={report.dataset_version} "
+                f"external_provider_allowed={str(report.external_provider_allowed).lower()} "
+                f"audit={args.audit} output={report.output_root}"
             )
             return 0
 

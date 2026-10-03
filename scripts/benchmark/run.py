@@ -293,6 +293,12 @@ def _run_offline(args: argparse.Namespace) -> int:
                     "outcome": "PASS",
                     "dataset_sha256": compilation.dataset_sha256,
                     "case_count": len(compilation.cases),
+                    "cross_session_source_pairs": sum(
+                        len(case.inputs.session_a_messages) // 2
+                        for case in compilation.cases
+                        if case.suite is Suite.CROSS_SESSION
+                        and case.eligibility.status == "eligible"
+                    ),
                     "output": str(args.output),
                 },
                 sort_keys=True,

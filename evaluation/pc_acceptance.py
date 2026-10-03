@@ -23,7 +23,7 @@ from evaluation.models import (
     Sha256,
     Suite,
 )
-from evaluation.pc_preflight import PcPreflightFreeze
+from evaluation.pc_preflight import PcPreflightRunSet
 
 _QUALITY_TERMINAL = {
     Outcome.PASS,
@@ -37,6 +37,7 @@ class PcVariantAcceptance(EvalModel):
     variant_id: Identifier
     benchmark_variant: BenchmarkVariant
     runtime_revision: GitSha
+    config_sha256: Sha256
     run_id: str
     eligible_cases: int = Field(ge=1)
     completed_eligible_cases: int = Field(ge=0)
@@ -58,14 +59,13 @@ class PcVariantAcceptance(EvalModel):
 
 
 class PcAcceptanceManifest(EvalModel):
-    schema_version: Literal[1] = 1
+    schema_version: Literal[2] = 2
     contract_id: Literal["kira-week5-benchmark-v4"] = BENCHMARK_CONTRACT_ID
     profile: Literal[Profile.PC_OPENAI_ACCEPTANCE] = Profile.PC_OPENAI_ACCEPTANCE
     official: Literal[False] = False
     quality_decision: Literal["diagnostic_only_no_promotion"] = "diagnostic_only_no_promotion"
     created_at: datetime
     dataset_sha256: Sha256
-    config_sha256: Sha256
     image_manifest_sha256: Sha256
     pc_preflight_sha256: Sha256
     variants: tuple[PcVariantAcceptance, ...] = Field(min_length=2, max_length=3)
@@ -134,8 +134,8 @@ def build_pc_acceptance(
     }
     eligible_ids = set().union(*eligible_by_suite.values())
 
-    preflight = PcPreflightFreeze.model_validate_json(pc_preflight_path.read_text(encoding="utf-8"))
-    if preflight.dataset_sha256 != compilation.dataset_sha256 or not preflight.ready:
+    preflight = PcPreflightRunSet.model_validate_json(pc_preflight_path.read_text(encoding="utf-8"))
+    if preflight.dataset_sha256 != compilation.dataset_sha256:
         raise ValueError("PC preflight is bound to another dataset or is not ready")
     image_manifest = json.loads(image_manifest_path.read_text(encoding="utf-8"))
     if image_manifest.get("contract_id") != BENCHMARK_CONTRACT_ID:
@@ -148,6 +148,8 @@ def build_pc_acceptance(
     expected_variant_ids = {"control", *(key for key in run_roots if key != "control")}
     if set(declared) != expected_variant_ids:
         raise ValueError("run variants do not match the exact image manifest")
+    if set(preflight.variants) != expected_variant_ids:
+        raise ValueError("run variants do not match the exact PC preflight run set")
 
     variant_results: list[PcVariantAcceptance] = []
     common_case_ids: tuple[str, ...] | None = None
@@ -155,11 +157,12 @@ def build_pc_acceptance(
     for variant_id in ordered_ids:
         store = _load_store(run_roots[variant_id])
         identity = store.manifest.identity
+        variant_preflight = preflight.variants[variant_id]
         if identity.profile is not Profile.PC_OPENAI_ACCEPTANCE or store.manifest.official:
             raise ValueError("run is not non-official PC acceptance evidence")
         if identity.dataset_sha256 != compilation.dataset_sha256:
             raise ValueError("run dataset hash differs from PC freeze")
-        if identity.config_sha256 != preflight.config_sha256:
+        if identity.config_sha256 != variant_preflight.config_sha256:
             raise ValueError("run config hash differs from PC freeze")
         if set(identity.suites) != set(Suite):
             raise ValueError("PC acceptance run must include all four suites")
@@ -183,6 +186,10 @@ def build_pc_acceptance(
             raise ValueError("run runtime SHA differs from exact image manifest")
         if identity.provenance.harness.sha != metadata.get("harness_revision"):
             raise ValueError("run harness SHA differs from exact image manifest")
+        if identity.provenance.harness.sha != variant_preflight.provenance.harness.sha:
+            raise ValueError("run harness SHA differs from current PC preflight")
+        if identity.provenance != variant_preflight.provenance:
+            raise ValueError("run provenance differs from its exact variant preflight")
         if identity.provenance.prompt_sha256 != metadata.get("prompt_sha256"):
             raise ValueError("run prompt hashes differ from exact image manifest")
         if identity.provenance.package_versions != metadata.get("package_versions"):
@@ -219,6 +226,7 @@ def build_pc_acceptance(
                 variant_id=variant_id,
                 benchmark_variant=identity.variant,
                 runtime_revision=identity.provenance.runtime.sha,
+                config_sha256=identity.config_sha256,
                 run_id=str(identity.run_id),
                 eligible_cases=len(eligible_ids),
                 completed_eligible_cases=completed,
@@ -234,7 +242,6 @@ def build_pc_acceptance(
     return PcAcceptanceManifest(
         created_at=now or datetime.now(UTC),
         dataset_sha256=compilation.dataset_sha256,
-        config_sha256=preflight.config_sha256,
         image_manifest_sha256=_file_sha256(image_manifest_path),
         pc_preflight_sha256=_file_sha256(pc_preflight_path),
         variants=tuple(variant_results),

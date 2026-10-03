@@ -5,8 +5,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
+import pytest
+
 from evaluation.artifacts import ArtifactRunIdentity, ArtifactStore, CaseAttemptArtifact
 from evaluation.compiler import compile_dataset
+from evaluation.config import EvalConfig
 from evaluation.models import (
     BenchmarkVariant,
     CandidateChangeScope,
@@ -18,13 +21,22 @@ from evaluation.models import (
     Suite,
 )
 from evaluation.pc_acceptance import build_pc_acceptance
-from evaluation.pc_preflight import PcPreflightFreeze, PcProviderIdentity
+from evaluation.pc_preflight import PcPreflightFreeze, PcPreflightRunSet, PcProviderIdentity
 from evaluation.scoring import output_sha256
 
 _DATASET_HASH = "d" * 64
-_CONFIG_HASH = "c" * 64
 _CONTROL_SHA = "75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00"
 _CANDIDATE_SHA = "1" * 40
+
+
+def _config_hash(variant: BenchmarkVariant) -> str:
+    target = "control" if variant is BenchmarkVariant.HISTORICAL_CONTROL else "candidate"
+    return EvalConfig(
+        profile=Profile.PC_OPENAI_ACCEPTANCE,
+        suites=tuple(Suite),
+        gateway_url=f"http://{target}-gateway:8000",
+        worker_url=f"http://{target}-worker:8001",
+    ).fingerprint()
 
 
 def _provenance(variant: BenchmarkVariant) -> RunProvenance:
@@ -90,7 +102,7 @@ def _write_store(
         dataset_version=compilation.dataset_version,
         dataset_sha256=_DATASET_HASH,
         compilation_sha256="e" * 64,
-        config_sha256=_CONFIG_HASH,
+        config_sha256=_config_hash(variant),
         seed=742,
         suites=tuple(Suite),
         selected_case_ids=tuple(case.case_id for case in compilation.cases),
@@ -181,19 +193,30 @@ def _evidence(tmp_path: Path, compilation) -> tuple[Path, Path]:
         encoding="utf-8",
     )
     preflight_path = tmp_path / "pc-preflight.json"
-    preflight = PcPreflightFreeze(
+    variants = {}
+    for name, variant in (
+        ("control", BenchmarkVariant.HISTORICAL_CONTROL),
+        ("candidate-a", BenchmarkVariant.RELEASE_CANDIDATE),
+    ):
+        variants[name] = PcPreflightFreeze(
+            created_at=datetime(2026, 9, 18, tzinfo=UTC),
+            dataset_id=compilation.dataset_id,
+            dataset_version=compilation.dataset_version,
+            dataset_sha256=_DATASET_HASH,
+            config_sha256=_config_hash(variant),
+            provider_preflight_sha256="f" * 64,
+            provider_run_id="00000000-0000-0000-0000-000000000001",
+            kira_response_sha256="9" * 64,
+            kira_identity_sha256="8" * 64,
+            kira_event_count=1,
+            kira_text_bytes=20,
+            providers={"extraction_json": PcProviderIdentity(requested_model="model")},
+            provenance=_provenance(variant),
+        )
+    preflight = PcPreflightRunSet(
         created_at=datetime(2026, 9, 18, tzinfo=UTC),
-        dataset_id=compilation.dataset_id,
-        dataset_version=compilation.dataset_version,
         dataset_sha256=_DATASET_HASH,
-        config_sha256=_CONFIG_HASH,
-        provider_preflight_sha256="f" * 64,
-        materialization_checkpoint_sha256="9" * 64,
-        kira_completed_tasks=80,
-        providers={
-            "extraction_json": PcProviderIdentity(requested_model="model"),
-        },
-        provenance=_provenance(BenchmarkVariant.RELEASE_CANDIDATE),
+        variants=variants,
     )
     preflight_path.write_text(
         preflight.model_dump_json(exclude_computed_fields=True),
@@ -225,6 +248,32 @@ def test_pc_acceptance_passes_only_technical_gates_without_quality_decision(tmp_
     assert result.quality_decision == "diagnostic_only_no_promotion"
     assert result.official is False
     assert [item.variant_id for item in result.variants] == ["control", "candidate-a"]
+    assert result.schema_version == 2
+    assert result.variants[0].config_sha256 != result.variants[1].config_sha256
+
+
+def test_pc_acceptance_rejects_preflight_for_another_variant_target(tmp_path, monkeypatch):
+    compilation = _small_compilation()
+    monkeypatch.setattr(
+        "evaluation.pc_acceptance.compile_dataset", lambda *_args, **_kwargs: compilation
+    )
+    control = tmp_path / "control"
+    candidate = tmp_path / "candidate-a"
+    _write_store(control, compilation, variant=BenchmarkVariant.HISTORICAL_CONTROL)
+    _write_store(candidate, compilation, variant=BenchmarkVariant.RELEASE_CANDIDATE)
+    image_manifest, preflight = _evidence(tmp_path, compilation)
+    document = json.loads(preflight.read_text(encoding="utf-8"))
+    document["variants"]["control"]["config_sha256"] = document["variants"]["candidate-a"][
+        "config_sha256"
+    ]
+    preflight.write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(ValueError, match="config hash"):
+        build_pc_acceptance(
+            run_roots={"control": control, "candidate-a": candidate},
+            dataset_root=tmp_path,
+            image_manifest_path=image_manifest,
+            pc_preflight_path=preflight,
+        )
 
 
 def test_pc_acceptance_safety_failure_blocks_handoff_but_does_not_promote(tmp_path, monkeypatch):

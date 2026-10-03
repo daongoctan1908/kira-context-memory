@@ -323,8 +323,28 @@ def _formation_case(context: _BundleContext, memory: Mapping[str, Any]) -> EvalC
     bundle_id = context.bundle.manifest.bundle_id
     local_id = str(memory["memory_id"])
     source_ids = [str(value) for value in memory["source_turn_ids"]]
-    supporting_ids = [str(value) for value in memory.get("supporting_turn_ids", [])]
-    messages, pending, source_rows = _evidence_window(context, source_ids + supporting_ids)
+    # A formation event ends at its actual source pair. Supporting evidence may be a later
+    # reinforcement; giving that to extraction would leak future context and change NewMessages.
+    source_messages, _, _ = _evidence_window(context, source_ids)
+    source_sessions = {message.session_id for message in source_messages}
+    if len(source_sessions) != 1:
+        raise ValueError("formation source event must belong to one original conversation")
+    source_session = next(iter(source_sessions))
+    selected_ids = {message.message_id for message in source_messages}
+    boundary = max(
+        index
+        for index, message in enumerate(context.messages)
+        if message.message_id in selected_ids
+    )
+    prefix_ids = [
+        message.local_message_id
+        for message in context.messages[: boundary + 1]
+        if message.session_id == source_session
+    ]
+    messages, pending, source_rows = _evidence_window(context, prefix_ids)
+    boundary_source_ids = (
+        tuple(message.message_id for message in messages[-2:]) if not pending else ()
+    )
     event_id = namespace_id(bundle_id, local_id)
     should_store = bool(memory["should_store"])
     facts = (
@@ -356,9 +376,15 @@ def _formation_case(context: _BundleContext, memory: Mapping[str, Any]) -> EvalC
         ),
         source_row_ids=tuple(dict.fromkeys((*source_rows, memory_row))),
         eligibility=_eligibility("pending_kira_assistant" if pending else ""),
-        inputs=FormationInput(user_id=context.user_id, messages=messages),
+        inputs=FormationInput(
+            user_id=context.user_id,
+            messages=messages,
+            source_message_ids=boundary_source_ids,
+        ),
         gold=GoldSpecification(
             facts=facts,
+            formation_contract="open_world",
+            forbidden_facts=(() if should_store else (str(memory["canonical_fact"]),)),
             semantic_expectation=(
                 str(memory["canonical_fact"])
                 if should_store
@@ -508,7 +534,13 @@ def _cross_session_case(context: _BundleContext, row: Mapping[str, Any]) -> Eval
             raise ValueError(f"unknown active memory row: {bundle_id}:{memory_id}") from error
         evidence_ids.extend(str(value) for value in memory["source_turn_ids"])
         evidence_ids.extend(str(value) for value in memory.get("supporting_turn_ids", []))
-    messages, pending, message_rows = _evidence_window(context, evidence_ids)
+    # QA gold is the end-of-bundle corpus, so replay the original complete trajectory rather
+    # than concatenate chosen active assertions. Superseded/cancelled events and their context
+    # must still reach native formation, in their own source conversations.
+    _evidence_window(context, evidence_ids)  # Validate references before expanding the trajectory.
+    messages, pending, message_rows = _evidence_window(
+        context, (message.local_message_id for message in context.messages)
+    )
     relevant_local_ids = tuple(
         dict.fromkeys(
             [
@@ -531,6 +563,30 @@ def _cross_session_case(context: _BundleContext, row: Mapping[str, Any]) -> Eval
             for memory_id in dict.fromkeys((*active_memory_ids, *relevant_local_ids))
         ),
     ]
+    # Native cross-session mapping must not depend on also selecting the formation suite.
+    # These are judge/scoring references only; Session A still forms its entire corpus natively.
+    gold = _qa_gold(bundle_id, row).model_copy(
+        update={
+            "facts": tuple(
+                GoldFact(
+                    gold_id=namespace_id(bundle_id, memory_id),
+                    text=str(memories_by_id[memory_id]["canonical_fact"]),
+                    evidence_message_ids=tuple(
+                        namespace_id(bundle_id, str(source_id))
+                        for source_id in dict.fromkeys(
+                            (
+                                *memories_by_id[memory_id]["source_turn_ids"],
+                                *memories_by_id[memory_id].get("supporting_turn_ids", []),
+                            )
+                        )
+                    ),
+                    attributed_to="user",
+                )
+                for memory_id in relevant_local_ids
+                if memory_id in memories_by_id
+            )
+        }
+    )
     return EvalCase(
         case_id=namespace_id(bundle_id, f"cross-session:{local_id}"),
         family_id=namespace_id(bundle_id, f"scenario:{row['scenario_group']}"),
@@ -551,7 +607,7 @@ def _cross_session_case(context: _BundleContext, row: Mapping[str, Any]) -> Eval
                 )
             ),
         ),
-        gold=_qa_gold(bundle_id, row),
+        gold=gold,
         review=context.bundle.manifest.review,
     )
 

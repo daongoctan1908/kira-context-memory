@@ -179,6 +179,78 @@ class _NeverJudge:
         raise AssertionError("exact formation match must not call the semantic judge")
 
 
+async def test_open_world_negative_allows_other_valid_source_fact_but_rejects_forbidden_target():
+    from evaluation.scoring import FormationMatchDecision, FormationMatchVerdict, JudgeProvenance
+
+    base = _case(should_store=False)
+    case = base.model_copy(
+        update={
+            "inputs": FormationInput(
+                user_id="conv01:user",
+                messages=(
+                    Message(
+                        message_id="conv01:t1",
+                        role="user",
+                        content="Mật khẩu là secret. Từ nay ưu tiên Hà Nội.",
+                    ),
+                ),
+                source_message_ids=("conv01:t1",),
+            ),
+            "gold": base.gold.model_copy(
+                update={
+                    "formation_contract": "open_world",
+                    "forbidden_facts": ("Mật khẩu là secret",),
+                    "semantic_expectation": "Never store the password; preferences may be stored.",
+                }
+            ),
+        }
+    )
+
+    class Judge:
+        async def formation(self, **kwargs):
+            assert kwargs["forbidden_facts"] == ("Mật khẩu là secret",)
+            return tuple(
+                FormationMatchDecision(
+                    prediction_index=index,
+                    verdict=(
+                        FormationMatchVerdict.VALID_EXTRA
+                        if kwargs["predicted_facts"][index] == "Ưu tiên Hà Nội"
+                        else FormationMatchVerdict.NO_MATCH
+                    ),
+                    reason_code="source_permission",
+                    judge=JudgeProvenance(
+                        provider="internal",
+                        model="judge",
+                        prompt_sha256="a" * 64,
+                        response_schema_sha256="b" * 64,
+                    ),
+                )
+                for index in kwargs["prediction_indexes"]
+            )
+
+    valid = await NativeFormationEvaluator(
+        _Runtime((_fact("Ưu tiên Hà Nội", "GLOBAL"),), ("Ưu tiên Hà Nội",)),
+        Judge(),  # type: ignore[arg-type]
+    ).evaluate(case)
+    assert valid.outcome is Outcome.PASS
+    assert valid.score.valid_extra == 1
+    assert valid.score.false_positive == 0
+    assert not valid.scope_semantics.false_global_promotion
+    assert valid.scope_semantics.missed_global_count == 0
+
+    leaked = await NativeFormationEvaluator(
+        _Runtime(
+            (_fact("Ưu tiên Hà Nội", "GLOBAL"), _fact("Mật khẩu là secret", "GLOBAL")),
+            ("Ưu tiên Hà Nội", "Mật khẩu là secret"),
+        ),
+        Judge(),  # type: ignore[arg-type]
+    ).evaluate(case)
+    assert leaked.outcome is Outcome.FAIL
+    assert leaked.score.valid_extra == 1
+    assert leaked.score.false_positive == 1
+    assert leaked.scope_semantics.missed_global_count == 1
+
+
 # TC-1: matched gold CONVERSATION + predicted CONVERSATION → PASS
 async def test_tc1_conversation_pair_passes():
     result = await _evaluate(

@@ -111,6 +111,10 @@ def build_extraction_messages(case: MemoryPolicyCase) -> list[dict[str, str]]:
 
 def parse_memory_facts(content: object) -> tuple[str, ...]:
     """Parse the same JSON memory envelope consumed by Mem0's V3 pipeline."""
+    return tuple(text for text, _ in _parse_memory_records(content))
+
+
+def _parse_memory_records(content: object) -> tuple[tuple[str, str], ...]:
     cleaned = remove_code_blocks(content)
     if not cleaned:
         raise PolicyEvalProtocolError
@@ -124,7 +128,7 @@ def parse_memory_facts(content: object) -> tuple[str, ...]:
     if not isinstance(payload, Mapping) or not isinstance(payload.get("memory"), list):
         raise PolicyEvalProtocolError
 
-    facts: list[str] = []
+    facts: list[tuple[str, str]] = []
     for item in payload["memory"]:
         if not isinstance(item, Mapping):
             raise PolicyEvalProtocolError
@@ -140,12 +144,17 @@ def parse_memory_facts(content: object) -> tuple[str, ...]:
         # invalid scopes rather than scoring a candidate that native would drop.
         if classify_scope(item.get("scope")) == "INVALID":
             raise PolicyEvalProtocolError
-        facts.append(text.strip())
+        scope = classify_scope(item.get("scope"))
+        facts.append((text.strip(), "CONVERSATION" if scope == "MISSING" else scope))
     return tuple(facts)
 
 
 def score_case(
-    case: MemoryPolicyCase, facts: Sequence[str], latency_ms: int = 0
+    case: MemoryPolicyCase,
+    facts: Sequence[str],
+    latency_ms: int = 0,
+    *,
+    scopes: Sequence[str] = (),
 ) -> PolicyEvalResult:
     """Score facts without returning their potentially sensitive text in evidence."""
     expectation = case.expectation
@@ -155,6 +164,10 @@ def score_case(
 
     if not expectation.min_facts <= len(facts) <= expectation.max_facts:
         reasons.append("fact_count")
+    if expectation.expected_scope is not None and (
+        len(scopes) != len(facts) or any(scope != expectation.expected_scope for scope in scopes)
+    ):
+        reasons.append("scope_mismatch")
     for term in expectation.required_terms:
         if _normalize(term) not in normalized:
             reasons.append("missing_required_term")
@@ -205,7 +218,8 @@ class MemoryPolicyEvalClient:
                 },
             )
             response.raise_for_status()
-            facts = parse_memory_facts(_response_content(response))
+            records = _parse_memory_records(_response_content(response))
+            facts = tuple(text for text, _ in records)
         except httpx.HTTPError as error:
             return PolicyEvalResult(
                 case=case.name,
@@ -222,7 +236,9 @@ class MemoryPolicyEvalClient:
                 fact_count=0,
                 latency_ms=_latency_ms(started),
             )
-        return score_case(case, facts, _latency_ms(started))
+        return score_case(
+            case, facts, _latency_ms(started), scopes=tuple(scope for _, scope in records)
+        )
 
 
 async def evaluate_cases(

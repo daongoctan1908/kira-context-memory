@@ -3,6 +3,8 @@
 import json
 import math
 import re
+from hashlib import sha256
+from uuid import uuid4
 
 import httpx
 from pydantic import ValidationError
@@ -11,6 +13,28 @@ from evaluation.config import EvalConfig, ProviderConfig
 from evaluation.errors import PreflightError, ProtocolError
 from evaluation.models import Outcome, Reason, TokenUsage
 from evaluation.scoring import classify_scope
+
+KIRA_READINESS_INPUT = "Kiểm tra kết nối: hãy trả lời một câu ngắn xác nhận đã nhận tin nhắn."
+
+
+class _BoundedResponseStream(httpx.AsyncByteStream):
+    """Bound authentication bodies and SSE lines before the native parser allocates them."""
+
+    def __init__(self, stream: httpx.AsyncByteStream, limit: int) -> None:
+        self._stream = stream
+        self._limit = limit
+
+    async def __aiter__(self):
+        size = 0
+        async for chunk in self._stream:
+            size += len(chunk)
+            if size > self._limit:
+                raise ProtocolError(Reason.RESPONSE_TOO_LARGE)
+            yield chunk
+
+    async def aclose(self) -> None:
+        await self._stream.aclose()
+
 
 EXTRACTION_SYSTEM = (
     'Return only JSON in the native Mem0 V3 envelope: {"memory":['
@@ -326,3 +350,84 @@ class ProviderProbes:
         if not isinstance(response, dict) or response.get("stub") != "kira-synthetic-local-only":
             raise ProtocolError(Reason.INVALID_HEALTH)
         return {}
+
+    async def kira_real(self) -> dict:
+        """Authenticate and exhaust one synthetic chat on a fresh approved identity."""
+
+        from app.config.settings import Settings
+        from app.domain.errors.kira import (
+            KiraAuthenticationError,
+            KiraConnectionError,
+            KiraHttpError,
+            KiraProtocolError,
+            KiraTimeoutError,
+        )
+        from app.infrastructure.kira.http_kira_client import KiraHttpAdapter
+
+        config = self.config
+        identity = f"benchmark_preflight_{uuid4().hex}"
+        # EvalConfig validates the explicit values; construct without loading app .env.
+        settings = Settings.model_construct(
+            kira_base_url=config.kira_base_url,
+            kira_username=identity,
+            kira_domain=config.kira_domain,
+            kira_basic_auth=config.kira_basic_auth,
+            kira_service_id=config.kira_service_id,
+            kira_device=config.kira_device,
+            kira_message_type=config.kira_message_type,
+            kira_connect_timeout_seconds=config.connect_timeout_seconds,
+            kira_read_timeout_seconds=config.read_timeout_seconds,
+            otel_enabled=False,
+            otel_capture_content_enabled=False,
+        )
+
+        async def bound_response(response: httpx.Response) -> None:
+            if response.is_stream_consumed:
+                if len(response.content) > config.max_response_bytes:
+                    raise ProtocolError(Reason.RESPONSE_TOO_LARGE)
+            else:
+                response.stream = _BoundedResponseStream(response.stream, config.max_response_bytes)
+
+        hooks = self.client.event_hooks["response"]
+        hooks.append(bound_response)
+        stream = None
+        try:
+            adapter = KiraHttpAdapter(self.client, settings)
+            stream = await adapter.chat_stream(KIRA_READINESS_INPUT)
+            digest = sha256()
+            text_bytes = 0
+            events = 0
+            has_text = False
+            async for event in stream:
+                events += 1
+                if event.text_fragment:
+                    fragment = event.text_fragment.encode("utf-8")
+                    text_bytes += len(fragment)
+                    digest.update(fragment)
+                    has_text = has_text or bool(event.text_fragment.strip())
+            if not events or not has_text:
+                raise ProtocolError(Reason.INVALID_CHAT)
+            return {
+                "kira_response_sha256": digest.hexdigest(),
+                "kira_event_count": events,
+                "kira_text_bytes": text_bytes,
+                "kira_context_isolation": "unique_username",
+                "kira_identity_sha256": sha256(identity.encode()).hexdigest(),
+            }
+        except KiraAuthenticationError:
+            raise PreflightError(Outcome.DEPENDENCY_ERROR, Reason.AUTH) from None
+        except KiraHttpError as error:
+            reason = Reason.AUTH if error.status_code in (401, 403) else Reason.HTTP_STATUS
+            raise PreflightError(
+                Outcome.DEPENDENCY_ERROR, reason, http_status=error.status_code
+            ) from None
+        except KiraTimeoutError:
+            raise PreflightError(Outcome.DEPENDENCY_ERROR, Reason.TIMEOUT) from None
+        except KiraConnectionError:
+            raise PreflightError(Outcome.DEPENDENCY_ERROR, Reason.CONNECTION) from None
+        except (KiraProtocolError, UnicodeError):
+            raise ProtocolError(Reason.INVALID_CHAT) from None
+        finally:
+            if stream is not None:
+                await stream.aclose()
+            hooks.remove(bound_response)

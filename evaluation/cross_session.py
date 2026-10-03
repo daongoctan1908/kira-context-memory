@@ -18,6 +18,7 @@ from evaluation.models import (
     NonEmpty,
     Outcome,
     Profile,
+    Sha256,
     Suite,
 )
 from evaluation.rewrite import RewriteJudgePort
@@ -47,6 +48,17 @@ class MemoryReadinessStatus(StrEnum):
 
 class MemoryJobHandle(EvalModel):
     event_id: UUID
+    # The anchor event preserves the single-event protocol; native trajectories list every
+    # source receipt so one completed final turn cannot stand in for an incomplete history.
+    source_event_ids: tuple[UUID, ...] = ()
+
+    @model_validator(mode="after")
+    def source_events_are_consistent(self) -> "MemoryJobHandle":
+        if len(self.source_event_ids) != len(set(self.source_event_ids)):
+            raise ValueError("source event IDs must be unique")
+        if self.source_event_ids and self.event_id not in self.source_event_ids:
+            raise ValueError("memory job anchor must belong to its source events")
+        return self
 
 
 class MemoryReadiness(EvalModel):
@@ -73,6 +85,7 @@ class SessionBExecution(EvalModel):
     session_id: Identifier
     current_query: NonEmpty
     provider_id: NonEmpty
+    kira_context_identity_sha256: Sha256 | None = None
     retrieved_memories: tuple[RetrievedMemory, ...] = ()
     rewritten_query: NonEmpty
     final_answer: NonEmpty
@@ -115,6 +128,7 @@ class CrossSessionArmEvaluation(EvalModel):
     outcome: Outcome
     rewritten_query: NonEmpty
     final_answer: NonEmpty
+    kira_context_identity_sha256: Sha256 | None = None
     retrieval: RetrievalScore | None = None
     rewrite_constraints: ConstraintScore
     rewrite_judgment: SemanticJudgment | None = None
@@ -209,10 +223,11 @@ class CrossSessionEvaluator:
         handle: MemoryJobHandle | None = None
         try:
             handle = await self._runtime.persist_session_a(case)
-            async with asyncio.timeout(self._readiness_timeout):
+            readiness_budget = self._readiness_timeout * max(1, len(handle.source_event_ids))
+            async with asyncio.timeout(readiness_budget):
                 readiness = await self._runtime.wait_for_memory(
                     handle,
-                    timeout_seconds=self._readiness_timeout,
+                    timeout_seconds=readiness_budget,
                 )
         except TimeoutError:
             return self._failure(
@@ -416,6 +431,7 @@ class CrossSessionEvaluator:
             outcome=outcome,
             rewritten_query=execution.rewritten_query,
             final_answer=execution.final_answer,
+            kira_context_identity_sha256=execution.kira_context_identity_sha256,
             retrieval=retrieval,
             rewrite_constraints=constraints,
             rewrite_judgment=rewrite_judgment,
@@ -472,6 +488,11 @@ class CrossSessionEvaluator:
             violations.append("cross_session_pair_query_drift")
         if no_ltm.provider_id != with_ltm.provider_id:
             violations.append("cross_session_pair_provider_drift")
+        if (
+            no_ltm.kira_context_identity_sha256 is not None
+            and no_ltm.kira_context_identity_sha256 == with_ltm.kira_context_identity_sha256
+        ):
+            violations.append("cross_session_kira_context_not_isolated")
         return tuple(violations)
 
     @staticmethod
