@@ -88,6 +88,65 @@ def test_gateway_metric_count_outcome_units_and_buckets_match_contract() -> None
     provider.shutdown()
 
 
+@pytest.mark.parametrize("outcome", ("active", "inactive"))
+def test_gateway_records_conversation_activity_stage(outcome: str) -> None:
+    reader = InMemoryMetricReader()
+    provider = MeterProvider(metric_readers=[reader])
+    observed = GatewayMetrics(provider.get_meter("gateway-test"))
+
+    observed.stage_observed("conversation.check_active", outcome, 0.03)
+
+    point = metric_by_name(reader, "kira.stage.duration").data.data_points[0]
+    assert point.attributes == {"stage": "conversation.check_active", "outcome": outcome}
+    assert point.count == 1
+    assert point.sum == pytest.approx(0.03)
+    provider.shutdown()
+
+
+@pytest.mark.parametrize(
+    ("stage", "outcome"),
+    (
+        ("mem0.extract.scope", "enforced"),
+        ("mem0.persist", "scope_dropped"),
+        ("memory_job.transition", "skipped"),
+    ),
+)
+def test_worker_records_scope_and_skipped_job_stages(stage: str, outcome: str) -> None:
+    reader = InMemoryMetricReader()
+    provider = MeterProvider(metric_readers=[reader])
+    observed = WorkerMetrics(provider.get_meter("worker-test"))
+
+    observed.stage_observed(stage, outcome, 0.02)
+
+    point = metric_by_name(reader, "kira.stage.duration").data.data_points[0]
+    assert point.attributes == {"stage": stage, "outcome": outcome}
+    assert point.count == 1
+    assert point.sum == pytest.approx(0.02)
+    provider.shutdown()
+
+
+def test_worker_records_skipped_jobs_in_processing_count_and_duration() -> None:
+    reader = InMemoryMetricReader()
+    provider = MeterProvider(metric_readers=[reader])
+    observed = WorkerMetrics(provider.get_meter("worker-test"))
+
+    observed.job_processed(
+        outcome="skipped",
+        seconds=0.04,
+        attempt_count=1,
+        lifecycle_event_count=None,
+    )
+
+    count = metric_by_name(reader, "kira.memory.job.process.count").data.data_points[0]
+    duration = metric_by_name(reader, "kira.memory.job.process.duration").data.data_points[0]
+    assert count.attributes == {"outcome": "skipped"}
+    assert count.value == 1
+    assert duration.attributes == {"outcome": "skipped"}
+    assert duration.count == 1
+    assert duration.sum == pytest.approx(0.04)
+    provider.shutdown()
+
+
 def test_worker_observable_gauges_read_only_cached_snapshot() -> None:
     reader = InMemoryMetricReader()
     provider = MeterProvider(metric_readers=[reader])

@@ -335,6 +335,51 @@ def test_explicit_internal_provider_and_config_knobs():
         assert "internal-secret" not in output
 
 
+def test_internal_rewriter_preserves_exact_path_like_served_model_identifier():
+    served_model = "/models/Qwen3_14B"
+    config = load_config(
+        profile=Profile.INTERNAL_TEST,
+        suites=(Suite.REWRITE,),
+        environment={
+            "BENCHMARK_REWRITE_BASE_URL": "http://qwen.internal/v1",
+            "BENCHMARK_REWRITE_MODEL": served_model,
+        },
+    )
+
+    assert config.rewrite.configured
+    assert config.rewrite.model == served_model
+    assert config.model_dump(mode="json")["rewrite"]["model"] == served_model
+    other = config.model_copy(
+        update={"rewrite": config.rewrite.model_copy(update={"model": "Qwen3_14B"})}
+    )
+    assert other.fingerprint() != config.fingerprint()
+
+
+@pytest.mark.parametrize("model", ["/models/Qwen3_14B", "org/model.v1", "a" * 200])
+def test_provider_model_identifier_accepts_opaque_names_within_existing_length_bound(model):
+    assert ProviderConfig(model=model).model == model
+
+
+@pytest.mark.parametrize(
+    "model",
+    [
+        "",
+        " /models/Qwen3_14B",
+        "/models/Qwen3_14B ",
+        "/models/Qwen3 14B",
+        "/models/Qwen3_14B\n",
+        "/models/Qwen3_14B\t",
+        "/models/\x00Qwen3_14B",
+        "a" * 201,
+        "/" + "a" * 200,
+        "sk-synthetic-only",
+    ],
+)
+def test_provider_model_identifier_still_rejects_whitespace_controls_and_oversized_names(model):
+    with pytest.raises(ValidationError):
+        ProviderConfig(model=model)
+
+
 def test_custom_endpoint_does_not_receive_shared_openai_key():
     config = load_config(
         profile=Profile.EXTERNAL_SYNTHETIC,

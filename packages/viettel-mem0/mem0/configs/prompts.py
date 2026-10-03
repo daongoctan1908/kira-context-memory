@@ -974,16 +974,6 @@ The attributed_to field should still reflect the original source: "user" for fac
 # Ported from platform/backend/shared/core/utils/prompt_builder.py
 # ---------------------------------------------------------------------------
 
-PAST_MESSAGE_TRUNCATION_LIMIT = 300
-
-
-def _truncate_content(text, limit=PAST_MESSAGE_TRUNCATION_LIMIT):
-    """Truncate text to limit characters, appending '...' when shortened."""
-    if len(text) <= limit:
-        return text
-    return text[:limit] + "..."
-
-
 def _format_summary(summary):
     """Extract summary text from a string or dict with a 'summary' key."""
     if isinstance(summary, dict):
@@ -992,7 +982,7 @@ def _format_summary(summary):
 
 
 def _format_conversation_history(messages):
-    """Format message dicts into 'role: content' lines with truncation."""
+    """Format complete message dicts into 'role: content' lines."""
     if not messages:
         return ""
     result = ""
@@ -1000,7 +990,7 @@ def _format_conversation_history(messages):
         role = msg.get("role", "")
         content = msg.get("message") or msg.get("content", "")
         if role and content:
-            result += f"{role}: {_truncate_content(content)}\n"
+            result += f"{role}: {content}\n"
     return result
 
 

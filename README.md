@@ -16,8 +16,9 @@ Luồng sản phẩm local đã có:
 - frontend React cho login, conversation list, chat, retry và deletion-pending;
 - Docker product E2E với các provider mock explicit.
 
-Chất lượng chính thức chưa được công bố. Dataset cần được materialize bằng KiRa thật trên PC công
-ty, sau đó control/candidate mới được chạy với internal models trên K8s. Xem:
+Chất lượng chính thức chưa được công bố. Dataset hiện đã materialize/review và ở trạng thái
+`benchmark_ready`; trên PC công ty cần validate bản freeze, chỉ materialize phần pending nếu có.
+Control/candidate chính thức chạy với internal models trên K8s. Xem:
 
 - [Master implementation plan](docs/production-readiness-plan.md)
 - [Company PC AI handoff](docs/company-pc-ai-handoff.md)
@@ -181,6 +182,11 @@ Runbook nằm trong [local product acceptance](docs/product-e2e.md#openai-runtim
 
 ## Local observability và Langfuse
 
+Telemetry là tùy chọn: `OTEL_ENABLED=false` mặc định, chat và Worker vẫn chạy bình thường.
+Khi bật OTel, `OTEL_CAPTURE_CONTENT_ENABLED=false` mặc định chỉ ghi timing, outcome, model,
+usage và IDs; đặt `true` khi cần debug prompt/output đã mask. Langfuse không phải dependency
+readiness hay điều kiện để chạy benchmark.
+
 OTel Collector là overlay fail-open của product stack. Prometheus/Grafana chỉ chạy khi bật profile
 `metrics`:
 
@@ -190,7 +196,12 @@ docker compose -f compose.product.yaml -f compose.observability.yaml up -d --bui
 
 Langfuse local acceptance:
 
+Overlay này pin Langfuse `3.225.7` bằng image digest và bật capture cho dữ liệu giả lập.
+Nếu môi trường đã đặt `OTEL_CAPTURE_CONTENT_ENABLED=false`, đặt lại `true` khi chạy bài smoke
+có kiểm tra input/output:
+
 ```powershell
+$env:OTEL_CAPTURE_CONTENT_ENABLED = "true"
 $compose = @(
   "-f", "compose.product.yaml",
   "-f", "compose.observability.yaml",
@@ -201,6 +212,10 @@ docker compose @compose config --quiet
 docker compose @compose up -d --build --wait
 uv run python -m scripts.local.smoke_langfuse
 ```
+
+Để kiểm tra chế độ chỉ ghi timing/metadata, khởi động lại Gateway và Worker với
+`OTEL_CAPTURE_CONTENT_ENABLED=false`, rồi chạy smoke với `--no-capture-content`.
+Bài kiểm tra này vẫn yêu cầu model/token usage và xác nhận mọi input/output đều vắng mặt.
 
 Mở `http://127.0.0.1:13001`. Credential mặc định chỉ dành cho local acceptance:
 `local@example.invalid` / `local-acceptance-only`. Trace tìm được bằng `correlation_id`, `turn_id`,

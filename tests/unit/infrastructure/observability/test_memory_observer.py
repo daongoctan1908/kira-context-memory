@@ -9,6 +9,7 @@ from app.infrastructure.observability.langfuse_attributes import (
     OBSERVATION_USAGE,
 )
 from app.infrastructure.observability.memory_observer import MemoryObserver
+from app.infrastructure.observability.tracing import bind_content_capture
 
 
 class BrokenMapping(dict):
@@ -22,7 +23,7 @@ def test_memory_observer_emits_masked_generation_with_model_usage_and_outcome() 
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     observer = MemoryObserver(provider.get_tracer("test"))
 
-    with observer.observe("mem0.extract", kind="client") as observation:
+    with bind_content_capture(True), observer.observe("mem0.extract", kind="client") as observation:
         observation.set_input({"content": "subscriber user@example.com"})
         observation.set_attribute("gen_ai.request.model", "memory-model")
         observation.set_usage({"input": 10, "output": 4, "total": 14})
@@ -61,9 +62,12 @@ def test_memory_observer_omits_unsafe_model_and_unmaskable_content() -> None:
     provider = TracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
 
-    with MemoryObserver(provider.get_tracer("test")).observe(
-        "mem0.extract", kind="client"
-    ) as observation:
+    with (
+        bind_content_capture(True),
+        MemoryObserver(provider.get_tracer("test")).observe(
+            "mem0.extract", kind="client"
+        ) as observation,
+    ):
         observation.set_attribute("gen_ai.request.model", "unsafe model " + "secret" * 30)
         observation.set_input(BrokenMapping(secret="private-input"))
         observation.set_output(BrokenMapping(secret="private-output"))

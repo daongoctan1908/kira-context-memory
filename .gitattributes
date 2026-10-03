@@ -21,3 +21,14 @@ Dockerfile text eol=lf
 *.yaml text eol=lf
 *.yml text eol=lf
 *.md text eol=lf
+
+# Frozen manifest hashes pin these eight bundle files' raw CRLF bytes.
+# Keep their checkout bytes identical on Windows and Linux; other JSON stays LF.
+dataset/kira_ltm_v1/bundles/conv01/conversation.json text eol=crlf
+dataset/kira_ltm_v1/bundles/conv01/qa.json text eol=crlf
+dataset/kira_ltm_v1/bundles/conv02/conversation.json text eol=crlf
+dataset/kira_ltm_v1/bundles/conv02/qa.json text eol=crlf
+dataset/kira_ltm_v1/bundles/conv03/conversation.json text eol=crlf
+dataset/kira_ltm_v1/bundles/conv03/qa.json text eol=crlf
+dataset/kira_ltm_v1/bundles/conv04/conversation.json text eol=crlf
+dataset/kira_ltm_v1/bundles/conv04/qa.json text eol=crlf

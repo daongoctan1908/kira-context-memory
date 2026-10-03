@@ -3,6 +3,18 @@
 The pristine upstream baseline is commit `4c95a43`. This ledger describes every
 intentional delta after that point.
 
+## Source-tree cleanup (no runtime release)
+
+- Omit upstream `server/`, `mem0-ts/`, `cli/`, `integrations/`, `examples/`, `skills/`,
+  repository `scripts/` and the unused `poetry.lock` from the KiRa checkout.
+- Omit the six editor-plugin marketplace catalogs whose integrations are not included.
+- Retain the complete Python SDK/providers, notices, SDK tests/docs, license and provenance.
+- Point the README skills catalog to upstream and document the selective checkout.
+
+These paths are excluded from the Python wheel and are not copied by KiRa's runtime or evaluator
+Dockerfile. Package code, configuration, API, schema and version stay unchanged. The pristine
+vendor commit remains intact and contains the omitted projects.
+
 ## Packaging delta: `2.0.20+viettel.1`
 
 - Rename the Python distribution from `mem0ai` to `viettel-mem0`.
@@ -88,3 +100,21 @@ owner from vector payloads or durable memory jobs and refuses to guess unresolve
 
 The memory table and receipt shape remain schema version 3. Existing `.5` schema metadata upgrades
 in place to `.6`; no vector, receipt, or application conversation data is rewritten.
+
+## Source-event formation context: `2.0.20+viettel.7`
+
+- Add optional per-call `last_k_messages` on `Memory.add` and `AsyncMemory.add` for preceding
+  extraction context. `None` retains native history lookup; `[]` means authoritative empty
+  context. Receipt replay returns before resolving context or invoking providers.
+- Render preceding messages in full; remove the former 300-character per-message truncation.
+  Caller-owned transcript windows remain responsible for bounding context.
+- Use optional `metadata.source_timestamp` as the existing prompt builder's Observation Date.
+  Preserve its timezone-aware ISO value; the public OSS `timestamp` parameter remains unsupported.
+- Preserve each emitted GLOBAL assertion from a distinct formation event even when its content
+  hash already exists. Same-event receipt replay and within-batch deduplication still apply;
+  CONVERSATION candidates and callers without formation identity retain native hash deduplication.
+
+Formation and native search remain ADD-only and keep their existing interfaces apart from the
+optional context argument. The KiRa adapter supplies only the source pair as New Messages, uses
+eligible earlier PostgreSQL pairs as context, and records the source user's timestamp. Neither
+native history caching nor new schema, mutable profile, or supersession machinery is introduced.

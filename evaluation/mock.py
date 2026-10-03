@@ -34,6 +34,7 @@ def mock_response(request: httpx.Request) -> httpx.Response:
                             "id": "0",
                             "text": "User prefers tables.",
                             "attributed_to": "user",
+                            "scope": "GLOBAL",
                         }
                     ]
                 }

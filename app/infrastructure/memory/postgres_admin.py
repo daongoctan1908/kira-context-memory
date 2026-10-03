@@ -28,7 +28,7 @@ PREVIOUS_MEM0_SCHEMA_CONTRACT_VERSION = "2.0.20+viettel.3"
 COMPATIBLE_MEMORY_SCHEMA_VERSION = 3
 COMPATIBLE_MEM0_SCHEMA_CONTRACT_VERSION = "2.0.20+viettel.5"
 MEM0_SCHEMA_CONTRACT_VERSION = "2.0.20+viettel.6"
-CURRENT_MEM0_DISTRIBUTION_VERSION = "2.0.20+viettel.6"
+CURRENT_MEM0_DISTRIBUTION_VERSION = "2.0.20+viettel.7"
 FORMATION_RECEIPT_SUFFIX = "_formation_receipts"
 
 
@@ -681,9 +681,7 @@ def _plan_scope_backfill_row(
 
     conversation_id_valid = isinstance(conversation_id, str) and bool(conversation_id.strip())
     try:
-        normalized_conversation_id = (
-            str(UUID(conversation_id)) if conversation_id_valid else None
-        )
+        normalized_conversation_id = str(UUID(conversation_id)) if conversation_id_valid else None
     except (ValueError, AttributeError, TypeError):
         normalized_conversation_id = None
         conversation_id_valid = False

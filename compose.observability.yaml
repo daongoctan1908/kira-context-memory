@@ -49,15 +49,9 @@ services:
     environment:
       OTEL_ENABLED: "true"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-    depends_on:
-      otel-collector:
-        condition: service_started
 
   worker:
     environment:
       APP_ENVIRONMENT: test
       OTEL_ENABLED: "true"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-    depends_on:
-      otel-collector:
-        condition: service_started

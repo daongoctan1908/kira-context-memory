@@ -60,11 +60,13 @@ class LangfuseAcceptanceOptions:
     public_key: str
     secret_key: str
     timeout_seconds: float
+    capture_content: bool = True
 
 
 async def run(options: LangfuseAcceptanceOptions) -> None:
     started_at = datetime.now(UTC) - timedelta(seconds=1)
-    await run_product_smoke(options.product)
+    product_result = await run_product_smoke(options.product)
+    expected_event_ids = frozenset(str(event_id) for event_id in product_result.event_ids)
 
     timeout = httpx.Timeout(options.timeout_seconds)
     auth = httpx.BasicAuth(options.public_key, options.secret_key)
@@ -73,9 +75,12 @@ async def run(options: LangfuseAcceptanceOptions) -> None:
             client,
             options,
             started_at=started_at,
+            expected_event_ids=expected_event_ids,
         )
 
-    retrieval_trace, formation_trace = _validate_traces(chat_traces, worker_traces)
+    retrieval_trace, formation_trace = _validate_traces(
+        chat_traces, worker_traces, capture_content=options.capture_content
+    )
 
     retrieval_metadata = _trace_metadata(retrieval_trace)
     formation_metadata = _trace_metadata(formation_trace)
@@ -96,6 +101,7 @@ async def _wait_for_traces(
     options: LangfuseAcceptanceOptions,
     *,
     started_at: datetime,
+    expected_event_ids: frozenset[str],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     deadline = time.monotonic() + options.timeout_seconds
     while time.monotonic() < deadline:
@@ -105,15 +111,23 @@ async def _wait_for_traces(
                 options.langfuse_url,
                 observation_name="chat.request",
                 started_at=started_at,
+                expected_event_ids=expected_event_ids,
             )
             worker_traces = await _recent_traces(
                 client,
                 options.langfuse_url,
                 observation_name="memory_job.process",
                 started_at=started_at,
+                expected_event_ids=expected_event_ids,
             )
-            if len(chat_traces) >= 2 and len(worker_traces) >= 2:
-                _validate_traces(chat_traces, worker_traces)
+            if {
+                _trace_metadata(trace)["event_id"] for trace in chat_traces
+            } == expected_event_ids and {
+                _trace_metadata(trace)["event_id"] for trace in worker_traces
+            } == expected_event_ids:
+                _validate_traces(
+                    chat_traces, worker_traces, capture_content=options.capture_content
+                )
                 return chat_traces, worker_traces
         except (httpx.HTTPError, json.JSONDecodeError, LangfuseAcceptanceError):
             pass
@@ -124,14 +138,19 @@ async def _wait_for_traces(
 def _validate_traces(
     chat_traces: list[dict[str, Any]],
     worker_traces: list[dict[str, Any]],
+    *,
+    capture_content: bool = True,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     all_traces = chat_traces + worker_traces
     _assert_searchable_metadata(all_traces)
     _assert_linkage(chat_traces, worker_traces)
-    retrieval_trace = _trace_with_stages(chat_traces, RETRIEVAL_TRACE_STAGES)
+    retrieval_trace = _trace_with_stages(
+        chat_traces, RETRIEVAL_TRACE_STAGES, require_retrieval_output=capture_content
+    )
     formation_trace = _trace_with_stages(worker_traces, FORMATION_TRACE_STAGES)
-    _assert_retrieval_output(retrieval_trace)
-    _assert_formation_generation(formation_trace)
+    if not capture_content:
+        _assert_content_absent(all_traces)
+    _assert_formation_generation(formation_trace, capture_content=capture_content)
     _assert_no_local_credentials(all_traces)
     return retrieval_trace, formation_trace
 
@@ -142,10 +161,15 @@ async def _recent_traces(
     *,
     observation_name: str,
     started_at: datetime,
+    expected_event_ids: frozenset[str],
 ) -> list[dict[str, Any]]:
     response = await client.get(
         langfuse_url + "/api/public/observations",
-        params={"name": observation_name, "limit": 10},
+        params={
+            "name": observation_name,
+            "limit": 100,
+            "fromStartTime": started_at.isoformat(),
+        },
     )
     if response.status_code != 200:
         raise LangfuseAcceptanceError
@@ -169,7 +193,8 @@ async def _recent_traces(
         if response.status_code != 200:
             raise LangfuseAcceptanceError
         trace = response.json()
-        if isinstance(trace, dict):
+        metadata = trace.get("metadata") if isinstance(trace, dict) else None
+        if isinstance(metadata, dict) and metadata.get("event_id") in expected_event_ids:
             traces.append(trace)
     return traces
 
@@ -225,6 +250,8 @@ def _assert_linkage(
 def _trace_with_stages(
     traces: list[dict[str, Any]],
     required_stages: set[str],
+    *,
+    require_retrieval_output: bool = False,
 ) -> dict[str, Any]:
     for trace in traces:
         observations = trace.get("observations")
@@ -234,6 +261,11 @@ def _trace_with_stages(
             observation.get("name") for observation in observations if isinstance(observation, dict)
         }
         if required_stages <= names:
+            if require_retrieval_output:
+                try:
+                    _assert_retrieval_output(trace)
+                except LangfuseAcceptanceError:
+                    continue
             return trace
     raise LangfuseAcceptanceError
 
@@ -258,7 +290,19 @@ def _assert_retrieval_output(trace: dict[str, Any]) -> None:
         raise LangfuseAcceptanceError
 
 
-def _assert_formation_generation(trace: dict[str, Any]) -> None:
+def _assert_content_absent(traces: list[dict[str, Any]]) -> None:
+    for trace in traces:
+        observations = trace.get("observations")
+        if not isinstance(observations, list):
+            raise LangfuseAcceptanceError
+        for observation in observations:
+            if not isinstance(observation, dict):
+                raise LangfuseAcceptanceError
+            if observation.get("input") is not None or observation.get("output") is not None:
+                raise LangfuseAcceptanceError
+
+
+def _assert_formation_generation(trace: dict[str, Any], *, capture_content: bool) -> None:
     extraction = _observation(trace, "mem0.extract")
     usage = extraction.get("usage")
     metadata = extraction.get("metadata")
@@ -266,12 +310,15 @@ def _assert_formation_generation(trace: dict[str, Any]) -> None:
     if (
         extraction.get("type") != "GENERATION"
         or extraction.get("model") != "local-memory-stub"
-        or extraction.get("input") is None
-        or extraction.get("output") is None
         or not isinstance(usage, dict)
         or usage.get("input") != 1
         or usage.get("output") != 1
         or not isinstance(attributes, dict)
+    ):
+        raise LangfuseAcceptanceError
+    if capture_content and (
+        extraction.get("input") is None
+        or extraction.get("output") is None
         or "kira.observation.input.truncated" not in attributes
         or "kira.observation.output.truncated" not in attributes
     ):
@@ -319,6 +366,14 @@ def parse_args(argv: list[str] | None = None) -> LangfuseAcceptanceOptions:
         default=os.environ.get("LANGFUSE_SECRET_KEY", DEFAULT_LANGFUSE_SECRET_KEY),
     )
     parser.add_argument("--timeout", type=float, default=30.0)
+    parser.add_argument(
+        "--capture-content",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Expect masked input/output; use --no-capture-content for timing/usage-only acceptance."
+        ),
+    )
     args = parser.parse_args(argv)
     if args.timeout <= 0:
         parser.error("timeout must be positive")
@@ -340,6 +395,7 @@ def parse_args(argv: list[str] | None = None) -> LangfuseAcceptanceOptions:
         public_key=args.langfuse_public_key,
         secret_key=args.langfuse_secret_key,
         timeout_seconds=args.timeout,
+        capture_content=args.capture_content,
     )
 
 

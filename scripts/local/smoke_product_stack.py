@@ -50,7 +50,12 @@ class ProductChatResult:
     event_id: UUID
 
 
-async def run(options: ProductSmokeOptions) -> None:
+@dataclass(frozen=True, slots=True)
+class ProductSmokeResult:
+    event_ids: tuple[UUID, UUID]
+
+
+async def run(options: ProductSmokeOptions) -> ProductSmokeResult:
     run_id = uuid4().hex[:12]
     fact = memory_fact(run_id)
     first_query = session_a_message(run_id)
@@ -112,6 +117,7 @@ async def run(options: ProductSmokeOptions) -> None:
 
             await _assert_conversation_list(client, options, expected_session_ids=session_ids)
             print("PASS product_frontend_auth_and_history conversations=2")
+            return ProductSmokeResult(event_ids=(first.event_id, second.event_id))
         finally:
             try:
                 try:

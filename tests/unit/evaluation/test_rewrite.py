@@ -21,7 +21,12 @@ from evaluation.models import (
     SeedMemory,
     Suite,
 )
-from evaluation.rewrite import RewriteCaseEvaluation, RewriteEvaluator, build_rewrite_context
+from evaluation.rewrite import (
+    RewriteCaseEvaluation,
+    RewriteEvaluator,
+    RewriteSourceTimestampMissing,
+    build_rewrite_context,
+)
 from evaluation.scoring import (
     JudgeProvenance,
     JudgeVerdict,
@@ -364,7 +369,9 @@ def test_context_builder_covers_rewrite_risk_families(name, current, recent, ltm
             "case_id": f"conv01:rewrite:{name}",
             "inputs": RewriteInput(
                 current_query=current,
-                recent_messages=(Message(message_id="turn-1", role="user", content=recent),),
+                recent_messages=(
+                    Message(message_id="turn-1", role="user", content=recent, timestamp=_NOW),
+                ),
                 long_term_memories=(SeedMemory(gold_id="memory-1", user_id="user-1", text=ltm),),
             ),
             "gold": GoldSpecification(
@@ -379,3 +386,84 @@ def test_context_builder_covers_rewrite_risk_families(name, current, recent, ltm
     assert context.current_query == current
     assert context.recent_messages[0].content == recent
     assert context.long_term_memories[0].content == ltm
+
+
+@pytest.mark.asyncio
+async def test_missing_recent_user_source_time_is_not_run_without_provider_calls():
+    case = _case()
+    case = case.model_copy(
+        update={
+            "inputs": case.inputs.model_copy(
+                update={
+                    "recent_messages": (
+                        Message(message_id="turn-1", role="user", content="FTTH?"),
+                    ),
+                }
+            )
+        }
+    )
+    rewriter, judge = _Rewriter(), _Judge()
+
+    with pytest.raises(RewriteSourceTimestampMissing):
+        build_rewrite_context(case)
+    result = await RewriteEvaluator(rewriter, judge, profile=Profile.MOCK, backend="mock").evaluate(
+        case
+    )
+
+    assert result.outcome is Outcome.NOT_RUN
+    assert result.reason_codes == ("rewrite_source_timestamp_missing",)
+    assert rewriter.contexts == []
+    assert judge.calls == []
+
+
+def test_missing_assistant_time_does_not_require_invented_user_chronology():
+    import json
+
+    from app.application.services.rewrite_prompt import build_rewrite_messages
+
+    case = _case()
+    case = case.model_copy(
+        update={
+            "inputs": case.inputs.model_copy(
+                update={
+                    "recent_messages": (
+                        *case.inputs.recent_messages,
+                        Message(message_id="turn-1", role="assistant", content="Previous answer."),
+                    ),
+                }
+            )
+        }
+    )
+    context = build_rewrite_context(case)
+
+    envelope = json.loads(build_rewrite_messages(context)[1]["content"])
+    assert envelope["recent_messages"][0]["source_timestamp"] == _NOW.isoformat()
+    assert envelope["recent_messages"][1]["source_timestamp"] is None
+
+
+@pytest.mark.asyncio
+async def test_recent_fixture_with_no_real_time_is_not_run():
+    case = _case()
+    case = case.model_copy(
+        update={
+            "inputs": case.inputs.model_copy(
+                update={
+                    "recent_messages": (
+                        Message(
+                            message_id="assistant-only", role="assistant", content="Prior answer."
+                        ),
+                    ),
+                }
+            )
+        }
+    )
+    rewriter, judge = _Rewriter(), _Judge()
+
+    result = await RewriteEvaluator(rewriter, judge, profile=Profile.MOCK, backend="mock").evaluate(
+        case
+    )
+
+    assert result.outcome is Outcome.NOT_RUN
+    assert result.reason_codes == ("rewrite_source_timestamp_missing",)
+    assert rewriter.contexts == []
+    assert judge.calls == []

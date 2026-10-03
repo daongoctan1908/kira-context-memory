@@ -10,6 +10,7 @@ def source(**overrides: object) -> SimpleNamespace:
         "app_environment": "test",
         "app_version": "0.4.1",
         "otel_enabled": True,
+        "otel_capture_content_enabled": False,
         "otel_exporter_otlp_endpoint": "http://collector:4318/",
         "otel_export_timeout_seconds": 1.0,
         "otel_batch_schedule_delay_seconds": 5.0,
@@ -28,8 +29,16 @@ def test_build_settings_copies_only_shared_contract_and_builds_signal_urls() -> 
 
     assert settings.service_name == "gateway"
     assert settings.otlp_endpoint == "http://collector:4318"
+    assert settings.capture_content_enabled is False
     assert settings.signal_endpoint("traces") == "http://collector:4318/v1/traces"
     assert settings.signal_endpoint("metrics") == "http://collector:4318/v1/metrics"
+
+
+def test_content_capture_requires_its_own_opt_in() -> None:
+    settings = build_observability_settings(
+        source(otel_capture_content_enabled=True), service_name="gateway"
+    )
+    assert settings.capture_content_enabled is True
 
 
 def test_unknown_signal_is_rejected() -> None:

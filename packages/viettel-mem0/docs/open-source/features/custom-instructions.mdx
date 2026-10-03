@@ -6,6 +6,34 @@ icon: "wand-magic-sparkles"
 
 Custom instructions let you decide exactly which facts Mem0 records from a conversation. Define a focused prompt, give a few examples, and Mem0 will add only the memories that match your use case.
 
+## Per-call source context in the Viettel Python fork
+
+`Memory.add` and `AsyncMemory.add` accept optional `last_k_messages` containing messages that
+precede the new source event. They help resolve references and confirmations without turning
+older context into New Messages. `None` retains native history lookup; `[]` supplies authoritative
+empty context. Context is rendered in full and is not saved as part of the new message batch.
+
+```python
+from mem0 import Memory
+
+memory = Memory.from_config({"history_enabled": False})
+memory.add(
+    [{"role": "user", "content": "Use that definition in my future reports."}],
+    user_id="example-user",
+    last_k_messages=[
+        {"role": "assistant", "content": "Example metric = completed tasks / all tasks."}
+    ],
+    metadata={"source_timestamp": "2026-09-13T10:00:00+07:00"},
+)
+```
+
+The optional timezone-aware ISO `metadata.source_timestamp` anchors Observation Date in the
+native extraction prompt; Current Date remains the processing date. The public OSS `timestamp`
+argument is still unsupported. Callers should bound the number of preceding messages and supply
+their original text and source time. An already committed formation receipt is replayed before
+context lookup or model calls. Event-scoped GLOBAL outputs preserve distinct assertion events;
+within-event duplicates and replay deliveries are still deduplicated.
+
 <Info>
   **You'll use this when...**
   - A project needs domain-specific facts (order numbers, customer info) without storing casual chatter.

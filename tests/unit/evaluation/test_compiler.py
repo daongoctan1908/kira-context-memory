@@ -86,14 +86,14 @@ def test_compiled_qa_cases_carry_source_tier_tag():
 
     compilation = compile_dataset(seed=23)
     diagnostic = next(
-        case
-        for case in compilation.cases
-        if case.case_id == "conv01:retrieval:Q_SINGLE_HOP_015"
+        case for case in compilation.cases if case.case_id == "conv01:retrieval:Q_SINGLE_HOP_015"
     )
     assert "tier:diagnostic_history" in diagnostic.tags
     assert "tier:hard_gate" not in diagnostic.tags
 
-    hard = next(case for case in compilation.cases if case.case_id == "conv01:retrieval:Q_SINGLE_HOP_001")
+    hard = next(
+        case for case in compilation.cases if case.case_id == "conv01:retrieval:Q_SINGLE_HOP_001"
+    )
     assert "tier:hard_gate" in hard.tags
 
     tiered = [case for case in compilation.cases if any(t.startswith("tier:") for t in case.tags)]

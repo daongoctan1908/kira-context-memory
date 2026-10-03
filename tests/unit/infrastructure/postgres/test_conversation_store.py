@@ -1,4 +1,6 @@
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from hashlib import sha256
 from types import SimpleNamespace
 from typing import Any
 from uuid import uuid4
@@ -584,6 +586,69 @@ async def test_abandon_chat_request_fences_stale_attempt_token() -> None:
         status=ChatRequestStatus.CANCELLED,
         now=now,
     )
+
+
+@pytest.mark.parametrize(
+    "outcome,attempt_count",
+    [
+        (ChatRequestReservationOutcome.ACQUIRED, 1),
+        (ChatRequestReservationOutcome.RECLAIMED, 2),
+    ],
+)
+async def test_completion_stores_first_request_timestamp_for_user(
+    outcome: ChatRequestReservationOutcome,
+    attempt_count: int,
+) -> None:
+    source_time = datetime(2026, 9, 19, tzinfo=UTC)
+    attempt_time = source_time + timedelta(minutes=10)
+    user = replace(message(ConversationRole.USER), timestamp=attempt_time)
+    assistant = replace(
+        message(ConversationRole.ASSISTANT), timestamp=attempt_time + timedelta(seconds=1)
+    )
+    request = _chat_request_row(
+        content_hash=sha256(user.content.encode()).digest(),
+        attempt_count=attempt_count,
+        lease_expires_at=attempt_time + timedelta(minutes=2),
+    )
+    request["turn_id"] = user.turn_id
+    reservation = PostgresConversationStoreAdapter._to_chat_reservation(
+        request, outcome, expose_lease=True
+    )
+    connection = FakeConnection(
+        [
+            FakeResult(
+                one=SimpleNamespace(
+                    conversation_id=reservation.conversation_id,
+                    session_id=user.session_id,
+                    next_turn_sequence=1,
+                )
+            ),
+            FakeResult(rows=[request]),
+            FakeResult(rowcount=1),
+            FakeResult(
+                rows=[
+                    {"message_id": 10, "message_index": 0},
+                    {"message_id": 11, "message_index": 1},
+                ]
+            ),
+            FakeResult(rowcount=1),
+        ]
+    )
+    store = adapter(connection)
+    await store.validate_schema()
+
+    result = await store.complete_chat_request(
+        USER_ID,
+        reservation,
+        user,
+        assistant,
+        completed_at=attempt_time + timedelta(seconds=2),
+    )
+
+    assert result.inserted
+    stored_pair = connection.calls[4][1]
+    assert stored_pair[0]["message_timestamp"] == source_time
+    assert stored_pair[1]["message_timestamp"] == assistant.timestamp
 
 
 async def test_read_recent_returns_chronological_domain_messages() -> None:

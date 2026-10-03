@@ -25,6 +25,8 @@ from tests.support.memory_policy_cases import (
     CASES,
     MEMORY_POLICY_EVAL_VERSION,
     REQUIRED_NEGATIVE_TAGS,
+    assistant,
+    user,
     validate_case_matrix,
 )
 
@@ -49,7 +51,7 @@ def test_build_messages_uses_exact_mem0_v3_prompt_and_policy_precedence() -> Non
     assert messages[0] == {"role": "system", "content": ADDITIVE_EXTRACTION_PROMPT}
     user_prompt = messages[1]["content"]
     assert MEMORY_EXTRACTION_INSTRUCTIONS in user_prompt
-    assert "this policy takes precedence" in user_prompt
+    assert "this policy takes precedence" in user_prompt.casefold()
     assert user_prompt.index("## New Messages") < user_prompt.index("## Custom Instructions")
     assert user_prompt.index("## Custom Instructions") < user_prompt.index("# Output:")
     assert "## Observation Date\n2026-09-07" in user_prompt
@@ -61,6 +63,47 @@ def test_build_messages_passes_existing_memories_with_runtime_style_ids() -> Non
 
     existing_section = prompt.split("## Existing Memories\n", 1)[1].split("## New Messages", 1)[0]
     assert json.loads(existing_section) == [{"id": "0", "text": correction.existing_memories[0]}]
+
+
+@pytest.mark.parametrize("fixture", CASES, ids=lambda fixture: fixture.name)
+def test_build_messages_uses_only_completed_source_pair_as_new_messages(fixture) -> None:
+    prompt = build_extraction_messages(fixture)[1]["content"]
+    context = prompt.split("## Last k Messages\n", 1)[1].split("## Recently Extracted Memories", 1)[
+        0
+    ]
+    source = prompt.split("## New Messages\n", 1)[1].split("## Observation Date", 1)[0]
+
+    for message in fixture.messages[-2:]:
+        assert f"{message.role}: {message.content}" in source
+    for message in fixture.messages[:-2]:
+        assert f"{message.role}: {message.content}" in context
+        assert message.content not in source
+
+
+def test_assistant_only_proposal_is_context_and_filler_is_source() -> None:
+    prompt = build_extraction_messages(case("assistant_claim_followed_by_filler"))[1]["content"]
+    source = prompt.split("## New Messages\n", 1)[1].split("## Observation Date", 1)[0]
+
+    assert (
+        "assistant: Bạn phụ trách toàn bộ hệ thống miền Nam."
+        in prompt.split("## New Messages", 1)[0]
+    )
+    assert "miền Nam" not in source
+    assert "user: Tiếp tục đi." in source
+
+
+@pytest.mark.parametrize(
+    "messages",
+    (
+        (user("Source"), assistant("Reply"), assistant("Extra reply")),
+        (user("Context"), user("Source"), assistant("Reply")),
+    ),
+)
+def test_build_messages_rejects_unverified_source_and_context_sequence(messages) -> None:
+    fixture = replace(case("greeting_only"), messages=messages)
+
+    with pytest.raises(ValueError, match="policy fixture"):
+        build_extraction_messages(fixture)
 
 
 def test_source_date_is_not_replaced_by_the_worker_observation_date() -> None:
@@ -127,6 +170,21 @@ def test_parse_memory_facts_matches_mem0_json_envelope() -> None:
 
     assert parse_memory_facts(content) == ("Người dùng thích bảng",)
     assert parse_memory_facts('{"memory": []}') == ()
+
+
+@pytest.mark.parametrize("scope", ["GLOBAL", "CONVERSATION", " global ", None, ""])
+def test_parse_memory_facts_accepts_native_scope_and_legacy_fallback(scope) -> None:
+    content = json.dumps({"memory": [{"id": "0", "text": "Standing preference", "scope": scope}]})
+
+    assert parse_memory_facts(content) == ("Standing preference",)
+
+
+@pytest.mark.parametrize("scope", ["INVALID", 1, False, [], {}])
+def test_parse_memory_facts_rejects_scope_native_would_drop(scope) -> None:
+    content = json.dumps({"memory": [{"text": "fact", "scope": scope}]})
+
+    with pytest.raises(PolicyEvalProtocolError):
+        parse_memory_facts(content)
 
 
 @pytest.mark.parametrize(
@@ -234,6 +292,8 @@ async def test_client_calls_openai_compatible_endpoint_without_writing_memory() 
                 "memory": [
                     {
                         "id": "0",
+                        "attributed_to": "user",
+                        "scope": "GLOBAL",
                         "text": (
                             "Tỷ lệ giữ chân = (thuê bao cuối kỳ - thuê bao mới) / "
                             "thuê bao đầu kỳ * 100%, ngưỡng cảnh báo < 95%."
@@ -272,6 +332,35 @@ async def test_client_returns_sanitized_dependency_error() -> None:
     assert result.reason_codes == ("HTTPStatusError",)
     assert "private" not in json.dumps(sanitized_report((result,)))
     assert "secret" not in json.dumps(sanitized_report((result,)))
+
+
+@pytest.mark.parametrize(
+    "body",
+    (
+        b"not-json private output",
+        b'{"choices":[{"message":{"content":"invalid private output"}}]}',
+        b'{"choices":[{"message":{"content":"{\\"memory\\":[{\\"text\\":\\"private fact\\",'
+        b'\\"scope\\":\\"INVALID\\"}]}"}}]}',
+    ),
+)
+async def test_invalid_response_is_sanitized_protocol_error_and_stops_suite(body) -> None:
+    request_count = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal request_count
+        request_count += 1
+        return httpx.Response(200, content=body)
+
+    results = await evaluate_cases(
+        PolicyEvalOptions("http://memory-llm.test/v1", "qwen-memory"),
+        CASES,
+        transport=httpx.MockTransport(handler),
+    )
+
+    assert request_count == 1
+    assert len(results) == 1
+    assert results[0].outcome == "protocol_error"
+    assert "private" not in json.dumps(sanitized_report(results))
 
 
 async def test_suite_stops_after_dependency_error() -> None:

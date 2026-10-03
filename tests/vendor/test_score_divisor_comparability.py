@@ -10,8 +10,7 @@ from mem0.utils.scoring import score_and_rank
 
 def _candidates(*scores: float) -> list[dict]:
     return [
-        {"id": f"mem-{index}", "score": score, "payload": {}}
-        for index, score in enumerate(scores)
+        {"id": f"mem-{index}", "score": score, "payload": {}} for index, score in enumerate(scores)
     ]
 
 

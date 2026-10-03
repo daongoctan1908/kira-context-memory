@@ -23,6 +23,7 @@ from app.application.services.memory_policy import (
     MEMORY_POLICY_VERSION,
     MEMORY_TAXONOMY,
 )
+from evaluation.scoring import classify_scope
 from tests.support.memory_policy_cases import (
     CASES,
     MEMORY_POLICY_EVAL_VERSION,
@@ -76,16 +77,28 @@ class PolicyEvalResult:
 
 
 def build_extraction_messages(case: MemoryPolicyCase) -> list[dict[str, str]]:
-    """Build the exact V3 extraction prompt shape without writing a memory."""
-    parsed_messages = parse_messages(
-        [{"role": message.role, "content": message.content} for message in case.messages]
-    )
+    """Use the fixture's final completed source pair and preceding native context.
+
+    These synthetic policy fixtures may start with an assistant-only contextual
+    proposal. It belongs to Last k Messages, never to the source event.
+    """
+    messages = [{"role": message.role, "content": message.content} for message in case.messages]
+    if len(messages) < 2 or [message["role"] for message in messages[-2:]] != [
+        "user",
+        "assistant",
+    ]:
+        raise ValueError("policy fixture requires a completed source user/assistant pair")
+    if any(
+        left["role"] == right["role"] for left, right in zip(messages, messages[1:], strict=False)
+    ):
+        raise ValueError("policy fixture messages must alternate user and assistant")
+    parsed_messages = parse_messages(messages[-2:])
     user_prompt = generate_additive_extraction_prompt(
         existing_memories=[
             {"id": str(index), "text": text} for index, text in enumerate(case.existing_memories)
         ],
         new_messages=parsed_messages,
-        last_k_messages=[],
+        last_k_messages=messages[:-2],
         current_date=case.observation_date,
         timestamp=case.observation_date,
         custom_instructions=MEMORY_EXTRACTION_INSTRUCTIONS,
@@ -115,13 +128,17 @@ def parse_memory_facts(content: object) -> tuple[str, ...]:
     for item in payload["memory"]:
         if not isinstance(item, Mapping):
             raise PolicyEvalProtocolError
-        if set(item) - {"id", "text", "attributed_to", "linked_memory_ids"}:
+        if set(item) - {"id", "text", "attributed_to", "linked_memory_ids", "scope"}:
             raise PolicyEvalProtocolError
         text = item.get("text")
         if not isinstance(text, str) or not text.strip():
             raise PolicyEvalProtocolError
         attributed_to = item.get("attributed_to")
         if attributed_to is not None and attributed_to not in ("user", "assistant"):
+            raise PolicyEvalProtocolError
+        # Native Mem0 accepts a missing/blank scope as CONVERSATION. Reject
+        # invalid scopes rather than scoring a candidate that native would drop.
+        if classify_scope(item.get("scope")) == "INVALID":
             raise PolicyEvalProtocolError
         facts.append(text.strip())
     return tuple(facts)
@@ -172,6 +189,7 @@ class MemoryPolicyEvalClient:
         self._options = options
 
     async def evaluate(self, case: MemoryPolicyCase) -> PolicyEvalResult:
+        messages = build_extraction_messages(case)
         started = time.perf_counter()
         try:
             response = await self._client.post(
@@ -179,7 +197,7 @@ class MemoryPolicyEvalClient:
                 headers=_authorization_header(self._options.api_key),
                 json={
                     "model": self._options.model,
-                    "messages": build_extraction_messages(case),
+                    "messages": messages,
                     "temperature": 0,
                     "max_tokens": self._options.max_tokens,
                     "stream": False,
@@ -188,10 +206,18 @@ class MemoryPolicyEvalClient:
             )
             response.raise_for_status()
             facts = parse_memory_facts(_response_content(response))
-        except (httpx.HTTPError, ValueError, PolicyEvalProtocolError) as error:
+        except httpx.HTTPError as error:
             return PolicyEvalResult(
                 case=case.name,
                 outcome="dependency_error",
+                reason_codes=(type(error).__name__,),
+                fact_count=0,
+                latency_ms=_latency_ms(started),
+            )
+        except (ValueError, PolicyEvalProtocolError) as error:
+            return PolicyEvalResult(
+                case=case.name,
+                outcome="protocol_error",
                 reason_codes=(type(error).__name__,),
                 fact_count=0,
                 latency_ms=_latency_ms(started),
@@ -215,7 +241,7 @@ async def evaluate_cases(
         for case in cases:
             result = await evaluator.evaluate(case)
             results.append(result)
-            if result.outcome == "dependency_error":
+            if result.outcome in {"dependency_error", "protocol_error"}:
                 break
         return tuple(results)
 

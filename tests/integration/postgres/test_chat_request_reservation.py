@@ -9,12 +9,13 @@ from uuid import uuid4
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import delete, func, select, text
+from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from app.domain.errors.conversation import (
     ChatRequestConflictError,
     ChatRequestLeaseLostError,
+    ConversationSourceUnavailableError,
     ConversationStoreProtocolError,
 )
 from app.domain.models.conversation import (
@@ -311,6 +312,148 @@ async def test_completion_atomically_persists_turn_job_and_replays_without_new_o
     assert request_row["lease_token"] is None
     assert message_count == 2
     assert job_count == 1
+
+
+@pytest.mark.parametrize("reclaim", [False, True])
+async def test_completion_and_legacy_reads_use_first_request_time(
+    managed_conversation,
+    engine: AsyncEngine,
+    reclaim: bool,
+) -> None:
+    adapter, user_id, created = managed_conversation
+    attempt_time = datetime.now(UTC)
+    source_time = attempt_time - timedelta(minutes=10 if reclaim else 1)
+    client_message_id = uuid4()
+    content = "remember the original source time"
+    digest = sha256(content.encode()).digest()
+    reservation = await adapter.reserve_chat_request(
+        user_id,
+        created.session_id,
+        client_message_id,
+        digest,
+        now=source_time,
+        lease_seconds=60 if reclaim else 180,
+    )
+    assert reservation is not None
+    if reclaim:
+        reservation = await adapter.reserve_chat_request(
+            user_id,
+            created.session_id,
+            client_message_id,
+            digest,
+            now=attempt_time,
+            lease_seconds=120,
+        )
+        assert reservation is not None
+        assert reservation.outcome is ChatRequestReservationOutcome.RECLAIMED
+    user = ConversationMessage(
+        created.session_id,
+        reservation.turn_id,
+        ConversationRole.USER,
+        content,
+        attempt_time,
+    )
+    assistant = ConversationMessage(
+        created.session_id,
+        reservation.turn_id,
+        ConversationRole.ASSISTANT,
+        "acknowledged",
+        attempt_time + timedelta(seconds=1),
+    )
+    completed = await adapter.complete_chat_request(
+        user_id,
+        reservation,
+        user,
+        assistant,
+        completed_at=attempt_time + timedelta(seconds=2),
+        schedule_memory=True,
+    )
+    assert completed.memory_job_event_id is not None
+    async with engine.connect() as connection:
+        stored_timestamps = (
+            (
+                await connection.execute(
+                    select(conversation_messages.c.message_timestamp)
+                    .where(conversation_messages.c.turn_id == reservation.turn_id)
+                    .order_by(conversation_messages.c.message_index)
+                )
+            )
+            .scalars()
+            .all()
+        )
+    assert stored_timestamps == [source_time, assistant.timestamp]
+
+    # Pre-change queued turns stored the attempt's clock. Reads recover the original
+    # request time without rewriting that historical row or the assistant timestamp.
+    async with engine.begin() as connection:
+        await connection.execute(
+            update(conversation_messages)
+            .where(
+                conversation_messages.c.turn_id == reservation.turn_id,
+                conversation_messages.c.role == ConversationRole.USER.value,
+            )
+            .values(message_timestamp=attempt_time)
+        )
+    recent = await adapter.read_recent(user_id, created.session_id, 10)
+    boundary = await adapter.read_through_boundary(
+        user_id,
+        created.conversation_id,
+        completed.reference.boundary_message_id,
+        10,
+    )
+    assert [message.timestamp for message in recent] == [source_time, assistant.timestamp]
+    assert boundary == recent
+    assert await adapter.read_recent("other-user", created.session_id, 10) == ()
+    with pytest.raises(ConversationSourceUnavailableError):
+        await adapter.read_through_boundary(
+            "other-user", created.conversation_id, completed.reference.boundary_message_id, 10
+        )
+    async with engine.connect() as connection:
+        stored_user_timestamp = await connection.scalar(
+            select(conversation_messages.c.message_timestamp).where(
+                conversation_messages.c.turn_id == reservation.turn_id,
+                conversation_messages.c.role == ConversationRole.USER.value,
+            )
+        )
+        original_request_time = await connection.scalar(
+            select(chat_requests.c.created_at).where(
+                chat_requests.c.request_id == reservation.request_id
+            )
+        )
+    assert stored_user_timestamp == attempt_time
+    assert original_request_time == source_time
+
+
+async def test_legacy_turn_without_reservation_keeps_stored_source_time(
+    managed_conversation,
+    engine: AsyncEngine,
+) -> None:
+    adapter, user_id, created = managed_conversation
+    source_time = datetime.now(UTC) - timedelta(days=1)
+    turn_id = uuid4().hex
+    user = ConversationMessage(
+        created.session_id, turn_id, ConversationRole.USER, "legacy /chat source", source_time
+    )
+    assistant = ConversationMessage(
+        created.session_id,
+        turn_id,
+        ConversationRole.ASSISTANT,
+        "legacy answer",
+        source_time + timedelta(seconds=1),
+    )
+    completed = await adapter.append_turn(user_id, user, assistant, schedule_memory=True)
+
+    assert await adapter.read_recent(user_id, created.session_id, 10) == (user, assistant)
+    assert await adapter.read_through_boundary(
+        user_id, created.conversation_id, completed.reference.boundary_message_id, 10
+    ) == (user, assistant)
+    async with engine.connect() as connection:
+        request_count = await connection.scalar(
+            select(func.count())
+            .select_from(chat_requests)
+            .where(chat_requests.c.turn_id == turn_id)
+        )
+    assert request_count == 0
 
 
 async def test_stale_completion_is_fenced_and_writes_nothing(

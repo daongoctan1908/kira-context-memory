@@ -1,6 +1,6 @@
 import asyncio
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -371,12 +371,55 @@ async def test_process_memory_calls_only_add_with_exact_boundary_metadata():
     assert kwargs["run_id"] == str(memory_source.reference.conversation_id)
     assert kwargs["metadata"]["formation_event_id"] == str(memory_source.formation_event_id)
     assert kwargs["metadata"]["boundary_message_id"] == 42
+    assert kwargs["metadata"]["source_timestamp"] == "2026-09-06T00:00:00+00:00"
+    assert kwargs["last_k_messages"] == []
     assert kwargs["infer"] is True
     assert "prompt" not in kwargs
     assert "timestamp" not in kwargs
     assert "expiration_date" not in kwargs
     assert not hasattr(client, "update")
     assert not hasattr(client, "delete")
+
+
+async def test_formation_sends_only_source_pair_and_eligible_preceding_pairs():
+    client = FakeMem0()
+    item = source()
+    source_user = item.messages[-2]
+    prior_pair = (
+        replace(
+            source_user,
+            turn_id="prior",
+            content="Definition request",
+            timestamp=source_user.timestamp - timedelta(seconds=2),
+        ),
+        replace(
+            item.messages[-1],
+            turn_id="prior",
+            content="A" * 350 + " formula = X / Y; excludes TEST_003.",
+            timestamp=source_user.timestamp - timedelta(seconds=1),
+        ),
+    )
+    overlapping_pair = (
+        replace(source_user, turn_id="overlap", content="Concurrent request"),
+        replace(
+            item.messages[-1],
+            turn_id="overlap",
+            content="Answer completed after the source request",
+            timestamp=source_user.timestamp + timedelta(seconds=1),
+        ),
+    )
+    item = replace(item, messages=prior_pair + overlapping_pair + item.messages)
+
+    await adapter(client).process_memory(item)
+
+    messages, kwargs = client.add_calls[0]
+    assert messages == [
+        {"role": message.role.value, "content": message.content} for message in item.messages[-2:]
+    ]
+    assert kwargs["last_k_messages"] == [
+        {"role": message.role.value, "content": message.content} for message in prior_pair
+    ]
+    assert "excludes TEST_003." in kwargs["last_k_messages"][1]["content"]
 
 
 async def test_concurrent_formations_keep_raw_content_and_event_identity():

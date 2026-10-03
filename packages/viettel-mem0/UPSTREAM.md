@@ -24,3 +24,15 @@ Both commands must print `71d41407cefaae26d8cdeb2f180f24bc4b0e90a7`.
 All Viettel packaging or behavior changes must be made after `4c95a43` and
 recorded in `PATCHES.md`. Upstream source must never be rewritten into the
 pristine commit.
+
+## Current vendored subset
+
+KiRa uses the Python SDK. The current checkout omits the separate upstream server/dashboard,
+TypeScript SDK, CLIs, integrations, sample applications, agent skills, plugin catalogs,
+repository scripts and unused Poetry lock. These paths remain recoverable from the pristine
+vendor commit.
+
+The Python `mem0/` package, its provider implementations, notices, SDK tests, documentation,
+license and patch provenance are retained. The removed projects are outside the wheel's build
+include list and neither runtime/evaluator Dockerfile copies them. This pruning changes no
+Python runtime behavior, persisted contract or package version.

@@ -176,9 +176,7 @@ class NativeFormationEvaluator:
         if gold is None or not gold.should_store:
             # Negative or un-annotated gold: no gold scope to compare. The
             # false-ADD gate above already fails every predicted fact.
-            negative_predictions = tuple(
-                classify_scope(fact.scope) for fact in extraction.facts
-            )
+            negative_predictions = tuple(classify_scope(fact.scope) for fact in extraction.facts)
             return (
                 score_scope_semantics(negative=True, negative_predictions=negative_predictions),
                 (),

@@ -47,6 +47,31 @@ _MASKED_OBSERVATION_STRINGS = {
     "langfuse.observation.output",
     "langfuse.observation.usage_details",
 }
+_CONTENT_CAPTURE_ATTRIBUTE = "kira.observation.content_capture_enabled"
+_content_capture: ContextVar[bool] = ContextVar("telemetry_content_capture", default=False)
+
+
+@contextmanager
+def bind_content_capture(enabled: bool) -> Iterator[None]:
+    """Scope explicit capture for standalone instrumentation; runtime policy takes precedence."""
+    token = _content_capture.set(enabled)
+    try:
+        yield
+    finally:
+        _content_capture.reset(token)
+
+
+def content_capture_enabled(span: Span) -> bool:
+    """Allow content only on recording spans with an explicit opt-in policy."""
+    try:
+        if not span.is_recording():
+            return False
+        attributes = getattr(span, "attributes", None)
+        if isinstance(attributes, Mapping) and _CONTENT_CAPTURE_ATTRIBUTE in attributes:
+            return attributes[_CONTENT_CAPTURE_ATTRIBUTE] is True
+        return _content_capture.get() is True
+    except Exception:
+        return False
 
 
 def current_trace_fields() -> dict[str, str]:
@@ -110,12 +135,16 @@ def telemetry_origin_trace_id(value: TelemetryContext | None) -> str | None:
 class LangfuseMetadataSpanProcessor(SpanProcessor):
     """Copy request-local IDs to filterable metadata without using network baggage."""
 
+    def __init__(self, *, capture_content: bool = False) -> None:
+        self._capture_content = capture_content
+
     def on_start(self, span: Span, parent_context: Context | None = None) -> None:
         del parent_context
         try:
             # Local import avoids making the context facade depend on the runtime.
             from app.infrastructure.observability.context import current_context_fields
 
+            span.set_attribute(_CONTENT_CAPTURE_ATTRIBUTE, self._capture_content)
             for key, value in current_context_fields().items():
                 mapped = searchable_trace_metadata(key, value)
                 if mapped is not None:
@@ -185,6 +214,9 @@ def start_span(
 
 def set_span_attribute(span: Span, key: str, value: object) -> None:
     """Attach one bounded scalar attribute and ignore observer failures."""
+    if key in {"langfuse.observation.input", "langfuse.observation.output"}:
+        if not content_capture_enabled(span):
+            return
     safe_key = safe_log_value(key)
     if (
         isinstance(safe_key, str)

@@ -96,7 +96,8 @@ The Worker attempt traces link to the Gateway producer span in trace `AAA`. The 
 not recorded. These values are trace/log fields and are never metric labels.
 
 Raw `user_id` and `session_id` are not telemetry identifiers. Langfuse user and session fields use
-the HMAC pseudonyms defined in the data policy.
+keyed HMAC pseudonyms if introduced later; the current integration omits both fields and uses
+the reviewed application identifiers for investigation.
 
 ## Gateway trace contract
 
@@ -247,18 +248,40 @@ Gateway and Worker each own one `ObservabilityRuntime` for their FastAPI process
 runtime creates a private `TracerProvider` and `MeterProvider` rather than replacing process-global
 providers; later manual instrumentation receives its tracer/meter from this runtime. This keeps
 dependency-injected tests isolated and prevents repeated global-provider registration. Generic
-HTTP/DB auto-instrumentation and content capture are not enabled.
+HTTP/DB auto-instrumentation is not enabled; AI content capture requires the separate opt-in below.
 
-`OTEL_ENABLED=false` is a true no-op. When enabled, the application exports traces and metrics via
+`OTEL_ENABLED=false` is a true no-op and remains the default. When enabled, the application exports traces and metrics via
 OTLP/HTTP only to the configured Collector base URL, using bounded trace queues and exporter
 timeouts. Missing endpoint, construction failure, export rejection, queue saturation, or bounded
 shutdown expiry cannot escape into business code. Correlation context remains available whether
 tracing is disabled, unsampled, or unavailable.
 
+`OTEL_CAPTURE_CONTENT_ENABLED=false` is an independent default. It keeps timing, outcomes,
+model names, provider token usage and trace/job identifiers while skipping prompt/input/output
+serialization and stream capture. Set it to `true` explicitly to attach masked, bounded AI content.
+Each Gateway/Worker runtime applies its own policy to its spans, including thread-based Mem0 hooks.
+The synthetic local Langfuse overlay opts in to capture for its acceptance flow; production must
+opt in separately. Application startup and readiness do not require a running Collector.
+
+Exporter failures, retries, SDK queue overflow and shutdown expiry emit sanitized JSON diagnostics
+through `opentelemetry` logging. Events are rate-limited per event and signal, without rendering
+SDK message arguments, response text, endpoints, credentials or stack traces.
+
 The local Compose overlay starts the pinned Collector with OTLP gRPC/HTTP receivers, a memory
 limiter, bounded batches, debug trace output, and a Prometheus endpoint for received OTel metrics.
 A separate local overlay validates Langfuse ingestion. Neither overlay is the pending Kubernetes
 deployment or centralized Loki pipeline.
+
+The local acceptance smoke selects only the two job event IDs created by its own run, avoiding
+false positives from old or concurrent traces. It verifies both masked content capture and
+`--no-capture-content` mode against the pinned Langfuse deployment. Product smoke also passes
+with the Collector stopped and with OTel disabled, including asynchronous formation and
+cross-session retrieval through the real Gateway, Worker and PostgreSQL with synthetic providers.
+
+Verification on 2026-10-02: the full test suite with PostgreSQL passed 1,544 tests (2 skipped),
+with 90.79% application/Worker/evaluation coverage. Ruff and Compose configuration validation
+passed. The four Docker acceptance modes above passed against the synthetic local stack;
+Kubernetes and production-provider acceptance remain separate deployment work.
 
 ## Version compatibility baseline
 
@@ -269,19 +292,20 @@ also lock its image digests and Helm dependencies before promotion.
 | Component | Current pin | Reason/constraint |
 | --- | --- | --- |
 | Application | `0.4.1`, Python `3.11.9` | Current runtime baseline |
-| `viettel-mem0` | `2.0.20+viettel.6` | Product disables auxiliary history and enforces active conversation ownership at the storage boundary; receipt ownership requires memory schema 3 |
+| `viettel-mem0` | `2.0.20+viettel.7` | Product supplies source-bound preceding context and preserves independent GLOBAL assertions; auxiliary history stays disabled, with existing owner fencing, memory schema 3 and the compatible `.6` storage contract |
 | OTel Python API/SDK | `1.44.0` | API, SDK, and OTLP HTTP exporter stay on the same stable line |
 | OTel semantic conventions, if imported directly | `0.65b0` | Must match the `1.44.0` Python release line; avoid direct dependency unless needed |
 | OTel Collector Contrib | `0.160.0` | Required for OTLP, filelog, Kubernetes enrichment, filtering, and OTLP/HTTP export |
-| Langfuse Helm chart | `2.1.0` | Use the chart's tested dependency set |
-| Langfuse application | `4.24.0` | Chart `2.1.0` default; do not override it with a newer app until chart tests pass |
+| Langfuse local application | `3.225.7`, web/worker image digests in `compose.langfuse.yaml` | Current local OTLP ingestion and legacy-read smoke baseline |
+| Langfuse Helm chart (future deployment) | `2.1.0` | Requires a separate deployment acceptance; not installed by the local overlay |
+| Langfuse v4 application (future deployment) | `4.24.0` | Update acceptance reads to Observations API v2 before using an events-only v4 deployment |
 | Prometheus | `3.14.0` | OTLP receiver backend for OTel metrics |
 | Loki | `3.7.7` | OTLP-compatible log backend through the Collector |
 | Grafana | `13.2.1` | Dashboard/UI baseline |
 
-The upstream Langfuse application release was newer than the chart default when this matrix was
-recorded. Compatibility with the pinned chart takes priority over independently selecting the
-newest application image.
+The local smoke uses `/api/public/observations` and `/api/public/traces/{id}` on the pinned v3
+deployment. These legacy reads are not a v4 acceptance gate: v4's default events-only mode requires
+Observations API v2. The ingestion-version header is compatible with the local v3 baseline.
 
 ## Phase 0 evidence
 
@@ -338,7 +362,7 @@ authorization headers, cookies, credentials, keys, tokens, passwords, DSNs, envi
 SQL bind values, embedding vectors, arbitrary provider bodies/exception text, raw user/session IDs,
 W3C baggage và client-supplied tracing attributes.
 
-Các reviewed AI fields được phép capture sau masking gồm current query/recent window, retrieved
+Chỉ khi `OTEL_CAPTURE_CONTENT_ENABLED=true`, các reviewed AI fields được phép capture sau masking gồm current query/recent window, retrieved
 memory được xét, rewrite input/output, query/final KiRa text và Mem0 formation/extraction fields.
 Masking phải chạy trước khi giá trị vào span/export queue; Collector chỉ là lớp lọc thứ hai. Masker
 bao phủ email, phone/MSISDN, IMSI/ICCID, identity/account/subscriber/payment identifiers, IP/MAC,

@@ -318,11 +318,6 @@ class HandleChatUseCase:
                 final_text,
                 datetime.now(UTC),
             )
-            telemetry_context = (
-                self._capture_telemetry_context(correlation_id)
-                if self._memory_formation_enabled
-                else None
-            )
             with self._observer.stage(
                 "conversation.append_turn",
                 kind="client",
@@ -334,6 +329,7 @@ class HandleChatUseCase:
                             kind="producer",
                         ) as enqueue_observation:
                             try:
+                                telemetry_context = self._capture_telemetry_context(correlation_id)
                                 result = await self._complete_chat_request(
                                     principal.user_id,
                                     reservation,

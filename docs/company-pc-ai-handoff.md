@@ -12,7 +12,7 @@ Laptop cá nhân
   -> phát triển code, deterministic tests, synthetic/OpenAI experiments không canonical
 
 PC công ty
-  -> KiRa thật materialize canonical dataset
+  -> validate dataset hiện có; KiRa thật materialize phần pending nếu còn
   -> human review + freeze dataset
   -> OpenAI + KiRa full technical acceptance (không promotion)
   -> build exact runtime/eval images
@@ -31,6 +31,14 @@ Kubernetes
 Benchmark chất lượng chính thức **chỉ** chạy ở Kubernetes với internal models. Kết quả OpenAI trên PC
 là diagnostic/technical acceptance, không dùng để chọn candidate thắng. Langfuse/OTel chỉ trace và
 debug; tuyệt đối không dùng làm scorer.
+
+Connectivity đã xác nhận ngày 2026-10-02: laptop gọi OpenAI nhưng không gọi được KiRa; PC gọi
+OpenAI và KiRa thật nhưng không gọi được Qwen; chỉ các node K8s gọi được Qwen và KiRa thật.
+Rewrite local/PC dùng `gpt-4o-mini`. Rewrite K8s dùng Qwen3-14B base tại
+`http://10.254.135.40:8080/v1`, served model `/models/Qwen3_14B`, không dùng `genai-lora`.
+Không đặt Qwen preflight thành điều kiện của PC acceptance. Handoff của thay đổi GLOBAL/source
+chronology/Last-k nằm trong [global-evidence-rollout.md](global-evidence-rollout.md), gồm command
+rewrite/window độc lập KiRa và các gate phải chạy tiếp trên PC/K8s.
 
 ## 2. Trạng thái repository khi bàn giao
 
@@ -63,26 +71,35 @@ từ tài liệu này trên một revision cũ.
 
 ### Dataset hiện tại trước khi lên PC
 
-`dataset/kira_ltm_v1/manifest.json` trên laptop vẫn cố ý ở trạng thái:
+Ở HEAD `34fae5b`, `dataset/kira_ltm_v1/manifest.json` khai báo trạng thái sau
+(tự kiểm tra lại manifest của revision được bàn giao):
 
 ```text
-dataset_version = 1.0.0-draft.2
-status = contract_frozen
-materialization_status = pending
-review.status = draft
+dataset_version = 1.0.0-benchmark-ready.1
+status = benchmark_ready
+materialization_status = materialized (cả 4 bundles)
+review.status = reviewed (cả 4 bundles)
 external_provider_allowed = false
 ```
 
-Workload dự kiến:
+Workload theo counts trong manifest:
 
-- 80 KiRa queries duy nhất;
-- 140 assistant fills;
-- 54 final-QA answers còn thiếu;
+- 86 sessions, 506 turns và 140 assistant fills;
+- 62 memory events và 209 QA records;
+- 0 pending answers;
 - 4 bundles `conv01`…`conv04`;
 - một canonical full corpus, không chia dev/holdout.
 
-Đó không phải lỗi. Các field chỉ được chuyển sang materialized/reviewed/benchmark-ready sau khi KiRa
-thật và human review hoàn tất trên PC.
+Đây là trạng thái manifest, không phải evidence rằng candidate hiện tại đã pass KiRa/PC hoặc K8s.
+Validate checksum/schema và review đúng revision trước khi chạy. Không materialize/freeze lại một
+dataset đã hoàn tất chỉ vì hướng dẫn Phase 4 lịch sử bên dưới từng mô tả trạng thái draft.
+Giữ data-policy hiện tại và dùng quy trình review cho bất kỳ thay đổi/policy authorization mới nào;
+không gửi canonical data ra external provider chỉ từ trạng thái `benchmark_ready`.
+
+Tám file conversation/QA đã được freeze theo raw CRLF hashes; `.gitattributes` pin đúng tám paths
+để Git checkout Windows/Linux giữ các hashes này. Không chuẩn hóa lại manifest hoặc toàn bộ JSON.
+Các file fills/memories vẫn LF. Validate trên checkout/build context thực tế; Git archive không
+áp checkout attributes và phải được kiểm tra riêng nếu platform chọn cách export đó.
 
 ### Phần đã test được trên laptop
 

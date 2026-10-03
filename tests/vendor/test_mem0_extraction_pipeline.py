@@ -70,8 +70,9 @@ async def test_configured_policy_reaches_extraction_without_changing_saved_messa
         assert history.save_messages.call_args.args[0] == raw
         prompt = llm.generate_response.call_args.kwargs["messages"][1]["content"]
         assert MEMORY_EXTRACTION_INSTRUCTIONS in prompt
-        assert "source_time" not in prompt
-        assert "## Last k Messages\nuser: old history" in prompt
+        assert "## Observation Date\n2026-09-14T02:00:00+00:00" in prompt
+        assert "old history" not in prompt
+        history.get_last_messages.assert_not_called()
         assert store.insert_with_formation_receipt.call_args.kwargs["event_id"] == str(
             item.formation_event_id
         )

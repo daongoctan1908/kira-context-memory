@@ -368,10 +368,13 @@ async def test_tc13_persistent_payload_scope_gates_promotion():
                 ),
             )
 
-    evaluator = NativeFormationEvaluator(_PersistentRuntime(
-        [ExtractedFact(text="Ưu tiên Hà Nội", attributed_to="user", scope="CONVERSATION")],
-        ["Ưu tiên Hà Nội"],
-    ), _NeverJudge())  # type: ignore[arg-type]
+    evaluator = NativeFormationEvaluator(
+        _PersistentRuntime(
+            [ExtractedFact(text="Ưu tiên Hà Nội", attributed_to="user", scope="CONVERSATION")],
+            ["Ưu tiên Hà Nội"],
+        ),
+        _NeverJudge(),
+    )  # type: ignore[arg-type]
     result = await evaluator.evaluate(_case(gold_scope="CONVERSATION"))
     assert result.outcome is Outcome.FAIL
     assert "scope_false_global_promotion" in result.reason_codes

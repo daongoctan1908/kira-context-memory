@@ -12,7 +12,8 @@ from pydantic import AnyHttpUrl, Field, SecretStr, StringConstraints, field_vali
 
 from evaluation.models import EvalModel, Profile, Suite
 
-ModelId = Annotated[str, StringConstraints(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_./:-]{0,199}$")]
+# Served model names are opaque identifiers; vLLM can advertise a path-like name.
+ModelId = Annotated[str, StringConstraints(pattern=r"^[a-zA-Z0-9/][a-zA-Z0-9_./:-]{0,199}$")]
 
 
 class ProviderConfig(EvalModel):

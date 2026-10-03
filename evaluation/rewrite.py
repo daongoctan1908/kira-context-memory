@@ -1,7 +1,6 @@
 """Native rewrite evaluation with deterministic gates before semantic judgment."""
 
 from collections.abc import Sequence
-from datetime import UTC, datetime
 from typing import Literal, Protocol
 
 from pydantic import model_validator
@@ -39,7 +38,9 @@ from evaluation.scoring import (
     score_constraints,
 )
 
-_FALLBACK_TIME = datetime(2000, 1, 1, tzinfo=UTC)
+
+class RewriteSourceTimestampMissing(ValueError):
+    """An eval fixture cannot supply a real source time for its recent context."""
 
 
 class RewriteJudgePort(Protocol):
@@ -99,13 +100,30 @@ def build_rewrite_context(case: EvalCase) -> ConversationContext:
 
     if not isinstance(case.inputs, RewriteInput):
         raise ValueError("rewrite evaluator requires a rewrite case")
+    if any(
+        message.role == "user" and message.timestamp is None
+        for message in case.inputs.recent_messages
+    ):
+        raise RewriteSourceTimestampMissing("recent user messages require source timestamps")
+    # Assistant timestamps are never serialized as user evidence. Reuse a real
+    # fixture time only to satisfy ConversationMessage's internal time contract.
+    known_time = next(
+        (
+            message.timestamp
+            for message in case.inputs.recent_messages
+            if message.timestamp is not None
+        ),
+        None,
+    )
+    if case.inputs.recent_messages and known_time is None:
+        raise RewriteSourceTimestampMissing("recent messages require a real fixture timestamp")
     recent = tuple(
         ConversationMessage(
             session_id=message.session_id or "eval-rewrite",
             turn_id=message.message_id,
             role=ConversationRole(message.role),
             content=message.content,
-            timestamp=message.timestamp or _FALLBACK_TIME,
+            timestamp=message.timestamp or known_time,
         )
         for message in case.inputs.recent_messages
     )
@@ -152,7 +170,10 @@ class RewriteEvaluator:
         if case.eligibility.status == "blocked":
             return self._failure(case, Outcome.NOT_RUN, "rewrite_case_blocked")
 
-        context = build_rewrite_context(case)
+        try:
+            context = build_rewrite_context(case)
+        except RewriteSourceTimestampMissing:
+            return self._failure(case, Outcome.NOT_RUN, "rewrite_source_timestamp_missing")
         try:
             rewritten = await self._rewriter.rewrite(context)
         except (

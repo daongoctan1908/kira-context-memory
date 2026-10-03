@@ -15,7 +15,11 @@ from app.infrastructure.observability.langfuse_attributes import (
     masked_io_attributes,
     usage_attributes,
 )
-from app.infrastructure.observability.tracing import set_span_attribute, start_span
+from app.infrastructure.observability.tracing import (
+    content_capture_enabled,
+    set_span_attribute,
+    start_span,
+)
 
 _SPAN_KINDS = {
     "internal": SpanKind.INTERNAL,
@@ -77,10 +81,12 @@ class _MemoryObservation:
             pass
 
     def set_input(self, value: object) -> None:
-        self._set_attributes(masked_io_attributes(input_value=value))
+        if content_capture_enabled(self._span):
+            self._set_attributes(masked_io_attributes(input_value=value))
 
     def set_output(self, value: object) -> None:
-        self._set_attributes(masked_io_attributes(output_value=value))
+        if content_capture_enabled(self._span):
+            self._set_attributes(masked_io_attributes(output_value=value))
 
     def set_usage(self, usage: Mapping[str, object]) -> None:
         for key in ("input", "output", "total"):

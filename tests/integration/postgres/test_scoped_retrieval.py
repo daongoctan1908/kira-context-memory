@@ -207,8 +207,7 @@ async def test_filters_apply_before_top_k_in_both_scoped_branches() -> None:
 
         store = _vector_store(dsn, schema_name, fenced=True)
         store.insert(
-            [[1.0, 0.0, 0.0]]
-            + [[0.0, 1.0, 0.0]] * (len(payloads) - 1),
+            [[1.0, 0.0, 0.0]] + [[0.0, 1.0, 0.0]] * (len(payloads) - 1),
             payloads=payloads,
             ids=[payload["id"] for payload in payloads],
         )
@@ -343,14 +342,17 @@ async def test_adapter_search_scoped_returns_only_in_scope_rows() -> None:
         )
         assert [memory.content for memory in global_memories] == ["global fact"]
 
-        assert await adapter.search_scoped(
-            other_user,
-            "fact",
-            conversation_id=other_conversation,
-            scope="global",
-            top_k=10,
-            threshold=0.0,
-        ) == ()
+        assert (
+            await adapter.search_scoped(
+                other_user,
+                "fact",
+                conversation_id=other_conversation,
+                scope="global",
+                top_k=10,
+                threshold=0.0,
+            )
+            == ()
+        )
     finally:
         if adapter is not None:
             adapter.close()

@@ -32,6 +32,7 @@ from app.infrastructure.observability.langfuse_attributes import (
 from app.infrastructure.observability.metrics import GatewayMetrics
 from app.infrastructure.observability.tracing import (
     capture_telemetry_context,
+    content_capture_enabled,
     mark_request_outcome,
     set_request_span_attribute,
     set_span_attribute,
@@ -116,10 +117,12 @@ class _StageObservation:
             pass
 
     def set_input(self, value: object) -> None:
-        self._set_attributes(masked_io_attributes(input_value=value))
+        if content_capture_enabled(self._span):
+            self._set_attributes(masked_io_attributes(input_value=value))
 
     def set_output(self, value: object) -> None:
-        self._set_attributes(masked_io_attributes(output_value=value))
+        if content_capture_enabled(self._span):
+            self._set_attributes(masked_io_attributes(output_value=value))
 
     def set_usage(self, usage: Mapping[str, object]) -> None:
         self._set_attributes(usage_attributes(usage))

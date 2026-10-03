@@ -83,12 +83,51 @@ DEV_STATIC_IDENTITY_ENABLED=false
 LTM_ENABLED=true
 MEMORY_FORMATION_ENABLED=true
 OTEL_ENABLED=true
+OTEL_CAPTURE_CONTENT_ENABLED=false
 OTEL_EXPORTER_OTLP_ENDPOINT=http://<collector-service>:4318
 ```
 
 `DATABASE_URL` and `MEMORY_DATABASE_URL` may use different roles but must resolve to the same host,
 port and database. The Worker now fails startup configuration if they differ. Configure TLS in the
 DSNs according to the managed PostgreSQL contract; do not copy the plaintext local Compose URLs.
+
+### Rewrite provider binding
+
+Gateway `Settings` reads `VLLM_BASE_URL`, `VLLM_MODEL` and optional `VLLM_API_KEY` from the
+environment (`app/config/settings.py`). Gateway startup passes those settings to
+`VllmQueryRewriterAdapter` (`app/presentation/api/main.py`); the adapter calls
+`<base>/chat/completions` when the base already ends in `/v1`. No endpoint or model is selected
+from the formation provider: `MEMORY_LLM_*` belongs to the Worker/Mem0 formation path.
+
+Inject the non-secret values in [deploy/production-rewrite.env.example](../deploy/production-rewrite.env.example)
+into the Gateway through the company ConfigMap/envFrom mechanism. The production binding is
+`http://10.254.135.40:8080/v1` and the exact served base-model name `/models/Qwen3_14B`, not
+`genai-lora`. If authentication is enabled, inject `VLLM_API_KEY` from a Secret. Local laptop/PC
+runs retain their explicit `gpt-4o-mini` configuration; `.env.openai.local` is not production config.
+This fragment does not choose the company's manifest format, registry, namespace or secrets.
+Connectivity is environment-specific: the laptop has OpenAI but cannot reach KiRa; the company
+PC has OpenAI and real KiRa but cannot reach Qwen; K8s nodes can reach Qwen and real KiRa.
+Use the Qwen fragment only in K8s. PC technical acceptance continues to use the explicit OpenAI
+provider configuration from `evaluation/benchmark.pc.env.example`.
+
+The paired production rewrite benchmark must independently declare
+`BENCHMARK_REWRITE_BASE_URL=http://10.254.135.40:8080/v1` and
+`BENCHMARK_REWRITE_MODEL=/models/Qwen3_14B`, plus its approved internal judge settings.
+Freeze the served model, request settings and server/chat-template configuration with the report.
+The current adapter expects final plain text, `finish_reason=stop`, and at most 256 generated
+tokens; verify that the served Qwen configuration satisfies that contract before rollout.
+Qwen3 supports a non-thinking chat-template mode, while its default template may generate
+thinking content ([Qwen deployment contract](https://qwen.readthedocs.io/en/stable/deployment/vllm.html#thinking-non-thinking-modes)).
+Require non-thinking output for this rewrite service through the actual server/template
+configuration and record it in preflight evidence. This application does not inject
+`chat_template_kwargs` or strip `<think>` blocks; such a block in `message.content` would be
+forwarded verbatim. A separate `reasoning_content` field is ignored, and truncated/empty final
+content fails the adapter contract and falls back to the original query. These are compatibility
+checks, not observed failures on the inaccessible server. Do not change a shared server's
+configuration as part of this application rollout without its operator's deployment contract.
+The laptop connection probe timed out, so no internal-provider acceptance is claimed here.
+Follow the [GLOBAL evidence rollout gate](global-evidence-rollout.md); external-model results
+and unit tests do not approve the production semantic behavior.
 
 Do not run automatic user creation on every rollout. Create the first account with
 `kira-auth-admin create --password-stdin` from a controlled one-shot admin pod, then remove that pod

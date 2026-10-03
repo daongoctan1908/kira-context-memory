@@ -190,7 +190,9 @@ async def test_session_a_formation_is_recalled_in_session_b_without_cross_user_l
         envelope = json.loads(request_payload["messages"][1]["content"])
         rewrite_envelopes.append(envelope)
         assert set(envelope) == {"long_term_memories", "recent_messages", "current_query"}
-        assert envelope["long_term_memories"] == [FACT]
+        assert len(envelope["long_term_memories"]) == 1
+        assert envelope["long_term_memories"][0]["text"] == FACT
+        assert set(envelope["long_term_memories"][0]) == {"text", "scope", "source_timestamp"}
         if envelope["current_query"] == RECENT_FOLLOW_UP:
             assert [message["content"] for message in envelope["recent_messages"]] == [
                 RECENT_OVERRIDE,

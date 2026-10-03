@@ -19,6 +19,7 @@ from app.domain.errors.query_rewriter import (
 )
 from app.domain.models.memory import LongTermMemory
 from app.infrastructure.llm.vllm_query_rewriter import VllmQueryRewriterAdapter
+from app.infrastructure.observability.tracing import bind_content_capture
 
 
 def make_settings(**overrides: object) -> Settings:
@@ -39,9 +40,11 @@ def completion(content: object, *, finish_reason: str = "stop") -> dict[str, obj
 
 @pytest.mark.parametrize("api_key", [None, "fake-vllm-secret"])
 @pytest.mark.parametrize("base_path", ["", "/", "/v1", "/v1/"])
+@pytest.mark.parametrize("model", ["configured-test-model", "/models/Qwen3_14B"])
 async def test_request_contract_model_auth_timeouts_and_plain_text_output(
     api_key: str | None,
     base_path: str,
+    model: str,
 ) -> None:
     requests: list[httpx.Request] = []
     context = ContextBuilder().build([], "Doanh thu Hưng Yên?")
@@ -53,7 +56,11 @@ async def test_request_contract_model_auth_timeouts_and_plain_text_output(
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         port = VllmQueryRewriterAdapter(
             client,
-            make_settings(vllm_api_key=api_key, vllm_base_url="http://vllm.test:8000" + base_path),
+            make_settings(
+                vllm_api_key=api_key,
+                vllm_base_url="http://vllm.test:8000" + base_path,
+                vllm_model=model,
+            ),
         )
         result = await port.rewrite(context)
         assert client.is_closed is False
@@ -69,7 +76,7 @@ async def test_request_contract_model_auth_timeouts_and_plain_text_output(
     else:
         assert "authorization" not in request.headers
     assert json.loads(request.content) == {
-        "model": "configured-test-model",
+        "model": model,
         "messages": build_rewrite_messages(context),
         "temperature": 0,
         "stream": False,
@@ -118,7 +125,7 @@ async def test_trace_captures_masked_io_model_and_optional_provider_usage() -> N
         )
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        with tracer.start_as_current_span("rewrite.generate"):
+        with bind_content_capture(True), tracer.start_as_current_span("rewrite.generate"):
             result = await VllmQueryRewriterAdapter(client, make_settings()).rewrite(
                 ContextBuilder().build([], "email user@example.com")
             )
@@ -152,8 +159,8 @@ async def test_request_contains_ranked_ltm_content_without_provider_metadata() -
     assert result == "standalone query"
     prompt_envelope = json.loads(json.loads(requests[0].content)["messages"][1]["content"])
     assert prompt_envelope["long_term_memories"] == [
-        "fact ranked first",
-        "fact ranked second",
+        {"text": "fact ranked first", "scope": None, "source_timestamp": None},
+        {"text": "fact ranked second", "scope": None, "source_timestamp": None},
     ]
     serialized_request = requests[0].content.decode()
     assert "private-id" not in serialized_request

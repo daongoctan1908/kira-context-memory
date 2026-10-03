@@ -52,9 +52,7 @@ def _provenance(variant: BenchmarkVariant) -> RunProvenance:
 
 def _small_compilation():
     full = compile_dataset(seed=742)
-    selected = list(
-        next(case for case in full.cases if case.suite is suite) for suite in Suite
-    )
+    selected = list(next(case for case in full.cases if case.suite is suite) for suite in Suite)
     return full.model_copy(update={"dataset_sha256": _DATASET_HASH, "cases": selected})
 
 
@@ -261,9 +259,7 @@ def test_diagnostic_semantic_fail_does_not_fail_pc_technical_acceptance(tmp_path
     monkeypatch.setattr(
         "evaluation.pc_acceptance.compile_dataset", lambda *_args, **_kwargs: compilation
     )
-    diagnostic_case = next(
-        case for case in compilation.cases if case.suite is Suite.CROSS_SESSION
-    )
+    diagnostic_case = next(case for case in compilation.cases if case.suite is Suite.CROSS_SESSION)
     control = tmp_path / "control"
     candidate = tmp_path / "candidate-a"
     _write_store(control, compilation, variant=BenchmarkVariant.HISTORICAL_CONTROL)
@@ -299,9 +295,7 @@ def test_diagnostic_safety_violation_still_fails_pc_technical_acceptance(tmp_pat
     monkeypatch.setattr(
         "evaluation.pc_acceptance.compile_dataset", lambda *_args, **_kwargs: compilation
     )
-    diagnostic_case = next(
-        case for case in compilation.cases if case.suite is Suite.CROSS_SESSION
-    )
+    diagnostic_case = next(case for case in compilation.cases if case.suite is Suite.CROSS_SESSION)
     control = tmp_path / "control"
     candidate = tmp_path / "candidate-a"
     _write_store(control, compilation, variant=BenchmarkVariant.HISTORICAL_CONTROL)
@@ -342,9 +336,7 @@ def test_diagnostic_dependency_error_still_leaves_run_incomplete(tmp_path, monke
     monkeypatch.setattr(
         "evaluation.pc_acceptance.compile_dataset", lambda *_args, **_kwargs: compilation
     )
-    diagnostic_case = next(
-        case for case in compilation.cases if case.suite is Suite.CROSS_SESSION
-    )
+    diagnostic_case = next(case for case in compilation.cases if case.suite is Suite.CROSS_SESSION)
     control = tmp_path / "control"
     candidate = tmp_path / "candidate-a"
     _write_store(control, compilation, variant=BenchmarkVariant.HISTORICAL_CONTROL)

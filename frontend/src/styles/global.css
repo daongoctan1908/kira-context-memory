@@ -399,16 +399,45 @@ button { color: inherit; }
 .message-bubble > p { margin: 0; line-height: 1.62; overflow-wrap: anywhere; white-space: pre-wrap; }
 .message-time { display: block; max-height: 0; margin-top: 0; overflow: hidden; color: var(--text-tertiary); font-size: .68rem; opacity: 0; transition: opacity 140ms ease, max-height 140ms ease, margin 140ms ease; }
 .message-row:hover .message-time, .message-row:focus-within .message-time { max-height: 1.25rem; margin-top: .45rem; opacity: 1; }
-.message-markdown { font-size: .94rem; line-height: 1.68; overflow-wrap: anywhere; }
+.message-markdown { min-width: 0; max-width: 100%; font-size: .94rem; line-height: 1.72; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .message-markdown > :first-child { margin-top: 0; }
 .message-markdown > :last-child { margin-bottom: 0; }
-.message-markdown p, .message-markdown ul, .message-markdown ol { margin: .75rem 0; }
-.message-markdown h1, .message-markdown h2, .message-markdown h3 { margin: 1.35rem 0 .55rem; line-height: 1.25; letter-spacing: -.025em; }
+.message-markdown p, .message-markdown ul, .message-markdown ol { margin: .85rem 0; }
+.message-markdown ul, .message-markdown ol { padding-left: 1.4rem; }
+.message-markdown li { padding-left: .15rem; }
+.message-markdown li + li { margin-top: .35rem; }
+.message-markdown li > p, .message-markdown li > ul, .message-markdown li > ol { margin: .35rem 0; }
+.message-markdown li::marker { color: var(--text-secondary); }
+.message-markdown strong { font-weight: 650; }
+.message-markdown h1, .message-markdown h2, .message-markdown h3, .message-markdown h4, .message-markdown h5, .message-markdown h6 { margin: 1.5rem 0 .6rem; font-weight: 650; line-height: 1.35; letter-spacing: -.02em; text-wrap: pretty; }
 .message-markdown h1 { font-size: 1.35rem; }
 .message-markdown h2 { font-size: 1.15rem; }
 .message-markdown h3 { font-size: 1rem; }
-.message-markdown table { width: 100%; display: block; overflow-x: auto; border-collapse: collapse; }
-.message-markdown th, .message-markdown td { padding: .5rem .65rem; border: 1px solid var(--border); text-align: left; }
+.message-markdown h4, .message-markdown h5, .message-markdown h6 { font-size: .94rem; }
+.message-markdown hr { margin: 1.4rem 0; border: 0; border-top: 1px solid var(--border); }
+.message-markdown .kira-value-positive, .message-markdown .kira-value-negative { font-weight: 650; white-space: nowrap; }
+.message-markdown .kira-value-positive { color: var(--success); }
+.message-markdown .kira-value-negative { color: var(--danger); }
+.message-table-scroll { max-width: 100%; margin: 1rem 0; overflow-x: auto; border: 1px solid var(--border); border-radius: .65rem; background: var(--surface); overscroll-behavior-x: contain; scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+.message-table-scroll:focus-visible { outline-offset: -2px; }
+.message-markdown table { width: 100%; min-width: 30rem; border-collapse: collapse; font-size: .85rem; line-height: 1.55; overflow-wrap: normal; }
+.message-markdown th, .message-markdown td { min-width: 5.5rem; padding: .65rem .8rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+.message-markdown th[data-align="center"], .message-markdown td[data-align="center"] { text-align: center; }
+.message-markdown th[data-align="right"], .message-markdown td[data-align="right"] { text-align: right; }
+.message-markdown th { min-width: 8.5rem; background: var(--surface-subtle); color: var(--text-secondary); font-weight: 650; }
+.message-markdown th:first-child, .message-markdown td:first-child { min-width: 9.5rem; }
+.message-markdown td:not(:first-child) strong { white-space: nowrap; }
+.message-markdown table:has(th:first-child[data-column="rank"]) th:first-child, .message-markdown table:has(th:first-child[data-column="rank"]) td:first-child { min-width: 3.5rem; width: 3.5rem; text-align: center; }
+.message-markdown th + th, .message-markdown td + td { border-left: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+.message-markdown tbody tr:nth-child(even) { background: color-mix(in srgb, var(--surface-subtle) 40%, var(--surface)); }
+.message-markdown tbody tr:last-child td { border-bottom: 0; }
+.message-image { display: block; width: fit-content; max-width: 100%; margin: 1rem 0; overflow: hidden; border: 1px solid var(--border); border-radius: .7rem; background: var(--surface); }
+.message-image img { display: block; max-width: 100%; max-height: 32rem; width: auto; height: auto; margin: 0 auto; object-fit: contain; }
+.message-image-caption { display: block; padding: .55rem .8rem; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: .76rem; line-height: 1.5; }
+.message-image-unavailable { display: flex; align-items: center; gap: .75rem; min-height: 5.5rem; padding: 1rem; background: var(--surface-subtle); color: var(--text-secondary); font-size: .82rem; line-height: 1.55; }
+.message-image-unavailable svg { flex: 0 0 auto; color: var(--text-tertiary); }
+.message-image-unavailable .message-image-caption { margin-top: .2rem; padding: 0; border: 0; }
+.message-image-title { display: block; color: var(--text); font-weight: 600; }
 .message-markdown blockquote { margin: 1rem 0; padding-left: .9rem; border-left: 3px solid var(--accent); color: var(--text-secondary); }
 .message-markdown a { color: var(--accent-text); text-underline-offset: .18rem; }
 .message-markdown :not(pre) > code { padding: .12rem .32rem; border-radius: .3rem; background: var(--surface-subtle); font-family: "Cascadia Code", Consolas, monospace; font-size: .86em; }

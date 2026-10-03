@@ -1,3 +1,5 @@
+import json
+
 from app.infrastructure.observability.langfuse_attributes import (
     OBSERVATION_INPUT,
     OBSERVATION_MODEL,
@@ -51,7 +53,8 @@ def test_usage_attributes_accept_only_provider_reported_nonnegative_counts() -> 
 def test_io_attributes_report_safe_truncation_metadata() -> None:
     attributes = masked_io_attributes(input_value={"message": "x" * 20_000})
 
-    assert len(attributes[OBSERVATION_INPUT]) <= 4110
+    assert len(attributes[OBSERVATION_INPUT]) <= 4096
+    assert json.loads(attributes[OBSERVATION_INPUT]).endswith("[TRUNCATED]")
     assert attributes["kira.observation.input.truncated"] is True
     assert attributes["kira.observation.input.original_bytes"] > 4096
 
@@ -67,6 +70,15 @@ def test_masking_failure_omits_content_without_exposing_exception() -> None:
     assert attributes["kira.observation.input.content_omitted"] == "masking_error"
     assert attributes["kira.observation.output.content_omitted"] == "masking_error"
     assert "private" not in str(attributes)
+
+
+def test_invalid_unicode_io_is_omitted_without_raising() -> None:
+    attributes = masked_io_attributes(input_value="\ud800", output_value={"message": "\udfff"})
+
+    assert attributes == {
+        "kira.observation.input.content_omitted": "masking_error",
+        "kira.observation.output.content_omitted": "masking_error",
+    }
 
 
 def test_only_reviewed_identifiers_become_searchable_trace_metadata() -> None:

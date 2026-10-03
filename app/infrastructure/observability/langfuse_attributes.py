@@ -12,8 +12,6 @@ OBSERVATION_MODEL = "langfuse.observation.model.name"
 OBSERVATION_USAGE = "langfuse.observation.usage_details"
 GEN_AI_INPUT_TOKENS = "gen_ai.usage.input_tokens"
 GEN_AI_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
-TRACE_USER_ID = "langfuse.trace.user_id"
-TRACE_SESSION_ID = "langfuse.trace.session_id"
 TRACE_METADATA_PREFIX = "langfuse.trace.metadata."
 SEARCHABLE_TRACE_IDENTIFIERS = frozenset(
     {"correlation_id", "turn_id", "event_id", "origin_trace_id"}

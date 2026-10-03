@@ -10,7 +10,7 @@ import uuid
 import warnings
 from copy import deepcopy
 from datetime import date, datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import ValidationError
 
@@ -844,6 +844,7 @@ class Memory(MemoryBase):
         infer: bool = True,
         memory_type: Optional[str] = None,
         prompt: Optional[str] = None,
+        last_k_messages: Optional[List[Dict[str, Any]]] = None,
     ):
         """
         Create a new memory.
@@ -869,6 +870,9 @@ class Memory(MemoryBase):
                 creating procedural memories (typically requires 'agent_id'). Otherwise, memories
                 are treated as general conversational/factual memories.
             prompt (str, optional): Prompt to use for the memory creation. Defaults to None.
+            last_k_messages (list[dict], optional): Per-call preceding source context for extraction.
+                None uses native history; an empty list supplies authoritative empty context.
+                This context is not saved as new messages.
 
         Note:
             `search()` and `get_all()` scope queries via `filters={"user_id": "...", "agent_id": "...", "run_id": "..."}` —
@@ -940,7 +944,9 @@ class Memory(MemoryBase):
         else:
             messages = parse_vision_messages(messages)
 
-        vector_store_result = self._add_to_vector_store(messages, processed_metadata, effective_filters, infer, prompt=prompt)
+        vector_store_result = self._add_to_vector_store(
+            messages, processed_metadata, effective_filters, infer, prompt=prompt, last_k_messages=last_k_messages
+        )
         scale_threshold_notice = detect_scale_threshold_from_add_result(self, vector_store_result)
         if temporal_usage_notice:
             display_temporal_usage_notice(self, "sync", "add", *temporal_usage_notice)
@@ -950,7 +956,7 @@ class Memory(MemoryBase):
             display_first_run_notice(self, "sync", "add")
         return {"results": vector_store_result}
 
-    def _add_to_vector_store(self, messages, metadata, filters, infer, prompt=None):
+    def _add_to_vector_store(self, messages, metadata, filters, infer, prompt=None, last_k_messages=None):
         if not infer:
             returned_memories = []
             for message_dict in messages:
@@ -1000,7 +1006,9 @@ class Memory(MemoryBase):
             )(*formation_identity)
             if committed is not None:
                 return committed
-        last_messages = self.db.get_last_messages(session_scope, limit=10)
+        last_messages = (
+            self.db.get_last_messages(session_scope, limit=10) if last_k_messages is None else last_k_messages
+        )
         parsed_messages = parse_messages(messages)
 
         # Phase 1: Existing memory retrieval
@@ -1031,6 +1039,7 @@ class Memory(MemoryBase):
             existing_memories=existing_memories,
             new_messages=parsed_messages,
             last_k_messages=last_messages,
+            timestamp=metadata.get("source_timestamp"),
             custom_instructions=custom_instr,
         )
 
@@ -1130,7 +1139,8 @@ class Memory(MemoryBase):
                 continue
 
             mem_hash = hashlib.md5(text.encode()).hexdigest()
-            if mem_hash in existing_hashes or mem_hash in seen_hashes:
+            preserve_assertion = formation_identity is not None and mem.get("memory_scope") == "GLOBAL"
+            if (mem_hash in existing_hashes and not preserve_assertion) or mem_hash in seen_hashes:
                 logger.debug(f"Skipping duplicate memory (hash match): {text[:50]}")
                 continue
             seen_hashes.add(mem_hash)
@@ -2604,6 +2614,7 @@ class AsyncMemory(MemoryBase):
         memory_type: Optional[str] = None,
         prompt: Optional[str] = None,
         llm=None,
+        last_k_messages: Optional[List[Dict[str, Any]]] = None,
     ):
         """
         Create a new memory asynchronously.
@@ -2622,6 +2633,9 @@ class AsyncMemory(MemoryBase):
                                          Pass "procedural_memory" to create procedural memories.
             prompt (str, optional): Prompt to use for the memory creation. Defaults to None.
             llm (BaseChatModel, optional): LLM class to use for generating procedural memories. Defaults to None. Useful when user is using LangChain ChatModel.
+            last_k_messages (list[dict], optional): Per-call preceding source context for extraction.
+                None uses native history; an empty list supplies authoritative empty context.
+                This context is not saved as new messages.
 
         Note:
             `search()` and `get_all()` scope queries via `filters={"user_id": "...", "agent_id": "...", "run_id": "..."}` —
@@ -2679,7 +2693,9 @@ class AsyncMemory(MemoryBase):
         else:
             messages = parse_vision_messages(messages)
 
-        vector_store_result = await self._add_to_vector_store(messages, processed_metadata, effective_filters, infer, prompt=prompt)
+        vector_store_result = await self._add_to_vector_store(
+            messages, processed_metadata, effective_filters, infer, prompt=prompt, last_k_messages=last_k_messages
+        )
         scale_threshold_notice = await asyncio.to_thread(detect_scale_threshold_from_add_result, self, vector_store_result)
         if temporal_usage_notice:
             await display_temporal_usage_notice_async(self, "async", "add", *temporal_usage_notice)
@@ -2696,6 +2712,7 @@ class AsyncMemory(MemoryBase):
         effective_filters: dict,
         infer: bool,
         prompt: Optional[str] = None,
+        last_k_messages: Optional[List[Dict[str, Any]]] = None,
     ):
         if not infer:
             returned_memories = []
@@ -2758,7 +2775,11 @@ class AsyncMemory(MemoryBase):
                 receipt_observation.set_outcome("miss")
             else:
                 receipt_observation.set_outcome("disabled")
-        last_messages = await asyncio.to_thread(self.db.get_last_messages, session_scope, 10)
+        last_messages = (
+            await asyncio.to_thread(self.db.get_last_messages, session_scope, 10)
+            if last_k_messages is None
+            else last_k_messages
+        )
         parsed_messages = parse_messages(messages)
 
         # Phase 1: Existing memory retrieval
@@ -2799,6 +2820,7 @@ class AsyncMemory(MemoryBase):
             existing_memories=existing_memories,
             new_messages=parsed_messages,
             last_k_messages=last_messages,
+            timestamp=metadata.get("source_timestamp"),
             custom_instructions=custom_instr,
         )
 
@@ -2949,7 +2971,8 @@ class AsyncMemory(MemoryBase):
                     continue
 
                 mem_hash = hashlib.md5(text.encode()).hexdigest()
-                if mem_hash in existing_hashes or mem_hash in seen_hashes:
+                preserve_assertion = formation_identity is not None and mem.get("memory_scope") == "GLOBAL"
+                if (mem_hash in existing_hashes and not preserve_assertion) or mem_hash in seen_hashes:
                     logger.debug("Skipping duplicate memory (hash match, async)")
                     duplicate_count += 1
                     continue

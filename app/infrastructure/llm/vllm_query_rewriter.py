@@ -18,7 +18,7 @@ from app.infrastructure.observability.langfuse_attributes import (
     model_attribute,
     usage_attributes,
 )
-from app.infrastructure.observability.tracing import set_span_attribute
+from app.infrastructure.observability.tracing import content_capture_enabled, set_span_attribute
 
 
 class VllmQueryRewriterAdapter:
@@ -61,7 +61,7 @@ class VllmQueryRewriterAdapter:
         self._observe_attributes(
             {
                 **model_attribute(self._model),
-                **masked_io_attributes(input_value=messages),
+                **self._content_attributes(input_value=messages),
             }
         )
         try:
@@ -109,8 +109,17 @@ class VllmQueryRewriterAdapter:
         except (ValueError, KeyError, TypeError) as error:
             raise QueryRewriterProtocolError from error
 
-        self._observe_attributes(masked_io_attributes(output_value=standalone_query))
+        self._observe_attributes(self._content_attributes(output_value=standalone_query))
         return standalone_query
+
+    @staticmethod
+    def _content_attributes(**values: object) -> dict[str, object]:
+        try:
+            if content_capture_enabled(trace.get_current_span()):
+                return masked_io_attributes(**values)
+        except Exception:
+            pass
+        return {}
 
     @staticmethod
     def _observe_attributes(attributes: dict[str, object]) -> None:

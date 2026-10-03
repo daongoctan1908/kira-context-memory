@@ -490,7 +490,9 @@ def _judge(
     )
 
 
-def _case(suite: Suite, *, tags: tuple[str, ...] = ("bundle:conv01",), name: str = "case-1") -> EvalCase:
+def _case(
+    suite: Suite, *, tags: tuple[str, ...] = ("bundle:conv01",), name: str = "case-1"
+) -> EvalCase:
     common = dict(
         case_id=f"conv01:{suite.value}:{name}",
         family_id=f"conv01:family:{suite.value}",
@@ -948,7 +950,9 @@ def test_hard_gate_semantic_fail_still_reduces_headline_metric(monkeypatch, tmp_
     assert no_ltm_metric.denominator == 1
 
 
-def test_diagnostic_infrastructure_error_still_marks_evidence_incomplete(monkeypatch, tmp_path: Path):
+def test_diagnostic_infrastructure_error_still_marks_evidence_incomplete(
+    monkeypatch, tmp_path: Path
+):
     """Regression: a diagnostic_history case with DEPENDENCY_ERROR must surface
     as an unresolved suite — infrastructure failures are never tier-excluded."""
 

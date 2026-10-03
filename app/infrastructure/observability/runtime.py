@@ -2,7 +2,7 @@
 
 import asyncio
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -11,18 +11,87 @@ from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExp
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.metrics import Meter
 from opentelemetry.sdk.metrics import MeterProvider
-from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.sdk.metrics.export import (
+    MetricExporter,
+    MetricExportResult,
+    MetricsData,
+    PeriodicExportingMetricReader,
+)
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter
+from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter, SpanExportResult
 from opentelemetry.sdk.trace.sampling import ParentBased, TraceIdRatioBased
 from opentelemetry.trace import Tracer
 
+from app.infrastructure.observability.logging import report_telemetry_diagnostic
 from app.infrastructure.observability.settings import ObservabilitySettings
 from app.infrastructure.observability.tracing import LangfuseMetadataSpanProcessor
 
 SpanExporterFactory = Callable[[ObservabilitySettings], SpanExporter]
 MetricExporterFactory = Callable[[ObservabilitySettings], Any]
+
+
+class _DiagnosticSpanExporter(SpanExporter):
+    """Observe exporter return values, which the SDK otherwise silently ignores."""
+
+    def __init__(self, exporter: SpanExporter) -> None:
+        self._exporter = exporter
+
+    def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+        try:
+            result = self._exporter.export(spans)
+        except Exception as error:
+            report_telemetry_diagnostic(
+                "telemetry.export_failed", signal="traces", error_class=type(error).__name__
+            )
+            return SpanExportResult.FAILURE
+        if result is not SpanExportResult.SUCCESS:
+            report_telemetry_diagnostic(
+                "telemetry.export_failed", signal="traces", error_class="ExportFailure"
+            )
+        return result
+
+    def force_flush(self, timeout_millis: int = 30_000) -> bool:
+        return self._exporter.force_flush(timeout_millis=timeout_millis)
+
+    def shutdown(self) -> None:
+        self._exporter.shutdown()
+
+
+class _DiagnosticMetricExporter(MetricExporter):
+    """Preserve metric exporter preferences while exposing export failures locally."""
+
+    def __init__(self, exporter: MetricExporter) -> None:
+        super().__init__(
+            preferred_temporality=exporter._preferred_temporality,
+            preferred_aggregation=exporter._preferred_aggregation,
+        )
+        self._exporter = exporter
+
+    def export(
+        self,
+        metrics_data: MetricsData,
+        timeout_millis: float = 10_000,
+        **kwargs: object,
+    ) -> MetricExportResult:
+        try:
+            result = self._exporter.export(metrics_data, timeout_millis=timeout_millis, **kwargs)
+        except Exception as error:
+            report_telemetry_diagnostic(
+                "telemetry.export_failed", signal="metrics", error_class=type(error).__name__
+            )
+            return MetricExportResult.FAILURE
+        if result is not MetricExportResult.SUCCESS:
+            report_telemetry_diagnostic(
+                "telemetry.export_failed", signal="metrics", error_class="ExportFailure"
+            )
+        return result
+
+    def force_flush(self, timeout_millis: float = 10_000) -> bool:
+        return self._exporter.force_flush(timeout_millis=timeout_millis)
+
+    def shutdown(self, timeout_millis: float = 30_000, **kwargs: object) -> None:
+        self._exporter.shutdown(timeout_millis=timeout_millis, **kwargs)
 
 
 @dataclass(slots=True)
@@ -84,23 +153,36 @@ class ObservabilityRuntime:
             thread.start()
         except Exception as error:
             self.shutdown_error_classes.append(type(error).__name__)
+            report_telemetry_diagnostic(
+                "telemetry.shutdown_failed", error_class=type(error).__name__
+            )
             return
         try:
             await asyncio.wait_for(completed.wait(), timeout=self.settings.shutdown_timeout_seconds)
         except TimeoutError:
             self.shutdown_timed_out = True
+            report_telemetry_diagnostic("telemetry.shutdown_timeout", error_class="ShutdownTimeout")
         except Exception as error:
             self.shutdown_error_classes.append(type(error).__name__)
+            report_telemetry_diagnostic(
+                "telemetry.shutdown_failed", error_class=type(error).__name__
+            )
 
-    def _shutdown_providers(self) -> None:
+    def _shutdown_providers(self, providers: Sequence[object | None] | None = None) -> None:
         # Stop metrics before traces so no final metric export outlives the trace provider.
-        for provider in (self.meter_provider, self.tracer_provider):
+        resolved_providers = (
+            providers if providers is not None else (self.meter_provider, self.tracer_provider)
+        )
+        for provider in resolved_providers:
             if provider is None:
                 continue
             try:
-                provider.shutdown()
+                provider.shutdown()  # type: ignore[attr-defined]
             except Exception as error:
                 self.shutdown_error_classes.append(type(error).__name__)
+                report_telemetry_diagnostic(
+                    "telemetry.shutdown_failed", error_class=type(error).__name__
+                )
 
 
 def create_observability_runtime(
@@ -115,12 +197,18 @@ def create_observability_runtime(
         return runtime
     if settings.otlp_endpoint is None:
         runtime.initialization_error_class = "MissingOtlpEndpointError"
+        report_telemetry_diagnostic(
+            "telemetry.initialization_failed", error_class="MissingOtlpEndpointError"
+        )
         return runtime
 
     span_factory = span_exporter_factory or _create_span_exporter
     metric_factory = metric_exporter_factory or _create_metric_exporter
     tracer_provider: TracerProvider | None = None
     meter_provider: MeterProvider | None = None
+    span_exporter: SpanExporter | None = None
+    metric_exporter: MetricExporter | None = None
+    metric_reader: PeriodicExportingMetricReader | None = None
     try:
         resource = Resource.create(
             {
@@ -129,12 +217,15 @@ def create_observability_runtime(
                 "deployment.environment.name": settings.deployment_environment,
             }
         )
-        span_exporter = span_factory(settings)
+        span_exporter = _DiagnosticSpanExporter(span_factory(settings))
         tracer_provider = TracerProvider(
             resource=resource,
             sampler=ParentBased(TraceIdRatioBased(settings.trace_sample_ratio)),
+            shutdown_on_exit=False,
         )
-        tracer_provider.add_span_processor(LangfuseMetadataSpanProcessor())
+        tracer_provider.add_span_processor(
+            LangfuseMetadataSpanProcessor(capture_content=settings.capture_content_enabled)
+        )
         tracer_provider.add_span_processor(
             BatchSpanProcessor(
                 span_exporter,
@@ -145,16 +236,25 @@ def create_observability_runtime(
             )
         )
 
-        metric_exporter = metric_factory(settings)
+        metric_exporter = _DiagnosticMetricExporter(metric_factory(settings))
         metric_reader = PeriodicExportingMetricReader(
             metric_exporter,
             export_interval_millis=int(settings.metric_export_interval_seconds * 1000),
             export_timeout_millis=int(settings.export_timeout_seconds * 1000),
         )
-        meter_provider = MeterProvider(resource=resource, metric_readers=[metric_reader])
+        meter_provider = MeterProvider(
+            resource=resource, metric_readers=[metric_reader], shutdown_on_exit=False
+        )
     except Exception as error:
         runtime.initialization_error_class = type(error).__name__
-        _shutdown_partial(meter_provider, tracer_provider)
+        report_telemetry_diagnostic(
+            "telemetry.initialization_failed", error_class=type(error).__name__
+        )
+        _shutdown_partial(
+            runtime,
+            meter_provider or metric_reader or metric_exporter,
+            tracer_provider or span_exporter,
+        )
         return runtime
 
     runtime.tracer_provider = tracer_provider
@@ -176,11 +276,36 @@ def _create_metric_exporter(settings: ObservabilitySettings) -> OTLPMetricExport
     return OTLPMetricExporter(endpoint=endpoint, timeout=settings.export_timeout_seconds)
 
 
-def _shutdown_partial(*providers: object | None) -> None:
+def _shutdown_partial(runtime: ObservabilityRuntime, *providers: object | None) -> None:
+    """Clean failed startup in daemon threads without blocking application availability."""
     for provider in providers:
         if provider is None:
             continue
+        completed = threading.Event()
+
+        def cleanup(
+            partial_provider: object = provider,
+            partial_completed: threading.Event = completed,
+        ) -> None:
+            try:
+                runtime._shutdown_providers((partial_provider,))
+            finally:
+                partial_completed.set()
+
+        def monitor(partial_completed: threading.Event = completed) -> None:
+            if not partial_completed.wait(timeout=runtime.settings.shutdown_timeout_seconds):
+                runtime.shutdown_timed_out = True
+                report_telemetry_diagnostic(
+                    "telemetry.shutdown_timeout", error_class="ShutdownTimeout"
+                )
+
         try:
-            provider.shutdown()  # type: ignore[attr-defined]
-        except Exception:
-            pass
+            threading.Thread(target=cleanup, name="otel-startup-cleanup", daemon=True).start()
+            threading.Thread(
+                target=monitor, name="otel-startup-cleanup-monitor", daemon=True
+            ).start()
+        except Exception as error:
+            runtime.shutdown_error_classes.append(type(error).__name__)
+            report_telemetry_diagnostic(
+                "telemetry.shutdown_failed", error_class=type(error).__name__
+            )

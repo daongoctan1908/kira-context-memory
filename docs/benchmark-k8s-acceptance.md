@@ -30,13 +30,19 @@ Docker/K8s/internal providers    NOT_RUN
 
 Những điều **chưa** được chứng minh trên laptop:
 
-- bundle Phase 4 thật chưa tồn tại vì dataset chưa được KiRa materialize/review;
+- bundle Phase 4 thật chưa được chứng minh; dataset hiện đã materialize/review và
+  `benchmark_ready`, cần validate bản freeze trước khi chạy Phase 4;
 - image chưa build/import/push;
 - chưa biết registry, namespace, ServiceAccount, Secret mechanism hoặc managed PostgreSQL thực tế;
-- internal model IDs/endpoints/dimension/JSON capability chưa được cấp;
+- binding/capability của extraction, embedding và judge nội bộ chưa được cấp đầy đủ;
 - chưa có K8s preflight, discovery, confirmation hoặc performance artifact.
 
 Mọi mục trên giữ `NOT_RUN`; không thay bằng mock hoặc OpenAI.
+
+Binding rewrite production được user cung cấp ngày 2026-10-02: Qwen3-14B base qua vLLM tại
+`http://10.254.135.40:8080/v1`, model ID `/models/Qwen3_14B`, không dùng `genai-lora`.
+`evaluation/benchmark.internal.env.example` đã ghi binding này cho cả evaluator và Gateway.
+Đây là cập nhật cấu hình; internal preflight và live readiness vẫn chưa được chứng minh.
 
 ## 2. Quy tắc chung
 

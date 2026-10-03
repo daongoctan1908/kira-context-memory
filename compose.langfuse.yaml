@@ -115,7 +115,7 @@ services:
       start_period: 3s
 
   langfuse-web:
-    image: langfuse/langfuse:3
+    image: langfuse/langfuse:3.225.7@sha256:a27fe525f52984fa6d36fd34e8b8c6e5ae4af43f34134cafc833b467fa9580ae
     restart: "no"
     mem_limit: 1280m
     depends_on: *langfuse-dependencies
@@ -137,7 +137,7 @@ services:
       LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-local-acceptance-only}
 
   langfuse-worker:
-    image: langfuse/langfuse-worker:3
+    image: langfuse/langfuse-worker:3.225.7@sha256:93207bd67d2e789ea55fa3d47eeba065dd6b1869187127ab24201784c52b96bc
     restart: "no"
     mem_limit: 1g
     depends_on: *langfuse-dependencies
@@ -151,6 +151,14 @@ services:
       LANGFUSE_OTEL_AUTH: Basic bGZfcGtfa2lyYV9sb2NhbF9hY2NlcHRhbmNlOmxmX3NrX2tpcmFfbG9jYWxfYWNjZXB0YW5jZQ==
     volumes:
       - ./deploy/observability/collector-langfuse-local.yaml:/etc/otelcol-contrib/config.yaml:ro
+
+  gateway:
+    environment:
+      OTEL_CAPTURE_CONTENT_ENABLED: ${OTEL_CAPTURE_CONTENT_ENABLED:-true}
+
+  worker:
+    environment:
+      OTEL_CAPTURE_CONTENT_ENABLED: ${OTEL_CAPTURE_CONTENT_ENABLED:-true}
 
 volumes:
   langfuse-postgres-data:

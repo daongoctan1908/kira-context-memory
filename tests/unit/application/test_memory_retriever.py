@@ -47,7 +47,7 @@ async def test_merge_interleaves_branches_by_raw_score():
     assert calls == ["conversation", "global"]
 
 
-async def test_merge_dedups_by_memory_id_and_content_preferring_conversation_local():
+async def test_merge_dedups_only_by_memory_id_preserving_independent_same_text():
     calls = []
     retriever = ScopedMemoryRetriever(
         branch_implementation(
@@ -67,10 +67,32 @@ async def test_merge_dedups_by_memory_id_and_content_preferring_conversation_loc
         "user-1", "query", conversation_id=CONVERSATION_ID, top_k=10, threshold=0.1
     )
 
-    # g2 ("duplicated text") is a content duplicate of c2 ("duPlicated   text");
-    # the conversation-local record wins the normalized-content tie.
-    assert [item.memory_id for item in result] == ["shared", "c2"]
-    assert result[0].content == "same text"
+    assert [item.memory_id for item in result] == ["g2", "shared", "c2"]
+    assert result[1].content == "same text"
+
+
+async def test_merge_preserves_same_text_with_different_source_times_and_scope():
+    earlier = LongTermMemory(
+        "earlier",
+        "Top mặc định là 3 dòng.",
+        0.8,
+        {"memory_scope": "GLOBAL", "source_timestamp": "2026-09-01T00:00:00Z"},
+    )
+    later = LongTermMemory(
+        "later",
+        earlier.content,
+        0.6,
+        {"memory_scope": "CONVERSATION", "source_timestamp": "2026-09-10T00:00:00Z"},
+    )
+    retriever = ScopedMemoryRetriever(
+        branch_implementation([], conversation=(later,), global_memories=(earlier,))
+    )
+
+    result = await retriever.search(
+        "user-1", "top", conversation_id=CONVERSATION_ID, top_k=10, threshold=0.1
+    )
+
+    assert result == (earlier, later)
 
 
 async def test_merge_caps_result_at_top_k():

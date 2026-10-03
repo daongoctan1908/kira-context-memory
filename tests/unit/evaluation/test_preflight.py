@@ -16,6 +16,7 @@ from evaluation.providers import (
     embedding_observations,
     extraction_count,
     judge_observations,
+    safe_model,
 )
 
 
@@ -37,7 +38,8 @@ def configured(suites=(Suite.FORMATION,), **overrides):
 
 
 def chat_response(
-    content='{"memory":[{"id":"0","text":"User prefers tables.","attributed_to":"user"}]}',
+    content='{"memory":[{"id":"0","text":"User prefers tables.",'
+    '"attributed_to":"user","scope":"GLOBAL"}]}',
     **choice_overrides,
 ):
     choice = {"finish_reason": "stop", "message": {"role": "assistant", "content": content}}
@@ -70,6 +72,37 @@ async def test_rewrite_only_does_not_require_extraction_embedding_or_db():
     assert report.checks[0].usage.total_tokens == 30
     assert "sk-synthetic-key" not in report.model_dump_json()
     assert "Một truy vấn độc lập" not in report.model_dump_json()
+
+
+async def test_path_like_served_model_is_preserved_in_request_and_preflight_observations():
+    served_model = "/models/Qwen3_14B"
+    provider = ProviderConfig(base_url="http://qwen.internal/v1", model=served_model)
+    config = EvalConfig(
+        profile=Profile.INTERNAL_TEST,
+        suites=(Suite.REWRITE,),
+        rewrite=provider,
+    )
+
+    def handle(request):
+        assert json.loads(request.content)["model"] == served_model
+        assert "authorization" not in request.headers
+        body = chat_response("Một truy vấn độc lập.")
+        body["model"] = served_model
+        return httpx.Response(200, json=body)
+
+    report = await run_preflight(config, transport=httpx.MockTransport(handle))
+
+    check = next(check for check in report.checks if check.probe is Probe.REWRITE_CHAT)
+    assert check.outcome is Outcome.PASS
+    assert check.requested_model == check.returned_model == served_model
+
+
+@pytest.mark.parametrize(
+    "value",
+    [None, 3, "", " bad", "bad ", "/models/bad\n", "/models/bad\t", "/models/\x00bad", "a" * 201],
+)
+def test_model_observation_sanitizer_keeps_existing_whitespace_control_and_length_guards(value):
+    assert safe_model(value) is None
 
 
 async def test_pc_rewrite_preflight_requires_and_validates_explicit_judge_schema():
@@ -139,6 +172,8 @@ async def test_json_contract_and_shared_dependencies_run_once():
         calls.append(body)
         assert body["max_tokens"] == 1000
         assert body["response_format"] == {"type": "json_object"}
+        assert '"scope":"GLOBAL"' in body["messages"][0]["content"]
+        assert "scope equal to CONVERSATION or GLOBAL" in body["messages"][0]["content"]
         return httpx.Response(200, json=chat_response())
 
     report = await run_preflight(
@@ -240,11 +275,14 @@ async def test_malformed_chat_is_protocol_error(body):
         '{"facts":[]}',
         '{"memory":[]}',
         '{"memory":["text"]}',
-        '{"memory":[{"id":"0","text":"x","attributed_to":"admin"}]}',
-        '{"memory":[{"id":"2","text":"x","attributed_to":"user"}]}',
-        '{"memory":[{"id":"0","text":"x","attributed_to":"user","linked_memory_ids":1}]}',
-        '{"memory":[{"id":"0","text":"x","attributed_to":"user","linked_memory_ids":[1]}]}',
-        '{"memory":[{"id":"0","text":"x","attributed_to":"user","taxonomy":"x"}]}',
+        '{"memory":[{"id":"0","text":"x","attributed_to":"admin","scope":"GLOBAL"}]}',
+        '{"memory":[{"id":"2","text":"x","attributed_to":"user","scope":"GLOBAL"}]}',
+        '{"memory":[{"id":"0","text":"x","attributed_to":"user",'
+        '"scope":"GLOBAL","linked_memory_ids":1}]}',
+        '{"memory":[{"id":"0","text":"x","attributed_to":"user",'
+        '"scope":"GLOBAL","linked_memory_ids":[1]}]}',
+        '{"memory":[{"id":"0","text":"x","attributed_to":"user","scope":"GLOBAL","taxonomy":"x"}]}',
+        '{"memory":[{"id":"0","text":"x","attributed_to":"user"}]}',
     ],
 )
 async def test_invalid_extraction_is_not_a_passing_negative(content):
@@ -253,6 +291,28 @@ async def test_invalid_extraction_is_not_a_passing_negative(content):
         transport=httpx.MockTransport(lambda _: httpx.Response(200, json=chat_response(content))),
     )
     assert report.checks[0].outcome == Outcome.PROTOCOL_ERROR
+
+
+@pytest.mark.parametrize("scope", [None, "", "INVALID", 1, False, [], {}])
+async def test_extraction_probe_requires_valid_explicit_scope(scope):
+    content = json.dumps(
+        {"memory": [{"id": "0", "text": "fact", "attributed_to": "user", "scope": scope}]}
+    )
+    report = await run_preflight(
+        configured(),
+        transport=httpx.MockTransport(lambda _: httpx.Response(200, json=chat_response(content))),
+    )
+
+    assert report.checks[0].outcome == Outcome.PROTOCOL_ERROR
+
+
+@pytest.mark.parametrize("scope", ["GLOBAL", "CONVERSATION", " global "])
+def test_extraction_probe_accepts_native_scope_normalization(scope):
+    content = json.dumps(
+        {"memory": [{"id": "0", "text": "fact", "attributed_to": "user", "scope": scope}]}
+    )
+
+    assert extraction_count(content) == 1
 
 
 async def test_response_byte_limit_and_invalid_json():
@@ -430,7 +490,7 @@ def test_endpoint_normalization_and_dual_source_envelope():
     assert (
         extraction_count(
             '{"memory":[{"id":"0","text":"Assistant suggestion",'
-            '"attributed_to":"assistant","linked_memory_ids":[]}]}'
+            '"attributed_to":"assistant","scope":"CONVERSATION","linked_memory_ids":[]}]}'
         )
         == 1
     )
@@ -474,7 +534,11 @@ async def test_reflected_credential_in_model_is_not_reported():
 
 
 @pytest.mark.parametrize("suite", [Suite.FORMATION, Suite.RETRIEVAL])
-async def test_arbitrary_provider_credential_reflection_is_redacted(suite):
+@pytest.mark.parametrize(
+    "reflected_model",
+    ["prefix-synthetic-secret-token-suffix", "/models/prefix-synthetic-secret-token-suffix"],
+)
+async def test_arbitrary_provider_credential_reflection_is_redacted(suite, reflected_model):
     provider = ProviderConfig(
         base_url="https://provider.test/v1",
         model="test-model",
@@ -484,7 +548,7 @@ async def test_arbitrary_provider_credential_reflection_is_redacted(suite):
         profile=Profile.INTERNAL_TEST, suites=(suite,), extraction=provider, embedding=provider
     )
     body = chat_response() if suite == Suite.FORMATION else vector_body()
-    body["model"] = "prefix-synthetic-secret-token-suffix"
+    body["model"] = reflected_model
     report = await run_preflight(
         config, transport=httpx.MockTransport(lambda _: httpx.Response(200, json=body))
     )

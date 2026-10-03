@@ -69,7 +69,10 @@ async def rewrite(request: Request) -> JSONResponse:
         current,
     )
     run_id = _follow_up_run_id(current)
-    if run_id is not None and memory_fact(run_id) in memories:
+    memory_texts = [
+        memory.get("text") if isinstance(memory, dict) else memory for memory in memories
+    ]
+    if run_id is not None and memory_fact(run_id) in memory_texts:
         output = rewritten_follow_up(run_id)
 
     rewrite_evidence.append(

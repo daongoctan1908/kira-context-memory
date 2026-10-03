@@ -18,6 +18,7 @@ from app.domain.errors.kira import (
 )
 from app.domain.models.kira import KiraEventKind
 from app.infrastructure.kira.http_kira_client import KiraHttpAdapter
+from app.infrastructure.observability.tracing import bind_content_capture
 
 
 def make_settings(**overrides: object) -> Settings:
@@ -203,7 +204,7 @@ async def test_chat_trace_measures_stream_milestones_with_masked_bounded_content
         )
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        with tracer.start_as_current_span("chat.request") as root:
+        with bind_content_capture(True), tracer.start_as_current_span("chat.request") as root:
             iterator = await KiraHttpAdapter(
                 client,
                 make_settings(),
@@ -229,6 +230,127 @@ async def test_chat_trace_measures_stream_milestones_with_masked_bounded_content
     assert "+84 912 345 678" not in str(chat_span.attributes)
     assert "[REDACTED_EMAIL]" in chat_span.attributes["langfuse.observation.input"]
     assert "[REDACTED_PHONE]" in chat_span.attributes["langfuse.observation.output"]
+    provider.shutdown()
+
+
+async def test_disabled_content_capture_does_not_mask_or_buffer_stream_content(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = provider.get_tracer("test.kira")
+    data = json.dumps(sse_payload("private-stream-content")).encode()
+
+    def unexpected_masking(*args: object, **kwargs: object) -> dict[str, object]:
+        raise AssertionError("disabled content must not be processed for telemetry")
+
+    monkeypatch.setattr(
+        "app.infrastructure.kira.http_kira_client.masked_io_attributes", unexpected_masking
+    )
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/authenticate":
+            return httpx.Response(200, json=auth_response(), request=request)
+        return httpx.Response(
+            200,
+            stream=TrackingStream(b"data: " + data + b"\n\n"),
+            request=request,
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with bind_content_capture(False):
+            iterator = await KiraHttpAdapter(client, make_settings(), tracer=tracer).chat_stream(
+                "private-input"
+            )
+            assert (await anext(iterator)).text_fragment == "private-stream-content"
+            assert iterator._output_fragments == []
+            assert [event async for event in iterator] == []
+
+    chat_span = next(span for span in exporter.get_finished_spans() if span.name == "kira.chat")
+    assert chat_span.attributes is not None
+    assert "langfuse.observation.input" not in chat_span.attributes
+    assert "langfuse.observation.output" not in chat_span.attributes
+    assert chat_span.attributes["kira.stream.first_content_seconds"] >= 0
+    assert chat_span.attributes["kira.outcome"] == "success"
+    provider.shutdown()
+
+
+@pytest.mark.parametrize(
+    ("content", "expected_truncated"),
+    [
+        ("-----BEGIN RSA PRIVATE KEY-----\n" + "PRIVATEKEYBODY" * 500, True),
+        ("ế" * 2000, False),
+    ],
+    ids=["private-key-prefix", "unicode-bytes-within-character-limit"],
+)
+async def test_stream_capture_masks_key_prefix_and_reports_actual_truncation(
+    content: str, expected_truncated: bool
+) -> None:
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    data = json.dumps(sse_payload(content), ensure_ascii=False).encode()
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/authenticate":
+            return httpx.Response(200, json=auth_response(), request=request)
+        return httpx.Response(
+            200,
+            stream=TrackingStream(b"data: " + data + b"\n\n"),
+            request=request,
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with bind_content_capture(True):
+            iterator = await KiraHttpAdapter(
+                client, make_settings(), tracer=provider.get_tracer("test.kira")
+            ).chat_stream('{"password":"private-input"}')
+            assert [event.text_fragment async for event in iterator] == [content]
+            assert iterator._output_fragments == []
+
+    chat_span = next(span for span in exporter.get_finished_spans() if span.name == "kira.chat")
+    assert chat_span.attributes is not None
+    attributes = chat_span.attributes
+    rendered = attributes["langfuse.observation.output"]
+    assert len(rendered) <= 4096
+    assert isinstance(json.loads(rendered), str)
+    assert "PRIVATEKEYBODY" not in rendered
+    assert "private-input" not in attributes["langfuse.observation.input"]
+    assert attributes["kira.observation.output.truncated"] is expected_truncated
+    assert attributes["kira.observation.output.original_bytes"] == len(content.encode("utf-8"))
+    provider.shutdown()
+
+
+async def test_invalid_unicode_telemetry_does_not_interrupt_stream_events() -> None:
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    content = "\ud800"
+    data = json.dumps(sse_payload(content)).encode()
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/authenticate":
+            return httpx.Response(200, json=auth_response(), request=request)
+        return httpx.Response(
+            200,
+            stream=TrackingStream(b"data: " + data + b"\n\n"),
+            request=request,
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with bind_content_capture(True):
+            iterator = await KiraHttpAdapter(
+                client, make_settings(), tracer=provider.get_tracer("test.kira")
+            ).chat_stream("question")
+            assert [event.text_fragment async for event in iterator] == [content]
+            assert iterator._output_fragments == []
+
+    chat_span = next(span for span in exporter.get_finished_spans() if span.name == "kira.chat")
+    assert chat_span.attributes is not None
+    assert "langfuse.observation.output" not in chat_span.attributes
+    assert chat_span.attributes["kira.observation.output.content_omitted"] == "masking_error"
+    assert chat_span.attributes["kira.outcome"] == "success"
     provider.shutdown()
 
 

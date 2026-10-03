@@ -10,6 +10,7 @@ class ObservabilitySettingsSource(Protocol):
     app_environment: str
     app_version: str
     otel_enabled: bool
+    otel_capture_content_enabled: bool
     otel_exporter_otlp_endpoint: object | None
     otel_export_timeout_seconds: float
     otel_batch_schedule_delay_seconds: float
@@ -36,6 +37,7 @@ class ObservabilitySettings:
     metric_export_interval_seconds: float
     trace_sample_ratio: float
     shutdown_timeout_seconds: float
+    capture_content_enabled: bool = False
 
     def signal_endpoint(self, signal: str) -> str | None:
         """Return an OTLP/HTTP signal URL without accepting arbitrary paths."""
@@ -66,4 +68,5 @@ def build_observability_settings(
         metric_export_interval_seconds=source.otel_metric_export_interval_seconds,
         trace_sample_ratio=source.otel_trace_sample_ratio,
         shutdown_timeout_seconds=source.otel_shutdown_timeout_seconds,
+        capture_content_enabled=source.otel_capture_content_enabled,
     )

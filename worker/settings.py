@@ -32,6 +32,7 @@ class WorkerSettings(BaseSettings):
     app_version: str = Field(default="0.4.1", min_length=1, max_length=64)
 
     otel_enabled: bool = False
+    otel_capture_content_enabled: bool = False
     otel_exporter_otlp_endpoint: AnyHttpUrl | None = None
     otel_export_timeout_seconds: float = Field(default=1.0, gt=0, le=30)
     otel_batch_schedule_delay_seconds: float = Field(default=5.0, gt=0, le=60)

@@ -217,7 +217,7 @@ npx skills add https://github.com/mem0ai/mem0 --skill mem0-test-integration
 npx skills add https://github.com/mem0ai/mem0 --skill mem0-oss-to-platform
 ```
 
-Use `/mem0-integrate` to wire Mem0 into an existing repo via a test-first pipeline, then `/mem0-test-integration` to verify. Use `/mem0-oss-to-platform` to migrate an existing project from Mem0 OSS to the hosted Platform SDK. See the [skills catalog](./skills/) or [Vibecoding with Mem0](https://docs.mem0.ai/vibecoding) for the full picture.
+Use `/mem0-integrate` to wire Mem0 into an existing repo via a test-first pipeline, then `/mem0-test-integration` to verify. Use `/mem0-oss-to-platform` to migrate an existing project from Mem0 OSS to the hosted Platform SDK. See the [upstream skills catalog](https://github.com/mem0ai/mem0/tree/v2.0.20/skills) or [Vibecoding with Mem0](https://docs.mem0.ai/vibecoding) for the full picture.
 
 ### Basic Usage
 

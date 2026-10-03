@@ -6,6 +6,11 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import httpx
+import pytest
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.trace import SpanKind
 
 from app.application.services.chat_idempotency import hash_chat_content
 from app.config.settings import Settings
@@ -26,6 +31,10 @@ from app.domain.models.conversation import (
 )
 from app.domain.models.identity import AuthenticatedPrincipal
 from app.domain.models.kira import KiraEventKind, KiraStreamEvent
+from app.domain.models.telemetry_context import TelemetryContext
+from app.infrastructure.observability.runtime import ObservabilityRuntime
+from app.infrastructure.observability.settings import ObservabilitySettings
+from app.infrastructure.observability.tracing import telemetry_context_links
 from app.presentation.api.main import create_app
 
 _USER_ID = UUID("11111111-1111-4111-8111-111111111111")
@@ -116,6 +125,8 @@ class FakeStore:
         self.messages: tuple[ConversationMessage, ConversationMessage] | None = None
         self.fail_complete = False
         self.abandoned: ChatRequestStatus | None = None
+        self.memory_job_event_id: UUID | None = None
+        self.telemetry_context: TelemetryContext | None = None
 
     async def reserve_chat_request(
         self,
@@ -175,6 +186,7 @@ class FakeStore:
             raise RuntimeError("private database detail")
         assert user_id == str(_USER_ID)
         assert reservation.lease_token == self.reservation.lease_token
+        self.telemetry_context = _kwargs.get("telemetry_context")
         self.messages = (user_message, assistant_message)
         self.reservation = ChatRequestReservation(
             reservation.request_id,
@@ -196,6 +208,7 @@ class FakeStore:
                 reservation.turn_id,
                 2,
             ),
+            self.memory_job_event_id if _kwargs.get("schedule_memory") else None,
         )
 
     async def read_completed_chat_request(self, user_id, session_id, reservation):
@@ -291,6 +304,48 @@ async def test_product_stream_commits_before_completed_and_duplicate_replays() -
         assert '"replayed":true' in replay.text
         assert "xin chao" in replay.text
         assert kira.calls == 1
+
+
+async def test_product_memory_job_context_links_to_enqueue_producer_span(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    exporter = InMemorySpanExporter()
+
+    def create_runtime(settings: ObservabilitySettings) -> ObservabilityRuntime:
+        provider = TracerProvider()
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        return ObservabilityRuntime(settings=settings, tracer_provider=provider)
+
+    monkeypatch.setattr(
+        "app.presentation.api.main.create_observability_runtime",
+        create_runtime,
+    )
+    store = FakeStore()
+    store.memory_job_event_id = uuid4()
+    settings = _settings(memory_formation_enabled=True)
+
+    async with _client(settings=settings, store=store) as (client, store, _kira):
+        response = await client.post(
+            "/api/v1/conversations/public-session/messages",
+            headers=_headers(),
+            json={"client_message_id": str(uuid4()), "message": "hello"},
+        )
+
+    assert response.status_code == 200
+    assert "event: message.completed" in response.text
+    assert store.messages is not None
+    assert store.telemetry_context is not None
+    assert store.telemetry_context.correlation_id == response.headers["x-correlation-id"]
+    spans = {span.name: span for span in exporter.get_finished_spans()}
+    producer = spans["memory_job.enqueue"]
+    assert producer.kind is SpanKind.PRODUCER
+    assert producer.parent.span_id == spans["conversation.append_turn"].context.span_id
+    assert producer.attributes["kira.outcome"] == "scheduled"
+    links = telemetry_context_links(store.telemetry_context)
+    assert len(links) == 1
+    assert links[0].context.trace_id == producer.context.trace_id
+    assert links[0].context.span_id == producer.context.span_id
+    assert links[0].context.span_id != spans["chat.request"].context.span_id
 
 
 async def test_product_idempotency_conflict_and_in_progress_are_409() -> None:

@@ -113,17 +113,13 @@ class ScopedMemoryRetriever:
         top_k: int,
     ) -> tuple[LongTermMemory, ...]:
         by_id: dict[str, LongTermMemory] = {}
-        by_content: dict[str, str] = {}
         ordered: list[LongTermMemory] = []
-        # Conversation-local records win exact-content ties over global ones.
+        # Repeated text can carry different scope or source evidence. Only the
+        # same record is a duplicate; keep independent assertions available.
         for memory in (*conversation, *global_memories):
             if memory.memory_id in by_id:
                 continue
-            content_key = " ".join(memory.content.casefold().split())
-            if content_key in by_content:
-                continue
             by_id[memory.memory_id] = memory
-            by_content[content_key] = memory.memory_id
             ordered.append(memory)
         ordered.sort(key=lambda memory: (-memory.score, memory.memory_id))
         return tuple(ordered[:top_k])

@@ -1,5 +1,14 @@
 # AGENTS.md
 
+## KiRa checkout scope
+
+This checkout retains the Python SDK, SDK tests/docs, licensing and provenance. The independent
+server, TypeScript SDK, CLIs, integrations, examples, skills, plugin catalogs and repository
+scripts are omitted;
+the monorepo sections below describe upstream rather than available KiRa packages. See
+`UPSTREAM.md` for the vendored subset. For KiRa runtime validation use the parent repository's
+locked environment and `tests/vendor/`; do not recreate omitted packages to follow upstream CI.
+
 Context for AI coding assistants (Claude Code, Cursor, Copilot, Codex) working in the Mem0 repository.
 
 **Mem0** ("mem-zero") is a memory layer for AI agents: persistent, personalized memory through a hosted platform API and self-hosted open-source SDKs. Apache-2.0.

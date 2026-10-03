@@ -80,7 +80,7 @@ async def release() -> dict[str, str]:
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: Request) -> JSONResponse:
-    """Extract only explicitly marked synthetic facts into a native V3 envelope."""
+    """Extract marked synthetic facts as user-global memories for cross-session recall."""
     body = await request.json()
     messages = body.get("messages")
     if (
@@ -116,7 +116,7 @@ async def chat_completions(request: Request) -> JSONResponse:
 
     facts = _extract_marked_facts(messages[1]["content"])
     content = json.dumps(
-        {"memory": [{"text": fact, "attributed_to": "user"} for fact in facts]},
+        {"memory": [{"text": fact, "attributed_to": "user", "scope": "GLOBAL"} for fact in facts]},
         ensure_ascii=False,
         separators=(",", ":"),
     )

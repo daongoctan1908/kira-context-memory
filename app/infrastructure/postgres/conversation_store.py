@@ -9,7 +9,7 @@ from hashlib import sha256
 from typing import Any, NoReturn
 from uuid import UUID, uuid4
 
-from sqlalchemy import Text, bindparam, delete, func, insert, or_, select, text, update
+from sqlalchemy import Text, bindparam, case, delete, func, insert, or_, select, text, update
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.exc import DBAPIError, IntegrityError, SQLAlchemyError
@@ -848,6 +848,11 @@ class PostgresConversationStoreAdapter:
                 turn_sequence = conversation.next_turn_sequence
                 if isinstance(turn_sequence, bool) or not isinstance(turn_sequence, int):
                     raise ConversationStoreProtocolError
+                user_values = self._message_values(
+                    reservation.conversation_id, turn_sequence, 0, user_message
+                )
+                # Reclaimed attempts keep the first accepted user message's clock.
+                user_values["message_timestamp"] = request_row["created_at"]
                 inserted_rows = (
                     (
                         await connection.execute(
@@ -856,12 +861,7 @@ class PostgresConversationStoreAdapter:
                                 conversation_messages.c.message_index,
                             ),
                             [
-                                self._message_values(
-                                    reservation.conversation_id,
-                                    turn_sequence,
-                                    0,
-                                    user_message,
-                                ),
+                                user_values,
                                 self._message_values(
                                     reservation.conversation_id,
                                     turn_sequence,
@@ -1013,7 +1013,15 @@ class PostgresConversationStoreAdapter:
                 conversation_messages.c.turn_id,
                 conversation_messages.c.role,
                 conversation_messages.c.content,
-                conversation_messages.c.message_timestamp,
+                case(
+                    (
+                        conversation_messages.c.role == ConversationRole.USER.value,
+                        func.coalesce(
+                            chat_requests.c.created_at, conversation_messages.c.message_timestamp
+                        ),
+                    ),
+                    else_=conversation_messages.c.message_timestamp,
+                ).label("message_timestamp"),
                 conversation_messages.c.schema_version,
                 conversation_messages.c.turn_sequence,
                 conversation_messages.c.message_index,
@@ -1022,6 +1030,11 @@ class PostgresConversationStoreAdapter:
                 conversation_messages.join(
                     conversations,
                     conversation_messages.c.conversation_id == conversations.c.conversation_id,
+                ).outerjoin(
+                    chat_requests,
+                    (chat_requests.c.conversation_id == conversation_messages.c.conversation_id)
+                    & (chat_requests.c.turn_id == conversation_messages.c.turn_id)
+                    & (chat_requests.c.status == ChatRequestStatus.COMPLETED.value),
                 )
             )
             .where(*filters)
@@ -1088,10 +1101,26 @@ class PostgresConversationStoreAdapter:
                 conversation_messages.c.turn_id,
                 conversation_messages.c.role,
                 conversation_messages.c.content,
-                conversation_messages.c.message_timestamp,
+                case(
+                    (
+                        conversation_messages.c.role == ConversationRole.USER.value,
+                        func.coalesce(
+                            chat_requests.c.created_at, conversation_messages.c.message_timestamp
+                        ),
+                    ),
+                    else_=conversation_messages.c.message_timestamp,
+                ).label("message_timestamp"),
                 conversation_messages.c.schema_version,
                 conversation_messages.c.turn_sequence,
                 conversation_messages.c.message_index,
+            )
+            .select_from(
+                conversation_messages.outerjoin(
+                    chat_requests,
+                    (chat_requests.c.conversation_id == conversation_messages.c.conversation_id)
+                    & (chat_requests.c.turn_id == conversation_messages.c.turn_id)
+                    & (chat_requests.c.status == ChatRequestStatus.COMPLETED.value),
+                )
             )
             .where(
                 conversation_messages.c.conversation_id == conversation_id,

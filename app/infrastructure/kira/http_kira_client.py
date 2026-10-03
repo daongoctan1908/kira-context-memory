@@ -27,6 +27,7 @@ from app.infrastructure.observability.langfuse_attributes import (
     masked_io_attributes,
 )
 from app.infrastructure.observability.tracing import (
+    content_capture_enabled,
     record_span_error,
     set_span_attribute,
     use_span_safely,
@@ -217,7 +218,8 @@ class KiraHttpAdapter:
             return trace.INVALID_SPAN
         set_span_attribute(span, OBSERVATION_TYPE, "generation")
         set_span_attribute(span, "server.address", self._settings.kira_base_url.host or "kira")
-        _set_span_attributes(span, masked_io_attributes(input_value=message))
+        if content_capture_enabled(span):
+            _set_span_attributes(span, masked_io_attributes(input_value=message))
         return span
 
 
@@ -245,6 +247,8 @@ class _KiraResponseStream(AsyncIterator[KiraStreamEvent]):
         self._first_content_seconds: float | None = None
         self._output_fragments: list[str] = []
         self._output_bytes = 0
+        self._captured_characters = 0
+        self._output_truncated = False
 
     def __aiter__(self) -> Self:
         return self
@@ -296,11 +300,11 @@ class _KiraResponseStream(AsyncIterator[KiraStreamEvent]):
             with anyio.CancelScope(shield=True):
                 await self._stream_context.__aexit__(None, None, None)
         finally:
-            if self._output_fragments:
-                _set_span_attributes(
-                    self._span,
-                    masked_io_attributes(output_value="".join(self._output_fragments)),
+            if self._output_fragments and content_capture_enabled(self._span):
+                output_attributes = masked_io_attributes(
+                    output_value="".join(self._output_fragments)
                 )
+                _set_span_attributes(self._span, output_attributes)
                 set_span_attribute(
                     self._span,
                     "kira.observation.output.original_bytes",
@@ -309,8 +313,10 @@ class _KiraResponseStream(AsyncIterator[KiraStreamEvent]):
                 set_span_attribute(
                     self._span,
                     "kira.observation.output.truncated",
-                    self._output_bytes > 4096,
+                    self._output_truncated
+                    or output_attributes.get("kira.observation.output.truncated", False),
                 )
+            self._output_fragments.clear()
             _finish_span(self._span, outcome, error)
             _observe_stream_metrics(
                 self._metric_observer,
@@ -330,11 +336,17 @@ class _KiraResponseStream(AsyncIterator[KiraStreamEvent]):
             self._first_content_observed = True
             self._first_content_seconds = elapsed
             set_span_attribute(self._span, "kira.stream.first_content_seconds", elapsed)
-        if event.text_fragment:
-            self._output_bytes += len(event.text_fragment.encode("utf-8"))
-            captured = sum(len(fragment) for fragment in self._output_fragments)
-            if captured < 4096:
-                self._output_fragments.append(event.text_fragment[: 4096 - captured])
+        if event.text_fragment and content_capture_enabled(self._span):
+            # Invalid Unicode remains a domain event; telemetry must not turn it
+            # into a stream failure. The snapshot builder omits invalid content.
+            self._output_bytes += len(event.text_fragment.encode("utf-8", errors="replace"))
+            remaining = max(4096 - self._captured_characters, 0)
+            fragment = event.text_fragment[:remaining]
+            if fragment:
+                self._output_fragments.append(fragment)
+                self._captured_characters += len(fragment)
+            if len(event.text_fragment) > remaining:
+                self._output_truncated = True
         if event.request_id is not None:
             set_span_attribute(self._span, "kira.request_id", event.request_id)
         if event.message_id is not None:

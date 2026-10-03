@@ -59,9 +59,12 @@ embedding + pgvector; rewrite cần chat provider; persistent formation cần c�
 và DB; full cross-session cần Gateway/Worker/queue và KiRa hoặc double được ghi rõ. Validate/review
 offline không đòi provider. Không bắt suite độc lập phải có tất cả endpoint.
 
-K8s Test không Internet/GPU, Qwen 14B API chưa có deployment name/endpoint cụ thể, embedding nội bộ
-chưa có. Không suy đoán model version, JSON support hay embedding dimension. Preflight kiểm tra
-khả năng thực tế, bao gồm embedding batch/count/dimension và JSON extraction format.
+K8s Test không Internet/GPU. User đã chỉ định binding rewrite production: Qwen3-14B base qua vLLM,
+`http://10.254.135.40:8080/v1`, model ID `/models/Qwen3_14B`, không dùng `genai-lora`.
+Binding này là cấu hình được cung cấp, chưa chứng minh internal preflight hoặc live readiness.
+Extraction, embedding và judge nội bộ vẫn cần binding/capability thực tế. Không suy đoán model
+revision, JSON support hay embedding dimension. Preflight kiểm tra khả năng thực tế, bao gồm
+embedding batch/count/dimension và JSON extraction format.
 
 Không cấu hình hoặc chưa lên lịch chạy: `NOT_RUN`. Đã thử nhưng dependency unavailable/timeout:
 `DEPENDENCY_ERROR`. Response không tuân contract: `PROTOCOL_ERROR`. Không auto-fallback provider
@@ -183,7 +186,12 @@ thấp hoặc không được ContextBuilder sử dụng. Gold-vs-formed reports
 Rewrite báo deterministic constraint pass/fail và internal-judge semantic pass, không gộp thành
 một score. Semantic pass cần giữ intent và đúng required slots/constraints, không invent KPI/date/location,
 không trả lời nghiệp vụ. Exact string match chỉ là diagnostic. Query standalone/topic-switch không
-bị ép dùng history; không đủ evidence thì giữ ambiguity. Current > Recent > LTM là hard assertion.
+bị ép dùng history; không đủ evidence thì giữ ambiguity. Explicit current-query information là
+hard precedence. Control rewrite v2 dùng Recent > LTM; candidate từ v3 (hiện v7) xét chronology và applicability
+của user evidence trong cả hai nguồn, không tự ưu tiên recent context hoặc một scope. Một GLOBAL
+declaration mới hơn có thể thay thế convention cũ trong recent messages nếu cùng ngữ cảnh áp dụng;
+conflict có timestamp không rõ/bằng nhau giữ ambiguity. Gold/review phải chốt đúng prompt contract
+của candidate, không áp precedence của control lên candidate một cách ngầm định.
 
 Cross-session/final QA báo internal-judge semantic pass và deterministic task success riêng;
 task success là `N/A` khi không có structured action/API evidence. Bounded wait hết hạn không được

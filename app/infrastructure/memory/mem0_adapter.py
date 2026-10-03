@@ -247,8 +247,16 @@ class Mem0Adapter:
             raise LongTermMemoryProtocolError from error
 
     async def process_memory(self, source: MemorySource) -> MemoryProcessResult:
+        source_pair = source.messages[-2:]
+        source_user = source_pair[0]
         messages = [
-            {"role": message.role.value, "content": message.content} for message in source.messages
+            {"role": message.role.value, "content": message.content} for message in source_pair
+        ]
+        preceding_context = [
+            {"role": message.role.value, "content": message.content}
+            for index in range(0, len(source.messages) - 2, 2)
+            if source.messages[index + 1].timestamp <= source_user.timestamp
+            for message in source.messages[index : index + 2]
         ]
         reference = source.reference
         try:
@@ -258,11 +266,13 @@ class Mem0Adapter:
                         messages,
                         user_id=reference.user_id,
                         run_id=str(reference.conversation_id),
+                        last_k_messages=preceding_context,
                         metadata={
                             "formation_event_id": str(source.formation_event_id),
                             "conversation_id": str(reference.conversation_id),
                             "turn_id": reference.turn_id,
                             "boundary_message_id": reference.boundary_message_id,
+                            "source_timestamp": source_user.timestamp.isoformat(),
                         },
                         infer=True,
                     )

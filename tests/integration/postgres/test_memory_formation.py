@@ -794,6 +794,7 @@ async def test_persisted_payload_carries_memory_scope_and_invalid_scope_row_is_a
             settings.memory_embedding_dims,
         )
         reference = await _persist_case(store, case, user_id, session_id)
+        first_event_id, fallback_event_id, reaffirmation_event_id = (uuid4() for _ in range(3))
         llm = ScopeScriptedMemoryLlm(
             [
                 json.dumps(
@@ -806,7 +807,7 @@ async def test_persisted_payload_carries_memory_scope_and_invalid_scope_row_is_a
                     ensure_ascii=False,
                 ),
                 json.dumps(
-                    {"memory": [{"text": "No scope field at all.", }]},
+                    {"memory": [{"text": "No scope field at all."}]},
                     ensure_ascii=False,
                 ),
                 json.dumps(
@@ -835,7 +836,8 @@ async def test_persisted_payload_carries_memory_scope_and_invalid_scope_row_is_a
                 operation_timeout_seconds=settings.memory_operation_timeout_seconds,
             )
 
-            await ProcessMemoryUseCase(store, adapter).execute(reference, uuid4())
+            process_memory = ProcessMemoryUseCase(store, adapter)
+            await process_memory.execute(reference, first_event_id)
             payloads = _read_payloads()
             scopes = {payload["data"]: payload.get("memory_scope") for payload in payloads}
             assert scopes == {
@@ -843,7 +845,8 @@ async def test_persisted_payload_carries_memory_scope_and_invalid_scope_row_is_a
                 fact_conversation: "CONVERSATION",
             }
 
-            await ProcessMemoryUseCase(store, adapter).execute(reference, uuid4())
+            reference = await _persist_case(store, case, user_id, session_id)
+            await process_memory.execute(reference, fallback_event_id)
             payloads = _read_payloads()
             missing_scoped = [
                 payload for payload in payloads if payload["data"] == "No scope field at all."
@@ -851,17 +854,30 @@ async def test_persisted_payload_carries_memory_scope_and_invalid_scope_row_is_a
             assert len(missing_scoped) == 1
             assert missing_scoped[0]["memory_scope"] == "CONVERSATION"
 
-            await ProcessMemoryUseCase(store, adapter).execute(reference, uuid4())
+            reference = await _persist_case(store, case, user_id, session_id)
+            last_result = await process_memory.execute(reference, reaffirmation_event_id)
             payloads = _read_payloads()
-            # The invalid-scope candidate never reaches a write; the GLOBAL fact is an exact
-            # hash duplicate from call 1 (same conversation), so it is deduplicated too.
+            # Separate source assertions survive even when their GLOBAL text matches.
+            # An invalid-scope candidate still never reaches a write.
             assert not any(payload["data"] == fact_invalid for payload in payloads)
-            assert sum(payload["data"] == fact_global for payload in payloads) == 1
+            global_payloads = [payload for payload in payloads if payload["data"] == fact_global]
+            assert len(global_payloads) == 2
+            assert all(payload["memory_scope"] == "GLOBAL" for payload in global_payloads)
+            assert {payload["formation_event_id"] for payload in global_payloads} == {
+                str(first_event_id),
+                str(reaffirmation_event_id),
+            }
+            assert len({payload["turn_id"] for payload in global_payloads}) == 2
             assert all(
-                payload.get("memory_scope") == "GLOBAL"
-                for payload in payloads
-                if payload["data"] == fact_global
+                payload["source_timestamp"] == "2026-09-07T00:00:00+00:00" for payload in payloads
             )
+            assert len(payloads) == 4
+            assert llm.calls == 3
+
+            replay = await process_memory.execute(reference, reaffirmation_event_id)
+            assert replay == last_result
+            assert llm.calls == 3
+            assert len(_read_payloads()) == len(payloads)
     finally:
         if adapter is not None:
             adapter.close()

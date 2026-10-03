@@ -22,7 +22,11 @@ from app.infrastructure.observability.langfuse_attributes import (
 )
 from app.infrastructure.observability.logging import configure_structured_logging
 from app.infrastructure.observability.metrics import WorkerMetrics
-from app.infrastructure.observability.tracing import set_span_attribute, start_span
+from app.infrastructure.observability.tracing import (
+    content_capture_enabled,
+    set_span_attribute,
+    start_span,
+)
 from worker.runner import MemoryJobRunnerSnapshot
 
 _QUEUE_STATUSES = ("pending", "processing", "completed", "dead")
@@ -60,10 +64,12 @@ class _StageObservation:
             pass
 
     def set_input(self, value: object) -> None:
-        self._set_attributes(masked_io_attributes(input_value=value))
+        if content_capture_enabled(self._span):
+            self._set_attributes(masked_io_attributes(input_value=value))
 
     def set_output(self, value: object) -> None:
-        self._set_attributes(masked_io_attributes(output_value=value))
+        if content_capture_enabled(self._span):
+            self._set_attributes(masked_io_attributes(output_value=value))
 
     def set_usage(self, usage: Mapping[str, object]) -> None:
         self._set_attributes(usage_attributes(usage))

@@ -10,12 +10,14 @@ from pydantic import ValidationError
 from evaluation.config import EvalConfig, ProviderConfig
 from evaluation.errors import PreflightError, ProtocolError
 from evaluation.models import Outcome, Reason, TokenUsage
+from evaluation.scoring import classify_scope
 
 EXTRACTION_SYSTEM = (
     'Return only JSON in the native Mem0 V3 envelope: {"memory":['
-    '{"id":"0","text":"a reusable fact","attributed_to":"user"}]} . '
+    '{"id":"0","text":"a reusable fact","attributed_to":"user","scope":"GLOBAL"}]} . '
     "Each memory needs a sequential string id, nonempty text, and attributed_to "
-    "equal to user or assistant. No additional top-level keys. Extract the explicit preference."
+    "equal to user or assistant, and scope equal to CONVERSATION or GLOBAL. "
+    "No additional top-level keys. Extract the explicit standing preference as GLOBAL."
 )
 EXTRACTION_INPUT = "Dữ liệu giả lập: Tôi muốn báo cáo được trình bày dưới dạng bảng."
 REWRITE_SYSTEM = "Rewrite the input as a standalone query in Vietnamese. Return only query text."
@@ -59,7 +61,7 @@ def safe_model(value: object) -> str | None:
     if (
         isinstance(value, str)
         and not value.startswith("sk-")
-        and re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_./:-]{0,199}", value)
+        and re.fullmatch(r"[a-zA-Z0-9/][a-zA-Z0-9_./:-]{0,199}", value)
     ):
         return value
     return None
@@ -117,9 +119,10 @@ def extraction_count(content: str) -> int:
     for index, memory in enumerate(memories):
         if (
             not isinstance(memory, dict)
-            or set(memory) - {"id", "text", "attributed_to", "linked_memory_ids"}
+            or set(memory) - {"id", "text", "attributed_to", "linked_memory_ids", "scope"}
             or memory.get("id") != str(index)
             or memory.get("attributed_to") not in ("user", "assistant")
+            or classify_scope(memory.get("scope")) not in ("CONVERSATION", "GLOBAL")
             or not isinstance(memory.get("text"), str)
             or not memory["text"].strip()
             or not isinstance(memory.get("linked_memory_ids", []), list)

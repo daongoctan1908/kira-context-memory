@@ -147,7 +147,7 @@ async def test_kira_mock_rejects_invalid_fault_control(control: object) -> None:
 
 
 async def test_memory_llm_mock_extracts_only_explicit_synthetic_marker() -> None:
-    marked_fact = "The local user's preferred synthetic region is North."
+    marked_fact = memory_fact("scope-regression")
     prompt = (
         "## Summary\n\n\n"
         "## New Messages\n"
@@ -171,7 +171,9 @@ async def test_memory_llm_mock_extracts_only_explicit_synthetic_marker() -> None
 
     assert response.status_code == 200
     extracted = json.loads(response.json()["choices"][0]["message"]["content"])
-    assert extracted == {"memory": [{"text": marked_fact, "attributed_to": "user"}]}
+    assert extracted == {
+        "memory": [{"text": marked_fact, "attributed_to": "user", "scope": "GLOBAL"}]
+    }
     ignored_content = json.loads(ignored.json()["choices"][0]["message"]["content"])
     assert ignored_content == {"memory": []}
 
@@ -210,7 +212,7 @@ async def test_memory_llm_mock_accepts_native_mem0_message_format_and_block_cont
         response = await asyncio.wait_for(pending, timeout=1)
 
     extracted = json.loads(response.json()["choices"][0]["message"]["content"])
-    assert extracted == {"memory": [{"text": fact, "attributed_to": "user"}]}
+    assert extracted == {"memory": [{"text": fact, "attributed_to": "user", "scope": "GLOBAL"}]}
 
 
 async def test_memory_llm_mock_applies_bounded_failure_budget_then_recovers() -> None:
@@ -282,7 +284,13 @@ async def test_rewriter_mock_uses_matching_long_term_memory_and_records_only_has
                     {
                         "current_query": current,
                         "recent_messages": [],
-                        "long_term_memories": [memory_fact(run_id)],
+                        "long_term_memories": [
+                            {
+                                "text": memory_fact(run_id),
+                                "scope": "GLOBAL",
+                                "source_timestamp": None,
+                            },
+                        ],
                     }
                 ),
             },
