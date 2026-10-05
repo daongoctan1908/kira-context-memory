@@ -1,4 +1,5 @@
-# syntax=docker/dockerfile:1
+# No `# syntax=` directive: the corporate proxy blocks the docker/dockerfile frontend
+# fetch; every feature used below is supported by the builtin frontend.
 
 FROM ghcr.io/astral-sh/uv:0.11.2 AS uv
 
