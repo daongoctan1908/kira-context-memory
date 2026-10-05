@@ -28,7 +28,7 @@ function Resolve-InputPath {
     return [System.IO.Path]::GetFullPath((Join-Path $RepositoryRoot $Path))
 }
 
-$ControlRevision = "75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00"
+$ControlRevision = "355020adae5a9917ad912429a6dbc0bde48bb595"
 $ContractId = "kira-week5-benchmark-v4"
 $BundleRoot = Resolve-InputPath $BundleDirectory
 $ManifestPath = Join-Path $BundleRoot "image-manifest.json"

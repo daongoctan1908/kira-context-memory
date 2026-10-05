@@ -6,7 +6,8 @@ from psycopg import sql
 from evaluation.config import EvalConfig
 from evaluation.errors import PreflightError, ProtocolError
 from evaluation.models import (
-    HISTORICAL_CONTROL_SHA,
+    OBSERVATION_CAPTURE_CONTROL_SHAS,
+    BenchmarkVariant,
     Outcome,
     Probe,
     Reason,
@@ -17,11 +18,17 @@ from evaluation.models import (
 def _expected_schema_contract(provenance: RunProvenance | None) -> tuple[str, int, str]:
     """Return the (alembic, memory schema_version, mem0 contract) pinned per runtime.
 
-    The historical control predates both the conversation-management migration and
-    memory schema 3, while every newer runtime requires them; the preflight probe
-    must match the exact runtime being evaluated instead of one fixed snapshot.
+    The historical control (including its observation-capture descendant, which
+    changes no schema or package version) predates both the conversation-management
+    migration and memory schema 3, while every newer runtime requires them; the
+    preflight probe must match the exact runtime being evaluated instead of one
+    fixed snapshot.
     """
-    if provenance is not None and provenance.runtime.sha == HISTORICAL_CONTROL_SHA:
+    if (
+        provenance is not None
+        and provenance.variant is BenchmarkVariant.HISTORICAL_CONTROL
+        and provenance.runtime.sha in OBSERVATION_CAPTURE_CONTROL_SHAS
+    ):
         return ("20260908_0003", 2, "2.0.20+viettel.3")
     return ("20260920_0008", 3, "2.0.20+viettel.6")
 

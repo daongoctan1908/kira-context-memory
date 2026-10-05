@@ -18,6 +18,12 @@ from pydantic import (
 
 BENCHMARK_CONTRACT_ID = "kira-week5-benchmark-v4"
 HISTORICAL_CONTROL_SHA = "75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00"
+# The historical control plus observation-only extraction capture (mem0
+# observability backport; see that commit's message for the parity proof).
+# Business behavior - prompts, provider call count, dedup, persistence,
+# receipts, returns - is byte-identical to the frozen control source.
+INSTRUMENTED_CONTROL_SHA = "355020adae5a9917ad912429a6dbc0bde48bb595"
+OBSERVATION_CAPTURE_CONTROL_SHAS = frozenset({HISTORICAL_CONTROL_SHA, INSTRUMENTED_CONTROL_SHA})
 
 
 def nonblank(value: str) -> str:
@@ -121,8 +127,11 @@ class RunProvenance(EvalModel):
         if missing := required_packages.difference(self.package_versions):
             raise ValueError(f"run provenance is missing package versions: {sorted(missing)}")
         if self.variant is BenchmarkVariant.HISTORICAL_CONTROL:
-            if self.runtime.sha != HISTORICAL_CONTROL_SHA:
-                raise ValueError("historical control must use the frozen control runtime SHA")
+            if self.runtime.sha not in OBSERVATION_CAPTURE_CONTROL_SHAS:
+                raise ValueError(
+                    "historical control must use the frozen control runtime SHA "
+                    "or its observation-capture descendant"
+                )
             if self.candidate is not None:
                 raise ValueError("historical control cannot contain a candidate declaration")
             if self.package_versions["kira-context-memory"] != "0.4.1":

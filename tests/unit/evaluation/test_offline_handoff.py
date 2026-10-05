@@ -92,7 +92,7 @@ def test_handoff_script_pins_control_and_verifies_offline_bundle():
         encoding="utf-8-sig"
     )
 
-    assert "75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00" in script
+    assert "355020adae5a9917ad912429a6dbc0bde48bb595" in script
     assert '"--pull=false"' in script
     assert '@("save", "--output", $archive)' in script
     assert '@("load", "--input", $archive)' in script

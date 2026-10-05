@@ -783,32 +783,113 @@ def test_legacy_compatibility_does_not_relax_persisted_memory_provenance():
     )
 
 
-def test_legacy_runtime_synthesizes_parse_observation_from_reconciled_lifecycle():
-    from evaluation.formation import FormationLifecycleRecord, _completed_extraction
+def test_persistent_extraction_keeps_both_facts_when_persistence_drops_one():
+    """Extractor emits two facts, persistence keeps one: extraction still shows both.
 
-    lifecycle = (
-        FormationLifecycleRecord(event="ADD", memory_id=_MEMORY_ID, memory="Uu tien Ha Noi"),
-    )
+    The parse capture reads the real extraction output (before dedup/persistence),
+    so a dropped duplicate can never shrink the extracted-fact evidence, and the
+    receipt/pgvector reconciliation still binds only the persisted subset.
+    """
+    from evaluation.formation import FormationLifecycleRecord
+
+    reference = _persistent_runtime('{"memory":[]}')[3]
+    kept_text = "Uu tien Ha Noi"
+    dropped_text = "Uu tien Ha Noi"  # same text -> hash dedup drops the second copy
+    lifecycle = (FormationLifecycleRecord(event="ADD", memory_id=_MEMORY_ID, memory=kept_text),)
     observer = FormationCaptureObserver()
-    with patch("evaluation.formation._MEM0_OBSERVABILITY", False):
-        result = _completed_extraction("conv01:formation:M01", observer, lifecycle)
-    parse = [c for c in result.stages if c.name == "mem0.extract.parse"]
-    assert len(parse) == 1
-    assert parse[0].attributes["kira.memory.parse_source"] == "runtime_legacy_lifecycle"
-    assert result.status is FormationExecutionStatus.VALID_FACTS
-    assert [fact.text for fact in result.facts] == ["Uu tien Ha Noi"]
-    assert [fact.attributed_to for fact in result.facts] == [None]
-    assert [fact.scope for fact in result.facts] == [None]
-
-
-def test_modern_runtime_keeps_native_parse_observation_only():
-    from evaluation.formation import _record_legacy_parse_observation
-
-    observer = FormationCaptureObserver()
+    # Real parse output as the extraction pipeline produced it, before dedup:
     with observer.observe("mem0.extract.parse") as observation:
         observation.set_outcome("parsed")
-        observation.set_output([{"text": "native", "attributed_to": "user", "scope": None}])
-    _record_legacy_parse_observation(observer, ())
-    assert len(observer.stage_indexes("mem0.extract.parse")) == 1
-    stages = observer.captures()
-    assert stages[0].attributes.get("kira.memory.parse_source") is None
+        observation.set_attribute("kira.memory.fact_count", 2)
+        observation.set_output(
+            [
+                {"text": kept_text, "attributed_to": "user", "scope": "CONVERSATION"},
+                {"text": dropped_text, "attributed_to": "user", "scope": "CONVERSATION"},
+            ]
+        )
+    extraction = FormationExtractionResult(
+        case_id="conv01:formation:M01",
+        outcome=Outcome.REVIEW_REQUIRED,
+        status=FormationExecutionStatus.VALID_FACTS,
+        facts=(
+            ExtractedFact(text=kept_text, attributed_to="user", scope="CONVERSATION"),
+            ExtractedFact(text=dropped_text, attributed_to="user", scope="CONVERSATION"),
+        ),
+        lifecycle_events=lifecycle,
+        provider_calls=1,
+        stages=observer.captures(),
+    )
+    receipt = PostgresFormationInspector._parse_receipt(
+        _legacy_receipt_row(
+            user_id=reference.user_id,
+            result=({"id": str(_MEMORY_ID), "event": "ADD", "memory": kept_text},),
+        ),
+        expected_event_id=_EVENT_ID,
+        expected_user_id=reference.user_id,
+        historical_control_runtime=True,
+    )
+    snapshot = FormationPersistenceSnapshot(
+        event_id=_EVENT_ID,
+        user_id=reference.user_id,
+        receipt=receipt,
+        memories=(
+            PersistedFormationMemory(
+                memory_id=_MEMORY_ID,
+                content=kept_text,
+                user_id=reference.user_id,
+                formation_event_id=_EVENT_ID,
+                conversation_id=reference.conversation_id,
+                turn_id=reference.turn_id,
+                boundary_message_id=reference.boundary_message_id,
+                attributed_to="user",
+            ),
+        ),
+    )
+    assert len(extraction.facts) == 2
+    assert len(extraction.lifecycle_events) == 1
+    assert len(snapshot.memories) == 1
+    # Reconciliation binds the persisted subset without shrinking extraction:
+    assert (
+        PersistentFormationEvaluator._reconciliation_failure(
+            extraction=extraction,
+            persistence=snapshot,
+            reference=reference,
+            historical_control_runtime=True,
+        )
+        is None
+    )
+    parse = [c for c in extraction.stages if c.name == "mem0.extract.parse"]
+    assert parse[0].output.value.count('"text"') == 2  # both facts remain in the captured output
+
+
+def test_empty_extraction_and_persist_dropped_facts_are_not_conflated():
+    """Empty extraction and facts-dropped-at-persist must stay distinguishable.
+
+    An empty parse capture yields VALID_EMPTY with no lifecycle, while a parse that
+    found facts whose every copy was deduplicated away yields facts plus zero ADD
+    lifecycle events; the validator rejects conflating either with the other.
+    """
+    empty = FormationExtractionResult(
+        case_id="conv01:formation:M01",
+        outcome=Outcome.REVIEW_REQUIRED,
+        status=FormationExecutionStatus.VALID_EMPTY,
+        provider_calls=1,
+        stages=(),
+    )
+    assert empty.status is FormationExecutionStatus.VALID_EMPTY
+    assert empty.facts == ()
+    assert empty.lifecycle_events == ()
+
+    dropped_all = FormationExtractionResult(
+        case_id="conv01:formation:M01",
+        outcome=Outcome.REVIEW_REQUIRED,
+        status=FormationExecutionStatus.VALID_FACTS,
+        facts=(ExtractedFact(text="Only fact", attributed_to="user", scope="CONVERSATION"),),
+        lifecycle_events=(),
+        provider_calls=1,
+        stages=(),
+    )
+    assert dropped_all.status is FormationExecutionStatus.VALID_FACTS
+    assert len(dropped_all.facts) == 1
+    assert dropped_all.lifecycle_events == ()
+    assert dropped_all.status is not empty.status

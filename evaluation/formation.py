@@ -41,7 +41,7 @@ from evaluation.artifacts import (
     FormedMemoryArtifact,
 )
 from evaluation.models import (
-    HISTORICAL_CONTROL_SHA,
+    OBSERVATION_CAPTURE_CONTROL_SHAS,
     BenchmarkVariant,
     EvalModel,
     FormationInput,
@@ -53,15 +53,13 @@ from evaluation.models import (
 
 try:
     from mem0.observability import bind_observer
-except ImportError:  # historical runtimes (<= 75deb1d8) ship no mem0.observability module
-    _MEM0_OBSERVABILITY = False
+except ImportError:  # runtimes without the mem0 observation module ship no hooks at all
 
     @contextmanager
     def bind_observer(observer: object) -> Iterator[None]:
         del observer
         yield
-else:
-    _MEM0_OBSERVABILITY = True
+
 
 try:
     from app.infrastructure.observability.redaction import masked_json_snapshot
@@ -477,7 +475,7 @@ class PostgresFormationInspector:
         self.historical_control_runtime = (
             runtime_provenance is not None
             and runtime_provenance.variant is BenchmarkVariant.HISTORICAL_CONTROL
-            and runtime_provenance.runtime.sha == HISTORICAL_CONTROL_SHA
+            and runtime_provenance.runtime.sha in OBSERVATION_CAPTURE_CONTROL_SHAS
         )
 
     async def inspect(
@@ -643,40 +641,11 @@ def _failed_extraction(
     )
 
 
-def _record_legacy_parse_observation(
-    recorder: FormationCaptureObserver,
-    lifecycle: tuple[FormationLifecycleRecord, ...],
-) -> None:
-    """Synthesize the parse stage for runtimes without mem0.observability.
-
-    Historical runtimes (receipt contract ``historical_control_75deb1d8``) have no
-    in-process observation hooks, so the parse capture that the evaluator requires
-    would otherwise be missing. The synthesized record carries only the ADD events
-    that the same evaluate() call already reconciled against the durable receipt and
-    pgvector rows; it introduces no new semantic evidence and stays distinguishable
-    from a real provider parse through its attribute marker.
-    """
-    if recorder.stage_indexes("mem0.extract.parse"):
-        return
-    facts = [
-        {"text": event.memory, "attributed_to": None, "scope": None}
-        for event in lifecycle
-        if event.event == "ADD"
-    ]
-    with recorder.observe("mem0.extract.parse") as observation:
-        observation.set_outcome("parsed" if facts else "empty_valid")
-        observation.set_attribute("kira.memory.fact_count", len(facts))
-        observation.set_attribute("kira.memory.parse_source", "runtime_legacy_lifecycle")
-        observation.set_output(facts)
-
-
 def _completed_extraction(
     case_id: str,
     recorder: FormationCaptureObserver,
     lifecycle: tuple[FormationLifecycleRecord, ...],
 ) -> FormationExtractionResult:
-    if not _MEM0_OBSERVABILITY:
-        _record_legacy_parse_observation(recorder, lifecycle)
     parse_indexes = recorder.stage_indexes("mem0.extract.parse")
     if len(parse_indexes) != 1:
         return _failed_extraction(
