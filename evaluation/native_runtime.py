@@ -40,7 +40,6 @@ from app.domain.models.conversation import (
 from app.domain.models.identity import AuthenticatedPrincipal
 from app.domain.models.kira import KiraStreamEvent
 from app.domain.models.memory import LongTermMemory
-from app.domain.ports.context_observer import StageName
 from app.domain.ports.kira_client import KiraClientPort
 from app.domain.ports.long_term_memory import LongTermMemoryPort
 from app.domain.ports.query_rewriter import QueryRewriterPort
@@ -232,7 +231,7 @@ class _NoOpContextObserver:
     @contextmanager
     def stage(
         self,
-        name: StageName,
+        name: str,
         *,
         kind: str = "internal",
         attributes: Mapping[str, object] | None = None,
