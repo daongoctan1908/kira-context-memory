@@ -10,7 +10,7 @@ import uuid
 import warnings
 from copy import deepcopy
 from datetime import date, datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import ValidationError
 
@@ -24,7 +24,6 @@ from mem0.configs.prompts import (
 )
 from mem0.exceptions import LLMError
 from mem0.exceptions import ValidationError as Mem0ValidationError
-from mem0.observability import observe
 from mem0.memory.base import MemoryBase
 from mem0.memory.notices import (
     PERFORMANCE_SLOW_QUERY_THRESHOLD_SECONDS,
@@ -50,7 +49,7 @@ from mem0.memory.notices import (
     get_temporal_feature_error_message_async,
 )
 from mem0.memory.setup import mem0_dir, setup_config
-from mem0.memory.storage import SQLiteManager
+from mem0.memory.storage import DisabledHistoryManager, SQLiteManager
 from mem0.memory.telemetry import MEM0_TELEMETRY, capture_event
 from mem0.memory.utils import (
     extract_json,
@@ -59,6 +58,7 @@ from mem0.memory.utils import (
     process_telemetry_filters,
     remove_code_blocks,
 )
+from mem0.observability import observe
 from mem0.utils.entity_extraction import extract_entities, extract_entities_batch
 from mem0.utils.factory import (
     EmbedderFactory,
@@ -139,6 +139,44 @@ DELETE_ALL_BATCH_SIZE = 1000
 # Tenant-scoping fields that caller-supplied metadata must never set, on either the
 # creation or the update path (issues #4490, #6277, #6655).
 _IDENTITY_KEYS = ENTITY_PARAMS | {"actor_id"}
+
+# Retrieval-scope classification produced by the extraction LLM. A valid scope is
+# copied into the persisted payload; a missing scope falls back to CONVERSATION and
+# an invalid value drops the candidate before hashing/embedding/persisting.
+_MEMORY_SCOPES = ("CONVERSATION", "GLOBAL")
+_DEFAULT_SCOPE = "CONVERSATION"
+
+
+def _enforce_memory_scopes(extracted_memories):
+    """Validate the LLM-assigned scope of every extracted candidate in place.
+
+    Returns a dict of telemetry counts. Valid scopes are normalized onto the
+    candidate dict as "memory_scope"; missing scopes default to CONVERSATION
+    (counted as fallback); values outside the enum drop the candidate before any
+    hashing, embedding, or writing occurs (counted as invalid).
+    """
+    counts = {"conversation": 0, "global": 0, "fallback": 0, "invalid": 0}
+    kept = []
+    for mem in extracted_memories:
+        raw_scope = mem.get("scope")
+        if raw_scope is None or (isinstance(raw_scope, str) and not raw_scope.strip()):
+            mem["memory_scope"] = _DEFAULT_SCOPE
+            counts["fallback"] += 1
+            kept.append(mem)
+            continue
+        scope = raw_scope.strip().upper() if isinstance(raw_scope, str) else raw_scope
+        if scope in _MEMORY_SCOPES:
+            mem["memory_scope"] = scope
+            counts[scope.lower()] += 1
+            kept.append(mem)
+        else:
+            counts["invalid"] += 1
+            logger.warning(
+                "Dropping extraction candidate with invalid memory_scope: %r",
+                raw_scope,
+            )
+    extracted_memories[:] = kept
+    return counts
 
 
 def _strip_identity_keys(
@@ -427,12 +465,15 @@ def _formation_identity(metadata, filters):
     user_id = filters.get("user_id")
     if not isinstance(event_id, str) or not isinstance(user_id, str) or not user_id.strip():
         raise ValueError("formation_event_id requires a user-scoped memory operation")
+    conversation_id = metadata.get("conversation_id")
     try:
         normalized_event_id = str(uuid.UUID(event_id))
+        normalized_conversation_id = str(uuid.UUID(conversation_id))
     except (ValueError, AttributeError, TypeError) as exc:
-        raise ValueError("formation_event_id must be a UUID") from exc
+        raise ValueError("formation_event_id and conversation_id must be UUIDs") from exc
     metadata["formation_event_id"] = normalized_event_id
-    return normalized_event_id, user_id
+    metadata["conversation_id"] = normalized_conversation_id
+    return normalized_event_id, user_id, normalized_conversation_id
 
 
 def _formation_method(vector_store, name):
@@ -520,7 +561,11 @@ class Memory(MemoryBase):
             self.config.vector_store.provider, self.config.vector_store.config
         )
         self.llm = LlmFactory.create(self.config.llm.provider, self.config.llm.config)
-        self.db = SQLiteManager(self.config.history_db_path)
+        self.db = (
+            SQLiteManager(self.config.history_db_path)
+            if self.config.history_enabled
+            else DisabledHistoryManager()
+        )
         self.collection_name = self.config.vector_store.config.collection_name
         self.api_version = self.config.version
         self.custom_instructions = self.config.custom_instructions
@@ -584,6 +629,12 @@ class Memory(MemoryBase):
         if self._entity_store is None:
             entity_config = _safe_deepcopy_config(self.config.vector_store.config)
             entity_collection = _entity_collection_name(self.config.vector_store.provider, self.collection_name)
+            if self.config.vector_store.provider == "pgvector" and getattr(
+                entity_config,
+                "enforce_active_conversation_ownership",
+                False,
+            ):
+                entity_config.owner_collection_name = self.collection_name
             # Set collection name on the cloned config
             if hasattr(entity_config, 'collection_name'):
                 entity_config.collection_name = entity_collection
@@ -793,6 +844,7 @@ class Memory(MemoryBase):
         infer: bool = True,
         memory_type: Optional[str] = None,
         prompt: Optional[str] = None,
+        last_k_messages: Optional[List[Dict[str, Any]]] = None,
     ):
         """
         Create a new memory.
@@ -818,6 +870,9 @@ class Memory(MemoryBase):
                 creating procedural memories (typically requires 'agent_id'). Otherwise, memories
                 are treated as general conversational/factual memories.
             prompt (str, optional): Prompt to use for the memory creation. Defaults to None.
+            last_k_messages (list[dict], optional): Per-call preceding source context for extraction.
+                None uses native history; an empty list supplies authoritative empty context.
+                This context is not saved as new messages.
 
         Note:
             `search()` and `get_all()` scope queries via `filters={"user_id": "...", "agent_id": "...", "run_id": "..."}` —
@@ -889,7 +944,9 @@ class Memory(MemoryBase):
         else:
             messages = parse_vision_messages(messages)
 
-        vector_store_result = self._add_to_vector_store(messages, processed_metadata, effective_filters, infer, prompt=prompt)
+        vector_store_result = self._add_to_vector_store(
+            messages, processed_metadata, effective_filters, infer, prompt=prompt, last_k_messages=last_k_messages
+        )
         scale_threshold_notice = detect_scale_threshold_from_add_result(self, vector_store_result)
         if temporal_usage_notice:
             display_temporal_usage_notice(self, "sync", "add", *temporal_usage_notice)
@@ -899,7 +956,7 @@ class Memory(MemoryBase):
             display_first_run_notice(self, "sync", "add")
         return {"results": vector_store_result}
 
-    def _add_to_vector_store(self, messages, metadata, filters, infer, prompt=None):
+    def _add_to_vector_store(self, messages, metadata, filters, infer, prompt=None, last_k_messages=None):
         if not infer:
             returned_memories = []
             for message_dict in messages:
@@ -949,7 +1006,9 @@ class Memory(MemoryBase):
             )(*formation_identity)
             if committed is not None:
                 return committed
-        last_messages = self.db.get_last_messages(session_scope, limit=10)
+        last_messages = (
+            self.db.get_last_messages(session_scope, limit=10) if last_k_messages is None else last_k_messages
+        )
         parsed_messages = parse_messages(messages)
 
         # Phase 1: Existing memory retrieval
@@ -980,6 +1039,7 @@ class Memory(MemoryBase):
             existing_memories=existing_memories,
             new_messages=parsed_messages,
             last_k_messages=last_messages,
+            timestamp=metadata.get("source_timestamp"),
             custom_instructions=custom_instr,
         )
 
@@ -1026,10 +1086,24 @@ class Memory(MemoryBase):
                     [],
                     event_id=formation_identity[0],
                     user_id=formation_identity[1],
+                    conversation_id=formation_identity[2],
                     result=[],
                 )
                 self.db.save_messages(messages, session_scope)
                 return committed
+            self.db.save_messages(messages, session_scope)
+            return []
+
+        scope_counts = _enforce_memory_scopes(extracted_memories)
+        if any(scope_counts.values()):
+            with observe("mem0.extract.scope") as scope_observation:
+                scope_observation.set_attribute("kira.memory.scope_conversation", scope_counts["conversation"])
+                scope_observation.set_attribute("kira.memory.scope_global", scope_counts["global"])
+                scope_observation.set_attribute("kira.memory.scope_fallback", scope_counts["fallback"])
+                scope_observation.set_attribute("kira.memory.scope_invalid", scope_counts["invalid"])
+                scope_observation.set_outcome("enforced")
+        if not extracted_memories:
+            # Every candidate had an invalid scope -- nothing to hash, embed, or write.
             self.db.save_messages(messages, session_scope)
             return []
 
@@ -1065,7 +1139,8 @@ class Memory(MemoryBase):
                 continue
 
             mem_hash = hashlib.md5(text.encode()).hexdigest()
-            if mem_hash in existing_hashes or mem_hash in seen_hashes:
+            preserve_assertion = formation_identity is not None and mem.get("memory_scope") == "GLOBAL"
+            if (mem_hash in existing_hashes and not preserve_assertion) or mem_hash in seen_hashes:
                 logger.debug(f"Skipping duplicate memory (hash match): {text[:50]}")
                 continue
             seen_hashes.add(mem_hash)
@@ -1082,6 +1157,8 @@ class Memory(MemoryBase):
             mem_metadata["updated_at"] = mem_metadata["created_at"]
             if mem.get("attributed_to"):
                 mem_metadata["attributed_to"] = mem["attributed_to"]
+            if mem.get("memory_scope"):
+                mem_metadata["memory_scope"] = mem["memory_scope"]
 
             records.append((memory_id, text, embed_map[text], mem_metadata))
 
@@ -1095,6 +1172,7 @@ class Memory(MemoryBase):
                 [],
                 event_id=formation_identity[0],
                 user_id=formation_identity[1],
+                conversation_id=formation_identity[2],
                 result=[],
             )
             self.db.save_messages(messages, session_scope)
@@ -1122,6 +1200,7 @@ class Memory(MemoryBase):
                 payloads=all_payloads,
                 event_id=formation_identity[0],
                 user_id=formation_identity[1],
+                conversation_id=formation_identity[2],
                 result=returned_memories,
             )
             if not created:
@@ -2214,7 +2293,11 @@ class Memory(MemoryBase):
 
         self.db.reset()
         self.db.close()
-        self.db = SQLiteManager(self.config.history_db_path)
+        self.db = (
+            SQLiteManager(self.config.history_db_path)
+            if self.config.history_enabled
+            else DisabledHistoryManager()
+        )
 
         if hasattr(self.vector_store, "reset"):
             self.vector_store = VectorStoreFactory.reset(self.vector_store)
@@ -2258,7 +2341,11 @@ class AsyncMemory(MemoryBase):
             self.config.vector_store.provider, self.config.vector_store.config
         )
         self.llm = LlmFactory.create(self.config.llm.provider, self.config.llm.config)
-        self.db = SQLiteManager(self.config.history_db_path)
+        self.db = (
+            SQLiteManager(self.config.history_db_path)
+            if self.config.history_enabled
+            else DisabledHistoryManager()
+        )
         self.collection_name = self.config.vector_store.config.collection_name
         self.api_version = self.config.version
         self.custom_instructions = self.config.custom_instructions
@@ -2302,6 +2389,12 @@ class AsyncMemory(MemoryBase):
         if self._entity_store is None:
             entity_config = _safe_deepcopy_config(self.config.vector_store.config)
             entity_collection = _entity_collection_name(self.config.vector_store.provider, self.collection_name)
+            if self.config.vector_store.provider == "pgvector" and getattr(
+                entity_config,
+                "enforce_active_conversation_ownership",
+                False,
+            ):
+                entity_config.owner_collection_name = self.collection_name
             if hasattr(entity_config, 'collection_name'):
                 entity_config.collection_name = entity_collection
             elif isinstance(entity_config, dict):
@@ -2521,6 +2614,7 @@ class AsyncMemory(MemoryBase):
         memory_type: Optional[str] = None,
         prompt: Optional[str] = None,
         llm=None,
+        last_k_messages: Optional[List[Dict[str, Any]]] = None,
     ):
         """
         Create a new memory asynchronously.
@@ -2539,6 +2633,9 @@ class AsyncMemory(MemoryBase):
                                          Pass "procedural_memory" to create procedural memories.
             prompt (str, optional): Prompt to use for the memory creation. Defaults to None.
             llm (BaseChatModel, optional): LLM class to use for generating procedural memories. Defaults to None. Useful when user is using LangChain ChatModel.
+            last_k_messages (list[dict], optional): Per-call preceding source context for extraction.
+                None uses native history; an empty list supplies authoritative empty context.
+                This context is not saved as new messages.
 
         Note:
             `search()` and `get_all()` scope queries via `filters={"user_id": "...", "agent_id": "...", "run_id": "..."}` —
@@ -2596,7 +2693,9 @@ class AsyncMemory(MemoryBase):
         else:
             messages = parse_vision_messages(messages)
 
-        vector_store_result = await self._add_to_vector_store(messages, processed_metadata, effective_filters, infer, prompt=prompt)
+        vector_store_result = await self._add_to_vector_store(
+            messages, processed_metadata, effective_filters, infer, prompt=prompt, last_k_messages=last_k_messages
+        )
         scale_threshold_notice = await asyncio.to_thread(detect_scale_threshold_from_add_result, self, vector_store_result)
         if temporal_usage_notice:
             await display_temporal_usage_notice_async(self, "async", "add", *temporal_usage_notice)
@@ -2613,6 +2712,7 @@ class AsyncMemory(MemoryBase):
         effective_filters: dict,
         infer: bool,
         prompt: Optional[str] = None,
+        last_k_messages: Optional[List[Dict[str, Any]]] = None,
     ):
         if not infer:
             returned_memories = []
@@ -2656,32 +2756,57 @@ class AsyncMemory(MemoryBase):
         session_scope = _build_session_scope(effective_filters)
         search_filters = {k: v for k, v in effective_filters.items() if k in ("user_id", "agent_id", "run_id") and v}
         formation_identity = _formation_identity(metadata, search_filters)
-        if formation_identity is not None:
-            committed = await asyncio.to_thread(
-                _formation_method(self.vector_store, "get_formation_result"),
-                *formation_identity,
-            )
-            if committed is not None:
-                return committed
-        last_messages = await asyncio.to_thread(self.db.get_last_messages, session_scope, 10)
+        with observe(
+            "mem0.receipt",
+            kind="client",
+            attributes={"kira.memory.receipt.enabled": formation_identity is not None},
+        ) as receipt_observation:
+            if formation_identity is not None:
+                committed = await asyncio.to_thread(
+                    _formation_method(self.vector_store, "get_formation_result"),
+                    *formation_identity,
+                )
+                if committed is not None:
+                    receipt_observation.set_attribute("kira.memory.receipt.hit", True)
+                    receipt_observation.set_output(committed)
+                    receipt_observation.set_outcome("replay")
+                    return committed
+                receipt_observation.set_attribute("kira.memory.receipt.hit", False)
+                receipt_observation.set_outcome("miss")
+            else:
+                receipt_observation.set_outcome("disabled")
+        last_messages = (
+            await asyncio.to_thread(self.db.get_last_messages, session_scope, 10)
+            if last_k_messages is None
+            else last_k_messages
+        )
         parsed_messages = parse_messages(messages)
 
         # Phase 1: Existing memory retrieval
-        query_embedding = await asyncio.to_thread(self.embedding_model.embed, parsed_messages, "search")
-        existing_results = await asyncio.to_thread(
-            self.vector_store.search,
-            query=parsed_messages,
-            vectors=query_embedding,
-            top_k=10,
-            filters=search_filters,
-        )
+        with observe(
+            "mem0.existing_memory.search",
+            kind="client",
+            attributes={"kira.memory.top_k": 10},
+        ) as search_observation:
+            search_observation.set_input(parsed_messages)
+            query_embedding = await asyncio.to_thread(self.embedding_model.embed, parsed_messages, "search")
+            existing_results = await asyncio.to_thread(
+                self.vector_store.search,
+                query=parsed_messages,
+                vectors=query_embedding,
+                top_k=10,
+                filters=search_filters,
+            )
 
-        # Map UUIDs to integers (anti-hallucination)
-        existing_memories = []
-        uuid_mapping = {}
-        for idx, mem in enumerate(existing_results):
-            uuid_mapping[str(idx)] = mem.id
-            existing_memories.append({"id": str(idx), "text": mem.payload.get("data", "")})
+            # Map UUIDs to integers (anti-hallucination)
+            existing_memories = []
+            uuid_mapping = {}
+            for idx, mem in enumerate(existing_results):
+                uuid_mapping[str(idx)] = mem.id
+                existing_memories.append({"id": str(idx), "text": mem.payload.get("data", "")})
+            search_observation.set_attribute("kira.memory.returned_count", len(existing_memories))
+            search_observation.set_output(existing_memories)
+            search_observation.set_outcome("success")
 
         # Phase 2: LLM extraction (single call)
         is_agent_scoped = bool(effective_filters.get("agent_id")) and not effective_filters.get("user_id")
@@ -2695,6 +2820,7 @@ class AsyncMemory(MemoryBase):
             existing_memories=existing_memories,
             new_messages=parsed_messages,
             last_k_messages=last_messages,
+            timestamp=metadata.get("source_timestamp"),
             custom_instructions=custom_instr,
         )
 
@@ -2713,7 +2839,7 @@ class AsyncMemory(MemoryBase):
             except Exception as e:
                 # Re-raise so callers can implement provider fallback / retry
                 # (see sync counterpart for rationale).
-                logger.error(f"LLM extraction failed (async): {e}")
+                logger.error("LLM extraction failed (async): %s", type(e).__name__)
                 raise LLMError(f"LLM extraction failed: {e}") from e
             extract_observation.set_output(response)
             extract_observation.set_outcome("success")
@@ -2742,15 +2868,58 @@ class AsyncMemory(MemoryBase):
 
         if not extracted_memories:
             if formation_identity is not None:
-                _, committed = await asyncio.to_thread(
-                    _formation_method(self.vector_store, "insert_with_formation_receipt"),
-                    [],
-                    [],
-                    [],
-                    event_id=formation_identity[0],
-                    user_id=formation_identity[1],
-                    result=[],
-                )
+                with observe(
+                    "mem0.persist",
+                    kind="client",
+                    attributes={"kira.memory.candidate_count": 0},
+                ) as persist_observation:
+                    created, committed = await asyncio.to_thread(
+                        _formation_method(self.vector_store, "insert_with_formation_receipt"),
+                        [],
+                        [],
+                        [],
+                        event_id=formation_identity[0],
+                        user_id=formation_identity[1],
+                        conversation_id=formation_identity[2],
+                        result=[],
+                    )
+                    persist_observation.set_attribute("kira.memory.receipt.created", created)
+                    persist_observation.set_output(committed)
+                    persist_observation.set_outcome("empty" if created else "receipt_replay")
+                await asyncio.to_thread(self.db.save_messages, messages, session_scope)
+                return committed
+            await asyncio.to_thread(self.db.save_messages, messages, session_scope)
+            return []
+
+        scope_counts = _enforce_memory_scopes(extracted_memories)
+        if any(scope_counts.values()):
+            with observe("mem0.extract.scope") as scope_observation:
+                scope_observation.set_attribute("kira.memory.scope_conversation", scope_counts["conversation"])
+                scope_observation.set_attribute("kira.memory.scope_global", scope_counts["global"])
+                scope_observation.set_attribute("kira.memory.scope_fallback", scope_counts["fallback"])
+                scope_observation.set_attribute("kira.memory.scope_invalid", scope_counts["invalid"])
+                scope_observation.set_outcome("enforced")
+        if not extracted_memories:
+            # Every candidate had an invalid scope -- nothing to hash, embed, or write.
+            if formation_identity is not None:
+                with observe(
+                    "mem0.persist",
+                    kind="client",
+                    attributes={"kira.memory.candidate_count": 0},
+                ) as persist_observation:
+                    created, committed = await asyncio.to_thread(
+                        _formation_method(self.vector_store, "insert_with_formation_receipt"),
+                        [],
+                        [],
+                        [],
+                        event_id=formation_identity[0],
+                        user_id=formation_identity[1],
+                        conversation_id=formation_identity[2],
+                        result=[],
+                    )
+                    persist_observation.set_attribute("kira.memory.receipt.created", created)
+                    persist_observation.set_output(committed)
+                    persist_observation.set_outcome("scope_dropped" if created else "receipt_replay")
                 await asyncio.to_thread(self.db.save_messages, messages, session_scope)
                 return committed
             await asyncio.to_thread(self.db.save_messages, messages, session_scope)
@@ -2758,64 +2927,97 @@ class AsyncMemory(MemoryBase):
 
         # Phase 3: Batch embed all extracted memory texts
         mem_texts = [m.get("text", "") for m in extracted_memories if m.get("text")]
-        try:
-            mem_embeddings_list = await asyncio.to_thread(self.embedding_model.embed_batch, mem_texts, "add")
-            embed_map = dict(zip(mem_texts, mem_embeddings_list))
-        except Exception:
-            embed_map = {}
-            for text in mem_texts:
-                try:
-                    embed_map[text] = await asyncio.to_thread(self.embedding_model.embed, text, "add")
-                except Exception as e:
-                    logger.warning(f"Failed to embed memory text (async): {e}")
-        if formation_identity is not None and any(text not in embed_map for text in mem_texts):
-            raise RuntimeError("atomic formation requires embeddings for every extracted memory")
+        with observe(
+            "mem0.memory.embed",
+            kind="client",
+            attributes={"kira.memory.item_count": len(mem_texts)},
+        ) as embed_observation:
+            embed_observation.set_input(mem_texts)
+            try:
+                mem_embeddings_list = await asyncio.to_thread(self.embedding_model.embed_batch, mem_texts, "add")
+                embed_map = dict(zip(mem_texts, mem_embeddings_list))
+            except Exception:
+                embed_observation.set_attribute("kira.memory.embedding_fallback", True)
+                embed_map = {}
+                for text in mem_texts:
+                    try:
+                        embed_map[text] = await asyncio.to_thread(self.embedding_model.embed, text, "add")
+                    except Exception as e:
+                        logger.warning("Failed to embed memory text (async): %s", type(e).__name__)
+            embed_observation.set_attribute("kira.memory.embedded_count", len(embed_map))
+            if formation_identity is not None and any(text not in embed_map for text in mem_texts):
+                raise RuntimeError("atomic formation requires embeddings for every extracted memory")
+            embed_observation.set_outcome("success" if len(embed_map) == len(mem_texts) else "partial")
 
         # Phase 4: Per-memory CPU processing + Phase 5: Hash dedup
-        existing_hashes = set()
-        for mem in existing_results:
-            h = mem.payload.get("hash") if hasattr(mem, "payload") and mem.payload else None
-            if h:
-                existing_hashes.add(h)
+        with observe(
+            "mem0.deduplicate",
+            attributes={"kira.memory.candidate_count": len(extracted_memories)},
+        ) as dedup_observation:
+            existing_hashes = set()
+            for mem in existing_results:
+                h = mem.payload.get("hash") if hasattr(mem, "payload") and mem.payload else None
+                if h:
+                    existing_hashes.add(h)
 
-        records = []
-        seen_hashes = set()
-        for mem in extracted_memories:
-            text = mem.get("text")
-            if not text or text not in embed_map:
-                continue
+            records = []
+            seen_hashes = set()
+            duplicate_count = 0
+            dropped_count = 0
+            for mem in extracted_memories:
+                text = mem.get("text")
+                if not text or text not in embed_map:
+                    dropped_count += 1
+                    continue
 
-            mem_hash = hashlib.md5(text.encode()).hexdigest()
-            if mem_hash in existing_hashes or mem_hash in seen_hashes:
-                logger.debug(f"Skipping duplicate memory (hash match, async): {text[:50]}")
-                continue
-            seen_hashes.add(mem_hash)
+                mem_hash = hashlib.md5(text.encode()).hexdigest()
+                preserve_assertion = formation_identity is not None and mem.get("memory_scope") == "GLOBAL"
+                if (mem_hash in existing_hashes and not preserve_assertion) or mem_hash in seen_hashes:
+                    logger.debug("Skipping duplicate memory (hash match, async)")
+                    duplicate_count += 1
+                    continue
+                seen_hashes.add(mem_hash)
 
-            text_lemmatized = lemmatize_for_bm25(text)
+                text_lemmatized = lemmatize_for_bm25(text)
 
-            memory_id = str(uuid.uuid4())
-            mem_metadata = deepcopy(metadata)
-            mem_metadata["data"] = text
-            mem_metadata["text_lemmatized"] = text_lemmatized
-            mem_metadata["hash"] = mem_hash
-            if "created_at" not in mem_metadata:
-                mem_metadata["created_at"] = datetime.now(timezone.utc).isoformat()
-            mem_metadata["updated_at"] = mem_metadata["created_at"]
-            if mem.get("attributed_to"):
-                mem_metadata["attributed_to"] = mem["attributed_to"]
+                memory_id = str(uuid.uuid4())
+                mem_metadata = deepcopy(metadata)
+                mem_metadata["data"] = text
+                mem_metadata["text_lemmatized"] = text_lemmatized
+                mem_metadata["hash"] = mem_hash
+                if "created_at" not in mem_metadata:
+                    mem_metadata["created_at"] = datetime.now(timezone.utc).isoformat()
+                mem_metadata["updated_at"] = mem_metadata["created_at"]
+                if mem.get("attributed_to"):
+                    mem_metadata["attributed_to"] = mem["attributed_to"]
+                if mem.get("memory_scope"):
+                    mem_metadata["memory_scope"] = mem["memory_scope"]
 
-            records.append((memory_id, text, embed_map[text], mem_metadata))
+                records.append((memory_id, text, embed_map[text], mem_metadata))
+            dedup_observation.set_attribute("kira.memory.retained_count", len(records))
+            dedup_observation.set_attribute("kira.memory.duplicate_count", duplicate_count)
+            dedup_observation.set_attribute("kira.memory.dropped_count", dropped_count)
+            dedup_observation.set_outcome("success" if records else "empty")
 
         if not records and formation_identity is not None:
-            _, committed = await asyncio.to_thread(
-                _formation_method(self.vector_store, "insert_with_formation_receipt"),
-                [],
-                [],
-                [],
-                event_id=formation_identity[0],
-                user_id=formation_identity[1],
-                result=[],
-            )
+            with observe(
+                "mem0.persist",
+                kind="client",
+                attributes={"kira.memory.candidate_count": 0},
+            ) as persist_observation:
+                created, committed = await asyncio.to_thread(
+                    _formation_method(self.vector_store, "insert_with_formation_receipt"),
+                    [],
+                    [],
+                    [],
+                    event_id=formation_identity[0],
+                    user_id=formation_identity[1],
+                    conversation_id=formation_identity[2],
+                    result=[],
+                )
+                persist_observation.set_attribute("kira.memory.receipt.created", created)
+                persist_observation.set_output(committed)
+                persist_observation.set_outcome("deduplicated_empty" if created else "receipt_replay")
             await asyncio.to_thread(self.db.save_messages, messages, session_scope)
             return committed
         if not records:
@@ -2831,33 +3033,49 @@ class AsyncMemory(MemoryBase):
             for r in records
         ]
 
-        if formation_identity is not None:
-            created, committed = await asyncio.to_thread(
-                _formation_method(self.vector_store, "insert_with_formation_receipt"),
-                vectors=all_vectors,
-                ids=all_ids,
-                payloads=all_payloads,
-                event_id=formation_identity[0],
-                user_id=formation_identity[1],
-                result=returned_memories,
-            )
-            if not created:
-                return committed
-            returned_memories = committed
-        else:
-            try:
-                await asyncio.to_thread(
-                    self.vector_store.insert,
+        with observe(
+            "mem0.persist",
+            kind="client",
+            attributes={"kira.memory.candidate_count": len(records)},
+        ) as persist_observation:
+            if formation_identity is not None:
+                created, committed = await asyncio.to_thread(
+                    _formation_method(self.vector_store, "insert_with_formation_receipt"),
                     vectors=all_vectors,
                     ids=all_ids,
                     payloads=all_payloads,
+                    event_id=formation_identity[0],
+                    user_id=formation_identity[1],
+                    conversation_id=formation_identity[2],
+                    result=returned_memories,
                 )
-            except Exception:
-                for mid, vec, pay in zip(all_ids, all_vectors, all_payloads):
-                    try:
-                        await asyncio.to_thread(self.vector_store.insert, vectors=[vec], ids=[mid], payloads=[pay])
-                    except Exception as e:
-                        logger.error(f"Failed to insert memory {mid} (async): {e}")
+                persist_observation.set_attribute("kira.memory.receipt.created", created)
+                persist_observation.set_output(committed)
+                if not created:
+                    persist_observation.set_outcome("receipt_replay")
+                    return committed
+                returned_memories = committed
+                persist_observation.set_outcome("created")
+            else:
+                failed_count = 0
+                try:
+                    await asyncio.to_thread(
+                        self.vector_store.insert,
+                        vectors=all_vectors,
+                        ids=all_ids,
+                        payloads=all_payloads,
+                    )
+                except Exception:
+                    for mid, vec, pay in zip(all_ids, all_vectors, all_payloads):
+                        try:
+                            await asyncio.to_thread(
+                                self.vector_store.insert, vectors=[vec], ids=[mid], payloads=[pay]
+                            )
+                        except Exception as e:
+                            failed_count += 1
+                            logger.error("Failed to insert memory (async): %s", type(e).__name__)
+                persist_observation.set_attribute("kira.memory.persisted_count", len(records) - failed_count)
+                persist_observation.set_outcome("success" if failed_count == 0 else "partial")
 
         # Batch history
         history_records = [
@@ -3977,7 +4195,11 @@ class AsyncMemory(MemoryBase):
 
         await asyncio.to_thread(self.db.reset)
         await asyncio.to_thread(self.db.close)
-        self.db = SQLiteManager(self.config.history_db_path)
+        self.db = (
+            SQLiteManager(self.config.history_db_path)
+            if self.config.history_enabled
+            else DisabledHistoryManager()
+        )
 
         self.vector_store = VectorStoreFactory.create(
             self.config.vector_store.provider, self.config.vector_store.config
