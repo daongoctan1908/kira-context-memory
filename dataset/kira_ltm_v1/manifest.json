@@ -2,7 +2,7 @@
   "$schema": "schemas/manifest.schema.json",
   "schema_version": 1,
   "dataset_id": "kira_ltm_v1",
-  "dataset_version": "1.0.0-benchmark-ready.1",
+  "dataset_version": "1.0.0-benchmark-ready.2-pc-openai",
   "status": "benchmark_ready",
   "canonical_format": "json",
   "evaluation_scope": "full_corpus",
@@ -14,7 +14,7 @@
   },
   "data_policy": {
     "classification": "internal_test_synthetic_derived",
-    "external_provider_allowed": false,
+    "external_provider_allowed": true,
     "public_git_status": "review_required"
   },
   "bundles": [
