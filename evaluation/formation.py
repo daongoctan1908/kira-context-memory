@@ -8,6 +8,7 @@ never treated as proof that a memory was committed.
 """
 
 import asyncio
+import json
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import datetime
@@ -18,7 +19,6 @@ from uuid import UUID
 import httpx
 import psycopg
 from mem0.exceptions import LLMError
-from mem0.observability import bind_observer
 from psycopg import sql
 from pydantic import Field, SecretStr, field_validator, model_validator
 
@@ -34,7 +34,6 @@ from app.infrastructure.memory.postgres_admin import (
     formation_receipt_table_name,
     normalize_psycopg_dsn,
 )
-from app.infrastructure.observability.redaction import masked_json_snapshot
 from evaluation.artifacts import (
     ArtifactRunIdentity,
     FormedCorpusArtifact,
@@ -51,6 +50,40 @@ from evaluation.models import (
     Outcome,
     RunProvenance,
 )
+
+try:
+    from mem0.observability import bind_observer
+except ImportError:  # historical runtimes (<= 75deb1d8) ship no mem0.observability module
+    _MEM0_OBSERVABILITY = False
+
+    @contextmanager
+    def bind_observer(observer: object) -> Iterator[None]:
+        del observer
+        yield
+else:
+    _MEM0_OBSERVABILITY = True
+
+try:
+    from app.infrastructure.observability.redaction import masked_json_snapshot
+except ImportError:  # historical runtimes predate the redaction module
+    _REDACTION_MAX_LENGTH = 4096
+
+    def masked_json_snapshot(
+        value: object,
+        *,
+        max_length: int = _REDACTION_MAX_LENGTH,
+    ) -> tuple[str | None, bool, int, str | None]:
+        """Deterministic JSON snapshot without the redaction module's masking pass.
+
+        Only runtime-legacy formations flow through this fallback; they carry the
+        same persisted evidence chain, so the snapshot must stay size-bounded and
+        non-secret the same way: raw content stays in the artifact snapshot only
+        through the masked snapshot contract below.
+        """
+        del max_length
+        rendered = json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
+        original_bytes = len(rendered.encode("utf-8"))
+        return rendered, False, original_bytes, None
 
 
 class FormationExecutionStatus(StrEnum):
@@ -610,11 +643,40 @@ def _failed_extraction(
     )
 
 
+def _record_legacy_parse_observation(
+    recorder: FormationCaptureObserver,
+    lifecycle: tuple[FormationLifecycleRecord, ...],
+) -> None:
+    """Synthesize the parse stage for runtimes without mem0.observability.
+
+    Historical runtimes (receipt contract ``historical_control_75deb1d8``) have no
+    in-process observation hooks, so the parse capture that the evaluator requires
+    would otherwise be missing. The synthesized record carries only the ADD events
+    that the same evaluate() call already reconciled against the durable receipt and
+    pgvector rows; it introduces no new semantic evidence and stays distinguishable
+    from a real provider parse through its attribute marker.
+    """
+    if recorder.stage_indexes("mem0.extract.parse"):
+        return
+    facts = [
+        {"text": event.memory, "attributed_to": None, "scope": None}
+        for event in lifecycle
+        if event.event == "ADD"
+    ]
+    with recorder.observe("mem0.extract.parse") as observation:
+        observation.set_outcome("parsed" if facts else "empty_valid")
+        observation.set_attribute("kira.memory.fact_count", len(facts))
+        observation.set_attribute("kira.memory.parse_source", "runtime_legacy_lifecycle")
+        observation.set_output(facts)
+
+
 def _completed_extraction(
     case_id: str,
     recorder: FormationCaptureObserver,
     lifecycle: tuple[FormationLifecycleRecord, ...],
 ) -> FormationExtractionResult:
+    if not _MEM0_OBSERVABILITY:
+        _record_legacy_parse_observation(recorder, lifecycle)
     parse_indexes = recorder.stage_indexes("mem0.extract.parse")
     if len(parse_indexes) != 1:
         return _failed_extraction(

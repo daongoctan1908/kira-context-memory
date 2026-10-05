@@ -781,3 +781,34 @@ def test_legacy_compatibility_does_not_relax_persisted_memory_provenance():
         )
         == "formation_pgvector_provenance_mismatch"
     )
+
+
+def test_legacy_runtime_synthesizes_parse_observation_from_reconciled_lifecycle():
+    from evaluation.formation import FormationLifecycleRecord, _completed_extraction
+
+    lifecycle = (
+        FormationLifecycleRecord(event="ADD", memory_id=_MEMORY_ID, memory="Uu tien Ha Noi"),
+    )
+    observer = FormationCaptureObserver()
+    with patch("evaluation.formation._MEM0_OBSERVABILITY", False):
+        result = _completed_extraction("conv01:formation:M01", observer, lifecycle)
+    parse = [c for c in result.stages if c.name == "mem0.extract.parse"]
+    assert len(parse) == 1
+    assert parse[0].attributes["kira.memory.parse_source"] == "runtime_legacy_lifecycle"
+    assert result.status is FormationExecutionStatus.VALID_FACTS
+    assert [fact.text for fact in result.facts] == ["Uu tien Ha Noi"]
+    assert [fact.attributed_to for fact in result.facts] == [None]
+    assert [fact.scope for fact in result.facts] == [None]
+
+
+def test_modern_runtime_keeps_native_parse_observation_only():
+    from evaluation.formation import _record_legacy_parse_observation
+
+    observer = FormationCaptureObserver()
+    with observer.observe("mem0.extract.parse") as observation:
+        observation.set_outcome("parsed")
+        observation.set_output([{"text": "native", "attributed_to": "user", "scope": None}])
+    _record_legacy_parse_observation(observer, ())
+    assert len(observer.stage_indexes("mem0.extract.parse")) == 1
+    stages = observer.captures()
+    assert stages[0].attributes.get("kira.memory.parse_source") is None
