@@ -142,9 +142,19 @@ def test_approved_decision_requires_every_manual_check():
         )
 
 
+def _rewind_policy(root):
+    """Policy tests exercise the false->true transition; the canonical dataset may
+    already carry the authorization, so rewind it on the copied fixture first."""
+    path = root / "manifest.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    manifest["data_policy"]["external_provider_allowed"] = False
+    path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 def test_policy_authorization_preserves_payload_and_existing_review(tmp_path):
     root = tmp_path / "dataset"
     shutil.copytree(default_dataset_root(), root)
+    _rewind_policy(root)
     before = json.loads((root / "manifest.json").read_bytes())
     payloads = {
         path.relative_to(root).as_posix(): path.read_bytes()
@@ -174,6 +184,7 @@ def test_policy_authorization_preserves_payload_and_existing_review(tmp_path):
 def test_policy_authorization_fails_closed_before_dataset_write(tmp_path, failure):
     root = tmp_path / "dataset"
     shutil.copytree(default_dataset_root(), root)
+    _rewind_policy(root)
     before = (root / "manifest.json").read_bytes()
     audit = tmp_path / "policy-audit.json"
     if failure == "stale":
@@ -197,6 +208,7 @@ def test_policy_authorization_fails_closed_before_dataset_write(tmp_path, failur
 def test_policy_authorization_copy_and_revocation_do_not_replace_human_review(tmp_path):
     source = tmp_path / "dataset"
     shutil.copytree(default_dataset_root(), source)
+    _rewind_policy(source)
     before = (source / "manifest.json").read_bytes()
     output = tmp_path / "approved"
     kwargs = {

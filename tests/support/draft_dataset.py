@@ -62,5 +62,8 @@ def copy_draft_dataset(target: Path) -> Path:
         entry["counts"]["pending_answers"] = pending
     manifest["status"] = "contract_frozen"
     manifest["dataset_version"] = "1.0.0-draft.test"
+    # External-provider authorization is only valid for the benchmark-ready canonical
+    # dataset; a rewound draft must not inherit it.
+    manifest["data_policy"]["external_provider_allowed"] = False
     _write_json(manifest_path, manifest)
     return target
