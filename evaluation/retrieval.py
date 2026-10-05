@@ -9,9 +9,10 @@ tables or issues broad user-scoped deletes.
 import hashlib
 import math
 from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Literal, Protocol
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import Field, model_validator
 
@@ -21,7 +22,11 @@ from app.domain.errors.memory import (
     LongTermMemoryProtocolError,
     LongTermMemoryTimeoutError,
 )
-from app.domain.models.conversation import ConversationSummary
+from app.domain.models.conversation import (
+    AppendTurnResult,
+    ConversationMessage,
+    ConversationRole,
+)
 from app.domain.models.memory import LongTermMemory
 from app.domain.ports.long_term_memory import LongTermMemoryPort
 from app.infrastructure.memory.mem0_adapter import Mem0Adapter
@@ -52,49 +57,64 @@ class GoldFixtureClient(Protocol):
 class RetrievalFixtureConversationStore(Protocol):
     """Conversation lifecycle surface needed to give fixture memories a real owner."""
 
-    async def create_conversation(
+    async def append_turn(
         self,
         user_id: str,
+        user_message: ConversationMessage,
+        assistant_message: ConversationMessage,
         *,
-        title: str | None = None,
-    ) -> ConversationSummary: ...
-
-    async def mark_deletion_pending(self, user_id: str, session_id: str) -> bool: ...
-
-    async def purge_deletion_pending(self, user_id: str, session_id: str) -> bool: ...
+        schedule_memory: bool = False,
+    ) -> AppendTurnResult: ...
 
 
-class _FixtureOwners:
-    def __init__(self, store: RetrievalFixtureConversationStore | None, *, title: str) -> None:
+class _FixtureOwner:
+    """Own one fixture conversation through the shared append-turn boundary."""
+
+    def __init__(self, store, *, title: str) -> None:
         self._store = store
         self._title = title
-        self._conversations: dict[str, ConversationSummary] = {}
+        self._session_ids: dict[str, str] = {}
+        self._active: dict[str, bool] = {}
 
     async def conversation_id(self, user_id: str) -> UUID | None:
         if self._store is None:
             return None
-        existing = self._conversations.get(user_id)
+        existing = self._session_ids.get(user_id)
         if existing is None:
-            existing = await self._store.create_conversation(user_id, title=self._title)
-            self._conversations[user_id] = existing
-        return existing.conversation_id
+            appended = await self._store.append_turn(
+                user_id,
+                ConversationMessage(
+                    f"eval-{uuid4().hex[:12]}",
+                    f"fixture-{uuid4().hex[:12]}",
+                    ConversationRole.USER,
+                    self._title,
+                    datetime.now(UTC),
+                ),
+                ConversationMessage(
+                    f"eval-{uuid4().hex[:12]}",
+                    f"fixture-{uuid4().hex[:12]}",
+                    ConversationRole.ASSISTANT,
+                    self._title,
+                    datetime.now(UTC),
+                ),
+            )
+            self._session_ids[user_id] = appended.reference.session_id
+            return appended.reference.conversation_id
+        return None
 
     async def retire(self) -> bool:
         if self._store is None:
             return False
         failed = False
-        for user_id, conversation in reversed(tuple(self._conversations.items())):
+        for user_id, session_id in reversed(tuple(self._session_ids.items())):
             try:
-                if not await self._store.mark_deletion_pending(user_id, conversation.session_id):
+                if not await self._store.mark_deletion_pending(user_id, session_id):
                     failed = True
-                elif not await self._store.purge_deletion_pending(
-                    user_id,
-                    conversation.session_id,
-                ):
+                elif not await self._store.purge_deletion_pending(user_id, session_id):
                     failed = True
             except Exception:
                 failed = True
-        self._conversations.clear()
+        self._session_ids.clear()
         return failed
 
 
@@ -208,7 +228,7 @@ class GoldRetrievalFixtureManager:
     ) -> None:
         self._client = client
         self._plan = plan
-        self._owners = _FixtureOwners(conversation_store, title="evaluation:gold-retrieval")
+        self._owners = _FixtureOwner(conversation_store, title="evaluation:gold-retrieval")
 
     async def setup(self, cases: Sequence[EvalCase]) -> GoldRetrievalFixture:
         case_ids = tuple(case.case_id for case in cases)
@@ -380,7 +400,7 @@ class FormationRetrievalFixtureManager:
     ) -> None:
         self._client = client
         self._plan = plan
-        self._owners = _FixtureOwners(conversation_store, title="evaluation:formed-retrieval")
+        self._owners = _FixtureOwner(conversation_store, title="evaluation:formed-retrieval")
 
     async def setup(
         self,

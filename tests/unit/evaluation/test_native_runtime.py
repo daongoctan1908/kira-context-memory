@@ -359,7 +359,7 @@ class _RecordingStore:
         del user_id, session_id, limit
         return ()
 
-    async def append_turn(self, user_id, user_message, assistant_message, *, schedule_memory):
+    async def append_turn(self, user_id, user_message, assistant_message, *, schedule_memory=False):
         self.schedule_flags.append(schedule_memory)
         self.appended.append((user_message, assistant_message))
         self.source_owners[user_message.session_id] = user_id
@@ -552,7 +552,7 @@ async def test_cross_session_runtime_owns_job_and_disables_session_b_formation(t
     assert with_ltm.retrieved_memories[0].memory_id == "memory-1"
     assert no_ltm.final_answer == "Tôi ưu tiên ở đâu?"
     assert with_ltm.final_answer.startswith("rewritten:ConversationContext")
-    assert store.schedule_flags == [True, False, False]
+    assert store.schedule_flags == [True, False, False, False, False]
     assert artifacts.load_isolation_ledger().resources[0].memory_ids == (UUID(int=400),)
 
     with pytest.raises(CrossSessionProtocolError):

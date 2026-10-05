@@ -826,11 +826,25 @@ class NativeCrossSessionRuntime(CrossSessionRuntimePort):
             memory_search_timeout_seconds=self._settings.memory_search_timeout_seconds,
             memory_formation_enabled=False,
         )
-        conversation = await self._store.create_conversation(
+        session_id = f"evaluation:{condition.value}"
+        await self._store.append_turn(
             resource.user_id,
-            title=f"evaluation:{condition.value}",
+            ConversationMessage(
+                session_id,
+                f"seed-{condition.value}",
+                ConversationRole.USER,
+                "benchmark bootstrap",
+                datetime.now(UTC),
+            ),
+            ConversationMessage(
+                session_id,
+                f"seed-{condition.value}",
+                ConversationRole.ASSISTANT,
+                "benchmark bootstrap",
+                datetime.now(UTC),
+            ),
         )
-        actual_session = conversation.session_id
+        actual_session = session_id
         session = await use_case.execute(
             ChatCommand(session_id=actual_session, message=case.inputs.session_b_query),
             principal=AuthenticatedPrincipal(user_id=resource.user_id),
@@ -959,6 +973,15 @@ class NativeRuntimeResources:
                 await self.engine.dispose()
 
 
+def _has_conversation_lifecycle(store: PostgresConversationStoreAdapter) -> bool:
+    """Runtime-legacy adapters predate the conversation lifecycle ports."""
+
+    return all(
+        callable(getattr(store, name, None))
+        for name in ("mark_deletion_pending", "purge_deletion_pending")
+    )
+
+
 async def create_native_runtime(
     *,
     config: EvalConfig,
@@ -1078,7 +1101,10 @@ async def create_native_runtime(
         client=cast(GoldFixtureClient, memory_client),
         evaluator=retrieval_evaluator,
         formation=formation,
-        conversation_store=store,
+        # Runtime-legacy stores predate the conversation lifecycle ports; their
+        # fixtures then run without a conversation owner, like the
+        # historical-control receipts, which record only event/owner.
+        conversation_store=_has_conversation_lifecycle(store) and store or None,
     )
     process_job = ProcessMemoryJobUseCase(
         processor,
