@@ -104,6 +104,12 @@ services:
       DATABASE_URL: postgresql+asyncpg://kira:${BENCHMARK_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
       MEMORY_DATABASE_URL: postgresql://kira:${BENCHMARK_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
       HEALTH_PORT: "8000"
+    volumes:
+      - ${BENCHMARK_MATERIALIZATION_ROOT:-./artifacts/benchmark}/certs/ca-bundle.pem:/etc/ssl/certs/ca-bundle.pem:ro
+    environment:
+      SSL_CERT_FILE: /etc/ssl/certs/ca-bundle.pem
+      HTTPS_PROXY: http://http.docker.internal:3128
+      HTTP_PROXY: http://http.docker.internal:3128
     ports:
       - "127.0.0.1:28000:8000"
     depends_on:
@@ -124,6 +130,12 @@ services:
       <<: [*provider-runtime, *worker-runtime]
       DATABASE_URL: postgresql+asyncpg://kira:${BENCHMARK_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
       MEMORY_DATABASE_URL: postgresql://kira:${BENCHMARK_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
+    volumes:
+      - ${BENCHMARK_MATERIALIZATION_ROOT:-./artifacts/benchmark}/certs/ca-bundle.pem:/etc/ssl/certs/ca-bundle.pem:ro
+    environment:
+      SSL_CERT_FILE: /etc/ssl/certs/ca-bundle.pem
+      HTTPS_PROXY: http://http.docker.internal:3128
+      HTTP_PROXY: http://http.docker.internal:3128
     ports:
       - "127.0.0.1:28001:8001"
     depends_on:
@@ -189,6 +201,12 @@ services:
       DATABASE_URL: postgresql+asyncpg://kira:${BENCHMARK_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
       MEMORY_DATABASE_URL: postgresql://kira:${BENCHMARK_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
       HEALTH_PORT: "8000"
+    volumes:
+      - ${BENCHMARK_MATERIALIZATION_ROOT:-./artifacts/benchmark}/certs/ca-bundle.pem:/etc/ssl/certs/ca-bundle.pem:ro
+    environment:
+      SSL_CERT_FILE: /etc/ssl/certs/ca-bundle.pem
+      HTTPS_PROXY: http://http.docker.internal:3128
+      HTTP_PROXY: http://http.docker.internal:3128
     ports:
       - "127.0.0.1:38000:8000"
     depends_on:
@@ -209,6 +227,12 @@ services:
       <<: [*provider-runtime, *worker-runtime]
       DATABASE_URL: postgresql+asyncpg://kira:${BENCHMARK_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
       MEMORY_DATABASE_URL: postgresql://kira:${BENCHMARK_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
+    volumes:
+      - ${BENCHMARK_MATERIALIZATION_ROOT:-./artifacts/benchmark}/certs/ca-bundle.pem:/etc/ssl/certs/ca-bundle.pem:ro
+    environment:
+      SSL_CERT_FILE: /etc/ssl/certs/ca-bundle.pem
+      HTTPS_PROXY: http://http.docker.internal:3128
+      HTTP_PROXY: http://http.docker.internal:3128
     ports:
       - "127.0.0.1:38001:8001"
     depends_on:
