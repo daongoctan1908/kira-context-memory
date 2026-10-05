@@ -26,7 +26,7 @@ from evaluation.postgres import probe_database
 from evaluation.provenance import capture_local_provenance
 from evaluation.providers import ProviderProbes
 
-DatabaseProbe = Callable[[EvalConfig, Probe, int | None], Awaitable[dict]]
+DatabaseProbe = Callable[[EvalConfig, Probe, int | None, RunProvenance | None], Awaitable[dict]]
 
 
 def required_probes(
@@ -126,7 +126,7 @@ async def run_preflight(
                         else:
 
                             async def operation(probe: Probe = probe, dims=dimension) -> dict:
-                                return await database_probe(config, probe, dims)
+                                return await database_probe(config, probe, dims, provenance)
                 case Probe.GATEWAY if config.gateway_url:
 
                     async def operation() -> dict:

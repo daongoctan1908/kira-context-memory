@@ -8,7 +8,14 @@ import pytest
 
 from evaluation.config import EvalConfig
 from evaluation.errors import PreflightError
-from evaluation.models import HISTORICAL_CONTROL_SHA, Probe, Reason
+from evaluation.models import (
+    HISTORICAL_CONTROL_SHA,
+    BenchmarkVariant,
+    GitSource,
+    Probe,
+    Reason,
+    RunProvenance,
+)
 from evaluation.postgres import probe_database
 from scripts.benchmark.run import main
 
@@ -38,6 +45,24 @@ def db_config():
     )
 
 
+def _provenance(runtime_sha: str) -> RunProvenance:
+    source = GitSource(sha=runtime_sha, dirty=False)
+    return RunProvenance(
+        variant=BenchmarkVariant.HISTORICAL_CONTROL
+        if runtime_sha == HISTORICAL_CONTROL_SHA
+        else BenchmarkVariant.WORKING_TREE,
+        runtime=source,
+        harness=source,
+        prompt_sha256={"memory_extraction": "a" * 64, "rewrite_system": "b" * 64},
+        package_versions={
+            "kira-context-memory": "0.4.1",
+            "viettel-mem0": "2.0.20+viettel.3"
+            if runtime_sha == HISTORICAL_CONTROL_SHA
+            else "2.0.20+viettel.7",
+        },
+    )
+
+
 @pytest.mark.parametrize("probe", [Probe.PGVECTOR, Probe.MEMORY_SCHEMA, Probe.CONVERSATION_DB])
 async def test_database_queries_read_only_and_connection_closed(monkeypatch, probe):
     rows = (
@@ -46,7 +71,7 @@ async def test_database_queries_read_only_and_connection_closed(monkeypatch, pro
         else [(2, "2.0.20+viettel.3", "embed", 3)]
     )
     connect, cursor, connection_cm = install_connection(monkeypatch, many=[rows])
-    assert await probe_database(db_config(), probe, 3) == {}
+    assert await probe_database(db_config(), probe, 3, _provenance(HISTORICAL_CONTROL_SHA)) == {}
     args, kwargs = connect.call_args
     assert "asyncpg" not in args[0]
     assert "default_transaction_read_only=on" in kwargs["options"]

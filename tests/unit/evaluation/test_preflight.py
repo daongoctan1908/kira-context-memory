@@ -432,7 +432,7 @@ async def test_missing_config_never_makes_requests():
 async def test_persistent_formation_requires_queue_and_memory_schema_and_reuses_dimension():
     calls = []
 
-    async def database(config, probe, dimension):
+    async def database(config, probe, dimension, provenance=None):
         calls.append((probe, dimension))
         return {}
 
@@ -450,7 +450,7 @@ async def test_persistent_formation_requires_queue_and_memory_schema_and_reuses_
 
 
 async def test_memory_schema_waits_for_embedding_dimension():
-    async def database(config, probe, dimension):
+    async def database(config, probe, dimension, provenance=None):
         assert probe == Probe.PGVECTOR
         return {}
 

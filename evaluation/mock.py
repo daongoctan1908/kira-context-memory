@@ -58,5 +58,10 @@ def mock_response(request: httpx.Request) -> httpx.Response:
     return httpx.Response(404)
 
 
-async def mock_database(config: EvalConfig, probe: Probe, dimension: int | None = None) -> dict:
+async def mock_database(
+    config: EvalConfig,
+    probe: Probe,
+    dimension: int | None = None,
+    provenance: object | None = None,
+) -> dict:
     return {}
