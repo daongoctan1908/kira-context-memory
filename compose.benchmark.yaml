@@ -70,6 +70,11 @@ services:
     env_file: *env-file
     environment:
       DATABASE_URL: postgresql+asyncpg://kira:${BENCHMARK_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
+      SSL_CERT_FILE: /etc/ssl/certs/ca-bundle.pem
+      HTTPS_PROXY: http://http.docker.internal:3128
+      HTTP_PROXY: http://http.docker.internal:3128
+    volumes:
+      - ${BENCHMARK_MATERIALIZATION_ROOT:-./artifacts/benchmark}/certs/ca-bundle.pem:/etc/ssl/certs/ca-bundle.pem:ro
     depends_on:
       control-postgres:
         condition: service_healthy
@@ -87,6 +92,11 @@ services:
       DATABASE_URL: postgresql+asyncpg://kira:${BENCHMARK_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
       MEMORY_DATABASE_URL: postgresql://kira:${BENCHMARK_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
       MEMORY_ADMIN_DATABASE_URL: postgresql://kira:${BENCHMARK_POSTGRES_PASSWORD}@control-postgres:5432/kira_control
+      SSL_CERT_FILE: /etc/ssl/certs/ca-bundle.pem
+      HTTPS_PROXY: http://http.docker.internal:3128
+      HTTP_PROXY: http://http.docker.internal:3128
+    volumes:
+      - ${BENCHMARK_MATERIALIZATION_ROOT:-./artifacts/benchmark}/certs/ca-bundle.pem:/etc/ssl/certs/ca-bundle.pem:ro
     depends_on:
       control-migrate:
         condition: service_completed_successfully
@@ -165,6 +175,11 @@ services:
     env_file: *env-file
     environment:
       DATABASE_URL: postgresql+asyncpg://kira:${BENCHMARK_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
+      SSL_CERT_FILE: /etc/ssl/certs/ca-bundle.pem
+      HTTPS_PROXY: http://http.docker.internal:3128
+      HTTP_PROXY: http://http.docker.internal:3128
+    volumes:
+      - ${BENCHMARK_MATERIALIZATION_ROOT:-./artifacts/benchmark}/certs/ca-bundle.pem:/etc/ssl/certs/ca-bundle.pem:ro
     depends_on:
       candidate-postgres:
         condition: service_healthy
@@ -182,6 +197,11 @@ services:
       DATABASE_URL: postgresql+asyncpg://kira:${BENCHMARK_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
       MEMORY_DATABASE_URL: postgresql://kira:${BENCHMARK_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
       MEMORY_ADMIN_DATABASE_URL: postgresql://kira:${BENCHMARK_POSTGRES_PASSWORD}@candidate-postgres:5432/kira_candidate
+      SSL_CERT_FILE: /etc/ssl/certs/ca-bundle.pem
+      HTTPS_PROXY: http://http.docker.internal:3128
+      HTTP_PROXY: http://http.docker.internal:3128
+    volumes:
+      - ${BENCHMARK_MATERIALIZATION_ROOT:-./artifacts/benchmark}/certs/ca-bundle.pem:/etc/ssl/certs/ca-bundle.pem:ro
     depends_on:
       candidate-migrate:
         condition: service_completed_successfully
