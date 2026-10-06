@@ -24,6 +24,7 @@ from mem0.configs.prompts import (
 )
 from mem0.exceptions import LLMError
 from mem0.exceptions import ValidationError as Mem0ValidationError
+from mem0.observability import observe
 from mem0.memory.base import MemoryBase
 from mem0.memory.notices import (
     PERFORMANCE_SLOW_QUERY_THRESHOLD_SECONDS,
@@ -2697,35 +2698,52 @@ class AsyncMemory(MemoryBase):
             custom_instructions=custom_instr,
         )
 
-        try:
-            response = await asyncio.to_thread(
-                self.llm.generate_response,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                response_format={"type": "json_object"},
-            )
-        except Exception as e:
-            # Re-raise so callers can implement provider fallback / retry
-            # (see sync counterpart for rationale).
-            logger.error(f"LLM extraction failed (async): {e}")
-            raise LLMError(f"LLM extraction failed: {e}") from e
+        extraction_messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        with observe("mem0.extract", kind="client") as extract_observation:
+            extract_observation.set_input(extraction_messages)
+            try:
+                response = await asyncio.to_thread(
+                    self.llm.generate_response,
+                    messages=extraction_messages,
+                    response_format={"type": "json_object"},
+                )
+            except Exception as e:
+                # Re-raise so callers can implement provider fallback / retry
+                # (see sync counterpart for rationale).
+                logger.error(f"LLM extraction failed (async): {e}")
+                raise LLMError(f"LLM extraction failed: {e}") from e
+            extract_observation.set_output(response)
+            extract_observation.set_outcome("success")
 
         # Parse response
-        try:
-            response = remove_code_blocks(response)
-            if not response or not response.strip():
+        with observe("mem0.extract.parse") as parse_observation:
+            parse_observation.set_input(response)
+            try:
+                response = remove_code_blocks(response)
+                if not response or not response.strip():
+                    extracted_memories = []
+                else:
+                    try:
+                        extracted_memories = json.loads(response, strict=False).get("memory", [])
+                    except json.JSONDecodeError:
+                        extracted_json = extract_json(response)
+                        extracted_memories = json.loads(
+                            extracted_json, strict=False
+                        ).get("memory", [])
+            except Exception as e:
+                logger.error("Error parsing extraction response (async): %s", type(e).__name__)
                 extracted_memories = []
+                parse_observation.set_outcome("malformed")
             else:
-                try:
-                    extracted_memories = json.loads(response, strict=False).get("memory", [])
-                except json.JSONDecodeError:
-                    extracted_json = extract_json(response)
-                    extracted_memories = json.loads(extracted_json, strict=False).get("memory", [])
-        except Exception as e:
-            logger.error(f"Error parsing extraction response (async): {e}")
-            extracted_memories = []
+                parse_observation.set_outcome("parsed" if extracted_memories else "empty_valid")
+            parse_observation.set_attribute(
+                "kira.memory.fact_count",
+                len(extracted_memories) if isinstance(extracted_memories, list) else 0,
+            )
+            parse_observation.set_output(extracted_memories)
 
         if not extracted_memories:
             if formation_identity is not None:
