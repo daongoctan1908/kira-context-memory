@@ -43,6 +43,16 @@ rewrite/window độc lập KiRa và các gate phải chạy tiếp trên PC/K8s
 ### Current harness gates trước paid corpus (2026-10-03)
 
 Các snapshot SHA, coverage và materialization bên dưới là lịch sử; kiểm tra revision đang checkout.
+Control chạy benchmark dùng observation-only descendant `05a2d17ff9d10bb410a65eb0e662618d55930e2d` của
+frozen `75deb1d8`, được pin trong `evaluation/models.py` và script Build. Descendant giữ package
+`.3` và schema 2; counter chỉ đếm list để `memory=null/false/0` không tạo exception mới. Source
+extraction trước dedup/persistence được capture trực tiếp; không tổng hợp facts từ ADD events.
+Regression tests thực thi async formation method của control với I/O mock và đối chiếu behavior.
+Ref Git `codex/benchmark-control-observation-guard` giữ commit này; khi sync bằng bundle, xuất cả
+`main` và ref đó. Script `backport_observability.py` yêu cầu `--output-root` và từ chối ghi đè SDK
+đang checkout. Images và freeze của control `355020a` là evidence lịch sử; Build sang bundle
+directory mới và tạo preflight/freeze mới cho exact runtime/harness, không ghi đè artifacts cũ.
+
 Memory runtime giữ native Mem0, hai scope, receipts và deletion/fencing. Harness hiện replay từng
 source event và conversation gốc; preceding context không trở thành New Messages. Cross-session
 QA dùng toàn bộ source bundle vì gold được khai báo theo corpus cuối bundle, không claim query-at-time.

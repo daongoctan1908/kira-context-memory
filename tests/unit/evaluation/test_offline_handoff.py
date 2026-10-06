@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from evaluation.models import INSTRUMENTED_CONTROL_SHA
 from scripts.benchmark.image_metadata import image_metadata
 from scripts.benchmark.mock_acceptance import run_mock_acceptance
 
@@ -92,7 +93,7 @@ def test_handoff_script_pins_control_and_verifies_offline_bundle():
         encoding="utf-8-sig"
     )
 
-    assert "355020adae5a9917ad912429a6dbc0bde48bb595" in script
+    assert f'$ControlRevision = "{INSTRUMENTED_CONTROL_SHA}"' in script
     assert '"--pull=false"' in script
     assert '@("save", "--output", $archive)' in script
     assert '@("load", "--input", $archive)' in script

@@ -19,10 +19,9 @@ from pydantic import (
 BENCHMARK_CONTRACT_ID = "kira-week5-benchmark-v4"
 HISTORICAL_CONTROL_SHA = "75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00"
 # The historical control plus observation-only extraction capture (mem0
-# observability backport; see that commit's message for the parity proof).
-# Business behavior - prompts, provider call count, dedup, persistence,
-# receipts, returns - is byte-identical to the frozen control source.
-INSTRUMENTED_CONTROL_SHA = "355020adae5a9917ad912429a6dbc0bde48bb595"
+# observability backport). Native-method regression tests compare its provider
+# requests, dedup, persistence, receipts and returns with the frozen control.
+INSTRUMENTED_CONTROL_SHA = "05a2d17ff9d10bb410a65eb0e662618d55930e2d"
 OBSERVATION_CAPTURE_CONTROL_SHAS = frozenset({HISTORICAL_CONTROL_SHA, INSTRUMENTED_CONTROL_SHA})
 
 
