@@ -11,10 +11,13 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from evaluation.artifacts import ArtifactRunManifest, ArtifactStore
-from evaluation.compiler import compile_dataset
+from evaluation.compiler import compile_dataset, cross_session_source_sha256
+from evaluation.isolation import allocate_bundle_resources, kira_benchmark_username
 from evaluation.models import (
     BENCHMARK_CONTRACT_ID,
     BenchmarkVariant,
+    CrossSessionInput,
+    EvalCase,
     EvalModel,
     GitSha,
     Identifier,
@@ -60,7 +63,7 @@ class PcVariantAcceptance(EvalModel):
 
 class PcAcceptanceManifest(EvalModel):
     schema_version: Literal[2] = 2
-    contract_id: Literal["kira-week5-benchmark-v4"] = BENCHMARK_CONTRACT_ID
+    contract_id: Literal["kira-week5-benchmark-v5"] = BENCHMARK_CONTRACT_ID
     profile: Literal[Profile.PC_OPENAI_ACCEPTANCE] = Profile.PC_OPENAI_ACCEPTANCE
     official: Literal[False] = False
     quality_decision: Literal["diagnostic_only_no_promotion"] = "diagnostic_only_no_promotion"
@@ -68,16 +71,32 @@ class PcAcceptanceManifest(EvalModel):
     dataset_sha256: Sha256
     image_manifest_sha256: Sha256
     pc_preflight_sha256: Sha256
-    variants: tuple[PcVariantAcceptance, ...] = Field(min_length=2, max_length=3)
+    selected_suites: tuple[Suite, ...] = Field(default=tuple(Suite), min_length=1)
+    evaluation_scope: Literal["full_corpus", "selected_suites"] = "full_corpus"
+    variants: tuple[PcVariantAcceptance, ...] = Field(min_length=1, max_length=3)
     technical_passed: bool
 
     @model_validator(mode="after")
     def overall_state_is_consistent(self) -> "PcAcceptanceManifest":
+        if self.selected_suites != tuple(suite for suite in Suite if suite in self.selected_suites):
+            raise ValueError("PC acceptance suites must be unique and canonical")
+        if Suite.RETRIEVAL in self.selected_suites and Suite.FORMATION not in self.selected_suites:
+            raise ValueError("PC acceptance retrieval suite requires formation")
+        expected_scope = (
+            "full_corpus" if self.selected_suites == tuple(Suite) else "selected_suites"
+        )
+        if self.evaluation_scope != expected_scope:
+            raise ValueError("PC acceptance scope differs from its selected suites")
         if self.technical_passed != all(item.technical_passed for item in self.variants):
             raise ValueError("PC acceptance verdict is inconsistent")
         ids = [item.variant_id for item in self.variants]
-        if ids[0] != "control" or len(ids) != len(set(ids)):
-            raise ValueError("PC acceptance requires one control followed by unique candidates")
+        if ids == ["current"]:
+            if self.variants[0].benchmark_variant is not BenchmarkVariant.CURRENT_RUNTIME:
+                raise ValueError("current acceptance requires current runtime provenance")
+        elif len(ids) < 2 or ids[0] != "control" or len(ids) != len(set(ids)):
+            raise ValueError(
+                "PC acceptance requires current runtime or an explicit control comparison"
+            )
         return self
 
 
@@ -110,6 +129,88 @@ def _load_store(root: Path) -> ArtifactStore:
     return ArtifactStore.resume(root, expected_identity=manifest.identity)
 
 
+def _validate_shared_sources(store: ArtifactStore, cases: Mapping[str, EvalCase]) -> set[str]:
+    """A terminal QA must be bound to the entire independently formed, run-owned source."""
+
+    source_cases: dict[str, list[EvalCase]] = {}
+    for case_id in store.manifest.identity.selected_case_ids:
+        case = cases[case_id]
+        if case.suite is Suite.CROSS_SESSION:
+            source_cases.setdefault(case_id.split(":", 1)[0], []).append(case)
+    if not source_cases:
+        return set()
+    incomplete: set[str] = set()
+    plan = store.load_isolation_plan()
+    ledger = store.load_isolation_ledger()
+    sources = {
+        resource.bundle_id: resource
+        for resource in ledger.resources
+        if resource.resource_role == "bundle_source"
+    }
+    qa_resources = {
+        (resource.case_id, resource.attempt): resource
+        for resource in ledger.resources
+        if resource.resource_role == "bundle_qa"
+    }
+    latest = {attempt.case_id: attempt for attempt in store.latest_attempts}
+    for bundle_id, bundle_cases in source_cases.items():
+        try:
+            corpus = store.load_bundle_source(bundle_id)
+        except FileNotFoundError:
+            incomplete.update(case.case_id for case in bundle_cases)
+            continue
+        inputs = bundle_cases[0].inputs
+        assert isinstance(inputs, CrossSessionInput)
+        expected_hash = cross_session_source_sha256(inputs)
+        if any(cross_session_source_sha256(case.inputs) != expected_hash for case in bundle_cases):
+            raise ValueError("QA bundle does not have one immutable source trajectory")
+        if (
+            corpus.source_sha256 != expected_hash
+            or corpus.logical_user_id != inputs.user_id
+            or corpus.expected_source_events != len(inputs.session_a_messages) // 2
+        ):
+            raise ValueError("bundle source does not match its complete compiled trajectory")
+        source = sources.get(bundle_id)
+        expected = allocate_bundle_resources(plan, bundle_id=bundle_id)
+        if source is None or (
+            source.user_id != expected.user_id
+            or source.session_id != expected.session_id
+            or corpus.persisted_user_id != source.user_id
+            or corpus.source_session_id != source.session_id
+            or (
+                corpus.ready
+                and corpus.source_conversation_id is not None
+                and corpus.source_conversation_id != source.conversation_id
+            )
+            or (corpus.ready and corpus.events and source.event_id != corpus.events[-1].event_id)
+        ):
+            raise ValueError("bundle source is not bound to its exact resource owner")
+        memory_ids = {memory_id for event in corpus.events for memory_id in event.memory_ids}
+        if memory_ids != set(source.memory_ids):
+            raise ValueError("bundle memory evidence differs from its durable ownership ledger")
+        if not corpus.ready or corpus.failed:
+            incomplete.update(case.case_id for case in bundle_cases)
+        for case in bundle_cases:
+            attempt = latest.get(case.case_id)
+            if attempt is None or attempt.outcome not in _QUALITY_TERMINAL:
+                continue
+            qa = qa_resources.get((case.case_id, attempt.attempt))
+            if qa is None or qa.bundle_id != bundle_id or qa.user_id != source.user_id:
+                raise ValueError("QA context does not belong to its source bundle user")
+            for arm in ("no_ltm", "with_ltm"):
+                expected_username = kira_benchmark_username(
+                    plan, case_id=case.case_id, attempt=attempt.attempt, arm=arm
+                )
+                payload = attempt.output.get(arm) if isinstance(attempt.output, Mapping) else None
+                if not isinstance(payload, Mapping) or payload.get(
+                    "kira_context_identity_sha256"
+                ) != (sha256(expected_username.encode()).hexdigest()):
+                    raise ValueError(
+                        "QA KiRa context differs from its isolated arm/attempt identity"
+                    )
+    return incomplete
+
+
 def build_pc_acceptance(
     *,
     run_roots: Mapping[str, Path],
@@ -120,8 +221,9 @@ def build_pc_acceptance(
 ) -> PcAcceptanceManifest:
     """Evaluate technical gates without comparing or promoting quality metrics."""
 
-    if not 2 <= len(run_roots) <= 3 or "control" not in run_roots:
-        raise ValueError("PC acceptance requires control and one or two candidates")
+    current_only = set(run_roots) == {"current"}
+    if not current_only and (not 2 <= len(run_roots) <= 3 or "control" not in run_roots):
+        raise ValueError("PC acceptance requires current runtime or an explicit control comparison")
     compilation = compile_dataset(dataset_root, seed=742)
     cases = {case.case_id: case for case in compilation.cases}
     eligible_by_suite = {
@@ -132,7 +234,6 @@ def build_pc_acceptance(
         }
         for suite in Suite
     }
-    eligible_ids = set().union(*eligible_by_suite.values())
 
     preflight = PcPreflightRunSet.model_validate_json(pc_preflight_path.read_text(encoding="utf-8"))
     if preflight.dataset_sha256 != compilation.dataset_sha256:
@@ -145,7 +246,7 @@ def build_pc_acceptance(
         for item in image_manifest.get("variants", [])
         if isinstance(item, dict)
     }
-    expected_variant_ids = {"control", *(key for key in run_roots if key != "control")}
+    expected_variant_ids = set(run_roots)
     if set(declared) != expected_variant_ids:
         raise ValueError("run variants do not match the exact image manifest")
     if set(preflight.variants) != expected_variant_ids:
@@ -153,7 +254,12 @@ def build_pc_acceptance(
 
     variant_results: list[PcVariantAcceptance] = []
     common_case_ids: tuple[str, ...] | None = None
-    ordered_ids = ("control", *sorted(key for key in run_roots if key != "control"))
+    common_suites: tuple[Suite, ...] | None = None
+    ordered_ids = (
+        ("current",)
+        if current_only
+        else ("control", *sorted(key for key in run_roots if key != "control"))
+    )
     for variant_id in ordered_ids:
         store = _load_store(run_roots[variant_id])
         identity = store.manifest.identity
@@ -162,16 +268,22 @@ def build_pc_acceptance(
             raise ValueError("run is not non-official PC acceptance evidence")
         if identity.dataset_sha256 != compilation.dataset_sha256:
             raise ValueError("run dataset hash differs from PC freeze")
-        if identity.config_sha256 != variant_preflight.config_sha256:
+        if identity.config_sha256 != variant_preflight.config_sha256_for_suites(identity.suites):
             raise ValueError("run config hash differs from PC freeze")
-        if set(identity.suites) != set(Suite):
-            raise ValueError("PC acceptance run must include all four suites")
+        if common_suites is None:
+            common_suites = identity.suites
+        elif identity.suites != common_suites:
+            raise ValueError("PC variants must run the same selected suites")
         if common_case_ids is None:
             common_case_ids = identity.selected_case_ids
         elif identity.selected_case_ids != common_case_ids:
             raise ValueError("PC variants must run the same ordered corpus")
-        if set(identity.selected_case_ids) != set(cases):
-            raise ValueError("PC variant did not select the complete compiled corpus")
+        selected_ids = {case.case_id for case in compilation.cases if case.suite in identity.suites}
+        if set(identity.selected_case_ids) != selected_ids:
+            raise ValueError(
+                "PC variant did not select the complete compiled corpus for its suites"
+            )
+        eligible_ids = set().union(*(eligible_by_suite[suite] for suite in identity.suites))
         expected_runtime = declared[variant_id].get("runtime_revision")
         metadata = declared[variant_id].get("metadata")
         if not isinstance(metadata, Mapping):
@@ -195,7 +307,9 @@ def build_pc_acceptance(
         if identity.provenance.package_versions != metadata.get("package_versions"):
             raise ValueError("run package versions differ from exact image manifest")
         expected_kind = (
-            BenchmarkVariant.HISTORICAL_CONTROL
+            BenchmarkVariant.CURRENT_RUNTIME
+            if current_only
+            else BenchmarkVariant.HISTORICAL_CONTROL
             if variant_id == "control"
             else BenchmarkVariant.RELEASE_CANDIDATE
         )
@@ -203,6 +317,7 @@ def build_pc_acceptance(
             raise ValueError("run variant kind differs from image declaration")
 
         latest = {attempt.case_id: attempt for attempt in store.latest_attempts}
+        incomplete_source_cases = _validate_shared_sources(store, cases)
         unresolved: list[str] = []
         safety: list[str] = []
         completed = 0
@@ -215,7 +330,11 @@ def build_pc_acceptance(
                 if attempt is None or attempt.outcome is not Outcome.NOT_RUN:
                     unresolved.append(case_id)
                 continue
-            if attempt is None or attempt.outcome not in _QUALITY_TERMINAL:
+            if (
+                attempt is None
+                or attempt.outcome not in _QUALITY_TERMINAL
+                or case_id in incomplete_source_cases
+            ):
                 unresolved.append(case_id)
                 continue
             completed += 1
@@ -239,11 +358,14 @@ def build_pc_acceptance(
             )
         )
 
+    assert common_suites is not None
     return PcAcceptanceManifest(
         created_at=now or datetime.now(UTC),
         dataset_sha256=compilation.dataset_sha256,
         image_manifest_sha256=_file_sha256(image_manifest_path),
         pc_preflight_sha256=_file_sha256(pc_preflight_path),
+        selected_suites=common_suites,
+        evaluation_scope="full_corpus" if common_suites == tuple(Suite) else "selected_suites",
         variants=tuple(variant_results),
         technical_passed=all(item.technical_passed for item in variant_results),
     )

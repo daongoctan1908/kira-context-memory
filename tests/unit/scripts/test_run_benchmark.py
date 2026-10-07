@@ -3,12 +3,15 @@
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 from uuid import UUID
 
 import pytest
 
 from evaluation.artifacts import ArtifactRunIdentity, ArtifactStore, CaseAttemptArtifact
 from evaluation.audit import AuditCandidate, AuditReconciliation
+from evaluation.config import EvalConfig
 from evaluation.dataset import default_dataset_root
 from evaluation.models import (
     BenchmarkVariant,
@@ -28,15 +31,94 @@ from evaluation.release_evidence import (
     QualityMetricName,
     RunQualityEvidence,
 )
+from evaluation.runner import BenchmarkExecutionResult, prepare_benchmark_run
 from evaluation.scoring import output_sha256
 from evaluation.timing import TimingOutcome, TimingStage
 from scripts.benchmark.run import (
+    _execute_native_run,
     _load_application_settings,
     _require_native_run_contract,
     main,
 )
 
 _HASH = "a" * 64
+
+
+@pytest.mark.parametrize("cleanup_fails", [False, True])
+async def test_completed_native_run_finishes_cleanup_without_recreating_source(
+    monkeypatch, cleanup_fails
+):
+    ledger = object()
+    config, plan = object(), object()
+    store = SimpleNamespace(load_isolation_ledger=lambda: ledger)
+    preparation = SimpleNamespace(selected_cases=())
+    cleanup = AsyncMock(side_effect=OSError("cleanup failed") if cleanup_fails else None)
+    create = AsyncMock(side_effect=AssertionError("completed source must not be recreated"))
+    monkeypatch.setattr("scripts.benchmark.run.reconcile_interrupted_attempts", lambda *_: None)
+    monkeypatch.setattr("scripts.benchmark.run.benchmark_execution_complete", lambda *_: True)
+    monkeypatch.setattr("scripts.benchmark.run.cleanup_native_runtime", cleanup)
+    monkeypatch.setattr("scripts.benchmark.run.create_native_runtime", create)
+    arguments = dict(
+        config=config, base_settings=None, plan=plan, preparation=preparation, store=store
+    )
+    if cleanup_fails:
+        with pytest.raises(OSError, match="cleanup failed"):
+            await _execute_native_run(**arguments)
+    else:
+        assert await _execute_native_run(**arguments) is True
+    cleanup.assert_awaited_once_with(config=config, plan=plan, ledger=ledger)
+    create.assert_not_awaited()
+
+
+async def test_qa_native_dispatch_does_not_execute_component_suites(monkeypatch):
+    config = EvalConfig(
+        profile=Profile.MOCK, suites=(Suite.CROSS_SESSION,), formation_mode="persistent"
+    )
+    preparation, _ = prepare_benchmark_run(
+        run_id=UUID(int=1),
+        config=config,
+        provenance=_identity().provenance,
+        dataset_root=default_dataset_root(),
+        seed=742,
+    )
+    assert len(preparation.selected_cases) == 209
+    assert {case.suite for case in preparation.selected_cases} == {Suite.CROSS_SESSION}
+    ledger, plan = object(), object()
+    store = SimpleNamespace(load_isolation_ledger=lambda: ledger)
+    runtime = SimpleNamespace(cross_session=object(), judge=object(), aclose=AsyncMock())
+    evaluated = []
+
+    class QaEvaluator:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        async def evaluate(self, case):
+            evaluated.append(case.case_id)
+            return BenchmarkExecutionResult(case_id=case.case_id, outcome=Outcome.REVIEW_REQUIRED)
+
+    async def execute_selected(preparation, _store, executor):
+        for case in preparation.selected_cases:
+            await executor.evaluate(case)
+
+    completion = iter((False, True))
+    cleanup = AsyncMock()
+    monkeypatch.setattr("scripts.benchmark.run.reconcile_interrupted_attempts", lambda *_: None)
+    monkeypatch.setattr(
+        "scripts.benchmark.run.benchmark_execution_complete", lambda *_: next(completion)
+    )
+    monkeypatch.setattr(
+        "scripts.benchmark.run.create_native_runtime", AsyncMock(return_value=runtime)
+    )
+    monkeypatch.setattr("scripts.benchmark.run.CrossSessionEvaluator", QaEvaluator)
+    monkeypatch.setattr("scripts.benchmark.run.execute_benchmark_cases", execute_selected)
+    monkeypatch.setattr("scripts.benchmark.run.cleanup_native_runtime", cleanup)
+
+    assert await _execute_native_run(
+        config=config, base_settings=None, plan=plan, preparation=preparation, store=store
+    )
+    assert evaluated == [case.case_id for case in preparation.selected_cases]
+    runtime.aclose.assert_awaited_once()
+    cleanup.assert_awaited_once_with(config=config, plan=plan, ledger=ledger)
 
 
 def _write_jsonl(path: Path, values: list[dict]) -> None:
@@ -123,13 +205,15 @@ def test_validate_and_compile_canonical_dataset_offline(tmp_path: Path, capsys):
     status = json.loads(capsys.readouterr().out)
     payload = json.loads(compilation.read_text(encoding="utf-8"))
     assert status["case_count"] == len(payload["cases"]) == 534
-    assert status["cross_session_source_pairs"] == sum(
+    assert status["cross_session_source_pairs"] == 253
+    assert status["cross_session_source_conversations"] == 4
+    assert status["per_qa_replay_pairs"] == sum(
         len(case["inputs"]["session_a_messages"]) // 2
         for case in payload["cases"]
         if case["inputs"]["kind"] == "cross_session" and case["eligibility"]["status"] == "eligible"
     )
     assert payload["seed"] == 742
-    assert payload["contract_id"] == "kira-week5-benchmark-v4"
+    assert payload["contract_id"] == "kira-week5-benchmark-v5"
 
     assert main(["compile", "--output", str(compilation)]) == 2
     assert json.loads(capsys.readouterr().out)["reason"] == "offline_command_error"
@@ -321,7 +405,7 @@ def test_run_cli_executes_and_resumes_the_mock_case_ledger(tmp_path: Path, capsy
     assert (root / "cases.jsonl").read_text(encoding="utf-8").splitlines() == case_lines
 
 
-def test_native_run_requires_the_complete_persistent_suite_contract(tmp_path: Path, capsys):
+def test_native_run_requires_the_persistent_suite_contract(tmp_path: Path, capsys):
     result = main(
         [
             "run",
@@ -345,6 +429,45 @@ def test_native_run_requires_the_complete_persistent_suite_contract(tmp_path: Pa
             tuple(Suite),
             "write_free",
         )
+
+
+@pytest.mark.parametrize(
+    "suites",
+    [
+        (Suite.CROSS_SESSION,),
+        (Suite.FORMATION,),
+        (Suite.REWRITE,),
+        (Suite.RETRIEVAL, Suite.FORMATION),
+        tuple(reversed(tuple(Suite))),
+    ],
+)
+def test_native_run_accepts_selected_suites_in_canonical_order(suites):
+    assert _require_native_run_contract(
+        Profile.PC_OPENAI_ACCEPTANCE, suites, "persistent"
+    ) == tuple(suite for suite in Suite if suite in suites)
+
+
+@pytest.mark.parametrize("suites", [(), (Suite.CROSS_SESSION, Suite.CROSS_SESSION)])
+def test_native_run_rejects_empty_or_duplicate_suite_selection(suites):
+    with pytest.raises(ValueError, match="nonempty unique"):
+        _require_native_run_contract(Profile.PC_OPENAI_ACCEPTANCE, suites, "persistent")
+
+
+def test_retrieval_component_still_requires_formation_produced_corpus():
+    with pytest.raises(ValueError, match="retrieval component suite requires formation"):
+        _require_native_run_contract(Profile.PC_OPENAI_ACCEPTANCE, (Suite.RETRIEVAL,), "persistent")
+
+
+def test_run_defaults_to_qa_only_without_component_replays(tmp_path, capsys):
+    root = tmp_path / "qa-only"
+    assert main(["run", "--profile", "mock", "--artifact-root", str(root)]) == 0
+    status = json.loads(capsys.readouterr().out)
+    assert status["selected_suites"] == ["cross_session"]
+    assert status["evaluation_scope"] == "selected_suites"
+    assert status["terminal_cases"] == 209
+    cases = [json.loads(line) for line in (root / "cases.jsonl").read_text().splitlines()]
+    assert {case["suite"] for case in cases} == {"cross_session"}
+    assert not (root / "formed-corpus.json").exists()
 
 
 def test_file_only_application_settings_ignore_ambient_values(tmp_path: Path, monkeypatch):

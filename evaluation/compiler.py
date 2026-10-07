@@ -103,7 +103,7 @@ class CompilationCoverage(EvalModel):
 
 class DatasetCompilation(EvalModel):
     schema_version: Literal[1] = 1
-    contract_id: Literal["kira-week5-benchmark-v4"] = BENCHMARK_CONTRACT_ID
+    contract_id: Literal["kira-week5-benchmark-v5"] = BENCHMARK_CONTRACT_ID
     dataset_id: Identifier
     dataset_version: Annotated[str, StringConstraints(min_length=1, max_length=64)]
     dataset_sha256: Sha256
@@ -510,6 +510,19 @@ def _rewrite_case(
         ),
         gold=_qa_gold(bundle_id, row),
         review=context.bundle.manifest.review,
+    )
+
+
+def cross_session_source_sha256(inputs: CrossSessionInput) -> str:
+    """Bind a shared source fixture to its exact transcript and logical owner."""
+    from evaluation.scoring import output_sha256
+
+    return output_sha256(
+        {
+            "logical_user_id": inputs.user_id,
+            "session_a": inputs.session_a,
+            "messages": [message.model_dump(mode="json") for message in inputs.session_a_messages],
+        }
     )
 
 

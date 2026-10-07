@@ -9,6 +9,7 @@ from pydantic import SecretStr
 
 from evaluation.config import EvalConfig, ProviderConfig
 from evaluation.judge import InternalSemanticJudge, JudgeError
+from evaluation.measurement import MeasurementRecorder, ProviderStage, measurement_arm
 from evaluation.models import Outcome, Profile, Suite
 from evaluation.scoring import FormationMatchVerdict, JudgeVerdict, output_sha256
 
@@ -94,6 +95,36 @@ async def test_semantic_judge_is_blind_strict_and_binds_output_hash():
     assert result.judge.deployment == "judge-test"
     assert len(result.judge.prompt_sha256) == 64
     assert len(result.judge.response_schema_sha256) == 64
+
+
+@pytest.mark.parametrize(
+    "usage", [None, {"prompt_tokens": 14, "completion_tokens": 3, "total_tokens": 17}]
+)
+async def test_judge_measurement_reads_actual_response_usage_without_extra_call(usage):
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        body = _chat({"verdict": "PASS", "reason_code": "test", "rationale": "Faithful."}).json()
+        if usage is not None:
+            body["usage"] = usage
+        return httpx.Response(200, json=body)
+
+    measurement = MeasurementRecorder()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with measurement.bind(), measurement_arm("with_ltm"):
+            judgment = await InternalSemanticJudge(client, _config()).semantic(
+                case_id="query-1",
+                suite=Suite.CROSS_SESSION,
+                output="answer",
+                semantic_expectation="Answer accurately.",
+            )
+    (call,) = measurement.snapshot().provider_calls
+    assert len(requests) == 1
+    assert judgment.verdict is JudgeVerdict.PASS
+    assert call.stage is ProviderStage.JUDGE
+    assert call.arm == "with_ltm"
+    assert call.usage.total_tokens == 17 if usage is not None else call.usage is None
 
 
 @pytest.mark.asyncio

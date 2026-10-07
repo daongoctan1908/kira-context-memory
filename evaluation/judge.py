@@ -14,6 +14,7 @@ import httpx
 from pydantic import Field, StringConstraints, ValidationError, model_validator
 
 from evaluation.config import EvalConfig
+from evaluation.measurement import ProviderStage, provider_call
 from evaluation.models import EvalModel, Identifier, Outcome, Profile, Suite
 from evaluation.providers import api_url
 from evaluation.scoring import (
@@ -346,50 +347,53 @@ class InternalSemanticJudge:
             raise JudgeError(Outcome.PROTOCOL_ERROR, "judge_invalid_schema") from None
 
     async def _request(self, url: str, body: dict) -> dict:
-        provider = self._config.judge
-        headers = {"Content-Type": "application/json"}
-        if provider.api_key:
-            headers["Authorization"] = f"Bearer {provider.api_key.get_secret_value()}"
-        timeout = httpx.Timeout(
-            self._config.read_timeout_seconds,
-            connect=self._config.connect_timeout_seconds,
-            write=self._config.connect_timeout_seconds,
-            pool=self._config.connect_timeout_seconds,
-        )
-        try:
-            async with asyncio.timeout(self._config.total_timeout_seconds):
-                async with self._client.stream(
-                    "POST",
-                    url,
-                    json=body,
-                    headers=headers,
-                    timeout=timeout,
-                    follow_redirects=False,
-                ) as response:
-                    if not response.is_success:
-                        status = response.status_code
-                        reason = (
-                            "judge_authentication"
-                            if status in (401, 403)
-                            else ("judge_rate_limit" if status == 429 else "judge_http_status")
-                        )
-                        raise JudgeError(
-                            Outcome.DEPENDENCY_ERROR,
-                            reason,
-                            http_status=status,
-                        )
-                    chunks = bytearray()
-                    async for chunk in response.aiter_bytes():
-                        if len(chunks) + len(chunk) > self._config.max_response_bytes:
-                            raise JudgeError(Outcome.PROTOCOL_ERROR, "judge_response_too_large")
-                        chunks.extend(chunk)
-        except TimeoutError:
-            raise JudgeError(Outcome.DEPENDENCY_ERROR, "judge_timeout") from None
-        except httpx.TimeoutException:
-            raise JudgeError(Outcome.DEPENDENCY_ERROR, "judge_timeout") from None
-        except httpx.RequestError:
-            raise JudgeError(Outcome.DEPENDENCY_ERROR, "judge_connection") from None
-        parsed = _parse_json(bytes(chunks))
-        if not isinstance(parsed, dict):
-            raise JudgeError(Outcome.PROTOCOL_ERROR, "judge_invalid_chat")
-        return parsed
+        with provider_call(ProviderStage.JUDGE, basis="http_request") as observation:
+            provider = self._config.judge
+            headers = {"Content-Type": "application/json"}
+            if provider.api_key:
+                headers["Authorization"] = f"Bearer {provider.api_key.get_secret_value()}"
+            timeout = httpx.Timeout(
+                self._config.read_timeout_seconds,
+                connect=self._config.connect_timeout_seconds,
+                write=self._config.connect_timeout_seconds,
+                pool=self._config.connect_timeout_seconds,
+            )
+            try:
+                async with asyncio.timeout(self._config.total_timeout_seconds):
+                    async with self._client.stream(
+                        "POST",
+                        url,
+                        json=body,
+                        headers=headers,
+                        timeout=timeout,
+                        follow_redirects=False,
+                    ) as response:
+                        if not response.is_success:
+                            status = response.status_code
+                            reason = (
+                                "judge_authentication"
+                                if status in (401, 403)
+                                else ("judge_rate_limit" if status == 429 else "judge_http_status")
+                            )
+                            raise JudgeError(
+                                Outcome.DEPENDENCY_ERROR,
+                                reason,
+                                http_status=status,
+                            )
+                        chunks = bytearray()
+                        async for chunk in response.aiter_bytes():
+                            if len(chunks) + len(chunk) > self._config.max_response_bytes:
+                                raise JudgeError(Outcome.PROTOCOL_ERROR, "judge_response_too_large")
+                            chunks.extend(chunk)
+            except TimeoutError:
+                raise JudgeError(Outcome.DEPENDENCY_ERROR, "judge_timeout") from None
+            except httpx.TimeoutException:
+                raise JudgeError(Outcome.DEPENDENCY_ERROR, "judge_timeout") from None
+            except httpx.RequestError:
+                raise JudgeError(Outcome.DEPENDENCY_ERROR, "judge_connection") from None
+            parsed = _parse_json(bytes(chunks))
+            if not isinstance(parsed, dict):
+                raise JudgeError(Outcome.PROTOCOL_ERROR, "judge_invalid_chat")
+            observation["outcome"] = "success"
+            observation["usage"] = parsed.get("usage")
+            return parsed

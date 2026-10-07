@@ -74,6 +74,37 @@ async def test_rewrite_only_does_not_require_extraction_embedding_or_db():
     assert "Một truy vấn độc lập" not in report.model_dump_json()
 
 
+@pytest.mark.parametrize("explicit_transport", [False, True])
+async def test_mock_preflight_ignores_ambient_proxy_without_network(
+    monkeypatch, explicit_transport
+):
+    monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:1")
+    monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:1")
+    monkeypatch.setenv("ALL_PROXY", "http://127.0.0.1:1")
+    monkeypatch.setenv("NO_PROXY", "")
+    config = load_config(profile=Profile.MOCK, suites=tuple(Suite), environment={})
+    transport = httpx.MockTransport(mock_response) if explicit_transport else None
+    report = await run_preflight(config, transport=transport)
+    assert report.simulated
+    assert all(check.outcome is Outcome.PASS for check in report.checks)
+
+
+async def test_live_default_transport_keeps_ambient_proxy_configuration(monkeypatch):
+    original_client = httpx.AsyncClient
+    observed = []
+
+    def client(**kwargs):
+        observed.append(kwargs["trust_env"])
+        # Observe the production configuration without sending a live request.
+        kwargs.update(transport=httpx.MockTransport(mock_response), trust_env=False)
+        return original_client(**kwargs)
+
+    monkeypatch.setattr(httpx, "AsyncClient", client)
+    report = await run_preflight(configured((Suite.REWRITE,)))
+    assert observed == [True]
+    assert report.suites[0].outcome is Outcome.PASS
+
+
 async def test_path_like_served_model_is_preserved_in_request_and_preflight_observations():
     served_model = "/models/Qwen3_14B"
     provider = ProviderConfig(base_url="http://qwen.internal/v1", model=served_model)

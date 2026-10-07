@@ -23,8 +23,12 @@ from evaluation.models import (
     RunProvenance,
     Suite,
 )
-from evaluation.pc_preflight import freeze_pc_preflight, freeze_pc_preflight_run_set
-from evaluation.preflight import run_preflight
+from evaluation.pc_preflight import (
+    PcPreflightFreeze,
+    freeze_pc_preflight,
+    freeze_pc_preflight_run_set,
+)
+from evaluation.preflight import required_probes, run_preflight
 from scripts.benchmark.freeze_pc_preflight import main as freeze_main
 
 
@@ -133,12 +137,82 @@ async def test_freeze_binds_complete_sanitized_pc_preflight(tmp_path: Path):
     assert frozen.kira_text_bytes == len(b"raw KiRa response")
     assert frozen.providers
     assert frozen.providers[next(iter(frozen.providers))].requested_model == "explicit-model"
+    assert frozen.selected_suites == tuple(Suite)
+    assert (
+        frozen.config_sha256_for_suites((Suite.CROSS_SESSION,))
+        == _config().model_copy(update={"suites": (Suite.CROSS_SESSION,)}).fingerprint()
+    )
     assert "raw KiRa response" not in serialized
     assert "synthetic-secret-token" not in serialized
     assert "synthetic-kira-credential" not in serialized
     assert "synthetic-runtime-token" not in serialized
     assert "approved-benchmark-base" not in serialized
     assert "password" not in serialized
+
+
+@pytest.mark.parametrize("suites", [(Suite.CROSS_SESSION,), (Suite.FORMATION,), (Suite.REWRITE,)])
+async def test_freeze_accepts_selected_suites_and_only_their_required_probe_union(tmp_path, suites):
+    root = _approved_dataset(tmp_path)
+    provider_path = tmp_path / "provider-preflight.json"
+    config = _config().model_copy(update={"suites": suites})
+    await _write_provider_report(provider_path, config=config)
+
+    frozen = freeze_pc_preflight(provider_preflight_path=provider_path, dataset_root=root)
+
+    assert frozen.selected_suites == suites
+    assert frozen.config_sha256_for_suites(suites) == config.fingerprint()
+    report = json.loads(provider_path.read_text(encoding="utf-8"))
+    expected = {
+        probe.value
+        for suite in suites
+        for probe in required_probes(suite, config.formation_mode, config.profile)
+    }
+    assert {check["probe"] for check in report["checks"]} == expected
+    if Suite.CROSS_SESSION in suites:
+        assert len(expected) == 10
+        assert frozen.kira_event_count == 1
+    else:
+        assert frozen.kira_event_count is None
+        with pytest.raises(ValueError, match="does not cover"):
+            frozen.config_sha256_for_suites((Suite.CROSS_SESSION,))
+
+
+async def test_legacy_freeze_keeps_exact_config_binding_without_suite_projection(tmp_path):
+    root = _approved_dataset(tmp_path)
+    provider_path = tmp_path / "provider-preflight.json"
+    await _write_provider_report(provider_path)
+    document = freeze_pc_preflight(
+        provider_preflight_path=provider_path, dataset_root=root
+    ).model_dump(exclude_computed_fields=True)
+    document.pop("config_sha256_by_suites")
+    document.pop("selected_suites")
+
+    legacy = PcPreflightFreeze.model_validate(document)
+
+    assert legacy.config_sha256_for_suites(tuple(Suite)) == _config().fingerprint()
+    assert (
+        legacy.config_sha256_for_suites((Suite.CROSS_SESSION,))
+        != _config().model_copy(update={"suites": (Suite.CROSS_SESSION,)}).fingerprint()
+    )
+
+
+async def test_qa_only_freeze_requires_every_dependency_probe(tmp_path):
+    root = _approved_dataset(tmp_path)
+    provider_path = tmp_path / "provider-preflight.json"
+    await _write_provider_report(
+        provider_path, config=_config().model_copy(update={"suites": (Suite.CROSS_SESSION,)})
+    )
+    document = json.loads(provider_path.read_text(encoding="utf-8"))
+    assert len(document["checks"]) == 10
+
+    for missing in document["checks"]:
+        incomplete = {
+            **document,
+            "checks": [check for check in document["checks"] if check != missing],
+        }
+        provider_path.write_text(json.dumps(incomplete), encoding="utf-8")
+        with pytest.raises(ValueError, match="missing a required successful probe"):
+            freeze_pc_preflight(provider_preflight_path=provider_path, dataset_root=root)
 
 
 async def test_freeze_rejects_missing_judge(tmp_path: Path):
@@ -241,6 +315,31 @@ async def test_run_set_keeps_real_control_and_candidate_target_fingerprints(tmp_
         == 0
     )
     assert set(json.loads(output.read_text(encoding="utf-8"))["variants"]) == set(paths)
+
+
+async def test_run_set_accepts_one_current_runtime_without_historical_workload(tmp_path):
+    root = _approved_dataset(tmp_path)
+    path = tmp_path / "current.json"
+    current = _provenance().model_copy(update={"variant": BenchmarkVariant.CURRENT_RUNTIME})
+    await _write_provider_report(path, provenance=current)
+    frozen = freeze_pc_preflight_run_set(
+        provider_preflight_paths={"current": path}, dataset_root=root
+    )
+    assert tuple(frozen.variants) == ("current",)
+    assert frozen.variants["current"].provenance.variant is BenchmarkVariant.CURRENT_RUNTIME
+    assert frozen.variants["current"].provenance.candidate is None
+    with pytest.raises(ValueError, match="current runtime provenance"):
+        frozen.model_validate(
+            frozen.model_copy(
+                update={
+                    "variants": {
+                        "current": frozen.variants["current"].model_copy(
+                            update={"provenance": _provenance()}
+                        )
+                    }
+                }
+            ).model_dump(exclude_computed_fields=True)
+        )
 
 
 async def test_run_set_rejects_missing_control_and_mislabeled_candidate(tmp_path):

@@ -16,7 +16,7 @@ from pydantic import (
     model_validator,
 )
 
-BENCHMARK_CONTRACT_ID = "kira-week5-benchmark-v4"
+BENCHMARK_CONTRACT_ID = "kira-week5-benchmark-v5"
 HISTORICAL_CONTROL_SHA = "75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00"
 # The historical control plus observation-only extraction capture (mem0
 # observability backport). Native-method regression tests compare its provider
@@ -73,6 +73,7 @@ class PerformanceReviewVerdict(StrEnum):
 
 class BenchmarkVariant(StrEnum):
     WORKING_TREE = "working_tree"
+    CURRENT_RUNTIME = "current_runtime"
     HISTORICAL_CONTROL = "historical_control"
     RELEASE_CANDIDATE = "release_candidate"
 
@@ -140,6 +141,11 @@ class RunProvenance(EvalModel):
         elif self.variant is BenchmarkVariant.RELEASE_CANDIDATE:
             if self.candidate is None:
                 raise ValueError("release candidate requires an explicit change declaration")
+        elif self.variant is BenchmarkVariant.CURRENT_RUNTIME:
+            if self.candidate is not None:
+                raise ValueError("current runtime cannot contain a candidate declaration")
+            if self.runtime.dirty or self.harness.dirty:
+                raise ValueError("current runtime evidence requires clean exact revisions")
         elif self.candidate is not None:
             raise ValueError("working-tree evidence cannot claim a release candidate declaration")
         return self
@@ -150,12 +156,15 @@ class RunProvenance(EvalModel):
         self,
     ) -> Literal[
         "working_tree",
+        "current_runtime",
         "historical_control",
         "prompt_or_config_candidate",
         "mixed_runtime_candidate",
     ]:
         if self.variant is BenchmarkVariant.WORKING_TREE:
             return "working_tree"
+        if self.variant is BenchmarkVariant.CURRENT_RUNTIME:
+            return "current_runtime"
         if self.variant is BenchmarkVariant.HISTORICAL_CONTROL:
             return "historical_control"
         assert self.candidate is not None
@@ -410,7 +419,7 @@ class SuiteReadiness(EvalModel):
 
 class PreflightReport(EvalModel):
     schema_version: Literal[1] = 1
-    contract_id: Literal["kira-week5-benchmark-v4"] = BENCHMARK_CONTRACT_ID
+    contract_id: Literal["kira-week5-benchmark-v5"] = BENCHMARK_CONTRACT_ID
     scope: Literal["dependency_preflight_only"] = "dependency_preflight_only"
     run_id: UUID
     started_at: datetime

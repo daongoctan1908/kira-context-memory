@@ -16,7 +16,7 @@ def main(argv: list[str] | None = None) -> int:
         action="append",
         required=True,
         metavar="VARIANT=PATH",
-        help="repeat for control and each declared candidate",
+        help="current=PATH by default; repeat only for an explicitly declared comparison",
     )
     parser.add_argument("--dataset-root", type=Path, default=default_dataset_root())
     parser.add_argument("--output", type=Path, required=True)

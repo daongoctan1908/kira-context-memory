@@ -46,6 +46,8 @@ class IsolationPlan(EvalModel):
 class CaseResourceOwnership(EvalModel):
     case_id: Identifier
     attempt: int = Field(ge=1, strict=True)
+    resource_role: Literal["case", "bundle_source", "bundle_qa"] = "case"
+    bundle_id: Identifier | None = None
     user_id: Identifier
     session_id: Identifier
     conversation_id: UUID
@@ -56,6 +58,12 @@ class CaseResourceOwnership(EvalModel):
     def memory_ids_are_unique(self) -> "CaseResourceOwnership":
         if len(self.memory_ids) != len(set(self.memory_ids)):
             raise ValueError("owned memory IDs must be unique")
+        if (self.resource_role == "case") != (self.bundle_id is None):
+            raise ValueError("bundle resources require exactly one bundle identity")
+        if self.resource_role == "bundle_source" and self.attempt != 1:
+            raise ValueError("bundle source has one stable formation attempt")
+        if self.resource_role == "bundle_qa" and self.memory_ids:
+            raise ValueError("QA resources cannot own source memory")
         return self
 
 
@@ -71,10 +79,30 @@ class IsolationLedger(EvalModel):
         identities = [(resource.case_id, resource.attempt) for resource in self.resources]
         if len(identities) != len(set(identities)):
             raise ValueError("case-attempt ownership entries must be unique")
-        for field in ("user_id", "session_id", "conversation_id", "event_id"):
+        for field in ("session_id", "conversation_id", "event_id"):
             values = [getattr(resource, field) for resource in self.resources]
             if len(values) != len(set(values)):
                 raise ValueError(f"owned {field} values must be unique")
+        by_user: dict[str, list[CaseResourceOwnership]] = {}
+        sources: dict[str, CaseResourceOwnership] = {}
+        for resource in self.resources:
+            by_user.setdefault(resource.user_id, []).append(resource)
+            if resource.resource_role == "bundle_source":
+                assert resource.bundle_id is not None
+                if resource.bundle_id in sources:
+                    raise ValueError("bundle has more than one source owner")
+                sources[resource.bundle_id] = resource
+        for resources in by_user.values():
+            if len(resources) > 1 and (
+                any(item.bundle_id is None for item in resources)
+                or len({item.bundle_id for item in resources}) != 1
+            ):
+                raise ValueError("shared user IDs must belong to one source bundle")
+        for resource in self.resources:
+            if resource.resource_role == "bundle_qa":
+                source = sources.get(resource.bundle_id or "")
+                if source is None or source.user_id != resource.user_id:
+                    raise ValueError("QA user must be owned by its source bundle")
         memory_ids = [memory_id for resource in self.resources for memory_id in resource.memory_ids]
         if len(memory_ids) != len(set(memory_ids)):
             raise ValueError("memory IDs cannot be owned by multiple case attempts")
@@ -204,6 +232,46 @@ def allocate_case_resources(
     )
 
 
+def allocate_bundle_resources(plan: IsolationPlan, *, bundle_id: str) -> CaseResourceOwnership:
+    """One durable user/source conversation owner for a dataset bundle in this run."""
+
+    case_id = f"bundle:{bundle_id}:source"
+    allocated = allocate_case_resources(plan, case_id=case_id, attempt=1)
+    return allocated.model_copy(update={"resource_role": "bundle_source", "bundle_id": bundle_id})
+
+
+def allocate_bundle_qa_resources(
+    plan: IsolationPlan,
+    *,
+    bundle_id: str,
+    case_id: str,
+    attempt: int,
+) -> CaseResourceOwnership:
+    """Fresh QA context using the already-formed bundle's user, without owning its memory."""
+
+    allocated = allocate_case_resources(plan, case_id=case_id, attempt=attempt)
+    source = allocate_bundle_resources(plan, bundle_id=bundle_id)
+    return allocated.model_copy(
+        update={"resource_role": "bundle_qa", "bundle_id": bundle_id, "user_id": source.user_id}
+    )
+
+
+def allocated_resource(
+    plan: IsolationPlan, resource: CaseResourceOwnership
+) -> CaseResourceOwnership:
+    """Reconstruct the deterministic pre-write ownership record, including shared source users."""
+
+    if resource.resource_role == "bundle_source":
+        assert resource.bundle_id is not None
+        return allocate_bundle_resources(plan, bundle_id=resource.bundle_id)
+    if resource.resource_role == "bundle_qa":
+        assert resource.bundle_id is not None
+        return allocate_bundle_qa_resources(
+            plan, bundle_id=resource.bundle_id, case_id=resource.case_id, attempt=resource.attempt
+        )
+    return allocate_case_resources(plan, case_id=resource.case_id, attempt=resource.attempt)
+
+
 def claim_case_resources(
     plan: IsolationPlan,
     *,
@@ -226,16 +294,14 @@ def register_case_resources(
     resource: CaseResourceOwnership,
 ) -> IsolationLedger:
     _validate_ledger_owner(ledger, plan)
-    expected = allocate_case_resources(
-        plan,
-        case_id=resource.case_id,
-        attempt=resource.attempt,
-    )
+    expected = allocated_resource(plan, resource)
     if (
         resource.case_id != expected.case_id
         or resource.attempt != expected.attempt
         or resource.user_id != expected.user_id
         or resource.session_id != expected.session_id
+        or resource.resource_role != expected.resource_role
+        or resource.bundle_id != expected.bundle_id
     ):
         raise ValueError("case resources were not allocated by this isolation plan")
     existing = next(
@@ -295,6 +361,8 @@ def register_memory_ids(
     if owned_elsewhere.intersection(memory_ids):
         raise ValueError("memory ID is already owned by another case attempt")
     existing_memory_ids = resources[index].memory_ids
+    if resources[index].resource_role == "bundle_qa" and memory_ids:
+        raise ValueError("QA resources cannot own source memory")
     if not set(existing_memory_ids).issubset(memory_ids):
         raise ValueError("registered memory ownership cannot be removed")
     combined = (
@@ -336,7 +404,7 @@ def authorize_cleanup(
         memory_database_sha256=plan.memory_database_sha256,
         memory_schema=plan.memory_schema,
         memory_collection=plan.memory_collection,
-        user_ids=tuple(item.user_id for item in ordered),
+        user_ids=tuple(dict.fromkeys(item.user_id for item in ordered)),
         session_ids=tuple(item.session_id for item in ordered),
         conversation_ids=tuple(item.conversation_id for item in ordered),
         event_ids=tuple(item.event_id for item in ordered),

@@ -225,7 +225,9 @@ Policy bắt buộc:
 - human verdict không thể xóa safety failure.
 
 Mỗi decision phải giữ nguyên `case_id`, `subject` và `output_sha256` từ batch. `subject` tách các
-semantic output trong cùng case, đặc biệt rewrite/final answer của hai arm No-LTM và With-LTM.
+semantic output trong cùng case: rewrite của With-LTM và final answer của cả No-LTM/With-LTM.
+No-LTM chuyển nguyên query nên không chạy rewrite judge; rewrite constraints chỉ là diagnostic
+và không quyết định outcome của baseline.
 
 Sinh candidates trực tiếp từ từng completed native run; command kiểm profile, dataset hash, thứ tự
 case và bind từng record vào hash của exact attempt output:

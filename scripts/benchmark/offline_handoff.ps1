@@ -1,14 +1,16 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Build", "Export", "Import", "MockAcceptance", "Validate", "StartControl", "StartCandidate", "Stop", "Publish")]
+    [ValidateSet("Build", "Export", "Import", "MockAcceptance", "Validate", "StartCurrent", "StartControl", "StartCandidate", "Stop", "Publish")]
     [string]$Action,
+    [string]$RuntimeRevision = "HEAD",
+    [switch]$CompareHistorical,
     [ValidateCount(1, 2)]
     [string[]]$CandidateRevision = @("HEAD"),
     [ValidateSet("prompt", "config", "runtime_code", "dependencies", "schema", "lifecycle")]
     [string[]]$CandidateChangeScope = @("runtime_code"),
     [string]$CandidateSummary = "Declared benchmark candidate.",
-    [ValidatePattern('^candidate-[ab]$')]
+    [ValidatePattern('^(current|candidate-[ab])$')]
     [string]$VariantId = "candidate-a",
     [string]$BundleDirectory = "artifacts/benchmark/offline-handoff",
     [string]$EnvFile = ".env.benchmark.internal.local",
@@ -29,7 +31,7 @@ function Resolve-InputPath {
 }
 
 $ControlRevision = "05a2d17ff9d10bb410a65eb0e662618d55930e2d"
-$ContractId = "kira-week5-benchmark-v4"
+$ContractId = "kira-week5-benchmark-v5"
 $BundleRoot = Resolve-InputPath $BundleDirectory
 $ManifestPath = Join-Path $BundleRoot "image-manifest.json"
 $RegistryManifestPath = Join-Path $BundleRoot "registry-manifest.json"
@@ -193,141 +195,111 @@ switch ($Action) {
         if (Test-Path -LiteralPath $ManifestPath) {
             throw "Build manifest already exists; use a new bundle directory for a new image set"
         }
-        if (-not $CandidateSummary.Trim()) {
-            throw "Candidate summary must not be blank"
-        }
-        $controlSha = Resolve-GitRevision $ControlRevision
         $harnessSha = Resolve-GitRevision "HEAD"
-        $controlPath = Join-Path $BundleRoot "worktrees/control"
-        Ensure-Worktree $controlPath $controlSha
-
-        $candidates = @()
-        for ($index = 0; $index -lt $CandidateRevision.Count; $index++) {
-            $candidateId = "candidate-$([char]([int][char]'a' + $index))"
-            $candidateSha = Resolve-GitRevision $CandidateRevision[$index]
-            $candidatePath = Join-Path $BundleRoot "worktrees/$candidateId"
-            Ensure-Worktree $candidatePath $candidateSha
-            $candidates += [ordered]@{
-                variant_id = $candidateId
-                revision = $candidateSha
-                path = $candidatePath
+        $declared = @()
+        $controlSha = $null
+        if ($CompareHistorical) {
+            if (-not $CandidateSummary.Trim()) {
+                throw "Candidate summary must not be blank"
             }
-        }
-
-        $controlTag = "kira-context-control:$($controlSha.Substring(0, 12))"
-        $controlEvalTag = "kira-context-control-eval:$($harnessSha.Substring(0, 12))-$($controlSha.Substring(0, 12))"
-        $dockerfile = Join-Path $RepositoryRoot "Dockerfile"
-        $evalDockerfile = Join-Path $RepositoryRoot "Dockerfile.eval"
-
-        Invoke-Checked docker @("build", "--pull=false", "-f", $dockerfile,
-            "--build-arg", "SOURCE_REVISION=$controlSha",
-            "--build-arg", "HARNESS_REVISION=$harnessSha",
-            "--build-arg", "BENCHMARK_VARIANT=historical_control",
-            "--build-arg", "BENCHMARK_ROLE=control-runtime",
-            "-t", $controlTag, $controlPath)
-        Invoke-Checked docker @("build", "--pull=false", "-f", $evalDockerfile,
-            "--build-context", "variant_source=$controlPath",
-            "--build-arg", "SOURCE_REVISION=$harnessSha",
-            "--build-arg", "RUNTIME_REVISION=$controlSha",
-            "--build-arg", "HARNESS_REVISION=$harnessSha",
-            "--build-arg", "BENCHMARK_VARIANT=historical_control",
-            "--build-arg", "BENCHMARK_ROLE=control-eval",
-            "-t", $controlEvalTag, $RepositoryRoot)
-
-        $postgresRef = "pgvector/pgvector:0.8.6-pg16-bookworm"
-        $controlMetadata = Get-EvalMetadata $controlEvalTag $controlSha $harnessSha
-        $provenanceRoot = Join-Path $BundleRoot "provenance"
-        New-Item -ItemType Directory -Force -Path $provenanceRoot | Out-Null
-        $controlProvenance = [ordered]@{
-            variant = "historical_control"
-            runtime = [ordered]@{ sha = $controlSha; dirty = $false }
-            harness = [ordered]@{ sha = $harnessSha; dirty = $false }
-            prompt_sha256 = $controlMetadata.prompt_sha256
-            package_versions = $controlMetadata.package_versions
-        }
-        [System.IO.File]::WriteAllText(
-            (Join-Path $provenanceRoot "control.json"),
-            ($controlProvenance | ConvertTo-Json -Depth 6),
-            [System.Text.UTF8Encoding]::new($false)
-        )
-        $images = @(
-            Get-ImageRecord "control-runtime" $controlTag $controlSha $controlSha $harnessSha "historical_control"
-            Get-ImageRecord "control-eval" $controlEvalTag $harnessSha $controlSha $harnessSha "historical_control"
-        )
-        $variants = @(
-            [ordered]@{
+            $controlSha = Resolve-GitRevision $ControlRevision
+            $declared += [ordered]@{
                 variant_id = "control"
                 benchmark_variant = "historical_control"
-                runtime_revision = $controlSha
-                runtime_role = "control-runtime"
-                eval_role = "control-eval"
-                provenance_file = "provenance/control.json"
-                metadata = $controlMetadata
+                revision = $controlSha
             }
-        )
-        foreach ($candidate in $candidates) {
-            $candidateTag = "kira-context-$($candidate.variant_id):$($candidate.revision.Substring(0, 12))"
-            $candidateEvalTag = "kira-context-$($candidate.variant_id)-eval:$($harnessSha.Substring(0, 12))-$($candidate.revision.Substring(0, 12))"
+            for ($index = 0; $index -lt $CandidateRevision.Count; $index++) {
+                $declared += [ordered]@{
+                    variant_id = "candidate-$([char]([int][char]'a' + $index))"
+                    benchmark_variant = "release_candidate"
+                    revision = Resolve-GitRevision $CandidateRevision[$index]
+                }
+            }
+        } else {
+            $declared += [ordered]@{
+                variant_id = "current"
+                benchmark_variant = "current_runtime"
+                revision = Resolve-GitRevision $RuntimeRevision
+            }
+        }
+
+        $dockerfile = Join-Path $RepositoryRoot "Dockerfile"
+        $evalDockerfile = Join-Path $RepositoryRoot "Dockerfile.eval"
+        $provenanceRoot = Join-Path $BundleRoot "provenance"
+        New-Item -ItemType Directory -Force -Path $provenanceRoot | Out-Null
+        $images = @()
+        $variants = @()
+        foreach ($runtime in $declared) {
+            $runtimePath = Join-Path $BundleRoot "worktrees/$($runtime.variant_id)"
+            Ensure-Worktree $runtimePath $runtime.revision
+            $runtimeRole = "$($runtime.variant_id)-runtime"
+            $evalRole = "$($runtime.variant_id)-eval"
+            $runtimeTag = "kira-context-$($runtime.variant_id):$($runtime.revision.Substring(0, 12))"
+            $evalTag = "kira-context-$($runtime.variant_id)-eval:$($harnessSha.Substring(0, 12))-$($runtime.revision.Substring(0, 12))"
             Invoke-Checked docker @("build", "--pull=false", "-f", $dockerfile,
-                "--build-arg", "SOURCE_REVISION=$($candidate.revision)",
+                "--build-arg", "SOURCE_REVISION=$($runtime.revision)",
                 "--build-arg", "HARNESS_REVISION=$harnessSha",
-                "--build-arg", "BENCHMARK_VARIANT=release_candidate",
-                "--build-arg", "BENCHMARK_ROLE=$($candidate.variant_id)-runtime",
-                "-t", $candidateTag, $candidate.path)
+                "--build-arg", "BENCHMARK_VARIANT=$($runtime.benchmark_variant)",
+                "--build-arg", "BENCHMARK_ROLE=$runtimeRole",
+                "-t", $runtimeTag, $runtimePath)
             Invoke-Checked docker @("build", "--pull=false", "-f", $evalDockerfile,
-                "--build-context", "variant_source=$($candidate.path)",
+                "--build-context", "variant_source=$runtimePath",
                 "--build-arg", "SOURCE_REVISION=$harnessSha",
-                "--build-arg", "RUNTIME_REVISION=$($candidate.revision)",
+                "--build-arg", "RUNTIME_REVISION=$($runtime.revision)",
                 "--build-arg", "HARNESS_REVISION=$harnessSha",
-                "--build-arg", "BENCHMARK_VARIANT=release_candidate",
-                "--build-arg", "BENCHMARK_ROLE=$($candidate.variant_id)-eval",
-                "-t", $candidateEvalTag, $RepositoryRoot)
-            $candidateMetadata = Get-EvalMetadata $candidateEvalTag $candidate.revision $harnessSha
-            $candidateProvenance = [ordered]@{
-                variant = "release_candidate"
-                runtime = [ordered]@{ sha = $candidate.revision; dirty = $false }
+                "--build-arg", "BENCHMARK_VARIANT=$($runtime.benchmark_variant)",
+                "--build-arg", "BENCHMARK_ROLE=$evalRole",
+                "-t", $evalTag, $RepositoryRoot)
+            $metadata = Get-EvalMetadata $evalTag $runtime.revision $harnessSha
+            $provenance = [ordered]@{
+                variant = $runtime.benchmark_variant
+                runtime = [ordered]@{ sha = $runtime.revision; dirty = $false }
                 harness = [ordered]@{ sha = $harnessSha; dirty = $false }
-                prompt_sha256 = $candidateMetadata.prompt_sha256
-                package_versions = $candidateMetadata.package_versions
-                candidate = [ordered]@{
-                    candidate_id = $candidate.variant_id
+                prompt_sha256 = $metadata.prompt_sha256
+                package_versions = $metadata.package_versions
+            }
+            if ($runtime.benchmark_variant -eq "release_candidate") {
+                $provenance.candidate = [ordered]@{
+                    candidate_id = $runtime.variant_id
                     control_runtime_sha = $controlSha
                     change_scopes = @($CandidateChangeScope)
                     summary = $CandidateSummary
                 }
             }
             [System.IO.File]::WriteAllText(
-                (Join-Path $provenanceRoot "$($candidate.variant_id).json"),
-                ($candidateProvenance | ConvertTo-Json -Depth 6),
+                (Join-Path $provenanceRoot "$($runtime.variant_id).json"),
+                ($provenance | ConvertTo-Json -Depth 6),
                 [System.Text.UTF8Encoding]::new($false)
             )
-            $images += Get-ImageRecord "$($candidate.variant_id)-runtime" $candidateTag $candidate.revision $candidate.revision $harnessSha "release_candidate"
-            $images += Get-ImageRecord "$($candidate.variant_id)-eval" $candidateEvalTag $harnessSha $candidate.revision $harnessSha "release_candidate"
+            $images += Get-ImageRecord $runtimeRole $runtimeTag $runtime.revision $runtime.revision $harnessSha $runtime.benchmark_variant
+            $images += Get-ImageRecord $evalRole $evalTag $harnessSha $runtime.revision $harnessSha $runtime.benchmark_variant
             $variants += [ordered]@{
-                variant_id = $candidate.variant_id
-                benchmark_variant = "release_candidate"
-                runtime_revision = $candidate.revision
-                runtime_role = "$($candidate.variant_id)-runtime"
-                eval_role = "$($candidate.variant_id)-eval"
-                provenance_file = "provenance/$($candidate.variant_id).json"
-                metadata = $candidateMetadata
+                variant_id = $runtime.variant_id
+                benchmark_variant = $runtime.benchmark_variant
+                runtime_revision = $runtime.revision
+                runtime_role = $runtimeRole
+                eval_role = $evalRole
+                provenance_file = "provenance/$($runtime.variant_id).json"
+                metadata = $metadata
             }
         }
-        $images += Get-ImageRecord "postgres-dependency" $postgresRef "" "" "" "dependency"
+        $images += Get-ImageRecord "postgres-dependency" "pgvector/pgvector:0.8.6-pg16-bookworm" "" "" "" "dependency"
         $manifest = [ordered]@{
             schema_version = 2
             contract_id = $ContractId
             created_at = [DateTime]::UtcNow.ToString("o")
-            control_revision = $controlSha
             harness_revision = $harnessSha
-            candidates = @($candidates | ForEach-Object {
-                [ordered]@{ variant_id = $_.variant_id; runtime_revision = $_.revision }
-            })
             variants = $variants
             pc_preflight_schema_version = 2
             pc_preflight_run_set_schema_version = 1
             benchmark_artifact_root = "artifacts/benchmark/benchmark"
             images = $images
+        }
+        if ($CompareHistorical) {
+            $manifest.control_revision = $controlSha
+            $manifest.candidates = @($declared | Where-Object { $_.benchmark_variant -eq "release_candidate" } | ForEach-Object {
+                [ordered]@{ variant_id = $_.variant_id; runtime_revision = $_.revision }
+            })
         }
         $manifestJson = $manifest | ConvertTo-Json -Depth 8
         [System.IO.File]::WriteAllText(
@@ -362,7 +334,8 @@ switch ($Action) {
         Copy-NewFile $ResolvedPcAcceptancePath $copiedAcceptance
         Copy-NewFile $DatasetManifestPath $copiedDatasetManifest
 
-        $evalImage = ($manifest.images | Where-Object { $_.role -eq "control-eval" }).reference
+        $evalRole = $manifest.variants[0].eval_role
+        $evalImage = ($manifest.images | Where-Object { $_.role -eq $evalRole }).reference
         Invoke-Checked docker @(
             "run", "--rm", "--network", "none",
             "--mount", "type=bind,src=$BundleRoot,dst=/handoff",
@@ -469,6 +442,21 @@ switch ($Action) {
     "Validate" {
         Invoke-Compose @("config", "--quiet")
         Write-Output "PASS internal compose configuration is valid"
+    }
+    "StartCurrent" {
+        $manifest = Read-Manifest
+        $variant = @($manifest.variants | Where-Object { $_.variant_id -eq "current" })
+        if ($variant.Count -ne 1 -or $variant[0].benchmark_variant -ne "current_runtime") {
+            throw "Current runtime is not declared in the image manifest"
+        }
+        # Reuse the candidate Compose stack; no second DB/collection is needed for current-only runs.
+        $env:BENCHMARK_CANDIDATE_IMAGE = ($manifest.images | Where-Object { $_.role -eq "current-runtime" }).reference
+        $env:BENCHMARK_EVAL_IMAGE = ($manifest.images | Where-Object { $_.role -eq "current-eval" }).reference
+        Invoke-Compose @("--profile", "candidate", "up", "-d", "candidate-postgres")
+        Invoke-Compose @("--profile", "candidate", "run", "--rm", "candidate-migrate")
+        Invoke-Compose @("--profile", "candidate", "run", "--rm", "candidate-memory-init")
+        Invoke-Compose @("--profile", "candidate", "up", "-d", "candidate-worker", "candidate-gateway")
+        Write-Output "PASS current runtime stack started sequentially"
     }
     "StartControl" {
         $manifest = Read-Manifest

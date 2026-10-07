@@ -17,6 +17,7 @@ from evaluation.cross_session import (
     SessionBExecution,
 )
 from evaluation.judge import JudgeError
+from evaluation.measurement import MeasurementRecorder, ProviderStage, record_provider_call
 from evaluation.models import (
     CaseEligibility,
     CrossSessionInput,
@@ -76,7 +77,7 @@ def _execution(
     user_id: str = "synthetic-user",
     session_id: str = "session-b",
     memories: tuple[RetrievedMemory, ...] | None = None,
-    rewrite: str = "Ngưỡng FTTH tôi đã đặt là 95%?",
+    rewrite: str | None = None,
     answer: str = "Ngưỡng FTTH đã đặt là 95%.",
     action: str | None = "answer",
     api: dict[str, object] | None = None,
@@ -101,7 +102,13 @@ def _execution(
         current_query=query,
         provider_id=provider,
         retrieved_memories=memories,
-        rewritten_query=rewrite,
+        rewritten_query=(
+            rewrite
+            if rewrite is not None
+            else query
+            if condition is CrossSessionCondition.NO_LTM
+            else "Ngưỡng FTTH tôi đã đặt là 95%?"
+        ),
         final_answer=answer,
         actual_action=action,
         actual_api={"metric": "FTTH", "extra": "allowed"} if api is None else api,
@@ -207,6 +214,23 @@ def _evaluator(runtime: _Runtime, judge: _Judge | None = None) -> CrossSessionEv
     )
 
 
+async def test_judge_calls_keep_the_paired_arm_measurement_after_product_executions():
+    class MeasuringJudge(_Judge):
+        async def semantic(self, **kwargs):
+            record_provider_call(ProviderStage.JUDGE, basis="http_request", outcome="success")
+            return await super().semantic(**kwargs)
+
+    measurement = MeasurementRecorder()
+    with measurement.bind():
+        result = await _evaluator(_Runtime(), MeasuringJudge()).evaluate(_case())
+    assert result.outcome is Outcome.PASS
+    assert [call.arm for call in measurement.snapshot().provider_calls] == [
+        "no_ltm",
+        "with_ltm",
+        "with_ltm",
+    ]
+
+
 async def test_readiness_budget_covers_all_source_events_in_native_trajectory():
     class TrajectoryRuntime(_Runtime):
         async def persist_session_a(self, case):
@@ -270,7 +294,39 @@ async def test_required_flow_runs_formation_then_paired_session_b_without_writes
             "conv01:cross-session:q1",
         ),
     ]
-    assert len(judge.calls) == 4
+    assert result.no_ltm.rewrite_judgment is None
+    assert len(judge.calls) == 3
+    assert [call["output"] for call in judge.calls] == [
+        runtime.no_ltm.final_answer,
+        runtime.with_ltm.rewritten_query,
+        runtime.with_ltm.final_answer,
+    ]
+
+
+@pytest.mark.parametrize(
+    ("verdict", "outcome"),
+    [
+        (JudgeVerdict.PASS, Outcome.PASS),
+        (JudgeVerdict.FAIL, Outcome.FAIL),
+        (JudgeVerdict.UNCERTAIN, Outcome.REVIEW_REQUIRED),
+    ],
+)
+async def test_no_ltm_grades_final_answer_without_grading_an_unexecuted_rewrite(verdict, outcome):
+    case = _case()
+    runtime = _Runtime()
+    judge = _Judge(verdicts=(verdict, JudgeVerdict.PASS, JudgeVerdict.PASS))
+
+    result = await _evaluator(runtime, judge).evaluate(case)
+
+    assert result.no_ltm is not None
+    assert result.no_ltm.rewritten_query == case.inputs.session_b_query
+    assert not result.no_ltm.rewrite_constraints.passed
+    assert result.no_ltm.rewrite_judgment is None
+    assert "rewrite_constraint_failed" not in result.no_ltm.reason_codes
+    assert result.no_ltm.final_judgment.verdict is verdict
+    assert result.no_ltm.outcome is outcome
+    assert len(judge.calls) == 3
+    assert judge.calls[0]["reference_answer"] == case.gold.expected_answer
 
 
 @pytest.mark.asyncio
@@ -299,7 +355,6 @@ async def test_retrieval_miss_and_semantic_final_failure_are_reported_separately
     )
     judge = _Judge(
         verdicts=(
-            JudgeVerdict.PASS,
             JudgeVerdict.PASS,
             JudgeVerdict.PASS,
             JudgeVerdict.FAIL,
@@ -381,12 +436,12 @@ async def test_rewrite_constraint_failure_skips_only_rewrite_judge_not_final_qa(
     assert result.with_ltm.rewrite_judgment is None
     assert result.with_ltm.final_judgment is not None
     assert "rewrite_constraint_failed" in result.with_ltm.reason_codes
-    assert len(judge.calls) == 3
+    assert len(judge.calls) == 2
 
 
 @pytest.mark.asyncio
 async def test_judge_failure_is_dependency_error_not_semantic_fail():
-    result = await _evaluator(_Runtime(), _Judge(error_at=4)).evaluate(_case())
+    result = await _evaluator(_Runtime(), _Judge(error_at=3)).evaluate(_case())
 
     assert result.outcome is Outcome.DEPENDENCY_ERROR
     assert result.with_ltm is not None
@@ -398,7 +453,6 @@ async def test_judge_failure_is_dependency_error_not_semantic_fail():
 async def test_uncertain_final_answer_requires_review_without_becoming_failure():
     judge = _Judge(
         verdicts=(
-            JudgeVerdict.PASS,
             JudgeVerdict.PASS,
             JudgeVerdict.PASS,
             JudgeVerdict.UNCERTAIN,

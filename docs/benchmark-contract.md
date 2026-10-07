@@ -1,19 +1,31 @@
-# Benchmark contract v4
+# Benchmark contract v5
 
-Status: **full-corpus acceptance contract**, 2026-09-18. Contract ID:
-`kira-week5-benchmark-v4`. V4 giữ quyết định bỏ dev/holdout split, chuyển performance sang
-guardrail chạy sau semantic confirmation, giới hạn workload đo bằng attempt cap, và bắt buộc
-phân biệt historical control với release candidate bằng runtime provenance. V4 thu gọn scorecard,
-thêm internal LLM judge có audit chọn mẫu và final-QA semantic/task-success. Corpus hiện tại là một
-acceptance dataset chạy toàn bộ, không phải bằng chứng generalization trên unseen holdout.
-Control source không đổi.
-Đây là đặc tả cho implementation tiếp theo, chưa phải harness hoặc benchmark result.
+Status: **full-corpus acceptance contract**, 2026-10-06. Contract ID:
+`kira-week5-benchmark-v5`. Mặc định đánh giá đúng một `current_runtime` từ revision sạch,
+giữ hai nhánh No-LTM/With-LTM của cùng runtime. Historical comparison chỉ chạy khi được yêu cầu
+rõ. V5 thay cách dựng source state: một source conversation cho mỗi bundle, formation nguồn một
+lần rồi các QA dùng chung corpus với context riêng. Payload, gold, scoring và audit criteria giữ
+nguyên. Corpus này là acceptance/regression evidence, không phải unseen-holdout generalization.
+Các artifact v4 vẫn là evidence lịch sử; không resume hoặc sửa chúng thành kết quả v5.
 
 Liên quan: [control manifest](benchmark-baseline.json),
 [PC/VDI handoff](company-pc-ai-handoff.md),
 [internal K8s acceptance](benchmark-k8s-acceptance.md).
 
-## 1. Control và phạm vi so sánh
+## 1. Runtime hiện tại và phạm vi so sánh tùy chọn
+
+Default run-set chỉ có variant ID `current`, provenance `current_runtime`, runtime SHA và
+harness SHA sạch được ghi riêng; không cần candidate declaration hay historical control.
+Build tạo runtime image, eval image và PostgreSQL dependency image. Preflight/freeze/acceptance
+phải khớp đúng một variant này. Không tự chạy thêm bản cũ hoặc nhân đôi corpus.
+
+Benchmark QA mặc định chọn `--suite cross_session`: bốn source users, 253 source events và 209 QA
+qua product flow với No-LTM/With-LTM. Formation component (62 cases) và rewrite component
+(54 cases) là scope độc lập: chạy cho cấu hình cần kiểm, chạy lại khi thành phần liên quan đổi,
+không bắt chạy lại mỗi lượt QA khi không đổi. Full bốn suites là diagnostic tùy chọn; mọi run
+ghi rõ selected suites và chỉ claim completeness trong scope đó.
+
+Các quy tắc dưới đây chỉ áp dụng khi explicitly chọn historical comparison.
 
 Control bất biến là source tại `75deb1d8e11b9c7ec3eb14ccb99e0860af3a1c00`, không phải HEAD
 của nhánh benchmark hiện tại và không phải một image tag mutable. Đây là **historical control**; việc package
@@ -56,8 +68,17 @@ Secret-negative cases dùng canary giả được đánh dấu synthetic, không
 
 T5.2 phải preflight theo suite: extraction cần chat provider và JSON contract; retrieval cần
 embedding + pgvector; rewrite cần chat provider; persistent formation cần các dependency formation
-và DB; full cross-session cần Gateway/Worker/queue và KiRa hoặc double được ghi rõ. Validate/review
+và DB; cross-session cần các dependency formation/retrieval/rewrite/judge cùng Gateway/Worker/queue
+và KiRa hoặc double được ghi rõ. Validate/review
 offline không đòi provider. Không bắt suite độc lập phải có tất cả endpoint.
+
+Preflight/freeze phải khớp selected suites, config và provenance của run. QA-only vẫn preflight
+đầy đủ các dependency mà product flow dùng; không cần chạy component cases để chứng minh readiness.
+Full-suite preflight PASS có thể cover QA subset khi runtime/harness, prompts, dataset và mọi
+config ngoài selected suites giữ nguyên. Freeze helper ghi config binding cho các subset phù hợp;
+freeze cũ chỉ có exact full-suite hash cần tạo lại offline từ provider-preflight JSON đã giữ,
+ở output path mới, không replay provider probes. Evidence component không được ghép thành metrics
+của QA run mới.
 
 K8s Test không Internet/GPU. User đã chỉ định binding rewrite production: Qwen3-14B base qua vLLM,
 `http://10.254.135.40:8080/v1`, model ID `/models/Qwen3_14B`, không dùng `genai-lora`.
@@ -72,7 +93,8 @@ khác trong cùng experiment hoặc biến provider error thành một case “k
 
 ## 3. Corpus, review và phạm vi chạy
 
-Dataset nguồn hiện có 209 QA trên bốn storyline. T5.3/T5.4 vẫn phải ghi số case thực sự chuyển
+Dataset nguồn hiện có 209 QA trên bốn storyline, 62 formation component cases và 54 rewrite
+component cases. T5.3/T5.4 vẫn phải ghi số case thực sự chuyển
 được sang từng suite và lý do loại case; thay đổi phải được review trước chạy chính thức.
 
 Mỗi case cần stable ID, suite, scenario-family ID, `evaluation_scope=full_corpus`, tags,
@@ -81,7 +103,8 @@ gold IDs/constraints, evidence references, allowed attribution và review status
 là atomic reusable claims; retrieval gold xác định relevant memory IDs; rewrite gold là các
 slot/constraints cần giữ hoặc không được invent, không chỉ một câu exact-match.
 
-- Mọi official run chạy toàn bộ case đủ điều kiện trong cả bốn bundle; không có dev/holdout split.
+- Mỗi run chạy toàn bộ case đủ điều kiện của selected suites trong cả bốn bundle; không có
+  dev/holdout split. Suite không chọn nằm ngoài scope, không được claim PASS hoặc tính vào denominator.
 - `scenario_group` và memory family chỉ dùng để báo cáo/audit, không quyết định case có được chạy.
 - Validator kiểm tra normalized exact duplicates, IDs, references và full-corpus scope; reviewer kiểm tra
   semantic overlap. Không quảng cáo exact normalization là semantic leakage detector.
@@ -110,8 +133,21 @@ Memory facts phải grounded trong conversation, giữ attribution. User xác nh
 đề xuất trước đó của assistant. Reusable assistant context được đánh giá theo policy native
 dual-source; không tự động gắn mọi câu assistant thành preference/fact do user phát biểu.
 
-Mỗi quality trial dùng fresh state và event mới. Same-event retry/reclaim là correctness suite
-riêng: paraphrase hoặc top-k miss không được tạo thêm memory sau khi receipt đã commit; crash trước
+Formation/retrieval/rewrite tests độc lập tiếp tục dùng state riêng theo case. Cross-session
+không dựng source state lại theo từng QA: `conv01` đến `conv04` là bốn users trong cùng run-scoped
+memory schema/collection. Mỗi bundle có một source conversation; sessions trong dataset là các
+đoạn làm việc theo thời gian, không phải source conversation mới. Replay các source pairs theo
+chronology, xử lý native formation của từng event và đợi corpus hoàn tất trước QA của bundle đó,
+rồi mới chuyển sang bundle kế. Corpus hiện có 253 source pairs cho một current-runtime run;
+đây là số source deliveries, không bảo đảm bằng số provider extraction calls.
+
+Mỗi QA/arm/attempt mở conversation mới của cùng bundle user, username KiRa riêng và tắt formation.
+With-LTM dùng scoped native Mem0 search và product context/rewrite; GLOBAL của user được xét,
+CONVERSATION memory nguồn vẫn isolate. Gold chỉ chấm/mapping output, không lọc memory đầu vào.
+No-LTM dùng cùng runtime và query nhưng tắt LTM. Các QA không sửa corpus nguồn.
+
+Same-event retry/reclaim là correctness suite riêng: paraphrase hoặc top-k miss không được tạo
+thêm memory sau khi receipt đã commit; crash trước
 commit không được để partial vectors/receipt; crash sau commit replay kết quả đầu rồi complete job.
 Queue vẫn at-least-once; không tuyên bố toàn bộ side effects SQLite/entity links là exactly-once.
 Distinct-event duplicate do overlapping history được đo riêng, không nhầm với event idempotency.
@@ -122,8 +158,13 @@ là cosine similarity. Không thay bằng tự viết SQL nearest-neighbor rồi
 Mapping gold ID/persisted ID nằm trong eval artifacts. Query đang đo không được enqueue formation
 làm nhiễm corpus retrieval.
 
-Cross-session chạy Current-only / Recent-only / LTM-only / Recent+LTM bằng eval-only wiring trên
-cùng scenario và fresh state. Session B phải đợi đúng job Session A completed bằng bounded wait;
+Native retrieval component yêu cầu chọn `--suite formation --suite retrieval` cùng run để có
+formed corpus; không chạy retrieval component đơn lẻ rồi bỏ denominator formed. Cross-session
+QA tự formation source corpus và gọi product Mem0 retrieval/rewrite, không phụ thuộc việc chọn
+formation/retrieval/rewrite component suites.
+
+Cross-session chạy No-LTM/With-LTM trên cùng source corpus, query và runtime, với QA context riêng.
+QA phải đợi đúng các source jobs completed bằng bounded wait;
 deadline được freeze trong run config, timeout hiện rõ. Memory readiness latency tách khỏi response
 latency. Mock KiRa kiểm tra standalone query và SSE; nghiệp vụ KiRa thật là gate riêng.
 
@@ -205,6 +246,16 @@ task success là `N/A` khi không có structured action/API evidence. Bounded wa
 
 ## 6. Candidate selection và late performance guardrail
 
+Default current-runtime run chỉ báo chất lượng từng nhánh, memory uplift/regression, stage latency
+và provider calls/tokens thực đo. `check_pc_acceptance` chỉ chốt completeness, lỗi kỹ thuật,
+safety và provenance trong selected suites; không promote hoặc tự kết luận chất lượng tốt.
+Metric component ngoài scope là `N/A`, không phải lỗi completeness của QA-only. Latency diagnostic trong
+corpus không thay comparative performance workload bên dưới. Unknown usage giữ `unavailable`;
+retry calls có evidence được tính riêng, source corpus không nhân lại theo số QA.
+
+Các quy tắc candidate selection và paired repetitions dưới đây là chế độ comparison riêng,
+không phải điều kiện để chạy benchmark bản hiện tại.
+
 T5.3 chạy control trước, thử tối đa hai declared candidate trên cùng full corpus; diagnostic grid
 chỉ hỗ trợ discovery. Tổ hợp cuối được chọn bằng metric/guardrail đã khóa trước, sau đó freeze thành
 một candidate cho ba paired repetitions T5.5. Không mở thêm candidate bằng cách cherry-pick case,
@@ -267,7 +318,8 @@ Mỗi run manifest tương lai phải chứa:
 - Run ID, contract version, UTC timestamps và profile.
 - Runtime Git SHA/dirty flag và harness Git SHA/dirty flag là hai trường độc lập; official run
   yêu cầu cả hai source sạch. Ghi image digest/ID nếu dùng container.
-- Variant `historical_control`, `release_candidate` hoặc `working_tree`. Historical control phải
+- Variant `current_runtime` mặc định, hoặc `historical_control`, `release_candidate`, `working_tree`.
+  Current runtime không có candidate declaration và phải dùng source sạch. Historical control phải
   dùng đúng SHA `75deb1d...`; release candidate phải có candidate ID, control SHA, declared change
   scopes và mô tả.
 - Corpus version/hash, evaluation-scope/family hash, gold review revision/hash, prompt rendered-content hashes,
@@ -278,6 +330,11 @@ Mỗi run manifest tương lai phải chứa:
   timeout/retry settings thực tế của runtime và probes riêng, concurrency/warm-up/sample counts.
 - DB/memory schema/package versions, isolated resource ownership cho cleanup; không credential,
   không connection URI có password hoặc request auth header.
+- Bundle source hash, logical/persisted user, một source conversation, ordered native event/boundary
+  references, completion/receipt progress, gold mapping và memory IDs. Bundle source owns memory;
+  QA chỉ owns context, không claim lại source memories. Resume giữ source đã hoàn tất, không
+  formation lại theo QA; source failure terminal phải hiện lỗi thay vì tự bắt đầu corpus mới.
+  Ledger ghi ownership trước DB write, cleanup dùng đúng run owner và users/conversations đã claim.
 - Dependency/preflight outcomes, per-case result/review references, coverage/errors, stage metrics,
   price/cost data chỉ nếu provider báo (thiếu là unavailable, không giả thành zero).
 
@@ -295,11 +352,11 @@ eval image/runbook. Không download dependencies/model lúc chạy ở K8s Test.
 vẫn ghi local completion và internal `NOT_RUN` riêng; không công bố internal quality bằng kết quả
 external model.
 
-## 8. Baseline acceptance và thay đổi contract
+## 8. Historical baseline và thay đổi contract
 
-V4 chỉ thay evaluation contract/harness metadata; không sửa historical control source, prompt,
+V5 chỉ thay benchmark contract/harness/state ownership; không sửa historical control source, prompt,
 package hoặc schema. `docs/benchmark-baseline.json` tiếp tục khóa app `0.4.1`, Mem0 `.3`, policy v2 và
-SHA `75deb1d...`, đồng thời trỏ sang contract v4 để run mới tuân scorecard/judge/audit rules mới.
+SHA `75deb1d...`, với contract v4 đã frozen; không viết lại manifest lịch sử thành v5.
 
 T5.1 đạt khi plan có đủ T5.1–T5.20/dependencies/checkpoints, manifest parse được và khớp Git
 commit/tree/blob IDs cùng versions/defaults được trích dẫn, README trỏ đúng ba artifacts, và diff

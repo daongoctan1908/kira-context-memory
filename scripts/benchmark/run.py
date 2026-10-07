@@ -123,11 +123,13 @@ def _require_native_run_contract(
 ) -> tuple[Suite, ...]:
     if profile not in {Profile.PC_OPENAI_ACCEPTANCE, Profile.INTERNAL_TEST}:
         raise ValueError("canonical native runner requires a PC or internal profile")
-    if len(suites) != len(_NATIVE_SUITES) or set(suites) != set(_NATIVE_SUITES):
-        raise ValueError("native runner requires each canonical suite exactly once")
+    if not suites or len(suites) != len(set(suites)):
+        raise ValueError("native runner requires nonempty unique suite selections")
+    if Suite.RETRIEVAL in suites and Suite.FORMATION not in suites:
+        raise ValueError("retrieval component suite requires formation in the same run")
     if formation_mode != "persistent":
         raise ValueError("native runner requires persistent formation")
-    return _NATIVE_SUITES
+    return tuple(suite for suite in _NATIVE_SUITES if suite in suites)
 
 
 async def _execute_native_run(
@@ -141,6 +143,13 @@ async def _execute_native_run(
     """Compose the exact adapters, execute sequentially, and clean only owned state."""
 
     reconcile_interrupted_attempts(store, preparation.selected_cases)
+    if benchmark_execution_complete(preparation, store):
+        await cleanup_native_runtime(
+            config=config,
+            plan=plan,
+            ledger=store.load_isolation_ledger(),
+        )
+        return True
     ledger = store.load_isolation_ledger()
     runtime = await create_native_runtime(
         config=config,
@@ -152,28 +161,27 @@ async def _execute_native_run(
     )
     complete = False
     try:
-        executor = NativeBenchmarkExecutor(
-            {
-                Suite.FORMATION: NativeFormationEvaluator(runtime.formation, runtime.judge),
-                Suite.RETRIEVAL: NativeRetrievalEvaluator(runtime.retrieval),
-                Suite.REWRITE: RewriteEvaluator(
-                    runtime.rewriter,
-                    runtime.judge,
-                    profile=config.profile,
-                    backend="native",
-                ),
-                Suite.CROSS_SESSION: CrossSessionEvaluator(
-                    runtime.cross_session,
-                    runtime.judge,
-                    profile=config.profile,
-                    backend="native",
-                    readiness_timeout_seconds=config.total_timeout_seconds,
-                ),
-            }
-        )
+        evaluators = {}
+        if Suite.FORMATION in config.suites:
+            evaluators[Suite.FORMATION] = NativeFormationEvaluator(runtime.formation, runtime.judge)
+        if Suite.RETRIEVAL in config.suites:
+            evaluators[Suite.RETRIEVAL] = NativeRetrievalEvaluator(runtime.retrieval)
+        if Suite.REWRITE in config.suites:
+            evaluators[Suite.REWRITE] = RewriteEvaluator(
+                runtime.rewriter, runtime.judge, profile=config.profile, backend="native"
+            )
+        if Suite.CROSS_SESSION in config.suites:
+            evaluators[Suite.CROSS_SESSION] = CrossSessionEvaluator(
+                runtime.cross_session,
+                runtime.judge,
+                profile=config.profile,
+                backend="native",
+                readiness_timeout_seconds=config.total_timeout_seconds,
+            )
+        executor = NativeBenchmarkExecutor(evaluators)
         await execute_benchmark_cases(preparation, store, executor)
         complete = benchmark_execution_complete(preparation, store)
-        if complete:
+        if complete and Suite.RETRIEVAL in config.suites:
             await runtime.retrieval.cleanup()
     finally:
         await runtime.aclose()
@@ -264,7 +272,12 @@ def _add_offline_commands(commands: argparse._SubParsersAction) -> None:
 
     run = commands.add_parser("run", help="Run the crash-safe benchmark case ledger")
     run.add_argument("--profile", choices=list(Profile), default=Profile.MOCK)
-    run.add_argument("--suite", choices=list(Suite), action="append", required=True)
+    run.add_argument(
+        "--suite",
+        choices=list(Suite),
+        action="append",
+        help="Select suites; default: cross_session",
+    )
     run.add_argument("--formation-mode", choices=("write_free", "persistent"), default="write_free")
     run.add_argument("--env-file", type=Path)
     run.add_argument("--env-file-only", action="store_true")
@@ -287,6 +300,15 @@ def _run_offline(args: argparse.Namespace) -> int:
         compilation = compile_dataset(args.root, seed=args.seed)
         output = compilation_json_bytes(compilation)
         _new_output(args.output, output)
+        cross_session_cases = [
+            case
+            for case in compilation.cases
+            if case.suite is Suite.CROSS_SESSION and case.eligibility.status == "eligible"
+        ]
+        source_corpora = {
+            (case.inputs.user_id, case.inputs.session_a): case.inputs
+            for case in cross_session_cases
+        }
         print(
             json.dumps(
                 {
@@ -294,10 +316,11 @@ def _run_offline(args: argparse.Namespace) -> int:
                     "dataset_sha256": compilation.dataset_sha256,
                     "case_count": len(compilation.cases),
                     "cross_session_source_pairs": sum(
-                        len(case.inputs.session_a_messages) // 2
-                        for case in compilation.cases
-                        if case.suite is Suite.CROSS_SESSION
-                        and case.eligibility.status == "eligible"
+                        len(inputs.session_a_messages) // 2 for inputs in source_corpora.values()
+                    ),
+                    "cross_session_source_conversations": len(source_corpora),
+                    "per_qa_replay_pairs": sum(
+                        len(case.inputs.session_a_messages) // 2 for case in cross_session_cases
                     ),
                     "output": str(args.output),
                 },
@@ -457,7 +480,7 @@ def _run_offline(args: argparse.Namespace) -> int:
         if args.env_file_only and args.env_file is None:
             raise ValueError("file-only mode needs an explicit file")
         profile = Profile(args.profile)
-        suites = tuple(Suite(value) for value in args.suite)
+        suites = tuple(Suite(value) for value in (args.suite or (Suite.CROSS_SESSION,)))
         if profile is not Profile.MOCK:
             suites = _require_native_run_contract(profile, suites, args.formation_mode)
         config = load_config(
@@ -538,6 +561,14 @@ def _run_offline(args: argparse.Namespace) -> int:
                     )
                 )
         summary = store.latest_outcome_counts
+        benchmark_report_path = None
+        if profile is not Profile.MOCK:
+            from evaluation.run_report import build_benchmark_report
+
+            benchmark_report = build_benchmark_report(
+                run_root=store.root, dataset_root=args.dataset_root
+            )
+            benchmark_report_path = store.write_benchmark_report(benchmark_report)
         print(
             json.dumps(
                 {
@@ -545,10 +576,19 @@ def _run_offline(args: argparse.Namespace) -> int:
                     "profile": profile.value,
                     "quality_claim": profile is not Profile.MOCK,
                     "official": store.manifest.official,
+                    "selected_suites": [suite.value for suite in preparation.identity.suites],
+                    "evaluation_scope": (
+                        "full_corpus"
+                        if set(preparation.identity.suites) == set(Suite)
+                        else "selected_suites"
+                    ),
                     "run_id": str(preparation.identity.run_id),
                     "terminal_cases": sum(summary.values()),
                     "outcomes": {key.value: value for key, value in summary.items()},
                     "artifact_root": str(args.artifact_root),
+                    "benchmark_report": (
+                        str(benchmark_report_path) if benchmark_report_path is not None else None
+                    ),
                 },
                 sort_keys=True,
             )

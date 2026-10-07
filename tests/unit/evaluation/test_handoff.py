@@ -16,6 +16,7 @@ from evaluation.models import (
     GitSource,
     Outcome,
     RunProvenance,
+    Suite,
 )
 from evaluation.pc_acceptance import PcAcceptanceManifest, PcVariantAcceptance
 from evaluation.pc_preflight import PcPreflightFreeze, PcPreflightRunSet, PcProviderIdentity
@@ -55,12 +56,15 @@ def _provenance(variant: BenchmarkVariant) -> RunProvenance:
     )
 
 
-def _write_evidence(tmp_path: Path, compilation) -> tuple[Path, Path, Path]:
+def _write_evidence(
+    tmp_path: Path, compilation, *, suites: tuple[Suite, ...] = tuple(Suite)
+) -> tuple[Path, Path, Path]:
+    selected_config_hash = _CONFIG_HASH if suites == tuple(Suite) else "a" * 64
     image = tmp_path / "image-manifest.json"
     image.write_text(
         json.dumps(
             {
-                "contract_id": "kira-week5-benchmark-v4",
+                "contract_id": "kira-week5-benchmark-v5",
                 "variants": [
                     {"variant_id": "control"},
                     {"variant_id": "candidate-a"},
@@ -88,6 +92,10 @@ def _write_evidence(tmp_path: Path, compilation) -> tuple[Path, Path, Path]:
             dataset_version=compilation.dataset_version,
             dataset_sha256=_DATASET_HASH,
             config_sha256=_CONFIG_HASH,
+            config_sha256_by_suites={
+                ",".join(suite.value for suite in Suite): _CONFIG_HASH,
+                "cross_session": "a" * 64,
+            },
             provider_preflight_sha256="f" * 64,
             provider_run_id="00000000-0000-0000-0000-000000000001",
             kira_response_sha256="9" * 64,
@@ -111,12 +119,14 @@ def _write_evidence(tmp_path: Path, compilation) -> tuple[Path, Path, Path]:
         dataset_sha256=_DATASET_HASH,
         image_manifest_sha256=file_sha256(image),
         pc_preflight_sha256=file_sha256(preflight_path),
+        selected_suites=suites,
+        evaluation_scope="full_corpus" if suites == tuple(Suite) else "selected_suites",
         variants=(
             PcVariantAcceptance(
                 variant_id="control",
                 benchmark_variant=BenchmarkVariant.HISTORICAL_CONTROL,
                 runtime_revision=_CONTROL_SHA,
-                config_sha256=_CONFIG_HASH,
+                config_sha256=selected_config_hash,
                 run_id="control-run",
                 eligible_cases=1,
                 completed_eligible_cases=1,
@@ -127,7 +137,7 @@ def _write_evidence(tmp_path: Path, compilation) -> tuple[Path, Path, Path]:
                 variant_id="candidate-a",
                 benchmark_variant=BenchmarkVariant.RELEASE_CANDIDATE,
                 runtime_revision=_CANDIDATE_SHA,
-                config_sha256=_CONFIG_HASH,
+                config_sha256=selected_config_hash,
                 run_id="candidate-run",
                 eligible_cases=1,
                 completed_eligible_cases=1,
@@ -141,7 +151,10 @@ def _write_evidence(tmp_path: Path, compilation) -> tuple[Path, Path, Path]:
     return image, preflight_path, acceptance_path
 
 
-def test_handoff_freeze_binds_review_acceptance_and_dynamic_image_set(tmp_path, monkeypatch):
+@pytest.mark.parametrize("suites", [tuple(Suite), (Suite.CROSS_SESSION,)])
+def test_handoff_freeze_binds_review_acceptance_and_dynamic_image_set(
+    tmp_path, monkeypatch, suites
+):
     source = load_manifest()
     reviewed = source.model_copy(
         update={
@@ -170,7 +183,7 @@ def test_handoff_freeze_binds_review_acceptance_and_dynamic_image_set(tmp_path, 
     dataset_root = tmp_path / "dataset"
     dataset_root.mkdir()
     (dataset_root / "manifest.json").write_text("{}", encoding="utf-8")
-    image, preflight, acceptance = _write_evidence(tmp_path, compilation)
+    image, preflight, acceptance = _write_evidence(tmp_path, compilation, suites=suites)
 
     result = build_handoff_evidence(
         dataset_root=dataset_root,
@@ -184,6 +197,10 @@ def test_handoff_freeze_binds_review_acceptance_and_dynamic_image_set(tmp_path, 
     assert result.variant_ids == ("control", "candidate-a")
     assert result.image_count == 5
     assert result.review_reviewer == "reviewer-1"
+    assert result.selected_suites == suites
+    assert result.evaluation_scope == (
+        "full_corpus" if suites == tuple(Suite) else "selected_suites"
+    )
 
 
 def test_handoff_freeze_rejects_image_manifest_changed_after_acceptance(tmp_path, monkeypatch):

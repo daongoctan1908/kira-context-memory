@@ -43,6 +43,8 @@ def main(argv: list[str] | None = None) -> int:
                     "outcome": "PASS" if result.technical_passed else "FAIL",
                     "official": False,
                     "quality_decision": result.quality_decision,
+                    "selected_suites": [suite.value for suite in result.selected_suites],
+                    "evaluation_scope": result.evaluation_scope,
                     "output": str(args.output),
                 },
                 sort_keys=True,

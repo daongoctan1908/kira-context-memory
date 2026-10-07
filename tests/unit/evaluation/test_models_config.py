@@ -91,10 +91,19 @@ def test_review_and_result_are_not_implicitly_passed():
         CaseResult(case_id="c1", run_id=uuid4(), outcome="good")
 
 
-def test_contract_v4_distinguishes_historical_control_and_candidate_scope():
+def test_contract_v5_distinguishes_current_runtime_and_optional_comparison_scope():
     control = provenance(BenchmarkVariant.HISTORICAL_CONTROL)
-    assert BENCHMARK_CONTRACT_ID == "kira-week5-benchmark-v4"
+    assert BENCHMARK_CONTRACT_ID == "kira-week5-benchmark-v5"
     assert control.attribution_scope == "historical_control"
+    current = provenance(BenchmarkVariant.CURRENT_RUNTIME, runtime_sha="3" * 40)
+    assert current.attribution_scope == "current_runtime"
+    assert current.candidate is None
+    with pytest.raises(ValueError, match="clean exact revisions"):
+        RunProvenance.model_validate(
+            current.model_copy(update={"runtime": GitSource(sha="3" * 40, dirty=True)}).model_dump(
+                exclude_computed_fields=True
+            )
+        )
     assert Outcome.INSUFFICIENT_EVIDENCE == "INSUFFICIENT_EVIDENCE"
     assert set(PerformanceReviewVerdict) == {
         PerformanceReviewVerdict.ACCEPTABLE,
@@ -155,10 +164,11 @@ def test_candidate_and_historical_control_declarations_fail_closed():
         RunProvenance.model_validate(historical)
 
 
-def test_contract_v4_does_not_rewrite_the_historical_control_runtime():
+def test_contract_v5_does_not_rewrite_the_frozen_v4_control_manifest():
     root = Path(__file__).resolve().parents[3]
     manifest = json.loads((root / "docs/benchmark-baseline.json").read_text(encoding="utf-8"))
-    assert manifest["contract_id"] == BENCHMARK_CONTRACT_ID
+    assert manifest["contract_id"] == "kira-week5-benchmark-v4"
+    assert BENCHMARK_CONTRACT_ID == "kira-week5-benchmark-v5"
     assert manifest["variant"] == BenchmarkVariant.HISTORICAL_CONTROL
     assert manifest["source"]["commit"] == HISTORICAL_CONTROL_SHA
     assert manifest["versions"]["viettel_mem0"] == "2.0.20+viettel.3"

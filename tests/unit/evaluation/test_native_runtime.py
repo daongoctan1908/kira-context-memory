@@ -1,12 +1,14 @@
 """Provider-free tests for native runtime composition and crash ownership."""
 
 import asyncio
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
+from sqlalchemy.dialects import postgresql
 
 from app.application.use_cases.process_memory import ProcessMemoryUseCase
 from app.application.use_cases.process_memory_job import (
@@ -15,11 +17,15 @@ from app.application.use_cases.process_memory_job import (
     ProcessMemoryJobUseCase,
 )
 from app.config.settings import Settings
+from app.domain.errors.memory import LongTermMemoryConnectionError
 from app.domain.models.conversation import AppendTurnResult, CompletedTurnReference
 from app.domain.models.kira import KiraEventKind, KiraStreamEvent
 from app.domain.models.memory import LongTermMemory, MemoryLifecycleEvent, MemoryProcessResult
 from app.domain.models.memory_job import MemoryJob
+from app.infrastructure.postgres.memory_job_queue import PostgresMemoryJobQueueAdapter
+from app.infrastructure.postgres.schema import memory_jobs
 from evaluation.artifacts import ArtifactRunIdentity, ArtifactStore
+from evaluation.compiler import compile_dataset
 from evaluation.config import EvalConfig, ProviderConfig, load_config
 from evaluation.cross_session import (
     CrossSessionCondition,
@@ -36,6 +42,7 @@ from evaluation.formation import (
 )
 from evaluation.isolation import (
     IsolationPlan,
+    allocate_bundle_qa_resources,
     allocate_case_resources,
     create_isolation_plan,
     isolation_plan_sha256,
@@ -62,10 +69,12 @@ from evaluation.native_runtime import (
     PersistentFormationRuntime,
     PersistentRetrievalRuntime,
     _NoOpContextObserver,
+    _owned_turn_id,
     _persist_message_pairs,
     _RecordingKira,
     _RecordingMemory,
     _RecordingRewriter,
+    _SourceMemoryJobQueue,
     create_native_runtime,
     reconcile_interrupted_attempts,
     settings_for_native_runtime,
@@ -340,20 +349,25 @@ class _RecordingStore:
         self.deletion_pending: set[tuple[str, str]] = set()
         self.deleted: list[tuple[str, str]] = []
         self.formed_memory = None
+        self.source_references = {}
 
     async def create_conversation(self, user_id, *, title=None):
-        del user_id, title
+        del title
         session_id = f"managed-session-{len(self.created_sessions) + 1}"
         self.created_sessions.append(session_id)
-        return SimpleNamespace(session_id=session_id)
+        self.source_owners[session_id] = user_id
+        self.source_conversations[session_id] = UUID(int=1000 + len(self.created_sessions))
+        return SimpleNamespace(
+            session_id=session_id, conversation_id=self.source_conversations[session_id]
+        )
 
     async def is_conversation_active(self, user_id, session_id):
         del user_id, session_id
         return True
 
     async def active_conversation_id(self, user_id, session_id):
-        del user_id, session_id
-        return UUID(int=1)
+        del user_id
+        return self.source_conversations.get(session_id, UUID(int=1))
 
     async def read_recent(self, user_id, session_id, limit):
         del user_id, session_id, limit
@@ -381,6 +395,7 @@ class _RecordingStore:
         )
         self.last_reference = result.reference
         if result.memory_job_event_id:
+            self.source_references[result.memory_job_event_id] = result.reference
             self.queued.append((result.memory_job_event_id, result.reference))
         return result
 
@@ -461,6 +476,37 @@ class _Queue:
         )
 
 
+@pytest.mark.parametrize("cancelled", (False, True))
+async def test_source_queue_filters_native_claim_and_resets_target(monkeypatch, cancelled):
+    queue = _SourceMemoryJobQueue(SimpleNamespace())
+    expected = UUID(int=300)
+    queries = []
+
+    async def capture_claim(self, **kwargs):
+        statement = self._claim_candidates(kwargs["limit"], kwargs["max_attempts"])
+        assert statement._where_criteria[-1].compare(memory_jobs.c.event_id == expected)
+        compiled = statement.compile(dialect=postgresql.dialect())
+        assert expected in compiled.params.values()
+        assert "memory_jobs.event_id = " in str(compiled)
+        assert "FOR UPDATE OF memory_jobs SKIP LOCKED" in str(compiled)
+        queries.append(compiled)
+        if cancelled:
+            raise asyncio.CancelledError
+        return ()
+
+    monkeypatch.setattr(PostgresMemoryJobQueueAdapter, "claim_due", capture_claim)
+    with pytest.raises(CrossSessionProtocolError):
+        queue._claim_candidates(1, 2)
+    if cancelled:
+        with pytest.raises(asyncio.CancelledError):
+            await queue.claim_expected(expected, limit=1, max_attempts=2)
+    else:
+        assert await queue.claim_expected(expected, limit=1, max_attempts=2) == ()
+    assert len(queries) == 1
+    with pytest.raises(CrossSessionProtocolError):
+        queue._claim_candidates(1, 2)
+
+
 class _JobProcessor:
     async def execute(self, job):
         assert job.event_id.int >= 300
@@ -468,7 +514,11 @@ class _JobProcessor:
 
 
 class _Inspector:
+    def __init__(self, store):
+        self.store = store
+
     async def inspect(self, *, event_id, user_id):
+        reference = self.store.source_references[event_id]
         lifecycle = FormationLifecycleRecord(
             event="ADD",
             memory_id=UUID(int=400),
@@ -484,8 +534,8 @@ class _Inspector:
                     user_id=user_id,
                     formation_event_id=event_id,
                     conversation_id=UUID(int=1),
-                    turn_id="turn-a",
-                    boundary_message_id=2,
+                    turn_id=reference.turn_id,
+                    boundary_message_id=reference.boundary_message_id,
                     attributed_to="user",
                 ),
             ),
@@ -520,7 +570,7 @@ async def test_cross_session_runtime_owns_job_and_disables_session_b_formation(t
         memory=memory,  # type: ignore[arg-type]
         memory_queue=_Queue(store),  # type: ignore[arg-type]
         process_job=_JobProcessor(),  # type: ignore[arg-type]
-        inspector=_Inspector(),  # type: ignore[arg-type]
+        inspector=_Inspector(store),  # type: ignore[arg-type]
         rewriter=_Rewriter(),  # type: ignore[arg-type]
         kira_factory=lambda _username: backend_kira,  # type: ignore[return-value]
         judge=_NeverFormationJudge(),  # type: ignore[arg-type]
@@ -552,7 +602,8 @@ async def test_cross_session_runtime_owns_job_and_disables_session_b_formation(t
     assert with_ltm.retrieved_memories[0].memory_id == "memory-1"
     assert no_ltm.final_answer == "Tôi ưu tiên ở đâu?"
     assert with_ltm.final_answer.startswith("rewritten:ConversationContext")
-    assert store.schedule_flags == [True, False, False, False, False]
+    assert store.schedule_flags == [True, False, False]
+    assert len(set(store.created_sessions)) == 2
     assert artifacts.load_isolation_ledger().resources[0].memory_ids == (UUID(int=400),)
 
     with pytest.raises(CrossSessionProtocolError):
@@ -621,7 +672,10 @@ class _ReceiptInspector:
         self.queue = queue
 
     async def inspect(self, *, event_id, user_id):
-        assert event_id in self.queue.completed
+        if event_id not in self.queue.completed:
+            return FormationPersistenceSnapshot(
+                event_id=event_id, user_id=user_id, memories=(), receipt=None
+            )
         source, result = self.memory.results[event_id]
         ref = source.reference
         return FormationPersistenceSnapshot(
@@ -691,7 +745,9 @@ async def test_source_trajectory_uses_all_receipts_and_preserves_context_boundar
         update={"inputs": case.inputs.model_copy(update={"session_a_messages": messages})}
     )
     artifacts, plan = _isolated_store(
-        tmp_path, case, additional_case_ids=("conv01:cross-session:Q02",)
+        tmp_path,
+        case,
+        additional_case_ids=("conv01:cross-session:Q02", "conv02:cross-session:Q01"),
     )
 
     class SourceStore(_BoundaryStore):
@@ -791,6 +847,18 @@ async def test_source_trajectory_uses_all_receipts_and_preserves_context_boundar
 
     async def next_case_survives_without_deleting_another_owner():
         next_case = case.model_copy(update={"case_id": "conv01:cross-session:Q02"})
+        # A failed source remains failed for every QA in its own bundle. Another
+        # bundle/user can proceed without replaying or deleting the failed user's source.
+        with pytest.raises(CrossSessionDependencyError):
+            await runtime.persist_session_a(next_case)
+        next_case = next_case.model_copy(
+            update={
+                "case_id": "conv02:cross-session:Q01",
+                "inputs": next_case.inputs.model_copy(
+                    update={"user_id": "conv02:user", "session_a": "conv02:source"}
+                ),
+            }
+        )
         next_handle = await runtime.persist_session_a(next_case)
         next_readiness = await runtime.wait_for_memory(next_handle, timeout_seconds=2)
         assert next_readiness.status is MemoryReadinessStatus.COMPLETED
@@ -816,6 +884,12 @@ async def test_source_trajectory_uses_all_receipts_and_preserves_context_boundar
 
     if delivery == "reversed":
         store.queued.reverse()
+        with pytest.raises(CrossSessionProtocolError):
+            await runtime.wait_for_memory(handle, timeout_seconds=2)
+        assert not store.queued
+        assert set(memory.results) == {UUID(int=777)}
+        await next_case_survives_without_deleting_another_owner()
+        return
     if delivery == "missing_receipt":
         with pytest.raises(CrossSessionProtocolError):
             await runtime.wait_for_memory(handle, timeout_seconds=2)
@@ -834,9 +908,10 @@ async def test_source_trajectory_uses_all_receipts_and_preserves_context_boundar
         with pytest.raises(TimeoutError):
             async with asyncio.timeout(0.01):
                 await runtime.wait_for_memory(handle, timeout_seconds=2)
-        assert not store.queued
-        assert set(memory.results) == {UUID(int=777)}
-        await next_case_survives_without_deleting_another_owner()
+        assert store.queued
+        assert len(memory.processed) == 1
+        assert not artifacts.load_bundle_source("conv01").failed
+        assert not artifacts.load_bundle_source("conv01").ready
         return
     readiness = await runtime.wait_for_memory(handle, timeout_seconds=2)
     if delivery in {"dead", "legacy_dead"}:
@@ -862,7 +937,8 @@ async def test_source_trajectory_uses_all_receipts_and_preserves_context_boundar
     assert [
         tuple(message.content for message in by_event[event_id].messages[::2])
         for event_id in handle.source_event_ids
-    ] == [("98",), ("98", "99"), ("98",)]
+    ] == [("98",), ("98", "99"), ("98", "99", "98")]
+    assert len({source.reference.conversation_id for source in memory.processed}) == 1
     assert [by_event[event_id].messages[-2].timestamp for event_id in handle.source_event_ids] == [
         messages[0].timestamp,
         messages[2].timestamp,
@@ -907,7 +983,7 @@ async def test_kira_history_is_independent_for_each_case_arm_and_attempt(tmp_pat
         memory=_Memory(),
         memory_queue=_Queue(store),
         process_job=_JobProcessor(),
-        inspector=_Inspector(),
+        inspector=_Inspector(store),
         rewriter=_Rewriter(),
         kira_factory=factory,
         judge=_NeverFormationJudge(),
@@ -931,7 +1007,9 @@ async def test_kira_history_is_independent_for_each_case_arm_and_attempt(tmp_pat
         runtime.ledger = register_case_resources(
             runtime.ledger,
             plan,
-            allocate_case_resources(plan, case_id=case_id, attempt=attempt),
+            allocate_bundle_qa_resources(
+                plan, bundle_id="conv01", case_id=case_id, attempt=attempt
+            ),
         )
         monkeypatch.setattr(artifacts, "next_attempt_number", lambda _case_id, n=attempt: n)
         for arm in (CrossSessionCondition.NO_LTM, CrossSessionCondition.WITH_LTM):
@@ -954,7 +1032,7 @@ async def test_cross_session_runtime_blocks_unapproved_kira_mode_before_db_mutat
     async def unexpected_reset(*_args):
         raise AssertionError("unapproved runtime must not reset benchmark state")
 
-    monkeypatch.setattr("evaluation.native_runtime._reset_owned_state", unexpected_reset)
+    monkeypatch.setattr("evaluation.native_runtime._initialize_owned_state", unexpected_reset)
     config = _native_config().model_copy(update={"suites": (Suite.CROSS_SESSION,)})
     with pytest.raises(ValueError, match="unique_username"):
         await create_native_runtime(
@@ -985,7 +1063,7 @@ async def test_persist_message_pairs_schedules_only_the_final_boundary():
     )
 
     assert store.schedule_flags == [False, True]
-    assert reference.turn_id == "turn-2"
+    assert reference.turn_id == _owned_turn_id("eval:user", "eval:session", "turn-2")
 
 
 async def test_persist_message_pairs_rejects_incomplete_misordered_or_existing_state():
@@ -1205,3 +1283,498 @@ def test_interrupted_owned_attempt_is_closed_before_resume(tmp_path: Path):
     assert attempt.reason_codes == ("benchmark_attempt_interrupted",)
     assert store.next_attempt_number(case.case_id) == 2
     assert case.case_id in store.resume_plan().run_case_ids
+
+
+class _SharedScopedMemory(_BoundaryMemory):
+    def __init__(self):
+        super().__init__()
+        self.searches = []
+
+    async def search_scoped(self, user_id, query, *, conversation_id, scope, top_k, threshold):
+        self.searches.append((user_id, query, conversation_id, scope))
+        owned = [
+            (source, result)
+            for source, result in self.results.values()
+            if source.reference.user_id == user_id
+        ]
+        if not owned:
+            return ()
+        source, result = owned[-1]
+        if scope == "conversation" and conversation_id != source.reference.conversation_id:
+            return ()
+        event = result.events[0]
+        return (
+            LongTermMemory(
+                event.memory_id,
+                event.content,
+                0.9,
+                {
+                    "user_id": user_id,
+                    "conversation_id": str(source.reference.conversation_id),
+                    "memory_scope": "GLOBAL" if scope == "global" else "CONVERSATION",
+                    "source_timestamp": source.messages[-2].timestamp.isoformat(),
+                },
+            ),
+        )
+
+
+class _CleanContextRewriter:
+    def __init__(self):
+        self.contexts = []
+
+    async def rewrite(self, context):
+        self.contexts.append(context)
+        assert context.recent_messages == ()
+        assert all(item.metadata["memory_scope"] == "GLOBAL" for item in context.long_term_memories)
+        return context.current_query
+
+
+def _shared_runtime(artifacts, plan, store, memory, queue, *, rewriter=None, kira_factory=None):
+    processor = ProcessMemoryJobUseCase(
+        ProcessMemoryUseCase(store, memory), queue, max_attempts=1, retry_delays_seconds=()
+    )
+    return NativeCrossSessionRuntime(
+        plan=plan,
+        ledger=artifacts.load_isolation_ledger(),
+        artifacts=artifacts,
+        settings=_base_settings(),
+        conversation_store=store,
+        memory=memory,
+        memory_queue=queue,
+        process_job=processor,
+        inspector=_ReceiptInspector(memory, queue),
+        rewriter=rewriter or _Rewriter(),
+        kira_factory=kira_factory or (lambda _: _Kira()),
+        judge=_NeverFormationJudge(),
+        gold_fact_text={},
+    )
+
+
+async def test_full_dataset_source_once_four_users_and_clean_product_qa(tmp_path):
+    cases = sorted(
+        (case for case in compile_dataset(seed=742).cases if case.suite is Suite.CROSS_SESSION),
+        key=lambda case: case.case_id.split(":")[0],
+    )
+    artifacts, plan = _isolated_store(
+        tmp_path, cases[0], additional_case_ids=tuple(case.case_id for case in cases[1:])
+    )
+    store = _BoundaryStore()
+    memory = _SharedScopedMemory()
+    queue = _ReceiptQueue(store)
+    rewriter = _CleanContextRewriter()
+    usernames = []
+
+    def kira(username):
+        usernames.append(username)
+        return _Kira()
+
+    runtime = _shared_runtime(
+        artifacts, plan, store, memory, queue, rewriter=rewriter, kira_factory=kira
+    )
+    formed_per_bundle = {}
+    for case in cases:
+        bundle = case.case_id.split(":")[0]
+        handle = await runtime.persist_session_a(case)
+        ready = await runtime.wait_for_memory(handle, timeout_seconds=30)
+        assert ready.status is MemoryReadinessStatus.COMPLETED
+        formed_per_bundle[bundle] = len(memory.processed)
+        source_before = tuple(memory.results)
+        for arm, enabled in (
+            (CrossSessionCondition.NO_LTM, False),
+            (CrossSessionCondition.WITH_LTM, True),
+        ):
+            output = await runtime.run_session_b(
+                case, condition=arm, enable_ltm=enabled, schedule_memory=False
+            )
+            assert bool(output.retrieved_memories) is enabled
+        assert tuple(memory.results) == source_before
+    assert formed_per_bundle == {"conv01": 87, "conv02": 145, "conv03": 202, "conv04": 253}
+    assert len(memory.processed) == len(queue.completed) == 253
+    assert len({source.reference.conversation_id for source in memory.processed}) == 4
+    assert len({source.reference.user_id for source in memory.processed}) == 4
+    assert len(store.created_sessions) == len(set(store.created_sessions)) == 418
+    assert len(usernames) == len(set(usernames)) == 418
+    assert len(rewriter.contexts) == 209
+    assert sum(store.schedule_flags) == 253
+    ledger = artifacts.load_isolation_ledger()
+    owners = [item for item in ledger.resources if item.resource_role == "bundle_source"]
+    assert len(owners) == 4
+    assert len({item.user_id for item in owners}) == 4
+    assert (
+        len(
+            {
+                item.memory_id
+                for source in memory.processed
+                for item in memory.results[source.formation_event_id][1].events
+            }
+        )
+        == 253
+    )
+    for bundle in ("conv01", "conv02", "conv03", "conv04"):
+        corpus = artifacts.load_bundle_source(bundle)
+        assert corpus.ready
+        assert len({event.conversation_id for event in corpus.events}) == 1
+    for context in rewriter.contexts:
+        assert len({memory.metadata["user_id"] for memory in context.long_term_memories}) == 1
+
+
+async def test_shared_source_survives_qa_retry_and_process_resume_without_reextraction(tmp_path):
+    case = _cross_case()
+    second = case.model_copy(update={"case_id": "conv01:cross-session:Q02"})
+    artifacts, plan = _isolated_store(tmp_path, case, additional_case_ids=(second.case_id,))
+    store = _BoundaryStore()
+    memory = _SharedScopedMemory()
+    queue = _ReceiptQueue(store)
+    runtime = _shared_runtime(artifacts, plan, store, memory, queue)
+    handle = await runtime.persist_session_a(case)
+    ready = await runtime.wait_for_memory(handle, timeout_seconds=2)
+    assert len(memory.processed) == 1
+    before = artifacts.load_bundle_source("conv01")
+    # New process: no in-memory source cache, same durable run/corpus.
+    resumed_store = ArtifactStore.resume(
+        artifacts.root, expected_identity=artifacts.manifest.identity
+    )
+    runtime = _shared_runtime(resumed_store, plan, store, memory, queue)
+    handle = await runtime.persist_session_a(second)
+    recovered = await runtime.wait_for_memory(handle, timeout_seconds=2)
+    assert recovered.gold_ids_by_memory_id == ready.gold_ids_by_memory_id
+    assert len(memory.processed) == 1
+    assert artifacts.load_bundle_source("conv01") == before
+    # A new QA attempt owns only its fresh context; source memory ownership stays put.
+    original_attempt = artifacts.next_attempt_number
+    artifacts.next_attempt_number = lambda _: 2
+    runtime.artifacts = artifacts
+    handle = await runtime.persist_session_a(second)
+    await runtime.wait_for_memory(handle, timeout_seconds=2)
+    output = await runtime.run_session_b(
+        second, condition=CrossSessionCondition.WITH_LTM, enable_ltm=True, schedule_memory=False
+    )
+    assert output.retrieved_memories
+    assert len(memory.processed) == 1
+    assert artifacts.load_bundle_source("conv01") == before
+    artifacts.next_attempt_number = original_attempt
+
+
+async def test_source_transient_retry_reuses_event_and_corpus_for_later_qa(tmp_path):
+    case = _cross_case()
+    second = case.model_copy(update={"case_id": "conv01:cross-session:Q02"})
+    artifacts, plan = _isolated_store(tmp_path, case, additional_case_ids=(second.case_id,))
+    store = _BoundaryStore()
+
+    class TransientMemory(_SharedScopedMemory):
+        def __init__(self):
+            super().__init__()
+            self.attempted = []
+
+        async def process_memory(self, source):
+            self.attempted.append(source.formation_event_id)
+            if len(self.attempted) == 1:
+                raise LongTermMemoryConnectionError
+            return await super().process_memory(source)
+
+    class RetryQueue(_ReceiptQueue):
+        def __init__(self, store):
+            super().__init__(store)
+            self.deliveries = []
+            self.next_attempt_at = None
+            self.not_due_claims = 0
+
+        async def claim_expected(self, event_id, **kwargs):
+            assert kwargs["max_attempts"] == 2
+            if self.next_attempt_at is not None and datetime.now(UTC) < self.next_attempt_at:
+                self.not_due_claims += 1
+                return ()
+            jobs = await super().claim_due(**kwargs)
+            assert jobs[0].event_id == event_id
+            self.deliveries.append(event_id)
+            return (replace(jobs[0], attempt_count=len(self.deliveries)),)
+
+        async def retry(self, event_id, lease_token, *, next_attempt_at, error_class):
+            del lease_token
+            assert error_class == "LongTermMemoryConnectionError"
+            self.next_attempt_at = next_attempt_at
+            self.timeline.append(("retry", event_id))
+            self.store.queued.append((event_id, self.store.source_references[event_id]))
+
+    memory = TransientMemory()
+    queue = RetryQueue(store)
+    native_processor = ProcessMemoryJobUseCase(
+        ProcessMemoryUseCase(store, memory), queue, max_attempts=2, retry_delays_seconds=(0.2,)
+    )
+    outcomes = []
+
+    class RecordingProcessor:
+        async def execute(self, job):
+            result = await native_processor.execute(job)
+            outcomes.append(result.outcome)
+            return result
+
+    runtime = _shared_runtime(artifacts, plan, store, memory, queue)
+    runtime._process_job = RecordingProcessor()
+    handle = await runtime.persist_session_a(case)
+    ready = await runtime.wait_for_memory(handle, timeout_seconds=2)
+    source = artifacts.load_bundle_source("conv01")
+
+    assert ready.status is MemoryReadinessStatus.COMPLETED
+    assert outcomes == [MemoryJobProcessOutcome.RETRY, MemoryJobProcessOutcome.COMPLETED]
+    assert queue.deliveries == memory.attempted == [handle.event_id, handle.event_id]
+    assert queue.not_due_claims >= 1
+    assert queue.completed == [handle.event_id]
+    assert len(store.appended) == len(source.events) == len(memory.processed) == 1
+    assert source.ready and not source.failed
+
+    next_handle = await runtime.persist_session_a(second)
+    await runtime.wait_for_memory(next_handle, timeout_seconds=2)
+    output = await runtime.run_session_b(
+        second, condition=CrossSessionCondition.WITH_LTM, enable_ltm=True, schedule_memory=False
+    )
+    assert output.retrieved_memories
+    assert queue.deliveries == memory.attempted == [handle.event_id, handle.event_id]
+    assert len(memory.processed) == sum(store.schedule_flags) == 1
+    assert artifacts.load_bundle_source("conv01") == source
+
+
+@pytest.mark.parametrize("lease_valid", (True, False))
+async def test_resume_waits_for_leased_source_event_without_claiming_later_turn(
+    tmp_path, lease_valid
+):
+    case = _cross_case()
+    later_pair = tuple(
+        message.model_copy(update={"message_id": f"later-{message.message_id}"})
+        for message in case.inputs.session_a_messages
+    )
+    case = case.model_copy(
+        update={
+            "inputs": case.inputs.model_copy(
+                update={"session_a_messages": (*case.inputs.session_a_messages, *later_pair)}
+            )
+        }
+    )
+    artifacts, plan = _isolated_store(tmp_path, case)
+    store = _BoundaryStore()
+    memory = _SharedScopedMemory()
+
+    class LeasedQueue(_ReceiptQueue):
+        def __init__(self, store):
+            super().__init__(store)
+            self.expected_claims = []
+            self.lease_valid = lease_valid
+
+        async def claim_due(self, **kwargs):
+            raise AssertionError("resume must claim only the expected source event")
+
+        async def claim_expected(self, event_id, **kwargs):
+            self.expected_claims.append(event_id)
+            if event_id == UUID(int=300) and self.lease_valid:
+                self.lease_valid = False
+                return ()
+            index = next(
+                index
+                for index, (queued_id, _) in enumerate(self.store.queued)
+                if queued_id == event_id
+            )
+            self.store.queued.insert(0, self.store.queued.pop(index))
+            return await _ReceiptQueue.claim_due(self, **kwargs)
+
+    queue = LeasedQueue(store)
+    runtime = _shared_runtime(artifacts, plan, store, memory, queue)
+    handle = await runtime.persist_session_a(case)
+    first, later = handle.source_event_ids
+    assert (first, later) == (UUID(int=300), UUID(int=301))
+    # The later pending turn was due before A's abandoned lease, even when A has expired.
+    now = datetime.now(UTC)
+    due_at = {
+        first: now + timedelta(seconds=30 if lease_valid else -1),
+        later: now - timedelta(minutes=1),
+    }
+    store.queued.sort(key=lambda item: due_at[item[0]])
+    resumed = ArtifactStore.resume(artifacts.root, expected_identity=artifacts.manifest.identity)
+    runtime = _shared_runtime(resumed, plan, store, memory, queue)
+    handle = await runtime.persist_session_a(case)
+    ready = await runtime.wait_for_memory(handle, timeout_seconds=2)
+
+    assert ready.status is MemoryReadinessStatus.COMPLETED
+    assert queue.expected_claims == ([first] if lease_valid else []) + [first, later]
+    assert queue.timeline == [
+        ("claim", first),
+        ("complete", first),
+        ("claim", later),
+        ("complete", later),
+    ]
+    assert [source.formation_event_id for source in memory.processed] == [first, later]
+    assert len(store.appended) == 2
+    assert resumed.load_bundle_source("conv01").ready
+
+
+async def test_ready_source_missing_receipt_fails_closed_without_replay(tmp_path):
+    case = _cross_case()
+    second = case.model_copy(update={"case_id": "conv01:cross-session:Q02"})
+    artifacts, plan = _isolated_store(tmp_path, case, additional_case_ids=(second.case_id,))
+    store = _BoundaryStore()
+    memory = _SharedScopedMemory()
+    queue = _ReceiptQueue(store)
+    runtime = _shared_runtime(artifacts, plan, store, memory, queue)
+    handle = await runtime.persist_session_a(case)
+    await runtime.wait_for_memory(handle, timeout_seconds=2)
+    runtime = _shared_runtime(artifacts, plan, store, memory, queue)
+
+    class Missing:
+        async def inspect(self, *, event_id, user_id):
+            return FormationPersistenceSnapshot(
+                event_id=event_id, user_id=user_id, memories=(), receipt=None
+            )
+
+    runtime._inspector = Missing()
+    handle = await runtime.persist_session_a(second)
+    with pytest.raises(CrossSessionProtocolError):
+        await runtime.wait_for_memory(handle, timeout_seconds=2)
+    assert len(memory.processed) == 1
+    assert artifacts.load_bundle_source("conv01").failed
+
+
+async def test_changed_source_is_rejected_instead_of_reusing_another_transcript(tmp_path):
+    case = _cross_case()
+    second = case.model_copy(update={"case_id": "conv01:cross-session:Q02"})
+    artifacts, plan = _isolated_store(tmp_path, case, additional_case_ids=(second.case_id,))
+    store = _BoundaryStore()
+    memory = _SharedScopedMemory()
+    runtime = _shared_runtime(artifacts, plan, store, memory, _ReceiptQueue(store))
+    handle = await runtime.persist_session_a(case)
+    await runtime.wait_for_memory(handle, timeout_seconds=2)
+    changed = second.model_copy(
+        update={
+            "inputs": second.inputs.model_copy(
+                update={
+                    "session_a_messages": (
+                        second.inputs.session_a_messages[0].model_copy(
+                            update={"content": "changed"}
+                        ),
+                        second.inputs.session_a_messages[1],
+                    ),
+                }
+            )
+        }
+    )
+    with pytest.raises(CrossSessionProtocolError):
+        await runtime.persist_session_a(changed)
+    assert len(memory.processed) == 1
+
+
+async def test_resume_committed_receipt_before_checkpoint_never_reextracts(tmp_path, monkeypatch):
+    case = _cross_case()
+    second = case.model_copy(update={"case_id": "conv01:cross-session:Q02"})
+    artifacts, plan = _isolated_store(tmp_path, case, additional_case_ids=(second.case_id,))
+    store = _BoundaryStore()
+    memory = _SharedScopedMemory()
+    queue = _ReceiptQueue(store)
+    runtime = _shared_runtime(artifacts, plan, store, memory, queue)
+    handle = await runtime.persist_session_a(case)
+    writer = artifacts.write_bundle_source
+
+    class ProcessCrash(BaseException):
+        pass
+
+    def crash_on_checkpoint(source):
+        if any(event.completed for event in source.events):
+            raise ProcessCrash
+        return writer(source)
+
+    async def process_is_gone(*_args):
+        pass
+
+    monkeypatch.setattr(artifacts, "write_bundle_source", crash_on_checkpoint)
+    monkeypatch.setattr(runtime, "_fail_source", process_is_gone)
+    with pytest.raises(ProcessCrash):
+        await runtime.wait_for_memory(handle, timeout_seconds=2)
+    assert len(memory.processed) == 1
+    assert queue.completed == list(handle.source_event_ids)
+    monkeypatch.setattr(artifacts, "write_bundle_source", writer)
+    assert not artifacts.load_bundle_source("conv01").events[0].completed
+    runtime = _shared_runtime(artifacts, plan, store, memory, queue)
+    handle = await runtime.persist_session_a(second)
+    ready = await runtime.wait_for_memory(handle, timeout_seconds=2)
+    assert ready.status is MemoryReadinessStatus.COMPLETED
+    assert len(memory.processed) == 1
+    assert artifacts.load_bundle_source("conv01").ready
+
+
+async def test_resume_append_before_checkpoint_reuses_native_source_event(tmp_path, monkeypatch):
+    case = _cross_case()
+    second = case.model_copy(update={"case_id": "conv01:cross-session:Q02"})
+    artifacts, plan = _isolated_store(tmp_path, case, additional_case_ids=(second.case_id,))
+
+    class IdempotentStore(_BoundaryStore):
+        async def append_turn(self, user_id, user, assistant, **kwargs):
+            for event_id, reference in self.source_references.items():
+                if reference.user_id == user_id and reference.turn_id == user.turn_id:
+                    return AppendTurnResult(
+                        inserted=False, reference=reference, memory_job_event_id=event_id
+                    )
+            return await super().append_turn(user_id, user, assistant, **kwargs)
+
+    store = IdempotentStore()
+    memory = _SharedScopedMemory()
+    queue = _ReceiptQueue(store)
+    runtime = _shared_runtime(artifacts, plan, store, memory, queue)
+    append = store.append_turn
+
+    async def append_then_interrupt(*args, **kwargs):
+        await append(*args, **kwargs)
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(store, "append_turn", append_then_interrupt)
+    with pytest.raises(asyncio.CancelledError):
+        await runtime.persist_session_a(case)
+    assert len(store.queued) == 1
+    assert not artifacts.load_bundle_source("conv01").events
+    monkeypatch.setattr(store, "append_turn", append)
+    runtime = _shared_runtime(artifacts, plan, store, memory, queue)
+    handle = await runtime.persist_session_a(second)
+    ready = await runtime.wait_for_memory(handle, timeout_seconds=2)
+    assert ready.status is MemoryReadinessStatus.COMPLETED
+    assert len(memory.processed) == 1
+    assert len(store.appended) == 1
+
+
+@pytest.mark.parametrize("global_finishes_first", [True, False])
+async def test_scoped_recording_keeps_global_result_in_either_completion_order(
+    global_finishes_first,
+):
+    class Delayed(_Memory):
+        async def search_scoped(self, *args, scope, **kwargs):
+            if (scope == "global") != global_finishes_first:
+                await asyncio.sleep(0.001)
+            return (LongTermMemory("global", "Evidence", 0.9),) if scope == "global" else ()
+
+    memory = _RecordingMemory(Delayed())
+    await asyncio.gather(
+        *[
+            memory.search_scoped(
+                "user", "query", conversation_id=UUID(int=1), scope=scope, top_k=5, threshold=0.1
+            )
+            for scope in ("global", "conversation")
+        ]
+    )
+    assert [item.memory_id for item in memory.returned] == ["global"]
+
+
+async def test_owned_state_init_never_resets_an_existing_source(tmp_path, monkeypatch):
+    from evaluation.native_runtime import _initialize_owned_state
+
+    case = _cross_case()
+    artifacts, plan = _isolated_store(tmp_path, case)
+    initialized = []
+    monkeypatch.setattr("evaluation.native_runtime._owned_schema_exists", lambda *_: True)
+
+    async def unexpected(*args):
+        initialized.append(args)
+        raise AssertionError("resume must not recreate its owned schema")
+
+    monkeypatch.setattr("evaluation.native_runtime._write_owner_marker", unexpected)
+    await _initialize_owned_state(_native_config(), plan, artifacts.load_isolation_ledger())
+    assert initialized == []
+    owned = allocate_case_resources(plan, case_id=case.case_id, attempt=1)
+    ledger = register_case_resources(artifacts.load_isolation_ledger(), plan, owned)
+    monkeypatch.setattr("evaluation.native_runtime._owned_schema_exists", lambda *_: False)
+    with pytest.raises(ValueError, match="state is missing"):
+        await _initialize_owned_state(_native_config(), plan, ledger)

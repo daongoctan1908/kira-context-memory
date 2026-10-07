@@ -7,12 +7,15 @@ from uuid import UUID
 import pytest
 from pydantic import ValidationError
 
+import evaluation.artifacts as artifacts
 from evaluation.artifacts import (
     ArtifactRunIdentity,
     ArtifactStore,
     AuditBatchArtifact,
     AuditDecisionArtifact,
     BenchmarkSummaryArtifact,
+    BundleSourceArtifact,
+    BundleSourceEventArtifact,
     CaseAttemptArtifact,
     DiagnosticArtifact,
     MetricArtifact,
@@ -349,6 +352,103 @@ def test_summary_report_and_safe_diagnostic_are_replaceable_derived_artifacts(tm
         store.write_diagnostic(diagnostic)
 
 
+@pytest.mark.parametrize("winerror", [5, 32])
+def test_artifact_replace_retries_transient_windows_lock(tmp_path: Path, monkeypatch, winerror):
+    path = tmp_path / "isolation-ledger.json"
+    path.write_text("before", encoding="utf-8")
+    error = PermissionError("locked")
+    error.winerror = winerror
+    calls = []
+    delays = []
+    real_replace = artifacts.os.replace
+
+    def locked_replace(source, target):
+        calls.append((source, target))
+        if len(calls) <= 2:
+            raise error
+        real_replace(source, target)
+
+    monkeypatch.setattr(artifacts.sys, "platform", "win32")
+    monkeypatch.setattr(artifacts.os, "replace", locked_replace)
+    monkeypatch.setattr(artifacts.time, "sleep", delays.append)
+
+    artifacts._replace(path, "after")
+
+    assert path.read_text(encoding="utf-8") == "after"
+    assert len(calls) == 3
+    assert all(call == calls[0] for call in calls)
+    assert delays == [0.01, 0.03]
+    assert list(tmp_path.iterdir()) == [path]
+
+
+@pytest.mark.parametrize("winerror", [5, 32])
+def test_artifact_replace_raises_after_bounded_windows_lock_retries(
+    tmp_path: Path, monkeypatch, winerror
+):
+    path = tmp_path / "isolation-ledger.json"
+    path.write_text("before", encoding="utf-8")
+    error = PermissionError("locked")
+    error.winerror = winerror
+    calls = []
+    delays = []
+
+    def locked_replace(source, target):
+        calls.append((source, target))
+        raise error
+
+    monkeypatch.setattr(artifacts.sys, "platform", "win32")
+    monkeypatch.setattr(artifacts.os, "replace", locked_replace)
+    monkeypatch.setattr(artifacts.time, "sleep", delays.append)
+
+    with pytest.raises(PermissionError) as caught:
+        artifacts._replace(path, "after")
+
+    assert caught.value is error
+    assert len(calls) == 4
+    assert all(call == calls[0] for call in calls)
+    assert delays == [0.01, 0.03, 0.1]
+    assert path.read_text(encoding="utf-8") == "before"
+    assert list(tmp_path.iterdir()) == [path]
+
+
+@pytest.mark.parametrize(
+    ("platform", "error_type", "winerror"),
+    [
+        ("linux", PermissionError, 5),
+        ("win32", PermissionError, None),
+        ("win32", PermissionError, 13),
+        ("win32", OSError, 5),
+    ],
+)
+def test_artifact_replace_does_not_retry_other_errors(
+    tmp_path: Path, monkeypatch, platform, error_type, winerror
+):
+    path = tmp_path / "isolation-ledger.json"
+    path.write_text("before", encoding="utf-8")
+    error = error_type("cannot replace")
+    if winerror is not None:
+        error.winerror = winerror
+    calls = []
+    delays = []
+
+    def failed_replace(source, target):
+        calls.append((source, target))
+        raise error
+
+    monkeypatch.setattr(artifacts.sys, "platform", platform)
+    monkeypatch.setattr(artifacts.os, "replace", failed_replace)
+    monkeypatch.setattr(artifacts.time, "sleep", delays.append)
+
+    with pytest.raises(error_type) as caught:
+        artifacts._replace(path, "after")
+
+    assert caught.value is error
+    assert len(calls) == 1
+    assert delays == []
+    assert path.read_text(encoding="utf-8") == "before"
+    assert list(tmp_path.iterdir()) == [path]
+
+
 def test_invalid_summary_denominators_and_safety_are_rejected():
     with pytest.raises(ValidationError):
         MetricArtifact(name="recall_at_3", value=0.0, numerator=0, denominator=0)
@@ -425,3 +525,117 @@ def test_isolation_plan_is_immutable_and_hash_bound(tmp_path: Path):
     other = plan.model_copy(update={"owner_token": UUID(int=999)})
     with pytest.raises(ValueError, match="does not match"):
         store.write_isolation_plan(other)
+
+
+def _bundle_source(identity: ArtifactRunIdentity) -> BundleSourceArtifact:
+    return BundleSourceArtifact(
+        identity=identity,
+        bundle_id="conv01",
+        logical_user_id="user01",
+        source_sha256="f" * 64,
+        persisted_user_id="eval:source-user",
+        source_session_id="eval:source-session",
+        expected_source_events=2,
+    )
+
+
+def _bundle_event(index: int, *, completed: bool = False) -> BundleSourceEventArtifact:
+    return BundleSourceEventArtifact(
+        event_id=UUID(int=index),
+        user_id="eval:source-user",
+        session_id="eval:source-session",
+        conversation_id=UUID(int=100),
+        turn_id=f"turn-{index}",
+        boundary_message_id=index * 2,
+        source_timestamp=_NOW,
+        completed=completed,
+        memory_ids=(UUID(int=200 + index),) if completed else (),
+    )
+
+
+def test_bundle_source_progress_survives_resume_and_rejects_reformation_or_reassignment(tmp_path):
+    identity = _identity()
+    store = ArtifactStore.create(tmp_path / "run", identity=identity, created_at=_NOW)
+    initial = _bundle_source(identity)
+    path = store.write_bundle_source(initial)
+    pending = initial.model_copy(
+        update={"source_conversation_id": UUID(int=100), "events": (_bundle_event(1),)}
+    )
+    store.write_bundle_source(pending)
+    completed = pending.model_copy(update={"events": (_bundle_event(1, completed=True),)})
+    store.write_bundle_source(completed)
+    resumed = ArtifactStore.resume(store.root, expected_identity=identity)
+    assert resumed.load_bundle_source("conv01") == completed
+    assert path.parent.name == "bundles"
+    with pytest.raises(ValueError, match="cannot be removed"):
+        resumed.write_bundle_source(completed.model_copy(update={"events": ()}))
+    with pytest.raises(ValueError, match="cannot be replaced"):
+        resumed.write_bundle_source(completed.model_copy(update={"source_sha256": "0" * 64}))
+    with pytest.raises(ValueError, match="cannot be reassigned"):
+        resumed.write_bundle_source(
+            completed.model_copy(
+                update={
+                    "source_conversation_id": UUID(int=101),
+                    "events": (
+                        _bundle_event(1, completed=True).model_copy(
+                            update={"conversation_id": UUID(int=101)}
+                        ),
+                    ),
+                }
+            )
+        )
+    with pytest.raises(ValueError, match="completed source"):
+        resumed.write_bundle_source(pending)
+    ready = completed.model_copy(
+        update={
+            "events": (_bundle_event(1, completed=True), _bundle_event(2, completed=True)),
+            "ready": True,
+            "memory_gold_ids": {UUID(int=201): ("conv01:M1",)},
+        }
+    )
+    resumed.write_bundle_source(ready)
+    assert resumed.load_bundle_source("conv01").ready
+    with pytest.raises(ValueError, match="cannot become incomplete"):
+        resumed.write_bundle_source(ready.model_copy(update={"ready": False}))
+    with pytest.raises(ValueError, match="gold mapping cannot be removed"):
+        resumed.write_bundle_source(ready.model_copy(update={"memory_gold_ids": {}}))
+    corrupt = ready.model_copy(
+        update={"ready": False, "failed": True, "failure_code": "source_receipt_missing"}
+    )
+    resumed.write_bundle_source(corrupt)
+    with pytest.raises(ValueError, match="terminal"):
+        resumed.write_bundle_source(ready)
+
+
+def test_failed_bundle_source_is_terminal_and_cannot_be_retried_by_another_qa(tmp_path):
+    identity = _identity()
+    store = ArtifactStore.create(tmp_path / "run", identity=identity, created_at=_NOW)
+    initial = _bundle_source(identity)
+    store.write_bundle_source(initial)
+    failed = initial.model_copy(update={"failed": True, "failure_code": "source_job_dead"})
+    store.write_bundle_source(failed)
+    assert store.load_bundle_source("conv01").failed
+    with pytest.raises(ValueError, match="terminal"):
+        store.write_bundle_source(initial)
+    with pytest.raises(ValueError, match="every source event"):
+        store.write_bundle_source(failed.model_copy(update={"ready": True}))
+
+
+@pytest.mark.parametrize("mutation", ["owner", "session", "conversation", "order", "ready"])
+def test_bundle_source_rejects_cross_owner_and_incomplete_or_reordered_evidence(mutation):
+    initial = _bundle_source(_identity())
+    event = _bundle_event(1)
+    data = initial.model_dump()
+    data.update(source_conversation_id=UUID(int=100), events=(event.model_dump(),))
+    if mutation == "owner":
+        data["events"][0]["user_id"] = "another-user"
+    elif mutation == "session":
+        data["events"][0]["session_id"] = "another-session"
+    elif mutation == "conversation":
+        data["events"][0]["conversation_id"] = UUID(int=101)
+    elif mutation == "order":
+        data["events"] = (_bundle_event(2).model_dump(), event.model_dump())
+    else:
+        data["ready"] = True
+    with pytest.raises(ValueError):
+        BundleSourceArtifact.model_validate(data)

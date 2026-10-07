@@ -7,6 +7,8 @@ reason codes; raw exception messages, credentials and connection strings have no
 import json
 import os
 import shutil
+import sys
+import time
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
@@ -19,9 +21,10 @@ from evaluation.audit import AuditBatch, HumanAuditDecision
 from evaluation.isolation import (
     IsolationLedger,
     IsolationPlan,
-    allocate_case_resources,
+    allocated_resource,
     isolation_plan_sha256,
 )
+from evaluation.measurement import CaseMeasurements
 from evaluation.models import (
     BENCHMARK_CONTRACT_ID,
     BenchmarkVariant,
@@ -44,7 +47,7 @@ from evaluation.timing import TimingReport
 
 
 class ArtifactRunIdentity(EvalModel):
-    contract_id: Literal["kira-week5-benchmark-v4"] = BENCHMARK_CONTRACT_ID
+    contract_id: Literal["kira-week5-benchmark-v5"] = BENCHMARK_CONTRACT_ID
     run_id: UUID
     profile: Profile
     variant: BenchmarkVariant
@@ -208,6 +211,92 @@ class FormedCorpusArtifact(EvalModel):
         return self
 
 
+class BundleSourceEventArtifact(EvalModel):
+    """One persisted source boundary, recorded before waiting for its native formation receipt."""
+
+    event_id: UUID
+    user_id: Identifier
+    session_id: Identifier
+    conversation_id: UUID
+    turn_id: Identifier
+    boundary_message_id: int = Field(ge=1, strict=True)
+    source_timestamp: datetime | None = None
+    completed: bool = False
+    memory_ids: tuple[UUID, ...] = ()
+
+    @model_validator(mode="after")
+    def event_evidence_is_consistent(self) -> "BundleSourceEventArtifact":
+        if len(self.memory_ids) != len(set(self.memory_ids)):
+            raise ValueError("source event memory IDs must be unique")
+        if self.memory_ids and not self.completed:
+            raise ValueError("source memory IDs require a completed source event")
+        if self.source_timestamp is not None and (
+            self.source_timestamp.tzinfo is None or self.source_timestamp.utcoffset() is None
+        ):
+            raise ValueError("source chronology must be timezone-aware")
+        return self
+
+
+class BundleSourceArtifact(EvalModel):
+    """Durable, provenance-bound source progress shared by QA cases in exactly one bundle."""
+
+    schema_version: Literal[1] = 1
+    identity: ArtifactRunIdentity
+    bundle_id: Identifier
+    logical_user_id: Identifier
+    source_sha256: Sha256
+    persisted_user_id: Identifier
+    source_session_id: Identifier
+    source_conversation_id: UUID | None = None
+    expected_source_events: int = Field(ge=1, strict=True)
+    events: tuple[BundleSourceEventArtifact, ...] = ()
+    ready: bool = False
+    failed: bool = False
+    failure_code: Identifier | None = None
+    memory_gold_ids: dict[UUID, tuple[Identifier, ...]] = Field(default_factory=dict)
+    measurement: CaseMeasurements | None = None
+
+    @model_validator(mode="after")
+    def source_is_closed_and_owned(self) -> "BundleSourceArtifact":
+        if len(self.events) > self.expected_source_events:
+            raise ValueError("source contains more boundaries than its pinned trajectory")
+        for field in ("event_id", "turn_id", "boundary_message_id"):
+            values = [getattr(event, field) for event in self.events]
+            if len(values) != len(set(values)):
+                raise ValueError(f"source {field} values must be unique")
+        if self.events and self.source_conversation_id is None:
+            raise ValueError("persisted source boundaries require a source conversation")
+        if [event.boundary_message_id for event in self.events] != sorted(
+            event.boundary_message_id for event in self.events
+        ):
+            raise ValueError("source boundaries must preserve append order")
+        seen_pending = False
+        for event in self.events:
+            if (
+                event.user_id != self.persisted_user_id
+                or event.session_id != self.source_session_id
+                or event.conversation_id != self.source_conversation_id
+            ):
+                raise ValueError("source event belongs to another owner or conversation")
+            if seen_pending and event.completed:
+                raise ValueError("source completion must follow trajectory order")
+            seen_pending = seen_pending or not event.completed
+        if self.ready and (
+            self.failed
+            or len(self.events) != self.expected_source_events
+            or any(not event.completed for event in self.events)
+        ):
+            raise ValueError("source readiness requires every source event to complete")
+        if self.failed != (self.failure_code is not None):
+            raise ValueError("failed source requires one failure reason")
+        memory_ids = {memory_id for event in self.events for memory_id in event.memory_ids}
+        if not set(self.memory_gold_ids).issubset(memory_ids):
+            raise ValueError("source gold mapping references memory outside the source corpus")
+        if any(len(ids) != len(set(ids)) for ids in self.memory_gold_ids.values()):
+            raise ValueError("source memory gold IDs must be unique")
+        return self
+
+
 class CaseAttemptArtifact(EvalModel):
     schema_version: Literal[1] = 1
     case_id: Identifier
@@ -219,6 +308,7 @@ class CaseAttemptArtifact(EvalModel):
     output_sha256: Sha256 | None = None
     reason_codes: tuple[Identifier, ...] = ()
     timing: TimingReport | None = None
+    measurement: CaseMeasurements | None = None
 
     @field_validator("completed_at")
     @classmethod
@@ -407,7 +497,18 @@ def _replace(path: Path, contents: str) -> None:
     temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
     try:
         _write_new(temporary, contents)
-        os.replace(temporary, path)
+        for delay in (0.01, 0.03, 0.1, None):
+            try:
+                os.replace(temporary, path)
+                break
+            except PermissionError as error:
+                if (
+                    sys.platform != "win32"
+                    or getattr(error, "winerror", None) not in (5, 32)
+                    or delay is None
+                ):
+                    raise
+                time.sleep(delay)
     finally:
         if temporary.exists():
             temporary.unlink()
@@ -624,6 +725,15 @@ class ArtifactStore:
             raise ValueError("report must be nonblank text")
         _replace(self.root / "report.md", markdown.rstrip() + "\n")
 
+    def write_benchmark_report(self, report: EvalModel) -> Path:
+        """Replace only the derived operational/quality report for this exact run."""
+
+        if getattr(report, "run_id", None) != self.manifest.identity.run_id:
+            raise ValueError("benchmark report belongs to another run")
+        path = self.root / "benchmark-report.json"
+        _replace(path, _canonical_json(report) + "\n")
+        return path
+
     def write_diagnostic(self, diagnostic: DiagnosticArtifact) -> Path:
         if diagnostic.case_id not in self.manifest.identity.selected_case_ids:
             raise ValueError("diagnostic case is outside the selected run corpus")
@@ -635,6 +745,7 @@ class ArtifactStore:
     def write_isolation_ledger(self, ledger: IsolationLedger) -> Path:
         """Persist ownership before DB writes so later cleanup never relies on a broad prefix."""
 
+        ledger = IsolationLedger.model_validate(ledger.model_dump())
         identity = self.manifest.identity
         if identity.isolation_sha256 is None:
             raise ValueError("artifact run has no isolation plan")
@@ -653,11 +764,7 @@ class ArtifactStore:
                     update={"memory_ids": ()}
                 ) == owned.model_copy(update={"memory_ids": ()})
                 if not identities_match:
-                    allocation = allocate_case_resources(
-                        plan,
-                        case_id=owned.case_id,
-                        attempt=owned.attempt,
-                    )
+                    allocation = allocated_resource(plan, owned)
                     if owned != allocation or replacement.memory_ids:
                         raise ValueError(
                             "persisted resource ownership cannot be removed or reassigned"
@@ -715,6 +822,79 @@ class ArtifactStore:
         )
         if corpus.identity != self.manifest.identity:
             raise ValueError("formed corpus belongs to another artifact run")
+        return corpus
+
+    def _bundle_source_path(self, bundle_id: str) -> Path:
+        return self.root / "diagnostics" / "bundles" / f"{output_sha256(bundle_id)[:24]}.json"
+
+    def write_bundle_source(self, corpus: BundleSourceArtifact) -> Path:
+        """Persist monotonic source progress; completed/failed sources cannot be replayed fresh."""
+
+        # Validate copies too: callers may construct progress with model_copy(update=...).
+        corpus = BundleSourceArtifact.model_validate(
+            corpus.model_dump(exclude_computed_fields=True)
+        )
+        if corpus.identity != self.manifest.identity:
+            raise ValueError("bundle source belongs to another artifact run")
+        path = self._bundle_source_path(corpus.bundle_id)
+        if path.exists():
+            existing = self.load_bundle_source(corpus.bundle_id)
+            mutable = {
+                "source_conversation_id",
+                "events",
+                "ready",
+                "failed",
+                "failure_code",
+                "memory_gold_ids",
+                "measurement",
+            }
+            if existing.model_dump(exclude=mutable) != corpus.model_dump(exclude=mutable):
+                raise ValueError("persisted bundle source identity cannot be replaced")
+            if existing.source_conversation_id is not None and (
+                existing.source_conversation_id != corpus.source_conversation_id
+            ):
+                raise ValueError("persisted source conversation cannot be reassigned")
+            if existing.failed and existing.model_dump(
+                exclude={"measurement"}
+            ) != corpus.model_dump(exclude={"measurement"}):
+                raise ValueError("failed bundle source is terminal")
+            if existing.ready and not corpus.ready and not corpus.failed:
+                raise ValueError("ready bundle source cannot become incomplete")
+            if len(corpus.events) < len(existing.events):
+                raise ValueError("persisted source boundaries cannot be removed")
+            for previous, updated in zip(existing.events, corpus.events, strict=False):
+                if previous.model_dump(exclude={"completed", "memory_ids"}) != updated.model_dump(
+                    exclude={"completed", "memory_ids"}
+                ):
+                    raise ValueError("persisted source boundary cannot be reassigned")
+                if previous.completed and previous != updated:
+                    raise ValueError("completed source evidence cannot be replaced")
+            for memory_id, gold_ids in existing.memory_gold_ids.items():
+                if not set(gold_ids).issubset(corpus.memory_gold_ids.get(memory_id, ())):
+                    raise ValueError("persisted source gold mapping cannot be removed")
+            if existing.measurement is not None:
+                if corpus.measurement is None or (
+                    corpus.measurement.provider_calls[: len(existing.measurement.provider_calls)]
+                    != existing.measurement.provider_calls
+                ):
+                    raise ValueError("persisted source measurements cannot be removed")
+                for arm, previous in existing.measurement.timing.items():
+                    updated = corpus.measurement.timing.get(arm)
+                    if (
+                        updated is None
+                        or updated.attempts[: len(previous.attempts)] != previous.attempts
+                    ):
+                        raise ValueError("persisted source measurements cannot be removed")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _replace(path, _canonical_json(corpus) + "\n")
+        return path
+
+    def load_bundle_source(self, bundle_id: str) -> BundleSourceArtifact:
+        corpus = BundleSourceArtifact.model_validate_json(
+            self._bundle_source_path(bundle_id).read_text(encoding="utf-8")
+        )
+        if corpus.identity != self.manifest.identity or corpus.bundle_id != bundle_id:
+            raise ValueError("bundle source belongs to another artifact run")
         return corpus
 
     def load_isolation_ledger(self) -> IsolationLedger:
@@ -805,6 +985,12 @@ class ArtifactStore:
             if attempt.case_id not in latest or attempt.attempt > latest[attempt.case_id].attempt:
                 latest[attempt.case_id] = attempt
         return Counter(attempt.outcome for attempt in latest.values())
+
+    @property
+    def attempts(self) -> tuple[CaseAttemptArtifact, ...]:
+        """All persisted attempts, including retries whose calls belong in operational totals."""
+
+        return tuple(self._attempts)
 
     @property
     def latest_attempts(self) -> tuple[CaseAttemptArtifact, ...]:

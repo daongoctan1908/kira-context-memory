@@ -25,6 +25,7 @@ from evaluation.artifacts import (
 from evaluation.compiler import DatasetCompilation, compilation_json_bytes, compile_dataset
 from evaluation.config import EvalConfig
 from evaluation.dataset import DatasetManifest, load_manifest
+from evaluation.measurement import MeasurementRecorder
 from evaluation.models import (
     EvalCase,
     EvalModel,
@@ -109,7 +110,14 @@ def prepare_benchmark_run(
         case
         for suite in Suite
         if suite in config.suites
-        for case in compilation.cases
+        for case in (
+            sorted(
+                (item for item in compilation.cases if item.suite is suite),
+                key=lambda item: item.case_id.split(":")[0],
+            )
+            if suite is Suite.CROSS_SESSION
+            else compilation.cases
+        )
         if case.suite is suite
     )
     if not selected:
@@ -169,8 +177,10 @@ async def execute_benchmark_cases(
         ):
             continue
         attempt_number = store.next_attempt_number(case_id)
+        measurement = MeasurementRecorder()
         try:
-            result = await executor.evaluate(case)
+            with measurement.bind():
+                result = await executor.evaluate(case)
             outcome = Outcome(result.outcome)
             reason_codes = tuple(getattr(result, "reason_codes", ()))
             output = (
@@ -195,6 +205,7 @@ async def execute_benchmark_cases(
                 output=output,
                 output_sha256=digest,
                 reason_codes=reason_codes,
+                measurement=measurement.snapshot(),
             )
         )
         if outcome in {Outcome.DEPENDENCY_ERROR, Outcome.PROTOCOL_ERROR}:

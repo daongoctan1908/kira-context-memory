@@ -107,7 +107,7 @@ async def run_mock_acceptance(
     suite_outcomes = {suite.suite.value: suite.outcome.value for suite in preflight.suites}
     summary = {
         "schema_version": 1,
-        "contract_id": "kira-week5-benchmark-v4",
+        "contract_id": "kira-week5-benchmark-v5",
         "profile": "mock",
         "network_required": False,
         "quality_claim": False,

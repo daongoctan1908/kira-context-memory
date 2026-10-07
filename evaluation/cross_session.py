@@ -9,6 +9,7 @@ from uuid import UUID
 from pydantic import Field, model_validator
 
 from evaluation.judge import InternalSemanticJudge, JudgeError
+from evaluation.measurement import measurement_arm
 from evaluation.models import (
     BENCHMARK_CONTRACT_ID,
     CrossSessionInput,
@@ -162,7 +163,7 @@ class CrossSessionArmEvaluation(EvalModel):
 
 class CrossSessionCaseEvaluation(EvalModel):
     schema_version: Literal[1] = 1
-    contract_id: Literal["kira-week5-benchmark-v4"] = BENCHMARK_CONTRACT_ID
+    contract_id: Literal["kira-week5-benchmark-v5"] = BENCHMARK_CONTRACT_ID
     case_id: Identifier
     outcome: Outcome
     event_id: UUID | None = None
@@ -307,18 +308,20 @@ class CrossSessionEvaluator:
             )
 
         pair_violations = self._pair_violations(inputs, no_ltm_execution, with_ltm_execution)
-        no_ltm = await self._evaluate_arm(
-            case,
-            no_ltm_execution,
-            readiness,
-            pair_violations,
-        )
-        with_ltm = await self._evaluate_arm(
-            case,
-            with_ltm_execution,
-            readiness,
-            pair_violations,
-        )
+        with measurement_arm("no_ltm"):
+            no_ltm = await self._evaluate_arm(
+                case,
+                no_ltm_execution,
+                readiness,
+                pair_violations,
+            )
+        with measurement_arm("with_ltm"):
+            with_ltm = await self._evaluate_arm(
+                case,
+                with_ltm_execution,
+                readiness,
+                pair_violations,
+            )
         outcome = self._combined_outcome((no_ltm.outcome, with_ltm.outcome))
         return CrossSessionCaseEvaluation(
             case_id=case.case_id,
@@ -372,9 +375,9 @@ class CrossSessionEvaluator:
         rewrite_judgment: SemanticJudgment | None = None
         final_judgment: SemanticJudgment | None = None
         error_outcomes: list[Outcome] = []
-        if not constraints.passed:
+        if execution.condition is CrossSessionCondition.WITH_LTM and not constraints.passed:
             reasons.append("rewrite_constraint_failed")
-        else:
+        elif execution.condition is CrossSessionCondition.WITH_LTM:
             rewrite_judgment, error = await self._judge_output(
                 case=case,
                 output=execution.rewritten_query,
@@ -418,7 +421,11 @@ class CrossSessionEvaluator:
 
         outcome = self._arm_outcome(
             violations=violations,
-            constraints=constraints,
+            # No-LTM passes the original query through. Preserve the constraint diagnostics,
+            # but do not grade a rewrite stage that this baseline did not execute.
+            constraints=(
+                constraints if execution.condition is CrossSessionCondition.WITH_LTM else None
+            ),
             retrieval=retrieval,
             rewrite_judgment=rewrite_judgment,
             final_judgment=final_judgment,
@@ -499,14 +506,14 @@ class CrossSessionEvaluator:
     def _arm_outcome(
         *,
         violations: Sequence[str],
-        constraints: ConstraintScore,
+        constraints: ConstraintScore | None,
         retrieval: RetrievalScore | None,
         rewrite_judgment: SemanticJudgment | None,
         final_judgment: SemanticJudgment | None,
         task: TaskSuccessScore | None,
         error_outcomes: Sequence[Outcome],
     ) -> Outcome:
-        if violations or not constraints.passed:
+        if violations or (constraints is not None and not constraints.passed):
             return Outcome.FAIL
         if Outcome.PROTOCOL_ERROR in error_outcomes:
             return Outcome.PROTOCOL_ERROR

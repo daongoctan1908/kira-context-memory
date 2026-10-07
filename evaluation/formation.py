@@ -365,7 +365,33 @@ class FormationCaptureObserver:
         observation = _CaptureObservation(self, len(self._records) - 1)
         for key, value in (attributes or {}).items():
             observation.set_attribute(key, value)
-        yield observation
+        succeeded = False
+        try:
+            yield observation
+            succeeded = True
+        finally:
+            # Native SDK hooks expose invocations and response usage, not hidden HTTP retries.
+            # This remains separate from extraction scoring and is active only in a benchmark
+            # measurement scope. The raw parse capture and formation behavior are unchanged.
+            from evaluation.measurement import ProviderStage, record_provider_call
+
+            stage = (
+                ProviderStage.EXTRACTION
+                if name == "mem0.extract"
+                else (
+                    ProviderStage.EMBEDDING
+                    if name in {"mem0.existing_memory.search", "mem0.memory.embed"}
+                    and "gen_ai.request.model" in record["attributes"]
+                    else None
+                )
+            )
+            if stage is not None:
+                record_provider_call(
+                    stage,
+                    basis="sdk_invocation",
+                    outcome="success" if succeeded else "error",
+                    usage=record["usage"],
+                )
 
     def captures(self) -> tuple[FormationStageCapture, ...]:
         return tuple(FormationStageCapture.model_validate(record) for record in self._records)

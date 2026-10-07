@@ -101,7 +101,7 @@ class FamilyQuality(EvalModel):
 
 class RunQualityEvidence(EvalModel):
     schema_version: Literal[1] = 1
-    contract_id: Literal["kira-week5-benchmark-v4"] = BENCHMARK_CONTRACT_ID
+    contract_id: Literal["kira-week5-benchmark-v5"] = BENCHMARK_CONTRACT_ID
     run_id: UUID
     variant: Literal[
         BenchmarkVariant.HISTORICAL_CONTROL,
@@ -145,7 +145,7 @@ class ConfirmationGate(EvalModel):
 
 class OfficialConfirmationReport(EvalModel):
     schema_version: Literal[1] = 1
-    contract_id: Literal["kira-week5-benchmark-v4"] = BENCHMARK_CONTRACT_ID
+    contract_id: Literal["kira-week5-benchmark-v5"] = BENCHMARK_CONTRACT_ID
     component: ConfirmationComponent
     control_run_ids: tuple[UUID, UUID, UUID]
     candidate_run_ids: tuple[UUID, UUID, UUID]

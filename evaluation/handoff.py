@@ -10,14 +10,14 @@ from pydantic import Field
 
 from evaluation.compiler import compile_dataset
 from evaluation.dataset import load_manifest
-from evaluation.models import BENCHMARK_CONTRACT_ID, EvalModel, Identifier, Sha256
+from evaluation.models import BENCHMARK_CONTRACT_ID, EvalModel, Identifier, Sha256, Suite
 from evaluation.pc_acceptance import PcAcceptanceManifest
 from evaluation.pc_preflight import PcPreflightRunSet
 
 
 class HandoffEvidence(EvalModel):
     schema_version: Literal[1] = 1
-    contract_id: Literal["kira-week5-benchmark-v4"] = BENCHMARK_CONTRACT_ID
+    contract_id: Literal["kira-week5-benchmark-v5"] = BENCHMARK_CONTRACT_ID
     created_at: datetime
     official: Literal[False] = False
     scope: Literal["pc_technical_acceptance_handoff"] = "pc_technical_acceptance_handoff"
@@ -30,8 +30,10 @@ class HandoffEvidence(EvalModel):
     image_manifest_sha256: Sha256
     pc_preflight_sha256: Sha256
     pc_acceptance_sha256: Sha256
-    variant_ids: tuple[Identifier, ...] = Field(min_length=2, max_length=3)
-    image_count: int = Field(ge=5, le=7, strict=True)
+    variant_ids: tuple[Identifier, ...] = Field(min_length=1, max_length=3)
+    selected_suites: tuple[Suite, ...] = Field(default=tuple(Suite), min_length=1)
+    evaluation_scope: Literal["full_corpus", "selected_suites"] = "full_corpus"
+    image_count: int = Field(ge=3, le=7, strict=True)
 
 
 def file_sha256(path: Path) -> str:
@@ -72,7 +74,8 @@ def build_handoff_evidence(
     if {item.variant_id for item in acceptance.variants} != set(preflight.variants):
         raise ValueError("PC acceptance and preflight variants differ")
     if any(
-        item.config_sha256 != preflight.variants[item.variant_id].config_sha256
+        item.config_sha256
+        != preflight.variants[item.variant_id].config_sha256_for_suites(acceptance.selected_suites)
         or item.runtime_revision != preflight.variants[item.variant_id].provenance.runtime.sha
         for item in acceptance.variants
     ):
@@ -117,5 +120,7 @@ def build_handoff_evidence(
         pc_preflight_sha256=pc_preflight_sha256,
         pc_acceptance_sha256=file_sha256(pc_acceptance_path),
         variant_ids=variant_ids,
+        selected_suites=acceptance.selected_suites,
+        evaluation_scope=acceptance.evaluation_scope,
         image_count=len(images),
     )

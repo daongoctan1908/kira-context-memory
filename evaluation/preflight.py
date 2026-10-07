@@ -87,10 +87,12 @@ async def run_preflight(
     }
     needed = {probe for probes in requirements.values() for probe in probes}
     results: dict[Probe, ProbeResult] = {}
-    # Default trust_env=True is required: the OpenAI route needs ambient
-    # HTTPS_PROXY/SSL_CERT_FILE, internal hosts need NO_PROXY exemption.
+    # Live default transports need ambient proxy/CA/NO_PROXY settings. A supplied
+    # transport (including offline MockTransport) owns routing; ambient proxy
+    # mounts must not replace it and send mock probes over the network.
     async with httpx.AsyncClient(
         transport=transport,
+        trust_env=not simulated and transport is None,
         follow_redirects=False,
     ) as client:
         providers = ProviderProbes(client, config)

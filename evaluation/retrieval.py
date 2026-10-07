@@ -579,7 +579,7 @@ class RetrievalModeReport(EvalModel):
 
 class RetrievalReport(EvalModel):
     schema_version: Literal[1] = 1
-    contract_id: Literal["kira-week5-benchmark-v4"] = BENCHMARK_CONTRACT_ID
+    contract_id: Literal["kira-week5-benchmark-v5"] = BENCHMARK_CONTRACT_ID
     gold_fixture: RetrievalModeReport
     formation_produced: RetrievalModeReport
 

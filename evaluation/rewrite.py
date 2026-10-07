@@ -18,6 +18,7 @@ from app.domain.models.memory import LongTermMemory
 from app.domain.ports.query_rewriter import QueryRewriterPort
 from app.infrastructure.llm.vllm_query_rewriter import VllmQueryRewriterAdapter
 from evaluation.judge import InternalSemanticJudge, JudgeError
+from evaluation.measurement import measure_stage
 from evaluation.models import (
     BENCHMARK_CONTRACT_ID,
     EvalCase,
@@ -37,6 +38,7 @@ from evaluation.scoring import (
     output_sha256,
     score_constraints,
 )
+from evaluation.timing import TimingStage
 
 
 class RewriteSourceTimestampMissing(ValueError):
@@ -59,7 +61,7 @@ class RewriteJudgePort(Protocol):
 
 class RewriteCaseEvaluation(EvalModel):
     schema_version: Literal[1] = 1
-    contract_id: Literal["kira-week5-benchmark-v4"] = BENCHMARK_CONTRACT_ID
+    contract_id: Literal["kira-week5-benchmark-v5"] = BENCHMARK_CONTRACT_ID
     case_id: Identifier
     outcome: Outcome
     rewritten_query: NonEmpty | None = None
@@ -175,7 +177,8 @@ class RewriteEvaluator:
         except RewriteSourceTimestampMissing:
             return self._failure(case, Outcome.NOT_RUN, "rewrite_source_timestamp_missing")
         try:
-            rewritten = await self._rewriter.rewrite(context)
+            with measure_stage(TimingStage.REWRITE):
+                rewritten = await self._rewriter.rewrite(context)
         except (
             QueryRewriterConfigurationError,
             QueryRewriterConnectionError,

@@ -10,6 +10,7 @@ from app.domain.errors.query_rewriter import (
     QueryRewriterProtocolError,
 )
 from evaluation.judge import JudgeError
+from evaluation.measurement import MeasurementRecorder
 from evaluation.models import (
     CaseEligibility,
     EvalCase,
@@ -33,6 +34,7 @@ from evaluation.scoring import (
     SemanticJudgment,
     output_sha256,
 )
+from evaluation.timing import TimingOutcome, TimingStage
 
 _NOW = datetime(2026, 9, 18, tzinfo=UTC)
 
@@ -126,6 +128,19 @@ class _Judge:
             rationale="The supplied rewrite was evaluated against the reference.",
             judge=_provenance(),
         )
+
+
+@pytest.mark.parametrize("error", [None, QueryRewriterConnectionError()])
+async def test_standalone_rewrite_records_adapter_latency_and_error_without_changing_result(error):
+    measurement = MeasurementRecorder()
+    with measurement.bind():
+        result = await RewriteEvaluator(
+            _Rewriter(error=error), _Judge(), profile=Profile.MOCK, backend="mock"
+        ).evaluate(_case())
+    (attempt,) = measurement.snapshot().timing["unpaired"].attempts
+    assert attempt.stage is TimingStage.REWRITE
+    assert attempt.outcome is (TimingOutcome.SUCCESS if error is None else TimingOutcome.ERROR)
+    assert result.outcome is (Outcome.PASS if error is None else Outcome.DEPENDENCY_ERROR)
 
 
 def test_context_wiring_preserves_current_recent_and_ltm_boundaries():

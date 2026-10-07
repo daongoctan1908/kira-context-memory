@@ -33,7 +33,7 @@ async def test_mock_acceptance_builds_complete_offline_bundle(tmp_path: Path):
         "mock-acceptance.json",
     }
     summary = json.loads((output / "mock-acceptance.json").read_text(encoding="utf-8"))
-    assert summary["contract_id"] == "kira-week5-benchmark-v4"
+    assert summary["contract_id"] == "kira-week5-benchmark-v5"
     assert summary["network_required"] is False
     assert summary["quality_claim"] is False
     assert summary["pc_preflight_schema_version"] == 2
@@ -88,7 +88,7 @@ def test_internal_compose_uses_only_prebuilt_images_and_fixed_handoff_mounts():
     assert 'OTEL_ENABLED: "false"' in compose
 
 
-def test_handoff_script_pins_control_and_verifies_offline_bundle():
+def test_handoff_script_defaults_to_current_runtime_and_verifies_offline_bundle():
     script = (REPOSITORY_ROOT / "scripts/benchmark/offline_handoff.ps1").read_text(
         encoding="utf-8-sig"
     )
@@ -102,11 +102,14 @@ def test_handoff_script_pins_control_and_verifies_offline_bundle():
     assert "org.opencontainers.image.revision" in script
     assert "[ValidateCount(1, 2)]" in script
     assert "schema_version = 2" in script
-    assert 'Get-ImageRecord "control-eval"' in script
-    assert '"$($candidate.variant_id)-eval"' in script
+    assert '[string]$RuntimeRevision = "HEAD"' in script
+    assert "[switch]$CompareHistorical" in script
+    assert 'benchmark_variant = "current_runtime"' in script
+    assert 'variant_id = "current"' in script
+    assert "$manifest.variants[0].eval_role" in script
     assert "runtime_revision = $ExpectedRuntimeRevision" in script
     assert "Where-Object { $_.variant_id -eq $VariantId }" in script
-    assert '"--build-context", "variant_source=$controlPath"' in script
+    assert '"--build-context", "variant_source=$runtimePath"' in script
     assert "Get-EvalMetadata" in script
     assert "foreach ($variant in $manifest.variants)" in script
     assert '"-m", "scripts.benchmark.freeze_handoff"' in script
@@ -117,9 +120,10 @@ def test_handoff_script_pins_control_and_verifies_offline_bundle():
     assert "bundle-manifest.json" in script
     assert "K8S-RUNBOOK.md" in script
     assert "CandidateChangeScope" in script
-    assert 'provenance_file = "provenance/control.json"' in script
-    assert 'variant = "historical_control"' in script
-    assert 'variant = "release_candidate"' in script
+    assert 'provenance_file = "provenance/$($runtime.variant_id).json"' in script
+    assert 'benchmark_variant = "historical_control"' in script
+    assert 'benchmark_variant = "release_candidate"' in script
+    assert '"StartCurrent" {' in script
     assert "Export checkout differs from the exact accepted harness revision" in script
     assert "registry-manifest.json" in script
     assert "immutable_reference = $digests[0]" in script
@@ -133,7 +137,7 @@ def test_image_metadata_binds_dataset_prompts_packages_and_exact_revisions(monke
 
     metadata = image_metadata(require_frozen=False)
 
-    assert metadata["contract_id"] == "kira-week5-benchmark-v4"
+    assert metadata["contract_id"] == "kira-week5-benchmark-v5"
     assert metadata["runtime_revision"] == "1" * 40
     assert metadata["harness_revision"] == "2" * 40
     assert metadata["dataset_id"] == "kira_ltm_v1"
