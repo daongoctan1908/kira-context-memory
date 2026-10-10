@@ -1,8 +1,16 @@
 # Unified observability architecture
 
 Status: Phases 0-5 application instrumentation, fail-open OTLP export, metric mapping and local
-Langfuse acceptance are complete. Kubernetes deployment, centralized logs/Loki and production
-retention/access controls remain pending.
+Langfuse acceptance are complete. OTel-only metrics and reviewable Kubernetes observability
+sources are prepared. Actual Kubernetes deployment, centralized logs/Loki and production
+retention/access acceptance remain pending.
+
+The [2026-10-09 stack audit](observability-stack-audit-2026-10-09.md) distinguishes the target
+architecture below from required first-release services. The user selected Langfuse for AI
+traces; its four data stores have distinct roles. Metrics choose one Prometheus/Grafana pair,
+either standalone or verified shared monitoring. Gateway/Worker legacy registries and `/metrics`
+routes are removed. Loki is excluded from the initial plan. The supplied cluster inventory
+contains a `rancher-monitoring` reuse candidate; its readiness/bindings still need verification.
 
 ## Goals
 
@@ -211,7 +219,9 @@ duration, and telemetry dropped/export-failure signals.
 Metric attributes are limited to reviewed bounded enums: `service.name`, environment, stage,
 operation, outcome, dependency, queue status, claim kind, and cleanup status. No correlation,
 trace, span, user, session, conversation, turn, boundary, provider-request, memory, or event ID is a
-metric attribute.
+metric attribute. Resource attributes additionally include Pod UID as `service.instance.id`
+and `k8s.pod.uid` in Kubernetes to distinguish replica streams; these are per-Pod identities,
+not per-request identifiers.
 
 Queue depth describes one shared PostgreSQL queue. Every Worker replica currently observes the
 same global counts, so dashboards aggregate this gauge with `max`, not `sum`.
@@ -295,12 +305,12 @@ also lock its image digests and Helm dependencies before promotion.
 | `viettel-mem0` | `2.0.20+viettel.7` | Product supplies source-bound preceding context and preserves independent GLOBAL assertions; auxiliary history stays disabled, with existing owner fencing, memory schema 3 and the compatible `.6` storage contract |
 | OTel Python API/SDK | `1.44.0` | API, SDK, and OTLP HTTP exporter stay on the same stable line |
 | OTel semantic conventions, if imported directly | `0.65b0` | Must match the `1.44.0` Python release line; avoid direct dependency unless needed |
-| OTel Collector Contrib | `0.160.0` | Required for OTLP, filelog, Kubernetes enrichment, filtering, and OTLP/HTTP export |
-| Langfuse local application | `3.225.7`, web/worker image digests in `compose.langfuse.yaml` | Current local OTLP ingestion and legacy-read smoke baseline |
+| OTel Collector Contrib | `0.160.0` | Current OTLP/HTTP, filtering, batching and Prometheus export; filelog/Kubernetes API enrichment is future work |
+| Langfuse application | `3.225.7`, web/worker image digests in `compose.langfuse.yaml` | Current local OTLP ingestion baseline and raw K8s deployment target |
 | Langfuse Helm chart (future deployment) | `2.1.0` | Requires a separate deployment acceptance; not installed by the local overlay |
 | Langfuse v4 application (future deployment) | `4.24.0` | Update acceptance reads to Observations API v2 before using an events-only v4 deployment |
-| Prometheus | `3.14.0` | OTLP receiver backend for OTel metrics |
-| Loki | `3.7.7` | OTLP-compatible log backend through the Collector |
+| Prometheus | `3.14.0` | Scrapes Collector application/self-metrics; no second native OTLP ingestion path |
+| Loki, future only | `3.7.7` | Planned log backend; not deployed by the current sources |
 | Grafana | `13.2.1` | Dashboard/UI baseline |
 
 The local smoke uses `/api/public/observations` and `/api/public/traces/{id}` on the pinned v3
@@ -389,9 +399,10 @@ metric không có high-cardinality ID và backend outage không đổi business 
 
 ## Metric semantics
 
-Trong giai đoạn dual-write, process-local Prometheus metrics và OTel equivalents cùng tồn tại để
-so parity. Prometheus/Grafana scrape Collector endpoints; legacy `/metrics` không phải nguồn của
-dashboard mới. Alert chỉ được evaluate một lần ở Prometheus.
+Gateway/Worker chỉ ghi metrics qua OTel. Registry và `/metrics` cũ đã được bỏ sau
+giai đoạn đối chiếu parity. Prometheus scrape Collector `8889` cho app metrics,
+`8888` cho Collector self-metrics; alert chỉ được evaluate ở backend đã chọn.
+Cột legacy trong bảng là tên lịch sử để tra cứu, không còn tồn tại ở runtime.
 
 | Legacy metric | OTel instrument | Collector export |
 | --- | --- | --- |
@@ -424,7 +435,7 @@ OTel additions gồm `kira.chat.request.duration`, generic `kira.stage.duration`
 Generic stage histogram dùng bounded `stage`, không chứa ID/content. Collector refused/failed point
 self-metrics theo dõi exporter health.
 
-OTel Worker outcome chuẩn là `completed` dù legacy label còn `success`. Boolean observable gauges
+OTel Worker outcome chuẩn là `completed`; label lịch sử `success` đã được bỏ. Boolean observable gauges
 dùng unit `1`; callback chỉ đọc lock-protected in-process snapshot, không query DB. Queue depth và
 oldest pending age là shared PostgreSQL queue nên aggregate replica bằng `max`, không dùng `sum`.
 

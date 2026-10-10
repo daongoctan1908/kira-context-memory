@@ -1,0 +1,58 @@
+{
+  "status": "PASS",
+  "kind": "disposable_local_observability_containers",
+  "credential_source": "new synthetic generator values only",
+  "cluster_apply": "NOT_RUN",
+  "networkpolicy_enforcement": "NOT_RUN",
+  "longhorn_mounts_and_capacity": "NOT_RUN",
+  "real_application_and_provider_acceptance": "NOT_RUN",
+  "standalone_metrics_runtime": {
+    "status": "PASS",
+    "checks": [
+      "Prometheus UID65534 nonroot starts with actual mounted config/rules and writable data",
+      "Grafana UID472 GID0 nonroot starts with writable data and read-only actual provisioning mounts",
+      "real OTLP-to-Collector-to-Prometheus scrape preserves two replica counter/histogram streams and honor_labels",
+      "Prometheus loads four intended alert rules exactly once",
+      "Grafana authenticated provisioned datasource/dashboard and real Prometheus datasource health; anonymous API denied"
+    ],
+    "kind": "isolated disposable Collector Prometheus Grafana nonroot containers",
+    "cluster_apply": "NOT_RUN",
+    "longhorn_mounts_and_fsGroup": "NOT_RUN; writable tmpfs mounts at matching UID/GID used locally",
+    "cleanup": "PASS",
+    "local_image_ids": {
+      "otel-collector": "sha256:799dc6cf12c96192af37b5bdba804da8c10b3bc563b43cb90c3f3c58d9572ad6",
+      "prometheus": "sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0",
+      "grafana": "sha256:f772d434e8fab0049deb2b1b30abd43342bcfca1537614aa8d36080232cf4283"
+    }
+  },
+  "checks": [
+    "PostgreSQL bootstrap creates non-superuser Langfuse role and own database",
+    "Redis AUTH and noeviction with YAML-generated startup config",
+    "ClickHouse nonroot user and own Langfuse database",
+    "nonroot MinIO and actual idempotent S3 bucket init Job script",
+    "Langfuse Web applies real migrations using non-superuser DB role and reaches readiness",
+    "Langfuse Worker reaches YAML readiness against all stores",
+    "synthetic OTLP trace searchable in pinned Langfuse without content or secrets",
+    "two replica resource streams preserve distinct counters and histograms"
+  ],
+  "langfuse_version": "3.225.7",
+  "cleanup": "PASS",
+  "local_image_ids": {
+    "langfuse-postgres": "sha256:67f41722b7a8cbdb868a44a4995c846eddfdc2973bccb291ce937dce88ad5675",
+    "langfuse-redis": "sha256:71da9275c5f3fcb97d0fa0c8c5b36cc995327265420f17a04bfd544f458059f7",
+    "langfuse-clickhouse": "sha256:8a790dd3468db22b1d4e7b18a176f378ff5ff6053b9c48dd4ea1fa71a24c5ba6",
+    "langfuse-minio": "sha256:21b9e1bccf46098dee2e928952bf5fd4690a5ec30a3b86a1e728f1bb0ceaed0e",
+    "langfuse-s3-init": "sha256:21b9e1bccf46098dee2e928952bf5fd4690a5ec30a3b86a1e728f1bb0ceaed0e",
+    "langfuse-web": "sha256:a27fe525f52984fa6d36fd34e8b8c6e5ae4af43f34134cafc833b467fa9580ae",
+    "langfuse-worker": "sha256:93207bd67d2e789ea55fa3d47eeba065dd6b1869187127ab24201784c52b96bc",
+    "otel-collector": "sha256:799dc6cf12c96192af37b5bdba804da8c10b3bc563b43cb90c3f3c58d9572ad6"
+  },
+  "replica_runtime_scope": "one disposable container per workload; Kubernetes replica placement, PDB enforcement and Longhorn were not tested",
+  "source_manifest_sha256": {
+    "config.yaml": "9e4e88793ef4b8573f6a048797514df7579fa99f490c55b0fb2c2fbfe7415d93",
+    "datastores.yaml": "920adfe4a2f8d34c29e23fdd36ab163ff6fe09a9e7b797f40237d709099ea707",
+    "langfuse.yaml": "06408fc995d3e0dcff8cf5e10e745d993f3c1b5e630ef5e3be77dd57ab1029e3",
+    "collector.yaml": "ad3be56ef4de360b2c8e28f2c9509c86c7673b103fa69dc15d64ef63272c7308",
+    "metrics.yaml": "2f4399524d513b702d07b9e9f41e77a2b9a372de87892edef3b69d34c1f4958e"
+  }
+}

@@ -1,0 +1,43 @@
+Source: terminal transcription supplied in the user's message on 2026-10-08.
+This block preserves the command/output order in that message. It is separate from
+kubernetes-vdi-inventory-2026-10-08.txt; no cross-block execution chronology is inferred.
+Spacing and message line wrapping are normalized for readability. Values are transcribed,
+including the reported NodePort mappings and example.com hosts; no corrections are inferred.
+
+> kubectl get gitrepos.fleet.cattle.io -A
+No resources found
+
+> kubectl get deployments,statefulsets -n vlp-cicd
+
+NAME                                                READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/gitlab-ce-gitlab-shell                2/2     2            2           700d
+deployment.apps/gitlab-ce-kas                         2/2     2            2           700d
+deployment.apps/gitlab-ce-registry                    2/2     2            2           700d
+deployment.apps/gitlab-ce-sidekiq-all-in-1-v2          1/1     1            1           700d
+deployment.apps/gitlab-ce-webservice-default          2/2     2            2           700d
+
+NAME                                 READY   AGE
+statefulset.apps/gitlab-ce-gitaly     1/1     700d
+statefulset.apps/jenkins              1/1     700d
+statefulset.apps/redis-master         1/1     700d
+statefulset.apps/redis-replicas       3/3     700d
+
+> kubectl get services,ingresses -n vlp-cicd
+
+NAME                                     TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)                              AGE
+service/gitlab-ce-gitaly                  ClusterIP   None           <none>        8075/TCP,9236/TCP                     700d
+service/gitlab-ce-gitlab-shell            ClusterIP   10.43.246.250  <none>        22/TCP                               700d
+service/gitlab-ce-kas                     ClusterIP   10.43.45.76    <none>        8150/TCP,8153/TCP,8154/TCP,8151/TCP     700d
+service/gitlab-ce-registry                ClusterIP   10.43.71.172   <none>        5000/TCP                             700d
+service/gitlab-ce-webservice-default      NodePort    10.43.235.43   <none>        9070:9243/TCP,8181:8940/TCP            700d
+service/jenkins                          NodePort    10.43.254.195  <none>        8080:9849/TCP                         700d
+service/jenkins-agent                    ClusterIP   10.43.95.103   <none>        50000/TCP                            700d
+service/redis-headless                   ClusterIP   None           <none>        6379/TCP                             700d
+service/redis-master                     ClusterIP   10.43.35.212   <none>        6379/TCP                             700d
+service/redis-replicas                   ClusterIP   10.43.59.13    <none>        6379/TCP                             700d
+
+NAME                                                      CLASS            HOSTS                  ADDRESS   PORTS    AGE
+ingress.networking.k8s.io/gitlab-ce-kas                    gitlab-ce-nginx  kas.example.com                  80, 443  700d
+ingress.networking.k8s.io/gitlab-ce-registry               gitlab-ce-nginx  registry.example.com             80, 443  700d
+ingress.networking.k8s.io/gitlab-ce-webservice-default     gitlab-ce-nginx  gitlab.example.com               80, 443  700d
+>

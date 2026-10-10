@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "status": "STARTUP_AND_CONFIG_VERIFICATION_PASS",
+  "created_at": "2026-10-09T09:47:32.443201+00:00",
+  "image": {
+    "reference": "pgvector/pgvector:0.8.6-pg16-bookworm",
+    "local_image_id": "sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b",
+    "repo_digests": [
+      "pgvector/pgvector@sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b"
+    ],
+    "platform": "linux/amd64"
+  },
+  "source": {
+    "postgres_yaml_sha256": "9e03fa6195d6c99967e799f3ca401547e53b691c822e8c53974b26bdc0e15256",
+    "config_yaml_sha256": "8426f4e8729a4abf9d244745e2c2a2a7fa2320eae18b4757377aca675074fd1e",
+    "init_script_sha256": "8db8571784c2ad8a7dc922ea06fa0032dd81cf58950e16b55d5e5dfc08d4bc5f"
+  },
+  "postgres_args": [
+    "-c",
+    "max_connections=200",
+    "-c",
+    "shared_buffers=2GB",
+    "-c",
+    "effective_cache_size=6GB",
+    "-c",
+    "max_wal_size=2GB"
+  ],
+  "checks": {
+    "startup_probe": "PASS",
+    "tcp_scram_authenticated_sql": "PASS",
+    "settings": {
+      "server_version": "16.15 (Debian 16.15-1.pgdg12+2)",
+      "max_connections": "200",
+      "shared_buffers": "2GB",
+      "effective_cache_size": "6GB",
+      "max_wal_size": "2GB",
+      "data_directory": "/var/lib/postgresql/data/pgdata",
+      "password_encryption": "scram-sha-256",
+      "vector_available_version": "0.8.6",
+      "runtime_roles": [
+        {
+          "name": "kira_app",
+          "superuser": false,
+          "create_db": false,
+          "create_role": false
+        },
+        {
+          "name": "kira_memory",
+          "superuser": false,
+          "create_db": false,
+          "create_role": false
+        }
+      ]
+    },
+    "vector_extension_creation": "PASS",
+    "vector_distance_sql": "PASS",
+    "uid": 999,
+    "gid": 999,
+    "shared_memory_bytes": 268435456,
+    "memory_limit_bytes": 17179869184,
+    "cpu_limit_nanocpus": 12000000000,
+    "capabilities_dropped": [
+      "ALL"
+    ],
+    "allow_privilege_escalation": false
+  },
+  "synthetic_credentials_only": true,
+  "production_credentials_used": false,
+  "network_mode": "none",
+  "temporary_container_removed": true,
+  "temporary_data": "isolated tmpfs, removed with container",
+  "limitations": {
+    "kubernetes_fs_group_and_longhorn_pvc": "NOT_RUN; Docker tmpfs preowned by UID/GID999 substitutes fresh writable data directory",
+    "cpu_and_memory_load_benchmark": "NOT_RUN; startup and settings only",
+    "cluster_apply": "NOT_RUN",
+    "registry_publish": "NOT_RUN",
+    "archive_export": "NOT_RUN"
+  }
+}

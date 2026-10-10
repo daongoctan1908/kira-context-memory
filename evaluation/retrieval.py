@@ -74,33 +74,36 @@ class _FixtureOwner:
         self._store = store
         self._title = title
         self._session_ids: dict[str, str] = {}
-        self._active: dict[str, bool] = {}
+        self._conversation_ids: dict[str, UUID] = {}
 
     async def conversation_id(self, user_id: str) -> UUID | None:
         if self._store is None:
             return None
-        existing = self._session_ids.get(user_id)
+        existing = self._conversation_ids.get(user_id)
         if existing is None:
+            session_id = f"eval-{uuid4().hex[:12]}"
+            turn_id = f"fixture-{uuid4().hex[:12]}"
             appended = await self._store.append_turn(
                 user_id,
                 ConversationMessage(
-                    f"eval-{uuid4().hex[:12]}",
-                    f"fixture-{uuid4().hex[:12]}",
+                    session_id,
+                    turn_id,
                     ConversationRole.USER,
                     self._title,
                     datetime.now(UTC),
                 ),
                 ConversationMessage(
-                    f"eval-{uuid4().hex[:12]}",
-                    f"fixture-{uuid4().hex[:12]}",
+                    session_id,
+                    turn_id,
                     ConversationRole.ASSISTANT,
                     self._title,
                     datetime.now(UTC),
                 ),
             )
             self._session_ids[user_id] = appended.reference.session_id
+            self._conversation_ids[user_id] = appended.reference.conversation_id
             return appended.reference.conversation_id
-        return None
+        return existing
 
     async def retire(self) -> bool:
         if self._store is None:
@@ -115,6 +118,7 @@ class _FixtureOwner:
             except Exception:
                 failed = True
         self._session_ids.clear()
+        self._conversation_ids.clear()
         return failed
 
 

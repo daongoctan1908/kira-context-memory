@@ -44,6 +44,15 @@ Binding rewrite production được user cung cấp ngày 2026-10-02: Qwen3-14B 
 `evaluation/benchmark.internal.env.example` đã ghi binding này cho cả evaluator và Gateway.
 Đây là cập nhật cấu hình; internal preflight và live readiness vẫn chưa được chứng minh.
 
+Cập nhật môi trường nhận ngày 2026-10-07: user đã xác minh từ Pod trên cả ba worker node
+`10.221.248.16`, `.17`, `.18` rằng Qwen chat inference và embedding inference đều PASS.
+Embedding candidate là `Qwen3-Embedding-0.6B` tại `http://10.254.135.40:8001/v1`, dimension
+1024; cần xác nhận exact API model ID từ request thành công. Target là `linux/amd64`, registry
+`registry.vlp.vn`, labels `infra/zone=compute`, `project=lhvtt`, taint `project=lhvtt:NoSchedule`.
+Chi tiết và giới hạn evidence nằm trong [kubernetes-target-environment.md](kubernetes-target-environment.md).
+Các probe này không thay cho native provider preflight trên exact release, extraction/judge
+bindings hoặc full application/benchmark acceptance; không nâng trạng thái các phase chưa chạy.
+
 ## 2. Quy tắc chung
 
 ```text

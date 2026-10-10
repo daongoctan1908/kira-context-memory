@@ -1,0 +1,5 @@
+{
+  "backend": "registry.vlp.vn/REPLACE_REPOSITORY/backend@sha256:REPLACE_PUBLISHED_DIGEST",
+  "frontend": "registry.vlp.vn/REPLACE_REPOSITORY/frontend@sha256:REPLACE_PUBLISHED_DIGEST",
+  "postgres": "registry.vlp.vn/REPLACE_REPOSITORY/postgres@sha256:REPLACE_PUBLISHED_DIGEST"
+}

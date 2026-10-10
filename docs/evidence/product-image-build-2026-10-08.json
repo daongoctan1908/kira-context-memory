@@ -1,0 +1,69 @@
+{
+  "additional_container_smoke": {
+    "frontend_http": "PASS",
+    "network": "none",
+    "pgvector_version": "0.8.6",
+    "postgres_extension": "PASS",
+    "production_credentials_used": false
+  },
+  "application_acceptance": "NOT_RUN",
+  "bundle_directory": "artifacts/deployment/k8s-20261008/transfer",
+  "checksums_sha256": "7cc488b4095cb8efd5da10a93c5361a552c5b069647131f2eef14f74b3827690",
+  "container_smoke": "PASS",
+  "created_at": "2026-10-08T08:49:28.947436+00:00",
+  "handoff_tests": "4 passed",
+  "images": [
+    {
+      "archive": "backend.tar",
+      "archive_bytes": 119853056,
+      "archive_sha256": "665b99b17b024cae036b2ab1feaee5a9e16d8ff9a51858bb5786800065da416a",
+      "config_digest": "sha256:93d85280ff73e39c22b5cf17f9605015a02d6b23a5a902dfde7c0ed1528d7c23",
+      "image_id": "sha256:c900e80f2a0f403e5fe0057d0bb37d2f2a72397341014f4fbcb9fc532817123a",
+      "platform": "linux/amd64",
+      "reference": "kira-context-memory/backend:0.4.1-6420db351663",
+      "repo_digests": [
+        "kira-context-memory/backend@sha256:c900e80f2a0f403e5fe0057d0bb37d2f2a72397341014f4fbcb9fc532817123a"
+      ],
+      "role": "backend"
+    },
+    {
+      "archive": "frontend.tar",
+      "archive_bytes": 26401280,
+      "archive_sha256": "de3220846e0483cf5453b77237a4b067780d9534c37b3a84c2b88f04819d3491",
+      "config_digest": "sha256:2a1425599dca8bf63bb3d4510a4b1f85fb17ec0b83da3eb4ff05bbc6e5b091f6",
+      "image_id": "sha256:14f1c6322fd2a692434457112eed59668d4151c0720419cb6cf0f68aaf3cdb18",
+      "platform": "linux/amd64",
+      "reference": "kira-context-memory/frontend:0.4.1-6420db351663",
+      "repo_digests": [
+        "kira-context-memory/frontend@sha256:14f1c6322fd2a692434457112eed59668d4151c0720419cb6cf0f68aaf3cdb18"
+      ],
+      "role": "frontend"
+    },
+    {
+      "archive": "postgres.tar",
+      "archive_bytes": 156219392,
+      "archive_sha256": "99188ef71fd977d3a9008ce849e02f52166a88375450a16113407be706826761",
+      "config_digest": "sha256:9b05db12a35460fff0587e009f9326e414a53e9484555547f96d214a2ba98ef7",
+      "image_id": "sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b",
+      "platform": "linux/amd64",
+      "reference": "pgvector/pgvector:0.8.6-pg16-bookworm",
+      "repo_digests": [
+        "pgvector/pgvector@sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b"
+      ],
+      "role": "postgres"
+    }
+  ],
+  "platform": "linux/amd64",
+  "postgres_server_version": "16.15",
+  "registry_publish": "NOT_RUN",
+  "ruff": "PASS",
+  "schema_version": 1,
+  "source_manifest_sha256": "4d57521b2c816d3e8d714e5e4d56b6423ade9b31b5423ed17d0595cb7afd94a9",
+  "source_snapshot_sha256": "6420db35166361d2544b203576832f84d894a2862380c1f0fd125071b7dcfe9d",
+  "status": "BUILT_EXPORTED",
+  "transport_zip": {
+    "bytes": 302539130,
+    "path": "artifacts/deployment/k8s-20261008/kira-context-memory-linux-amd64-20261008.zip",
+    "sha256": "fae01942391702c2dc1facb94f45d53888141c80350c8afa724cb7ce91fa68ca"
+  }
+}

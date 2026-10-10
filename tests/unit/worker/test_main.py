@@ -93,7 +93,9 @@ def dependency_factory(runner: FakeRunner, queue: FakeQueue, captured: dict[str,
     return dependencies
 
 
-async def test_worker_app_exposes_only_internal_read_endpoints_and_cached_metrics() -> None:
+async def test_worker_app_keeps_readiness_sampler_and_exports_cached_otel_metrics(
+    otel_capture,
+) -> None:
     settings = make_settings()
     runner = FakeRunner()
     queue = FakeQueue()
@@ -114,17 +116,17 @@ async def test_worker_app_exposes_only_internal_read_endpoints_and_cached_metric
             ready = await client.get("/ready")
             calls_before_probes = queue.stats_calls
             health = await client.get("/health")
-            metrics = await client.get("/metrics")
+            removed_scrape = await client.get("/metrics")
+            metrics = otel_capture.snapshot()
 
         assert health.status_code == 200
         assert health.json() == {"status": "ok"}
         assert ready.json() == {"status": "ready"}
-        assert metrics.status_code == 200
-        assert metrics.headers["content-type"].startswith("text/plain")
-        assert 'kira_memory_job_queue_depth{status="pending"} 2.0' in metrics.text
-        assert "kira_memory_job_oldest_pending_age_seconds 7.5" in metrics.text
-        assert "kira_memory_worker_runner_active 1.0" in metrics.text
-        assert "kira_memory_job_queue_database_available 1.0" in metrics.text
+        assert removed_scrape.status_code == 404
+        assert metrics.value("kira.memory.job.queue.depth", {"status": "pending"}) == 2
+        assert metrics.value("kira.memory.job.oldest_pending.age") == 7.5
+        assert metrics.value("kira.memory.worker.runner.active") == 1
+        assert metrics.value("kira.memory.job.queue.database.available") == 1
         assert queue.stats_calls == calls_before_probes
         assert queue.purge_calls[0]["limit"] == 1000
 
@@ -138,7 +140,6 @@ async def test_worker_app_exposes_only_internal_read_endpoints_and_cached_metric
     assert exposed == {
         ("GET", "/health"),
         ("GET", "/ready"),
-        ("GET", "/metrics"),
     }
 
 

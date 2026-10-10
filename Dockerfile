@@ -15,6 +15,10 @@ COPY --from=uv /uv /uvx /bin/
 COPY pyproject.toml uv.lock README.md ./
 COPY packages/viettel-mem0/pyproject.toml packages/viettel-mem0/README.md packages/viettel-mem0/LICENSE ./packages/viettel-mem0/
 COPY packages/viettel-mem0/mem0 ./packages/viettel-mem0/mem0
+
+# Cache locked runtime dependencies independently from Gateway/Worker source changes.
+RUN uv sync --frozen --no-dev --no-editable --no-install-project
+
 COPY app ./app
 COPY alembic.ini ./
 COPY migrations ./migrations
@@ -56,13 +60,14 @@ WORKDIR /app
 RUN groupadd --system --gid 10001 kira \
     && useradd --system --uid 10001 --gid kira --home-dir /app --shell /usr/sbin/nologin kira
 
-COPY --from=builder --chown=kira:kira /app/.venv /app/.venv
-COPY --chown=kira:kira app ./app
-COPY --chown=kira:kira alembic.ini ./
-COPY --chown=kira:kira migrations ./migrations
-COPY --chown=kira:kira worker ./worker
+COPY --from=builder --chown=10001:10001 /app/.venv /app/.venv
+COPY --chown=10001:10001 app ./app
+COPY --chown=10001:10001 alembic.ini ./
+COPY --chown=10001:10001 migrations ./migrations
+COPY --chown=10001:10001 worker ./worker
 
-USER kira
+# Numeric IDs match the Kubernetes runAsUser/runAsGroup contract directly.
+USER 10001:10001
 
 EXPOSE 8000 8001
 

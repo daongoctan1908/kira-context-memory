@@ -1,0 +1,44 @@
+{
+  "date": "2026-10-09",
+  "status": "PASS_AFTER_TARGETED_RECHECK",
+  "source": "current uncommitted working tree prepared for review",
+  "schema_validation": {
+    "tool": "kubeconform 0.7.0",
+    "kubernetes_version": "1.30.5",
+    "strict": true,
+    "resources": 82,
+    "valid": 82,
+    "invalid": 0,
+    "errors": 0
+  },
+  "application_regression": {
+    "database": "disposable local PostgreSQL 16 / pgvector; synthetic credentials",
+    "full_run": {"passed": 1824, "failed": 1, "skipped": 2},
+    "initial_failure": "pre-existing gold retrieval fixture created paired messages with different session/turn IDs",
+    "repair": "shared session/turn IDs and cached conversation ownership for all fixture seeds; existing store validation unchanged",
+    "targeted_recheck": {
+      "passed": 26,
+      "failed": 0,
+      "scope": ["unit retrieval fixtures", "real PostgreSQL gold fixture", "observability deployment helpers"],
+      "coverage_mode": "append to full-run coverage"
+    },
+    "final_collection": 1828,
+    "unique_tests_passed_after_recheck": 1826,
+    "skipped": 2,
+    "unresolved_failures": 0,
+    "combined_coverage_percent": 90.90,
+    "required_coverage_percent": 90,
+    "cleanup": "PASS"
+  },
+  "additional_checks": {
+    "ruff": "PASS",
+    "uv_lock_offline_check": "PASS",
+    "git_diff_whitespace": "PASS",
+    "legacy_metrics_consumers_in_app_worker": "NONE"
+  },
+  "runtime_receipt": "observability-yaml-local-verification-2026-10-09.json",
+  "cluster_apply": "NOT_RUN",
+  "image_rebuild_or_observability_export": "NOT_RUN; earlier application image artifact retained unchanged",
+  "registry_publish": "NOT_RUN",
+  "real_application_provider_acceptance": "NOT_RUN"
+}

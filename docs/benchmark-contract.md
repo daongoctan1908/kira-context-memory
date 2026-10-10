@@ -82,9 +82,13 @@ của QA run mới.
 
 K8s Test không Internet/GPU. User đã chỉ định binding rewrite production: Qwen3-14B base qua vLLM,
 `http://10.254.135.40:8080/v1`, model ID `/models/Qwen3_14B`, không dùng `genai-lora`.
-Binding này là cấu hình được cung cấp, chưa chứng minh internal preflight hoặc live readiness.
-Extraction, embedding và judge nội bộ vẫn cần binding/capability thực tế. Không suy đoán model
-revision, JSON support hay embedding dimension. Preflight kiểm tra khả năng thực tế, bao gồm
+Theo cập nhật user cung cấp ngày 2026-10-07, Pod trên cả ba worker node mục tiêu đã chạy Qwen
+chat inference và embedding inference thành công. Embedding candidate là `Qwen3-Embedding-0.6B`
+tại `http://10.254.135.40:8001/v1`, dimension 1024. Xem
+[target environment](kubernetes-target-environment.md) để phân biệt Pod connectivity evidence
+với native provider preflight và application acceptance. Exact embedding API model ID,
+extraction/judge bindings và các capability còn lại vẫn phải được xác nhận. Không suy đoán model
+revision hay JSON support. Preflight kiểm tra khả năng thực tế, bao gồm
 embedding batch/count/dimension và JSON extraction format.
 
 Không cấu hình hoặc chưa lên lịch chạy: `NOT_RUN`. Đã thử nhưng dependency unavailable/timeout:

@@ -1,0 +1,19 @@
+{
+  "status": "PASS",
+  "kind": "disposable_local_containers",
+  "provider": "synthetic_1024_dimension_embedder",
+  "cluster_apply": "NOT_RUN",
+  "real_provider_acceptance": "NOT_RUN",
+  "postgres_uid": 999,
+  "backend_uid": 10001,
+  "frontend_uid": 101,
+  "checks": [
+    "postgres bootstrap and non-superuser roles",
+    "alembic migrations",
+    "memory init",
+    "memory runtime validation",
+    "runtime DML without schema CREATE",
+    "gateway worker frontend readiness",
+    "auth account creation with runtime role"
+  ]
+}

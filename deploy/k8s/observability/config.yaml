@@ -1,0 +1,144 @@
+# Review templates first; bind internal image digests before apply.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kira-langfuse-config
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: kira-langfuse-config
+data:
+  NEXTAUTH_URL: http://langfuse-web:3000
+  HOSTNAME: 0.0.0.0
+  TELEMETRY_ENABLED: 'false'
+  LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: 'false'
+  CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+  CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+  CLICKHOUSE_USER: langfuse
+  CLICKHOUSE_DB: langfuse
+  CLICKHOUSE_CLUSTER_ENABLED: 'false'
+  REDIS_HOST: langfuse-redis
+  REDIS_PORT: '6379'
+  REDIS_TLS_ENABLED: 'false'
+  LANGFUSE_USE_AZURE_BLOB: 'false'
+  LANGFUSE_USE_OCI_NATIVE_OBJECT_STORAGE: 'false'
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: 'true'
+  LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+  LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+  LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+  LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: 'true'
+  LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+  LANGFUSE_S3_BATCH_EXPORT_ENABLED: 'false'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kira-langfuse-postgres-init
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: kira-langfuse-postgres-init
+data:
+  10-create-langfuse-role.sh: |
+    #!/bin/sh
+    set -eu
+    psql -X -v ON_ERROR_STOP=1 --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" <<'SQL'
+    \getenv langfuse_password LF_PG_PASSWORD
+    CREATE ROLE langfuse LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD :'langfuse_password';
+    ALTER DATABASE langfuse OWNER TO langfuse;
+    REVOKE CONNECT ON DATABASE langfuse FROM PUBLIC;
+    GRANT CONNECT ON DATABASE langfuse TO langfuse;
+    ALTER SCHEMA public OWNER TO langfuse;
+    REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+    SQL
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kira-otel-config
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: kira-otel-config
+data:
+  collector.yaml: |
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
+    receivers:
+      otlp:
+        protocols:
+          http:
+            endpoint: 0.0.0.0:4318
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 6144
+        spike_limit_mib: 1024
+      filter/drop_idle_memory_job_claims:
+        error_mode: ignore
+        traces:
+          span:
+          - name == "memory_job.claim" and attributes["kira.memory.job.claimed_count"]
+            == 0 and attributes["kira.memory.job.reclaimed_count"] == 0
+      batch:
+        send_batch_size: 256
+        send_batch_max_size: 512
+        timeout: 1s
+    exporters:
+      otlphttp/langfuse:
+        endpoint: http://langfuse-web:3000/api/public/otel
+        headers:
+          Authorization: ${env:LANGFUSE_OTEL_AUTH}
+          x-langfuse-ingestion-version: '4'
+        timeout: 1s
+        retry_on_failure:
+          enabled: true
+          initial_interval: 1s
+          max_interval: 5s
+          max_elapsed_time: 30s
+        sending_queue:
+          enabled: true
+          num_consumers: 2
+          queue_size: 256
+      prometheus:
+        endpoint: 0.0.0.0:8889
+        send_timestamps: false
+        resource_to_telemetry_conversion:
+          enabled: true
+    service:
+      extensions:
+      - health_check
+      telemetry:
+        metrics:
+          readers:
+          - pull:
+              exporter:
+                prometheus:
+                  host: 0.0.0.0
+                  port: 8888
+                  without_scope_info: true
+                  without_type_suffix: true
+                  without_units: true
+      pipelines:
+        traces:
+          receivers:
+          - otlp
+          processors:
+          - memory_limiter
+          - filter/drop_idle_memory_job_claims
+          - batch
+          exporters:
+          - otlphttp/langfuse
+        metrics:
+          receivers:
+          - otlp
+          processors:
+          - memory_limiter
+          - batch
+          exporters:
+          - prometheus

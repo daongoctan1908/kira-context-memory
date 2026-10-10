@@ -24,31 +24,6 @@ class MetricSpec:
     boundaries: tuple[float, ...] = ()
 
 
-LEGACY_METRIC_MAP: Mapping[str, str] = {
-    "kira_context_recent_messages": "kira.context.recent_messages",
-    "kira_context_estimated_recent_tokens": "kira.context.estimated_recent_tokens",
-    "kira_memory_search_total": "kira.memory.search.count",
-    "kira_memory_search_duration_seconds": "kira.memory.search.duration",
-    "kira_memory_search_results": "kira.memory.search.result_count",
-    "kira_memory_job_schedule_total": "kira.memory.job.schedule.count",
-    "kira_context_rewrite_total": "kira.context.rewrite.count",
-    "kira_context_rewrite_duration_seconds": "kira.context.rewrite.duration",
-    "kira_context_degraded_total": "kira.context.degraded.count",
-    "kira_conversation_write_total": "kira.conversation.write.count",
-    "kira_memory_job_queue_depth": "kira.memory.job.queue.depth",
-    "kira_memory_job_oldest_pending_age_seconds": "kira.memory.job.oldest_pending.age",
-    "kira_memory_job_claim_total": "kira.memory.job.claim.count",
-    "kira_memory_job_processing_total": "kira.memory.job.process.count",
-    "kira_memory_job_processing_duration_seconds": "kira.memory.job.process.duration",
-    "kira_memory_job_attempt_count": "kira.memory.job.attempt.number",
-    "kira_memory_job_lifecycle_event_count": "kira.memory.lifecycle_event.count",
-    "kira_memory_job_cleanup_total": "kira.memory.job.cleanup.count",
-    "kira_memory_worker_runner_active": "kira.memory.worker.runner.active",
-    "kira_memory_job_queue_database_available": "kira.memory.job.queue.database.available",
-    "kira_memory_job_in_flight": "kira.memory.job.in_flight",
-    "kira_memory_job_database_backoff_seconds": "kira.memory.job.database_backoff",
-}
-
 _DURATION_BOUNDARIES = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60, 120)
 
 METRIC_SPECS: Mapping[str, MetricSpec] = {
@@ -291,7 +266,6 @@ class GatewayMetrics:
         self._stream_duration = _create_instrument(resolved, METRIC_SPECS["kira_stream_duration"])
         self._first_event = _create_instrument(resolved, METRIC_SPECS["kira_first_event"])
         self._first_content = _create_instrument(resolved, METRIC_SPECS["kira_first_content"])
-        self._formation_scope = _create_instrument(resolved, METRIC_SPECS["formation_scope"])
 
     def context_observed(self, message_count: int, estimated_tokens: int) -> None:
         _safe_record(self._recent_messages, message_count)

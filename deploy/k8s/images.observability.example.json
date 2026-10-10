@@ -1,0 +1,14 @@
+{
+  "backend": "registry.vlp.vn/REPLACE_REPOSITORY/backend@sha256:REPLACE_PUBLISHED_DIGEST",
+  "frontend": "registry.vlp.vn/REPLACE_REPOSITORY/frontend@sha256:REPLACE_PUBLISHED_DIGEST",
+  "postgres": "registry.vlp.vn/REPLACE_REPOSITORY/postgres@sha256:REPLACE_PUBLISHED_DIGEST",
+  "otel_collector": "registry.vlp.vn/REPLACE_REPOSITORY/otel-collector@sha256:REPLACE_PUBLISHED_DIGEST",
+  "langfuse_web": "registry.vlp.vn/REPLACE_REPOSITORY/langfuse-web@sha256:REPLACE_PUBLISHED_DIGEST",
+  "langfuse_worker": "registry.vlp.vn/REPLACE_REPOSITORY/langfuse-worker@sha256:REPLACE_PUBLISHED_DIGEST",
+  "langfuse_postgres": "registry.vlp.vn/REPLACE_REPOSITORY/langfuse-postgres@sha256:REPLACE_PUBLISHED_DIGEST",
+  "langfuse_clickhouse": "registry.vlp.vn/REPLACE_REPOSITORY/langfuse-clickhouse@sha256:REPLACE_PUBLISHED_DIGEST",
+  "langfuse_redis": "registry.vlp.vn/REPLACE_REPOSITORY/langfuse-redis@sha256:REPLACE_PUBLISHED_DIGEST",
+  "langfuse_minio": "registry.vlp.vn/REPLACE_REPOSITORY/langfuse-minio@sha256:REPLACE_PUBLISHED_DIGEST",
+  "prometheus": "registry.vlp.vn/REPLACE_REPOSITORY/prometheus@sha256:REPLACE_PUBLISHED_DIGEST",
+  "grafana": "registry.vlp.vn/REPLACE_REPOSITORY/grafana@sha256:REPLACE_PUBLISHED_DIGEST"
+}

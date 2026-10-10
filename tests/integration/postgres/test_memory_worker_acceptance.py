@@ -12,7 +12,6 @@ import httpx
 import pytest
 from alembic import command
 from alembic.config import Config
-from prometheus_client import generate_latest
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
@@ -33,10 +32,10 @@ from app.domain.models.memory_job import MemoryJob, MemoryJobStatus
 from app.infrastructure.postgres.conversation_store import PostgresConversationStoreAdapter
 from app.infrastructure.postgres.memory_job_queue import PostgresMemoryJobQueueAdapter
 from app.infrastructure.postgres.schema import conversations, memory_jobs
+from tests.support.otel_metrics import worker_telemetry
 from worker.main import create_app
 from worker.runner import MemoryJobRunner
 from worker.settings import WorkerSettings
-from worker.telemetry import MemoryJobTelemetry
 
 pytestmark = pytest.mark.postgres_integration
 
@@ -217,8 +216,7 @@ class RecordingProcessor:
 
 
 async def test_worker_http_runtime_retries_then_completes_exact_postgres_boundary(
-    engine: AsyncEngine,
-    migrated_database: str,
+    engine: AsyncEngine, migrated_database: str, otel_capture
 ) -> None:
     user_id = f"t4-17-retry-user-{uuid4()}"
     session_id = f"t4-17-retry-session-{uuid4()}"
@@ -271,7 +269,7 @@ async def test_worker_http_runtime_retries_then_completes_exact_postgres_boundar
                 row = await _wait_for_status(engine, event_id, MemoryJobStatus.COMPLETED)
                 ready = await _wait_for_ready(client, 200)
                 health = await client.get("/health")
-                metrics = await client.get("/metrics")
+                metrics = otel_capture.snapshot()
 
         assert ready.json() == {"status": "ready"}
         assert health.status_code == 200
@@ -284,9 +282,9 @@ async def test_worker_http_runtime_retries_then_completes_exact_postgres_boundar
             "durable user fact retry",
             "confirmed retry",
         ]
-        assert 'kira_memory_job_processing_total{outcome="retry"} 1.0' in metrics.text
-        assert 'kira_memory_job_processing_total{outcome="success"} 1.0' in metrics.text
-        assert 'kira_memory_job_claim_total{kind="new"} 2.0' in metrics.text
+        assert metrics.value("kira.memory.job.process.count", {"outcome": "retry"}) == 1.0
+        assert metrics.value("kira.memory.job.process.count", {"outcome": "completed"}) == 1.0
+        assert metrics.value("kira.memory.job.claim.count", {"kind": "new"}) == 2.0
     finally:
         async with engine.begin() as connection:
             await connection.execute(
@@ -374,7 +372,7 @@ async def test_grace_expiry_preserves_job_for_reclaim_and_rejects_stale_lease(
                 retry_delays_seconds=(0.02,),
             )
         )
-        telemetry = MemoryJobTelemetry()
+        telemetry, recorded_metrics = worker_telemetry()
         replacement_runner = MemoryJobRunner(
             queue,
             replacement_processor,
@@ -405,9 +403,9 @@ async def test_grace_expiry_preserves_job_for_reclaim_and_rejects_stale_lease(
         assert completed.attempt_count == 2
         assert completed.lifecycle_event_count == 1
         assert completed.lease_token is None
-        metrics = generate_latest(telemetry.registry).decode()
-        assert 'kira_memory_job_claim_total{kind="reclaimed"} 1.0' in metrics
-        assert 'kira_memory_job_processing_total{outcome="success"} 1.0' in metrics
+        metrics = recorded_metrics.snapshot()
+        assert metrics.value("kira.memory.job.claim.count", {"kind": "reclaimed"}) == 1.0
+        assert metrics.value("kira.memory.job.process.count", {"outcome": "completed"}) == 1.0
     finally:
         first_runner.request_stop()
         if replacement_memory is not None:

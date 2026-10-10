@@ -1,0 +1,777 @@
+# Dedicated single-primary Langfuse stores; PVC sizes are pilot choices, not HA or measured capacity.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: langfuse-postgres-data
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-postgres-data
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: longhorn-storage-2-retain
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-postgres
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-postgres
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-postgres
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: postgres
+  clusterIP: None
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: langfuse-postgres
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-postgres
+spec:
+  serviceName: langfuse-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+      app.kubernetes.io/component: langfuse-postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: kira-context-memory
+        app.kubernetes.io/component: langfuse-postgres
+    spec:
+      serviceAccountName: kira-runtime
+      automountServiceAccountToken: false
+      nodeSelector:
+        infra/zone: compute
+        project: lhvtt
+        kubernetes.io/arch: amd64
+        kubernetes.io/os: linux
+      tolerations:
+      - key: project
+        operator: Equal
+        value: lhvtt
+        effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-16
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-17
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-18
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            preference:
+              matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-17
+          - weight: 50
+            preference:
+              matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-18
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: langfuse-postgres
+        image: REPLACE_LANGFUSE_POSTGRES_IMAGE
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: false
+        resources:
+          requests:
+            cpu: '4'
+            memory: 8Gi
+            ephemeral-storage: 128Mi
+          limits:
+            cpu: '12'
+            memory: 16Gi
+            ephemeral-storage: 1Gi
+        args:
+        - -c
+        - max_connections=200
+        - -c
+        - shared_buffers=2GB
+        - -c
+        - effective_cache_size=6GB
+        - -c
+        - max_wal_size=2GB
+        env:
+        - name: POSTGRES_DB
+          value: langfuse
+        - name: POSTGRES_USER
+          value: postgres
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        - name: POSTGRES_INITDB_ARGS
+          value: --auth-host=scram-sha-256
+        - name: TZ
+          value: UTC
+        - name: PGTZ
+          value: UTC
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LF_PG_ADMIN_PASSWORD
+        - name: LF_PG_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LF_PG_PASSWORD
+        ports:
+        - name: postgres
+          containerPort: 5432
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+        - name: init
+          mountPath: /docker-entrypoint-initdb.d
+          readOnly: true
+        - name: dshm
+          mountPath: /dev/shm
+        startupProbe:
+          exec:
+            command:
+            - pg_isready
+            - -h
+            - 127.0.0.1
+            - -U
+            - postgres
+            - -d
+            - langfuse
+          timeoutSeconds: 3
+          periodSeconds: 5
+          failureThreshold: 120
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -h
+            - 127.0.0.1
+            - -U
+            - postgres
+            - -d
+            - langfuse
+          timeoutSeconds: 3
+          periodSeconds: 10
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -h
+            - 127.0.0.1
+            - -U
+            - postgres
+            - -d
+            - langfuse
+          timeoutSeconds: 3
+          periodSeconds: 10
+          failureThreshold: 6
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: langfuse-postgres-data
+      - name: init
+        configMap:
+          name: kira-langfuse-postgres-init
+          defaultMode: 365
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 256Mi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: langfuse-clickhouse-data
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-clickhouse-data
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: longhorn-storage-2-retain
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-clickhouse
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-clickhouse
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-clickhouse
+  ports:
+  - name: http
+    port: 8123
+    targetPort: http
+  - name: native
+    port: 9000
+    targetPort: native
+  clusterIP: None
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: langfuse-clickhouse
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-clickhouse
+spec:
+  serviceName: langfuse-clickhouse
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+      app.kubernetes.io/component: langfuse-clickhouse
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: kira-context-memory
+        app.kubernetes.io/component: langfuse-clickhouse
+    spec:
+      serviceAccountName: kira-runtime
+      automountServiceAccountToken: false
+      nodeSelector:
+        infra/zone: compute
+        project: lhvtt
+        kubernetes.io/arch: amd64
+        kubernetes.io/os: linux
+      tolerations:
+      - key: project
+        operator: Equal
+        value: lhvtt
+        effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-16
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-17
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-18
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            preference:
+              matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-17
+          - weight: 50
+            preference:
+              matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-18
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: langfuse-clickhouse
+        image: REPLACE_LANGFUSE_CLICKHOUSE_IMAGE
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: false
+        resources:
+          requests:
+            cpu: '8'
+            memory: 32Gi
+            ephemeral-storage: 128Mi
+          limits:
+            cpu: '24'
+            memory: 64Gi
+            ephemeral-storage: 1Gi
+        env:
+        - name: CLICKHOUSE_DB
+          value: langfuse
+        - name: CLICKHOUSE_USER
+          value: langfuse
+        - name: CLICKHOUSE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LF_CLICKHOUSE_PASSWORD
+        - name: TZ
+          value: UTC
+        ports:
+        - name: http
+          containerPort: 8123
+        - name: native
+          containerPort: 9000
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/clickhouse
+        - name: logs
+          mountPath: /var/log/clickhouse-server
+        startupProbe:
+          httpGet:
+            path: /ping
+            port: http
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 120
+        readinessProbe:
+          httpGet:
+            path: /ping
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /ping
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: langfuse-clickhouse-data
+      - name: logs
+        emptyDir:
+          sizeLimit: 512Mi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: langfuse-redis-data
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-redis-data
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: longhorn-storage-2-retain
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-redis
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-redis
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-redis
+  ports:
+  - name: redis
+    port: 6379
+    targetPort: redis
+  clusterIP: None
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: langfuse-redis
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-redis
+spec:
+  serviceName: langfuse-redis
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+      app.kubernetes.io/component: langfuse-redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: kira-context-memory
+        app.kubernetes.io/component: langfuse-redis
+    spec:
+      serviceAccountName: kira-runtime
+      automountServiceAccountToken: false
+      nodeSelector:
+        infra/zone: compute
+        project: lhvtt
+        kubernetes.io/arch: amd64
+        kubernetes.io/os: linux
+      tolerations:
+      - key: project
+        operator: Equal
+        value: lhvtt
+        effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-16
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-17
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-18
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            preference:
+              matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-17
+          - weight: 50
+            preference:
+              matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-18
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: langfuse-redis
+        image: REPLACE_LANGFUSE_REDIS_IMAGE
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: false
+        resources:
+          requests:
+            cpu: '2'
+            memory: 4Gi
+            ephemeral-storage: 128Mi
+          limits:
+            cpu: '4'
+            memory: 8Gi
+            ephemeral-storage: 1Gi
+        command:
+        - sh
+        - -ec
+        args:
+        - |
+          umask 077
+          printf '%s\n' 'bind 0.0.0.0' 'port 6379' 'dir /data' 'appendonly yes' 'appendfsync everysec' 'save ""' 'maxmemory 4gb' 'maxmemory-policy noeviction' > /tmp/kira-redis.conf
+          printf 'requirepass %s\n' "$REDIS_PASSWORD" >> /tmp/kira-redis.conf
+          exec redis-server /tmp/kira-redis.conf
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LF_REDIS_PASSWORD
+        ports:
+        - name: redis
+          containerPort: 6379
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        startupProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli -h 127.0.0.1 ping | grep -q
+              PONG
+          timeoutSeconds: 3
+          periodSeconds: 5
+          failureThreshold: 60
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli -h 127.0.0.1 ping | grep -q
+              PONG
+          timeoutSeconds: 3
+          periodSeconds: 10
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli -h 127.0.0.1 ping | grep -q
+              PONG
+          timeoutSeconds: 3
+          periodSeconds: 10
+          failureThreshold: 6
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: langfuse-redis-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: langfuse-minio-data
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-minio-data
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: longhorn-storage-2-retain
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-minio
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-minio
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-minio
+  ports:
+  - name: s3
+    port: 9000
+    targetPort: s3
+  clusterIP: None
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: langfuse-minio
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-minio
+spec:
+  serviceName: langfuse-minio
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+      app.kubernetes.io/component: langfuse-minio
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: kira-context-memory
+        app.kubernetes.io/component: langfuse-minio
+    spec:
+      serviceAccountName: kira-runtime
+      automountServiceAccountToken: false
+      nodeSelector:
+        infra/zone: compute
+        project: lhvtt
+        kubernetes.io/arch: amd64
+        kubernetes.io/os: linux
+      tolerations:
+      - key: project
+        operator: Equal
+        value: lhvtt
+        effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-16
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-17
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-18
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            preference:
+              matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-17
+          - weight: 50
+            preference:
+              matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-18
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: langfuse-minio
+        image: REPLACE_LANGFUSE_MINIO_IMAGE
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: false
+        resources:
+          requests:
+            cpu: '2'
+            memory: 4Gi
+            ephemeral-storage: 128Mi
+          limits:
+            cpu: '8'
+            memory: 16Gi
+            ephemeral-storage: 1Gi
+        args:
+        - server
+        - --address
+        - :9000
+        - --console-address
+        - :9001
+        - /data
+        env:
+        - name: MINIO_ROOT_USER
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LF_S3_ACCESS_KEY
+        - name: MINIO_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LF_S3_SECRET_KEY
+        ports:
+        - name: s3
+          containerPort: 9000
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        startupProbe:
+          httpGet:
+            path: /minio/health/live
+            port: s3
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 120
+        readinessProbe:
+          httpGet:
+            path: /minio/health/ready
+            port: s3
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /minio/health/live
+            port: s3
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: langfuse-minio-data

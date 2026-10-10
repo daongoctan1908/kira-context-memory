@@ -118,7 +118,7 @@ async def test_enabled_ltm_constructs_and_closes_one_owned_adapter(monkeypatch):
     assert memory.close_calls == 1
 
 
-async def test_injected_ltm_is_wired_but_remains_caller_owned():
+async def test_injected_ltm_is_wired_but_remains_caller_owned(otel_capture):
     memory = FakeLongTermMemory((ranked_memory(),))
     rewriter = FakeRewriter("standalone using LTM")
     kira = FakeKiraClient(events=[kira_event('{"text":"answer"}', "answer")])
@@ -141,7 +141,7 @@ async def test_injected_ltm_is_wired_but_remains_caller_owned():
             "/chat",
             json={"session_id": "session-1", "message": "follow-up"},
         )
-        metrics = await client.get("/metrics")
+        metrics = otel_capture.snapshot()
 
         assert app.state.ltm_status == "injected"
         assert response.status_code == 200
@@ -152,14 +152,14 @@ async def test_injected_ltm_is_wired_but_remains_caller_owned():
             ("trusted-user", "follow-up", "conversation", 10, 0.1),
             ("trusted-user", "follow-up", "global", 10, 0.1),
         ]
-        assert 'kira_memory_search_total{outcome="success"} 1.0' in metrics.text
-        assert "kira_memory_search_results_sum 1.0" in metrics.text
-        assert "provider-private" not in metrics.text
+        assert metrics.value("kira.memory.search.count", {"outcome": "success"}) == 1.0
+        assert metrics.value("kira.memory.search.result_count", None, field="sum") == 1.0
+        assert "provider-private" not in repr(metrics)
 
     assert memory.close_calls == 0
 
 
-async def test_runtime_ltm_failure_degrades_without_affecting_sse_or_readiness():
+async def test_runtime_ltm_failure_degrades_without_affecting_sse_or_readiness(otel_capture):
     memory = FakeLongTermMemory(error=LongTermMemoryConnectionError())
     rewriter = FakeRewriter("standalone from recent")
     kira = FakeKiraClient(events=[kira_event('{"text":"answer"}', "answer")])
@@ -183,19 +183,21 @@ async def test_runtime_ltm_failure_degrades_without_affecting_sse_or_readiness()
             json={"session_id": "session-1", "message": "follow-up"},
         )
         ready = await client.get("/ready")
-        metrics = await client.get("/metrics")
+        metrics = otel_capture.snapshot()
 
     assert response.status_code == 200
     assert response.content == b'data: {"text":"answer"}\n\n'
     assert kira.messages == ["standalone from recent"]
     assert ready.status_code == 200
     assert ready.json() == {"status": "ready"}
-    assert 'kira_memory_search_total{outcome="error"} 1.0' in metrics.text
+    assert metrics.value("kira.memory.search.count", {"outcome": "error"}) == 1.0
     assert (
-        'kira_context_degraded_total{dependency="mem0",operation="memory_search"} 1.0'
-        in metrics.text
+        metrics.value(
+            "kira.context.degraded.count", {"dependency": "mem0", "operation": "memory_search"}
+        )
+        == 1.0
     )
-    assert "LongTermMemoryConnectionError" not in metrics.text
+    assert "LongTermMemoryConnectionError" not in repr(metrics)
 
 
 async def test_enabled_ltm_wiring_failure_fails_startup_and_closes_owned_clients(monkeypatch):

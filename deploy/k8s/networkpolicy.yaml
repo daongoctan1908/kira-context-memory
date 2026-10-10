@@ -1,0 +1,357 @@
+# Review templates first; bind REPLACE_*_IMAGE before apply.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: default-deny
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: allow-dns
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  - ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-internal
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: frontend-internal
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - frontend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector: {}
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - gateway
+    ports:
+    - protocol: TCP
+      port: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-internal
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: gateway-internal
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - gateway
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - frontend
+          - ops
+    ports:
+    - protocol: TCP
+      port: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: worker-internal
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: worker-internal
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - worker
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - ops
+    ports:
+    - protocol: TCP
+      port: 8001
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-internal
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: postgres-internal
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - postgres
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - gateway
+          - worker
+          - migrate
+          - memory-init
+          - memory-validate
+          - ops
+    ports:
+    - protocol: TCP
+      port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: database-egress
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: database-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - gateway
+      - worker
+      - migrate
+      - memory-init
+      - memory-validate
+      - ops
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kira-egress
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: kira-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - gateway
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 10.255.62.64/32
+    ports:
+    - protocol: TCP
+      port: 8122
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: qwen-egress
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: qwen-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - gateway
+      - worker
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 10.254.135.40/32
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8001
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: embedding-init-egress
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: embedding-init-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - memory-init
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 10.254.135.40/32
+    ports:
+    - protocol: TCP
+      port: 8001
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: operator-http-egress
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: operator-http-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - ops
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - frontend
+    ports:
+    - protocol: TCP
+      port: 8080
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - gateway
+    ports:
+    - protocol: TCP
+      port: 8000
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - worker
+    ports:
+    - protocol: TCP
+      port: 8001

@@ -1,0 +1,495 @@
+# Pinned Langfuse v3 baseline; two stateless replicas per service, soft node spread, dedicated stores.
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-web
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-web
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-web
+  ports:
+  - name: http
+    port: 3000
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langfuse-web
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-web
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  progressDeadlineSeconds: 900
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+      app.kubernetes.io/component: langfuse-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: kira-context-memory
+        app.kubernetes.io/component: langfuse-web
+    spec:
+      serviceAccountName: kira-runtime
+      automountServiceAccountToken: false
+      nodeSelector:
+        infra/zone: compute
+        project: lhvtt
+        kubernetes.io/arch: amd64
+        kubernetes.io/os: linux
+      tolerations:
+      - key: project
+        operator: Equal
+        value: lhvtt
+        effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-16
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-17
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-18
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            preference:
+              matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-17
+          - weight: 50
+            preference:
+              matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-18
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/part-of: kira-context-memory
+                  app.kubernetes.io/component: langfuse-web
+              topologyKey: kubernetes.io/hostname
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 65533
+        fsGroup: 1001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: langfuse-web
+        image: REPLACE_LANGFUSE_WEB_IMAGE
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: false
+        resources:
+          requests:
+            cpu: '2'
+            memory: 4Gi
+            ephemeral-storage: 128Mi
+          limits:
+            cpu: '6'
+            memory: 8Gi
+            ephemeral-storage: 1Gi
+        envFrom:
+        - configMapRef:
+            name: kira-langfuse-config
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LF_DATABASE_URL
+        - name: SALT
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LANGFUSE_SALT
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LANGFUSE_ENCRYPTION_KEY
+        - name: CLICKHOUSE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LF_CLICKHOUSE_PASSWORD
+        - name: REDIS_AUTH
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LF_REDIS_PASSWORD
+        - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LF_S3_ACCESS_KEY
+        - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LF_S3_SECRET_KEY
+        - name: LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LF_S3_ACCESS_KEY
+        - name: LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LF_S3_SECRET_KEY
+        - name: PORT
+          value: '3000'
+        - name: NODE_OPTIONS
+          value: --max-old-space-size=4096
+        - name: NEXTAUTH_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LANGFUSE_NEXTAUTH_SECRET
+        - name: AUTH_DISABLE_SIGNUP
+          value: 'true'
+        - name: LANGFUSE_INIT_ORG_ID
+          value: kira-internal-org
+        - name: LANGFUSE_INIT_ORG_NAME
+          value: KiRa Internal
+        - name: LANGFUSE_INIT_PROJECT_ID
+          value: kira-internal-project
+        - name: LANGFUSE_INIT_PROJECT_NAME
+          value: KiRa Context Memory
+        - name: LANGFUSE_INIT_PROJECT_PUBLIC_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LANGFUSE_PROJECT_PUBLIC_KEY
+        - name: LANGFUSE_INIT_PROJECT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LANGFUSE_PROJECT_SECRET_KEY
+        - name: LANGFUSE_INIT_USER_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LANGFUSE_INIT_USER_EMAIL
+        - name: LANGFUSE_INIT_USER_NAME
+          value: KiRa Operator
+        - name: LANGFUSE_INIT_USER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LANGFUSE_INIT_USER_PASSWORD
+        ports:
+        - name: http
+          containerPort: 3000
+        startupProbe:
+          httpGet:
+            path: /api/public/health
+            port: http
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 120
+        readinessProbe:
+          httpGet:
+            path: /api/public/ready
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /api/public/health
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/part-of: kira-context-memory
+            app.kubernetes.io/component: langfuse-web
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-worker
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-worker
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-worker
+  ports:
+  - name: http
+    port: 3030
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langfuse-worker
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-worker
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  progressDeadlineSeconds: 900
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+      app.kubernetes.io/component: langfuse-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: kira-context-memory
+        app.kubernetes.io/component: langfuse-worker
+    spec:
+      serviceAccountName: kira-runtime
+      automountServiceAccountToken: false
+      nodeSelector:
+        infra/zone: compute
+        project: lhvtt
+        kubernetes.io/arch: amd64
+        kubernetes.io/os: linux
+      tolerations:
+      - key: project
+        operator: Equal
+        value: lhvtt
+        effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-16
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-17
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-18
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            preference:
+              matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-17
+          - weight: 50
+            preference:
+              matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-18
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/part-of: kira-context-memory
+                  app.kubernetes.io/component: langfuse-worker
+              topologyKey: kubernetes.io/hostname
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 65533
+        fsGroup: 1001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: langfuse-worker
+        image: REPLACE_LANGFUSE_WORKER_IMAGE
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: false
+        resources:
+          requests:
+            cpu: '4'
+            memory: 8Gi
+            ephemeral-storage: 128Mi
+          limits:
+            cpu: '12'
+            memory: 16Gi
+            ephemeral-storage: 1Gi
+        envFrom:
+        - configMapRef:
+            name: kira-langfuse-config
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LF_DATABASE_URL
+        - name: SALT
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LANGFUSE_SALT
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LANGFUSE_ENCRYPTION_KEY
+        - name: CLICKHOUSE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LF_CLICKHOUSE_PASSWORD
+        - name: REDIS_AUTH
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LF_REDIS_PASSWORD
+        - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LF_S3_ACCESS_KEY
+        - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LF_S3_SECRET_KEY
+        - name: LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LF_S3_ACCESS_KEY
+        - name: LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LF_S3_SECRET_KEY
+        - name: PORT
+          value: '3030'
+        - name: NODE_OPTIONS
+          value: --max-old-space-size=8192
+        ports:
+        - name: http
+          containerPort: 3030
+        startupProbe:
+          httpGet:
+            path: /api/health
+            port: http
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 120
+        readinessProbe:
+          httpGet:
+            path: /api/ready
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/part-of: kira-context-memory
+            app.kubernetes.io/component: langfuse-worker
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: langfuse-web
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-web
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+      app.kubernetes.io/component: langfuse-web
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: langfuse-worker
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-worker
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+      app.kubernetes.io/component: langfuse-worker

@@ -1,0 +1,569 @@
+# Review templates first; bind REPLACE_*_IMAGE before apply.
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: gateway
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: gateway
+  ports:
+  - name: http
+    port: 8000
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: gateway
+spec:
+  replicas: 3
+  revisionHistoryLimit: 3
+  progressDeadlineSeconds: 600
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: kira-context-memory
+        app.kubernetes.io/component: gateway
+    spec:
+      serviceAccountName: kira-runtime
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 45
+      nodeSelector:
+        infra/zone: compute
+        project: lhvtt
+        kubernetes.io/arch: amd64
+        kubernetes.io/os: linux
+      tolerations:
+      - key: project
+        operator: Equal
+        value: lhvtt
+        effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-16
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-17
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-18
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            preference:
+              matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-17
+          - weight: 50
+            preference:
+              matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-18
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/part-of: kira-context-memory
+                  app.kubernetes.io/component: gateway
+              topologyKey: kubernetes.io/hostname
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: gateway
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: false
+        resources:
+          requests:
+            cpu: '4'
+            memory: 4Gi
+            ephemeral-storage: 128Mi
+          limits:
+            cpu: '8'
+            memory: 8Gi
+            ephemeral-storage: 1Gi
+        image: REPLACE_BACKEND_IMAGE
+        env:
+        - name: POD_UID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.uid
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: service.instance.id=$(POD_UID),k8s.pod.uid=$(POD_UID)
+        ports:
+        - name: http
+          containerPort: 8000
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+          periodSeconds: 5
+          failureThreshold: 60
+          timeoutSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          periodSeconds: 20
+          timeoutSeconds: 3
+          failureThreshold: 3
+        envFrom:
+        - configMapRef:
+            name: kira-runtime-config
+        - configMapRef:
+            name: kira-memory-config
+        - secretRef:
+            name: kira-database
+        - configMapRef:
+            name: kira-gateway-config
+        - secretRef:
+            name: kira-service
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/part-of: kira-context-memory
+            app.kubernetes.io/component: gateway
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: gateway
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: gateway
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+      app.kubernetes.io/component: gateway
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: worker
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: worker
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: worker
+  ports:
+  - name: http
+    port: 8001
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: worker
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  progressDeadlineSeconds: 600
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: kira-context-memory
+        app.kubernetes.io/component: worker
+    spec:
+      serviceAccountName: kira-runtime
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 45
+      nodeSelector:
+        infra/zone: compute
+        project: lhvtt
+        kubernetes.io/arch: amd64
+        kubernetes.io/os: linux
+      tolerations:
+      - key: project
+        operator: Equal
+        value: lhvtt
+        effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-16
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-17
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-18
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            preference:
+              matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-17
+          - weight: 50
+            preference:
+              matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-18
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/part-of: kira-context-memory
+                  app.kubernetes.io/component: worker
+              topologyKey: kubernetes.io/hostname
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: worker
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: false
+        resources:
+          requests:
+            cpu: '4'
+            memory: 8Gi
+            ephemeral-storage: 128Mi
+          limits:
+            cpu: '12'
+            memory: 24Gi
+            ephemeral-storage: 1Gi
+        image: REPLACE_BACKEND_IMAGE
+        ports:
+        - name: http
+          containerPort: 8001
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+          periodSeconds: 5
+          failureThreshold: 60
+          timeoutSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          periodSeconds: 20
+          timeoutSeconds: 3
+          failureThreshold: 3
+        envFrom:
+        - configMapRef:
+            name: kira-runtime-config
+        - configMapRef:
+            name: kira-memory-config
+        - secretRef:
+            name: kira-database
+        command:
+        - python
+        - -m
+        - worker.main
+        env:
+        - name: POD_UID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.uid
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: service.instance.id=$(POD_UID),k8s.pod.uid=$(POD_UID)
+        - name: HEALTH_PORT
+          value: '8001'
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/part-of: kira-context-memory
+            app.kubernetes.io/component: worker
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: frontend
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: frontend
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: frontend
+spec:
+  replicas: 3
+  revisionHistoryLimit: 3
+  progressDeadlineSeconds: 600
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+      app.kubernetes.io/component: frontend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: kira-context-memory
+        app.kubernetes.io/component: frontend
+    spec:
+      serviceAccountName: kira-runtime
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 45
+      nodeSelector:
+        infra/zone: compute
+        project: lhvtt
+        kubernetes.io/arch: amd64
+        kubernetes.io/os: linux
+      tolerations:
+      - key: project
+        operator: Equal
+        value: lhvtt
+        effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-16
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-17
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-18
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            preference:
+              matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-17
+          - weight: 50
+            preference:
+              matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-18
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/part-of: kira-context-memory
+                  app.kubernetes.io/component: frontend
+              topologyKey: kubernetes.io/hostname
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: frontend
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: false
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+            ephemeral-storage: 128Mi
+          limits:
+            cpu: '2'
+            memory: 1Gi
+            ephemeral-storage: 1Gi
+        image: REPLACE_FRONTEND_IMAGE
+        ports:
+        - name: http
+          containerPort: 8080
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          periodSeconds: 5
+          failureThreshold: 60
+          timeoutSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          periodSeconds: 20
+          timeoutSeconds: 3
+          failureThreshold: 3
+        env:
+        - name: GATEWAY_UPSTREAM
+          value: gateway:8000
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/part-of: kira-context-memory
+            app.kubernetes.io/component: frontend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: frontend
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: frontend
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+      app.kubernetes.io/component: frontend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: worker
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: worker
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+      app.kubernetes.io/component: worker

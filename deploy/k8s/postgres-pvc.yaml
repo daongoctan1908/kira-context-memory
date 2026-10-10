@@ -1,0 +1,17 @@
+# Initial pilot allocation; adjust for the measured workload before production rollout.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: kira-context-memory
+spec:
+  storageClassName: longhorn-storage-2-retain
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 20Gi

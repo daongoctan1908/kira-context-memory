@@ -20,9 +20,9 @@ from app.domain.errors.query_rewriter import (
     QueryRewriterTimeoutError,
 )
 from app.domain.models.chat import ChatCommand
-from app.infrastructure.observability.context import ContextTelemetry
 from tests.integration.test_gateway_api import FakeKiraClient, ListStream, kira_event
 from tests.support.context_fakes import PRINCIPAL, FakeRewriter, MemoryStore, make_use_case, pair
+from tests.support.otel_metrics import gateway_telemetry
 
 COMMAND = ChatCommand("session-1", "Hưng Yên thì sao?")
 
@@ -39,7 +39,7 @@ async def test_rewrite_and_persist_original_with_exact_assistant_once():
     store = MemoryStore(pair())
     rewriter = FakeRewriter("Doanh thu Hưng Yên tháng 8?")
     client = FakeKiraClient(events=[answer(" exact\n"), answer("answer ")])
-    telemetry = ContextTelemetry()
+    telemetry, metrics = gateway_telemetry()
     session = await make_use_case(
         client,
         conversation_store=store,
@@ -63,15 +63,15 @@ async def test_rewrite_and_persist_original_with_exact_assistant_once():
     assert store.schedule_requests == [False]
     assert rewriter.contexts[0].current_query == COMMAND.message
     assert (
-        telemetry.registry.get_sample_value(
-            "kira_conversation_write_total",
+        metrics.value(
+            "kira.conversation.write.count",
             {"outcome": "inserted"},
         )
         == 1
     )
     assert (
-        telemetry.registry.get_sample_value(
-            "kira_memory_job_schedule_total",
+        metrics.value(
+            "kira.memory.job.schedule.count",
             {"outcome": "disabled"},
         )
         == 1
@@ -80,7 +80,7 @@ async def test_rewrite_and_persist_original_with_exact_assistant_once():
 
 async def test_completed_turn_requests_memory_job_when_formation_is_enabled():
     store = MemoryStore()
-    telemetry = ContextTelemetry()
+    telemetry, metrics = gateway_telemetry()
     session = await make_use_case(
         FakeKiraClient(events=[answer()]),
         conversation_store=store,
@@ -93,8 +93,8 @@ async def test_completed_turn_requests_memory_job_when_formation_is_enabled():
     assert len(store.writes) == 1
     assert store.schedule_requests == [True]
     assert (
-        telemetry.registry.get_sample_value(
-            "kira_memory_job_schedule_total",
+        metrics.value(
+            "kira.memory.job.schedule.count",
             {"outcome": "scheduled"},
         )
         == 1
@@ -126,7 +126,7 @@ async def test_empty_or_fully_trimmed_context_bypasses_rewriter(budget, history)
     ],
 )
 async def test_read_failure_bypasses_even_failing_rewriter(error):
-    telemetry = ContextTelemetry()
+    telemetry, metrics = gateway_telemetry()
     rewriter = FakeRewriter(error=QueryRewriterTimeoutError())
     client = FakeKiraClient(events=[answer()])
     store = MemoryStore(read_error=error)
@@ -141,8 +141,8 @@ async def test_read_failure_bypasses_even_failing_rewriter(error):
     assert rewriter.contexts == []
     assert len(store.writes) == 1
     assert (
-        telemetry.registry.get_sample_value(
-            "kira_context_degraded_total",
+        metrics.value(
+            "kira.context.degraded.count",
             {"dependency": "postgresql", "operation": "postgres_read"},
         )
         == 1
@@ -160,7 +160,7 @@ async def test_read_failure_bypasses_even_failing_rewriter(error):
 )
 async def test_rewriter_failure_uses_original(error):
     client = FakeKiraClient()
-    telemetry = ContextTelemetry()
+    telemetry, metrics = gateway_telemetry()
     await make_use_case(
         client,
         conversation_store=MemoryStore(pair()),
@@ -169,8 +169,8 @@ async def test_rewriter_failure_uses_original(error):
     ).execute(COMMAND, principal=PRINCIPAL)
     assert client.messages == [COMMAND.message]
     assert (
-        telemetry.registry.get_sample_value(
-            "kira_context_rewrite_total",
+        metrics.value(
+            "kira.context.rewrite.count",
             {"outcome": "error"},
         )
         == 1
@@ -198,7 +198,7 @@ async def test_unsuccessful_or_textless_stream_does_not_persist(failure):
         open_error=error if failure == "before" else None,
         stream_error=error if failure == "midstream" else None,
     )
-    telemetry = ContextTelemetry()
+    telemetry, metrics = gateway_telemetry()
     use_case = make_use_case(
         client,
         conversation_store=store,
@@ -223,8 +223,8 @@ async def test_unsuccessful_or_textless_stream_does_not_persist(failure):
     assert store.writes == []
     assert store.schedule_requests == []
     assert all(
-        telemetry.registry.get_sample_value(
-            "kira_memory_job_schedule_total",
+        metrics.value(
+            "kira.memory.job.schedule.count",
             {"outcome": outcome},
         )
         is None
@@ -236,7 +236,7 @@ async def test_unsuccessful_or_textless_stream_does_not_persist(failure):
     "write_error", [ConversationStoreConnectionError(), RuntimeError("private")]
 )
 async def test_write_failure_is_only_observed_never_raised(write_error):
-    telemetry = ContextTelemetry()
+    telemetry, metrics = gateway_telemetry()
     session = await make_use_case(
         FakeKiraClient(events=[answer()]),
         conversation_store=MemoryStore(write_error=write_error),
@@ -245,15 +245,15 @@ async def test_write_failure_is_only_observed_never_raised(write_error):
     ).execute(COMMAND, principal=PRINCIPAL)
     assert len(await drain(session)) == 1
     assert (
-        telemetry.registry.get_sample_value(
-            "kira_conversation_write_total",
+        metrics.value(
+            "kira.conversation.write.count",
             {"outcome": "error"},
         )
         == 1
     )
     assert (
-        telemetry.registry.get_sample_value(
-            "kira_memory_job_schedule_total",
+        metrics.value(
+            "kira.memory.job.schedule.count",
             {"outcome": "error"},
         )
         == 1
@@ -261,7 +261,7 @@ async def test_write_failure_is_only_observed_never_raised(write_error):
 
 
 async def test_duplicate_write_outcome():
-    telemetry = ContextTelemetry()
+    telemetry, metrics = gateway_telemetry()
     session = await make_use_case(
         FakeKiraClient(events=[answer()]),
         conversation_store=MemoryStore(inserted=False),
@@ -270,15 +270,15 @@ async def test_duplicate_write_outcome():
     ).execute(COMMAND, principal=PRINCIPAL)
     await drain(session)
     assert (
-        telemetry.registry.get_sample_value(
-            "kira_conversation_write_total",
+        metrics.value(
+            "kira.conversation.write.count",
             {"outcome": "duplicate"},
         )
         == 1
     )
     assert (
-        telemetry.registry.get_sample_value(
-            "kira_memory_job_schedule_total",
+        metrics.value(
+            "kira.memory.job.schedule.count",
             {"outcome": "duplicate"},
         )
         == 1
@@ -288,7 +288,7 @@ async def test_duplicate_write_outcome():
 async def test_missing_job_reference_is_observed_as_schedule_protocol_error():
     store = MemoryStore()
     store.memory_job_event_id = None
-    telemetry = ContextTelemetry()
+    telemetry, metrics = gateway_telemetry()
     session = await make_use_case(
         FakeKiraClient(events=[answer()]),
         conversation_store=store,
@@ -299,15 +299,15 @@ async def test_missing_job_reference_is_observed_as_schedule_protocol_error():
     await drain(session)
 
     assert (
-        telemetry.registry.get_sample_value(
-            "kira_memory_job_schedule_total",
+        metrics.value(
+            "kira.memory.job.schedule.count",
             {"outcome": "error"},
         )
         == 1
     )
     assert (
-        telemetry.registry.get_sample_value(
-            "kira_context_degraded_total",
+        metrics.value(
+            "kira.context.degraded.count",
             {"dependency": "postgresql", "operation": "postgres_write"},
         )
         == 1
@@ -316,7 +316,7 @@ async def test_missing_job_reference_is_observed_as_schedule_protocol_error():
 
 async def test_missing_identity_uses_current_query_without_history_or_persistence():
     store = MemoryStore(pair())
-    telemetry = ContextTelemetry()
+    telemetry, metrics = gateway_telemetry()
     client = FakeKiraClient(events=[answer()])
 
     session = await make_use_case(
@@ -332,8 +332,8 @@ async def test_missing_identity_uses_current_query_without_history_or_persistenc
     assert store.writes == []
     assert store.schedule_requests == []
     assert (
-        telemetry.registry.get_sample_value(
-            "kira_context_degraded_total",
+        metrics.value(
+            "kira.context.degraded.count",
             {"dependency": "identity", "operation": "identity"},
         )
         == 1
@@ -350,7 +350,7 @@ async def test_total_store_operation_deadline(operation):
         await asyncio.Event().wait()
 
     setattr(store, operation, hang)
-    telemetry = ContextTelemetry()
+    telemetry, metrics = gateway_telemetry()
     client = FakeKiraClient(events=[answer()])
     async with asyncio.timeout(1):
         session = await make_use_case(
@@ -363,8 +363,8 @@ async def test_total_store_operation_deadline(operation):
     assert started.is_set()
     assert client.messages == [COMMAND.message]
     assert (
-        telemetry.registry.get_sample_value(
-            "kira_context_degraded_total",
+        metrics.value(
+            "kira.context.degraded.count",
             {
                 "dependency": "postgresql",
                 "operation": "postgres_read" if operation == "read_recent" else "postgres_write",

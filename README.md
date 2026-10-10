@@ -182,6 +182,16 @@ Runbook nằm trong [local product acceptance](docs/product-e2e.md#openai-runtim
 
 ## Local observability và Langfuse
 
+K8s: [bộ YAML và thứ tự triển khai](deploy/k8s/DEPLOY.md),
+[Langfuse và metrics](deploy/k8s/observability/README.md). Gateway/Worker chỉ ghi
+metrics qua OTel; `/metrics` cũ đã bỏ. Metrics vận hành dùng một Prometheus/Grafana
+đã chọn; Langfuse giữ chức năng trace các bước AI. Dockerfile backend/frontend
+đã cập nhật và cả hai image `0.4.1-cbea254a95b2` đã build, probe local ngày
+2026-10-09; xem [receipt](docs/evidence/product-dockerfile-rebuild-2026-10-09.json).
+Chưa export/publish. Bộ image ngày 2026-10-08 còn code metrics cũ.
+Review replica, CPU/RAM, connection budget và Longhorn tại
+[CAPACITY.md](deploy/k8s/CAPACITY.md).
+
 Telemetry là tùy chọn: `OTEL_ENABLED=false` mặc định, chat và Worker vẫn chạy bình thường.
 Khi bật OTel, `OTEL_CAPTURE_CONTENT_ENABLED=false` mặc định chỉ ghi timing, outcome, model,
 usage và IDs; đặt `true` khi cần debug prompt/output đã mask. Langfuse không phải dependency

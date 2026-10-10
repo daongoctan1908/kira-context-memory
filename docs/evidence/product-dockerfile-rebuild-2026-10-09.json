@@ -1,0 +1,70 @@
+{
+  "archive_export": "NOT_RUN",
+  "base_revision": "6eb9adc0ff54219e22bf003b588b6a578a26699f",
+  "checks": {
+    "backend": {
+      "gid": 10001,
+      "http": {
+        "gateway/health": 200,
+        "gateway/metrics": 404,
+        "gateway/ready": 200,
+        "worker/health": 200,
+        "worker/metrics": 404,
+        "worker/ready": 200
+      },
+      "imports": "PASS",
+      "legacy_dependencies_absent": "PASS",
+      "network": "none",
+      "uid": 10001,
+      "worker_readiness_sampler": "PASS"
+    },
+    "frontend": {
+      "gid": 101,
+      "healthz_http": 200,
+      "healthz_response": "ok",
+      "network": "none",
+      "nginx_configuration": "PASS",
+      "nginx_request_variables_preserved": "PASS",
+      "sse_proxy_configuration": "PASS",
+      "uid": 101,
+      "upstream_substitution": "PASS"
+    }
+  },
+  "cluster_apply": "NOT_RUN",
+  "created_at": "2026-10-09T09:39:05.404703+00:00",
+  "current_runtime_files_checked": 279,
+  "database_acceptance": "NOT_RUN",
+  "dockerfile_sha256": "0b90d0e8825332d6a6d8a6a64312b89b4c4179ee6f79178ab16eae3325a6f2bd",
+  "frontend_dockerfile_sha256": "ca0c493b0e53e4265d7e188eed79fd78e5da3e6b0068e523df11d0648512d6f2",
+  "frozen_context": "artifacts/deployment/k8s-20261009-sized/build-context",
+  "images": [
+    {
+      "bytes": 546103977,
+      "local_image_id": "sha256:c0df893a6613e712ef8b59a07ca622e7774b933115ae2cc32edb4e9bdf8db636",
+      "platform": "linux/amd64",
+      "reference": "kira-context-memory/backend:0.4.1-cbea254a95b2",
+      "role": "backend",
+      "user": "10001:10001"
+    },
+    {
+      "bytes": 94357468,
+      "local_image_id": "sha256:ea045a45d22746f827be8844cc27e5ee11d2f6e55624f6908433e9c4cbd1490b",
+      "platform": "linux/amd64",
+      "reference": "kira-context-memory/frontend:0.4.1-cbea254a95b2",
+      "role": "frontend",
+      "user": "101:101"
+    }
+  ],
+  "platform": "linux/amd64",
+  "production_credentials_used": false,
+  "providers": "synthetic_injected_dependencies",
+  "real_provider_acceptance": "NOT_RUN",
+  "registry_publish": "NOT_RUN",
+  "runtime_source_matches_current_workspace": "PASS",
+  "schema_version": 1,
+  "source_manifest_sha256": "43db0ba213a309976ed45dd88a5a71a8ce427b741cc9020487f1a649c592fc93",
+  "source_snapshot_sha256": "cbea254a95b2c6edd4a4c21c68755368e7967de4f9048016bdb0a110a51f2ccd",
+  "source_state": "working_tree_snapshot",
+  "status": "BUILT_LOCAL_VERIFICATION_PASS",
+  "zip_packaging": "NOT_RUN"
+}

@@ -11,7 +11,7 @@ from tests.integration.test_gateway_api import FakeKiraClient, kira_event, make_
 from tests.support.context_fakes import FakeRewriter, MemoryStore, pair
 
 
-async def test_gateway_preserves_sse_on_write_failure_and_exposes_safe_metrics():
+async def test_gateway_preserves_sse_on_write_failure_and_exposes_safe_metrics(otel_capture):
     app = create_app(
         settings=make_settings().model_copy(update={"memory_formation_enabled": True}),
         kira_client=FakeKiraClient(events=[kira_event('{"text":"answer"}', "answer")]),
@@ -28,7 +28,8 @@ async def test_gateway_preserves_sse_on_write_failure_and_exposes_safe_metrics()
         response = await client.post(
             "/chat", json={"session_id": "session-1", "message": "followup"}
         )
-        metrics = await client.get("/metrics")
+        metrics = otel_capture.snapshot()
+        removed_scrape = await client.get("/metrics")
         ready = await client.get("/ready")
         rejected = await client.post(
             "/chat",
@@ -41,13 +42,12 @@ async def test_gateway_preserves_sse_on_write_failure_and_exposes_safe_metrics()
     assert response.content == b'data: {"text":"answer"}\n\n'
     assert ready.status_code == 200
     assert rejected.status_code == 422
-    assert metrics.status_code == 200
-    assert metrics.headers["content-type"].startswith("text/plain")
-    assert 'kira_conversation_write_total{outcome="error"} 1.0' in metrics.text
-    assert 'kira_memory_job_schedule_total{outcome="error"} 1.0' in metrics.text
-    assert 'kira_context_rewrite_total{outcome="success"} 1.0' in metrics.text
-    assert "session-1" not in metrics.text
-    assert "private" not in metrics.text
+    assert removed_scrape.status_code == 404
+    assert metrics.value("kira.conversation.write.count", {"outcome": "error"}) == 1.0
+    assert metrics.value("kira.memory.job.schedule.count", {"outcome": "error"}) == 1.0
+    assert metrics.value("kira.context.rewrite.count", {"outcome": "success"}) == 1.0
+    assert "session-1" not in repr(metrics)
+    assert "private" not in repr(metrics)
 
 
 async def test_runtime_schema_error_degrades_chat_but_not_ready_until_revalidated():

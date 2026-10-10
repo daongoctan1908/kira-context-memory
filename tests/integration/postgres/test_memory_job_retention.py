@@ -8,7 +8,6 @@ from uuid import UUID, uuid4
 import pytest
 from alembic import command
 from alembic.config import Config
-from prometheus_client import generate_latest
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
@@ -24,6 +23,7 @@ from app.domain.models.memory_job import MemoryJobPurgeResult, MemoryJobStatus
 from app.infrastructure.postgres.conversation_store import PostgresConversationStoreAdapter
 from app.infrastructure.postgres.memory_job_queue import PostgresMemoryJobQueueAdapter
 from app.infrastructure.postgres.schema import conversations, memory_jobs
+from tests.support.otel_metrics import MetricCapture
 from worker.cleanup import MemoryJobCleanupRunner
 from worker.telemetry import MemoryJobTelemetry
 
@@ -104,8 +104,8 @@ class AlwaysTimeoutMemory:
 
 
 class NotifyingTelemetry(MemoryJobTelemetry):
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, *, meter=None) -> None:
+        super().__init__(meter=meter)
         self.results: list[MemoryJobPurgeResult] = []
         self.observed = asyncio.Event()
 
@@ -280,7 +280,8 @@ async def test_cleanup_applies_distinct_retention_and_preserves_active_jobs(
                 .values(dead_at=NOW - timedelta(days=29))
             )
 
-        telemetry = NotifyingTelemetry()
+        metrics = MetricCapture()
+        telemetry = NotifyingTelemetry(meter=metrics.meter)
         cleanup = MemoryJobCleanupRunner(
             queue,
             interval_seconds=3600,
@@ -297,9 +298,8 @@ async def test_cleanup_applies_distinct_retention_and_preserves_active_jobs(
         await asyncio.wait_for(task, timeout=2)
 
         assert telemetry.results == [MemoryJobPurgeResult(completed=1, dead=1)]
-        payload = generate_latest(telemetry.registry).decode()
-        assert 'kira_memory_job_cleanup_total{status="completed"} 1.0' in payload
-        assert 'kira_memory_job_cleanup_total{status="dead"} 1.0' in payload
+        assert metrics.value("kira.memory.job.cleanup.count", {"status": "completed"}) == 1
+        assert metrics.value("kira.memory.job.cleanup.count", {"status": "dead"}) == 1
         async with engine.connect() as connection:
             rows = (
                 await connection.execute(

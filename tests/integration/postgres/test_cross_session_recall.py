@@ -136,7 +136,7 @@ def settings(database: str, schema_name: str, user_id: str) -> Settings:
     )
 
 
-async def post_chat(app, session_id: str, message: str):
+async def post_chat(app, session_id: str, message: str, otel_capture):
     async with (
         app.router.lifespan_context(app),
         httpx.AsyncClient(
@@ -148,7 +148,7 @@ async def post_chat(app, session_id: str, message: str):
             "/chat",
             json={"session_id": session_id, "message": message},
         )
-        metrics = (await client.get("/metrics")).text
+        metrics = otel_capture.snapshot()
         ready = await client.get("/ready")
     assert response.status_code == 200
     assert response.content == b'data: {"text":"answer"}\n\n'
@@ -168,7 +168,9 @@ def assert_rewritten_threshold(query: str, expected: int, *forbidden: int) -> No
         assert not re.search(rf"(?<!\d){threshold}\s*%", normalized_query)
 
 
-async def test_session_a_formation_is_recalled_in_session_b_without_cross_user_leak() -> None:
+async def test_session_a_formation_is_recalled_in_session_b_without_cross_user_leak(
+    otel_capture,
+) -> None:
     database = database_url()
     psycopg_dsn = normalize_psycopg_dsn(database)
     schema_name = f"memory_c4_{uuid4().hex}"
@@ -316,10 +318,10 @@ async def test_session_a_formation_is_recalled_in_session_b_without_cross_user_l
                     query_rewriter=rewriter,
                     long_term_memory=adapter,
                 )
-                metrics_a = await post_chat(app_a, session_b, FOLLOW_UP)
+                metrics_a = await post_chat(app_a, session_b, FOLLOW_UP, otel_capture)
                 assert kira_a.messages == [REWRITTEN_FOLLOW_UP]
-                assert 'kira_memory_search_total{outcome="success"} 1.0' in metrics_a
-                assert "kira_memory_search_results_sum 1.0" in metrics_a
+                assert metrics_a.value("kira.memory.search.count", {"outcome": "success"}) == 1.0
+                assert metrics_a.value("kira.memory.search.result_count", None, field="sum") == 1.0
 
                 persisted_b = await store.read_recent(user_a, session_b, 10)
                 assert [message.content for message in persisted_b] == [FOLLOW_UP, KIRA_ANSWER]
@@ -332,10 +334,10 @@ async def test_session_a_formation_is_recalled_in_session_b_without_cross_user_l
                     query_rewriter=rewriter,
                     long_term_memory=adapter,
                 )
-                metrics_b = await post_chat(app_b, session_b, FOLLOW_UP)
+                metrics_b = await post_chat(app_b, session_b, FOLLOW_UP, otel_capture)
                 assert kira_b.messages == [FOLLOW_UP]
-                assert 'kira_memory_search_total{outcome="success"} 1.0' in metrics_b
-                assert "kira_memory_search_results_sum 0.0" in metrics_b
+                assert metrics_b.value("kira.memory.search.count", {"outcome": "success"}) == 1.0
+                assert metrics_b.value("kira.memory.search.result_count", None, field="sum") == 0.0
 
                 kira_override = FakeKiraClient(
                     events=[kira_event('{"text":"answer"}', KIRA_ANSWER)]
@@ -347,7 +349,7 @@ async def test_session_a_formation_is_recalled_in_session_b_without_cross_user_l
                     query_rewriter=rewriter,
                     long_term_memory=adapter,
                 )
-                await post_chat(app_override, session_c, EXPLICIT_OVERRIDE)
+                await post_chat(app_override, session_c, EXPLICIT_OVERRIDE, otel_capture)
                 assert kira_override.messages == [EXPLICIT_OVERRIDE]
 
                 recent_turn_id = uuid4().hex
@@ -376,7 +378,7 @@ async def test_session_a_formation_is_recalled_in_session_b_without_cross_user_l
                     query_rewriter=rewriter,
                     long_term_memory=adapter,
                 )
-                await post_chat(app_recent, session_d, RECENT_FOLLOW_UP)
+                await post_chat(app_recent, session_d, RECENT_FOLLOW_UP, otel_capture)
                 assert kira_recent.messages == [REWRITTEN_RECENT_FOLLOW_UP]
 
                 kira_fallback = FakeKiraClient(
@@ -393,13 +395,18 @@ async def test_session_a_formation_is_recalled_in_session_b_without_cross_user_l
                     app_fallback,
                     fallback_session,
                     FOLLOW_UP,
+                    otel_capture,
                 )
                 assert kira_fallback.messages == [FOLLOW_UP]
                 assert (
-                    'kira_context_degraded_total{dependency="mem0",operation="memory_search"} 1.0'
-                ) in fallback_metrics
+                    fallback_metrics.value(
+                        "kira.context.degraded.count",
+                        {"dependency": "mem0", "operation": "memory_search"},
+                    )
+                    == 1.0
+                )
 
-            combined_metrics = metrics_a + metrics_b + fallback_metrics
+            combined_metrics = repr((metrics_a, metrics_b, fallback_metrics))
             for sensitive_value in (
                 user_a,
                 user_b,

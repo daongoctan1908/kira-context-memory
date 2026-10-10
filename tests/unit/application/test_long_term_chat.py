@@ -14,9 +14,9 @@ from app.domain.errors.query_rewriter import QueryRewriterTimeoutError
 from app.domain.models.chat import ChatCommand
 from app.domain.models.identity import AuthenticatedPrincipal
 from app.domain.models.memory import LongTermMemory
-from app.infrastructure.observability.context import ContextTelemetry
 from tests.integration.test_gateway_api import FakeKiraClient
 from tests.support.context_fakes import FakeRewriter, MemoryStore, make_use_case, pair
+from tests.support.otel_metrics import gateway_telemetry
 
 COMMAND = ChatCommand("session-1", "Hưng Yên thì sao?")
 PRINCIPAL = AuthenticatedPrincipal("trusted-user")
@@ -68,7 +68,7 @@ async def test_combines_ranked_ltm_with_recent_using_trusted_user_and_original_q
     client = FakeKiraClient()
     store = MemoryStore(recent)
 
-    telemetry = ContextTelemetry()
+    telemetry, metrics = gateway_telemetry()
     await make_use_case(
         client,
         conversation_store=store,
@@ -89,13 +89,13 @@ async def test_combines_ranked_ltm_with_recent_using_trusted_user_and_original_q
     assert rewriter.contexts[0].long_term_memories == memories
     assert rewriter.contexts[0].current_query == COMMAND.message
     assert (
-        telemetry.registry.get_sample_value(
-            "kira_memory_search_total",
+        metrics.value(
+            "kira.memory.search.count",
             {"outcome": "success"},
         )
         == 1
     )
-    assert telemetry.registry.get_sample_value("kira_memory_search_results_sum") == 2
+    assert metrics.value("kira.memory.search.result_count", field="sum") == 2
 
 
 async def test_ltm_only_context_still_invokes_rewriter_for_cross_session_recall():
@@ -164,7 +164,7 @@ async def test_memory_failure_degrades_to_recent_and_current(error):
     recent = pair()
     rewriter = FakeRewriter("rewritten from recent")
     client = FakeKiraClient()
-    telemetry = ContextTelemetry()
+    telemetry, metrics = gateway_telemetry()
 
     await make_use_case(
         client,
@@ -178,8 +178,8 @@ async def test_memory_failure_degrades_to_recent_and_current(error):
     assert rewriter.contexts[0].long_term_memories == ()
     assert client.messages == ["rewritten from recent"]
     assert (
-        telemetry.registry.get_sample_value(
-            "kira_context_degraded_total",
+        metrics.value(
+            "kira.context.degraded.count",
             {"dependency": "mem0", "operation": "memory_search"},
         )
         == 1
@@ -381,7 +381,7 @@ async def test_cancellation_during_memory_search_propagates_before_kira():
 async def test_missing_identity_never_searches_ltm():
     ltm = FakeLongTermMemory((memory(1),))
     client = FakeKiraClient()
-    telemetry = ContextTelemetry()
+    telemetry, metrics = gateway_telemetry()
 
     await make_use_case(client, long_term_memory=ltm, observer=telemetry).execute(
         COMMAND, principal=None
@@ -390,8 +390,8 @@ async def test_missing_identity_never_searches_ltm():
     assert ltm.searches == []
     assert client.messages == [COMMAND.message]
     assert (
-        telemetry.registry.get_sample_value(
-            "kira_memory_search_total",
+        metrics.value(
+            "kira.memory.search.count",
             {"outcome": "bypass"},
         )
         == 1

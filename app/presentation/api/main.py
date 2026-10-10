@@ -54,7 +54,6 @@ from app.presentation.api.errors import (
     sanitized_validation_exception_handler,
 )
 from app.presentation.api.health_router import router as health_router
-from app.presentation.api.metrics_router import router as metrics_router
 from app.presentation.api.tracing_middleware import ChatTracingMiddleware
 
 logger = logging.getLogger(__name__)
@@ -301,7 +300,6 @@ def create_app(
     application.include_router(auth_router)
     application.include_router(conversation_router)
     application.include_router(chat_router)
-    application.include_router(metrics_router)
     return application
 
 

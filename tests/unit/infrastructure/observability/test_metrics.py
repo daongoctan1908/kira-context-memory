@@ -6,7 +6,6 @@ from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader, MetricsData
 
 from app.infrastructure.observability.metrics import (
-    LEGACY_METRIC_MAP,
     METRIC_SPECS,
     GatewayMetrics,
     WorkerMetrics,
@@ -26,12 +25,17 @@ def metric_by_name(reader: InMemoryMetricReader, name: str) -> Any:
     return next(metric for metric in metric_items(data) if metric.name == name)
 
 
-def test_every_legacy_metric_has_one_reviewed_otel_spec() -> None:
+def test_otel_specs_have_unique_canonical_instrument_names() -> None:
     spec_names = [spec.name for spec in METRIC_SPECS.values()]
 
-    assert len(LEGACY_METRIC_MAP) == 22
-    assert set(LEGACY_METRIC_MAP.values()) <= set(spec_names)
-    assert all(spec_names.count(name) == 1 for name in LEGACY_METRIC_MAP.values())
+    assert len(spec_names) == len(set(spec_names))
+    assert all(name.startswith("kira.") and " " not in name for name in spec_names)
+    assert {
+        "kira.chat.request.duration",
+        "kira.stream.first_content.duration",
+        "kira.memory.job.queue.depth",
+        "kira.memory.job.process.count",
+    } <= set(spec_names)
 
 
 @pytest.mark.parametrize(

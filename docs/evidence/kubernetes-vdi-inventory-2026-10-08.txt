@@ -1,0 +1,163 @@
+> Run kubectl commands inside here
+# e.g. kubectl get all
+> kubectl config current-context
+default
+
+> kubectl get namespaces --show-labels
+NAME                                                  STATUS   AGE    LABELS
+airflow                                               Active   125d   kubernetes.io/metadata.name=airflow
+autolake                                              Active   147d   kubernetes.io/metadata.name=autolake
+autolake-ai-test                                      Active   23d    kubernetes.io/metadata.name=autolake-ai-test
+calico-system                                         Active   716d   field.cattle.io/projectId=p-mpnmw,kubernetes.io/metadata.name=calico-system,name=calico-system,pod-security.kubernetes.io/enforce-version=latest,pod-security.kubernetes.io/enforce=privileged
+cattle-dashboards                                     Active   511d   app.kubernetes.io/instance=rancher-monitoring,app.kubernetes.io/managed-by=Helm,app.kubernetes.io/part-of=rancher-monitoring,app.kubernetes.io/version=105.1.1_up61.3.2,chart=rancher-monitoring-105.1.1_up61.3.2,field.cattle.io/projectId=p-mpnmw,heritage=Helm,kubernetes.io/metadata.name=cattle-dashboards,name=cattle-dashboards,release=rancher-monitoring
+cattle-fleet-clusters-system                          Active   152d   field.cattle.io/projectId=p-5g94w,kubernetes.io/metadata.name=cattle-fleet-clusters-system,objectset.rio.cattle.io/hash=4510[?]
+303f19b9bcbafc9031143b1866f16c2be7aaa
+cattle-fleet-local-system                             Active   152d   field.cattle.io/projectId=p-mpnmw,kubernetes.io/metadata.name=cattle-fleet-local-system,objectset.rio.cattle.io/hash=363023f[?]
+752e7f1989d0b652e029bd2c658ae7c44
+cattle-fleet-system                                   Active   714d   field.cattle.io/projectId=p-mpnmw,kubernetes.io/metadata.name=cattle-fleet-system,objectset.rio.cattle.io/hash=4510303f19b9bc6c[?]
+bafc9031148b1866f16c2be7aaa
+cattle-global-data                                    Active   152d   cattle.io/creator=norman,field.cattle.io/projectId=p-mpnmw,kubernetes.io/metadata.name=cattle-global-data
+cattle-global-nt                                      Active   152d   cattle.io/creator=norman,field.cattle.io/projectId=p-mpnmw,kubernetes.io/metadata.name=cattle-global-nt
+cattle-impersonation-system                           Active   714d   authz.cluster.cattle.io/impersonator=true,cattle.io/creator=norman,field.cattle.io/projectId=p-mpnmw,kubernetes.io/metadata.name=cattle-impersonation-system
+cattle-monitoring-system                              Active   511d   field.cattle.io/projectId=p-mpnmw,kubernetes.io/metadata.name=cattle-monitoring-system
+cattle-provisioning-capi-system                       Active   152d   field.cattle.io/projectId=p-mpnmw,kubernetes.io/metadata.name=cattle-provisioning-capi-system
+cattle-system                                         Active   714d   field.cattle.io/projectId=p-mpnmw,kubernetes.io/metadata.name=cattle-system
+cattle-ui-plugin-system                               Active   715d   field.cattle.io/projectId=p-mpnmw,kubernetes.io/metadata.name=cattle-ui-plugin-system
+cert-manager                                          Active   562d   field.cattle.io/projectId=p-mpnmw,kubernetes.io/metadata.name=cert-manager
+clickhouse-operator                                   Active   7d23h  kubernetes.io/metadata.name=clickhouse-operator
+clickhouse-operator-system                            Active   7d23h  kubernetes.io/metadata.name=clickhouse-operator-system
+clickhouse-test                                       Active   6d17h  kubernetes.io/metadata.name=clickhouse-test
+cluster-fleet-local-local-1a3d67d[?]a899              Active   152d   field.cattle.io/projectId=p-5g94w,fleet.cattle.io/managed=true,kubernetes.io/metadata.name=cluster-fleet-local-local-1a3d67d[?]a899
+data-migration                                        Active   126d   kubernetes.io/metadata.name=data-migration
+default                                               Active   716d   field.cattle.io/projectId=p-mpnmw,kubernetes.io/metadata.name=default
+dev-data-transfer                                     Active   575d   field.cattle.io/projectId=p-gmjnv,kubernetes.io/metadata.name=dev-data-transfer
+fleet-default                                         Active   152d   field.cattle.io/projectId=p-5g94w,kubernetes.io/metadata.name=fleet-default,objectset.rio.cattle.io/hash=7e7ea272a8ed59a1c[?]
+ea1587cb55d693b393102
+fleet-local                                           Active   152d   field.cattle.io/projectId=p-5g94w,kubernetes.io/metadata.name=fleet-local
+kafka                                                 Active   46d    kubernetes.io/metadata.name=kafka
+kafka-operator                                        Active   44d    kubernetes.io/metadata.name=kafka-operator
+kafka-ui                                              Active   41d    kubernetes.io/metadata.name=kafka-ui
+kafka-ultra                                           Active   41d    kubernetes.io/metadata.name=kafka-ultra
+keycloak                                              Active   114d   field.cattle.io/projectId=p-7dvxk,kubernetes.io/metadata.name=keycloak
+kube-node-lease                                       Active   716d   field.cattle.io/projectId=p-mpnmw,kubernetes.io/metadata.name=kube-node-lease
+kube-public                                           Active   716d   field.cattle.io/projectId=p-mpnmw,kubernetes.io/metadata.name=kube-public
+kube-system                                           Active   716d   field.cattle.io/projectId=p-mpnmw,kubernetes.io/metadata.name=kube-system
+local                                                 Active   715d   field.cattle.io/projectId=p-mpnmw,kubernetes.io/metadata.name=local
+local-storage                                         Active   42d    kubernetes.io/metadata.name=local-storage
+longhorn-system                                       Active   715d   field.cattle.io/projectId=p-mpnmw,kubernetes.io/metadata.name=longhorn-system
+minio-operator                                        Active   117d   field.cattle.io/projectId=p-7dvxk,kubernetes.io/metadata.name=minio-operator
+mlflow                                                Active   114d   field.cattle.io/projectId=p-7dvxk,kubernetes.io/metadata.name=mlflow
+p-4lhvr                                               Active   152d   kubernetes.io/metadata.name=p-4lhvr
+p-7dvxk                                               Active   82d    kubernetes.io/metadata.name=p-7dvxk
+p-bs9p4                                               Active   152d   kubernetes.io/metadata.name=p-bs9p4
+p-cp9sb                                               Active   152d   kubernetes.io/metadata.name=p-cp9sb
+p-lpx9m                                               Active   152d   kubernetes.io/metadata.name=p-lpx9m
+p-mpnmw                                               Active   152d   kubernetes.io/metadata.name=p-mpnmw
+p-nph6n                                               Active   152d   kubernetes.io/metadata.name=p-nph6n
+p-st877                                               Active   152d   kubernetes.io/metadata.name=p-st877
+p-tprh9                                               Active   152d   kubernetes.io/metadata.name=p-tprh9
+p-wxdx6                                               Active   49d    kubernetes.io/metadata.name=p-wxdx6
+risingwave-operator-system                            Active   5d23h  control-plane=controller-manager,kubernetes.io/metadata.name=risingwave-operator-system
+rw-charging                                           Active   5d23h  kubernetes.io/metadata.name=rw-charging
+superset                                              Active   72d    field.cattle.io/projectId=p-7dvxk,kubernetes.io/metadata.name=superset
+superset-operator                                     Active   26d    kubernetes.io/metadata.name=superset-operator
+tenant-ns                                             Active   117d   field.cattle.io/projectId=p-7dvxk,kubernetes.io/metadata.name=tenant-ns,name=tenant-ns
+test-154                                              Active   36d    kubernetes.io/metadata.name=test-154
+tigera-operator                                       Active   716d   app.kubernetes.io/managed-by=Helm,field.cattle.io/projectId=p-mpnmw,kubernetes.io/metadata.name=tigera-operator,name=tigera-operator
+u-2qmzn                                               Active   145d   kubernetes.io/metadata.name=u-2qmzn
+u-4x9p7                                               Active   142d   kubernetes.io/metadata.name=u-4x9p7
+u-6qt4g                                               Active   147d   kubernetes.io/metadata.name=u-6qt4g
+u-7gwdt                                               Active   152d   kubernetes.io/metadata.name=u-7gwdt
+u-8n8jd                                               Active   152d   kubernetes.io/metadata.name=u-8n8jd
+u-8qmmc                                               Active   148d   kubernetes.io/metadata.name=u-8qmmc
+u-8xzvz                                               Active   49d    kubernetes.io/metadata.name=u-8xzvz
+u-dh6mn                                               Active   152d   kubernetes.io/metadata.name=u-dh6mn
+u-f66gr                                               Active   96d    kubernetes.io/metadata.name=u-f66gr
+u-hlb5k                                               Active   152d   kubernetes.io/metadata.name=u-hlb5k
+u-pnzhz                                               Active   145d   kubernetes.io/metadata.name=u-pnzhz
+u-tzgwg                                               Active   28d    kubernetes.io/metadata.name=u-tzgwg
+u-vbhrf                                               Active   82d    kubernetes.io/metadata.name=u-vbhrf
+u-xf5lr                                               Active   145d   kubernetes.io/metadata.name=u-xf5lr
+user-s5znw                                            Active   152d   kubernetes.io/metadata.name=user-s5znw
+vlp-cicd                                              Active   700d   field.cattle.io/projectId=p-st877,kubernetes.io/metadata.name=vlp-cicd
+vlp-core-app                                          Active   453d   field.cattle.io/projectId=p-st877,kubernetes.io/metadata.name=vlp-core-app
+vlp-database-core                                     Active   700d   field.cattle.io/projectId=p-st877,kubernetes.io/metadata.name=vlp-database-core
+vlp-dev                                               Active   637d   field.cattle.io/projectId=p-st877,kubernetes.io/metadata.name=vlp-dev
+vlp-kafka                                             Active   597d   field.cattle.io/projectId=p-cp9sb,kubernetes.io/metadata.name=vlp-kafka
+vlp-nifi                                              Active   229d   field.cattle.io/projectId=p-cp9sb,kubernetes.io/metadata.name=vlp-nifi
+vlp-tenantfmxjcjj-ws1j8l6to-core                      Active   589d   field.cattle.io/projectId=p-bs9p4,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-core
+vlp-tenantfmxjcjj-ws1j8l6to-control                   Active   589d   field.cattle.io/projectId=p-bs9p4,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-control
+vlp-tenantfmxjcjj-ws1j8l6to-data                      Active   589d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-data
+vlp-tenantfmxjcjj-ws1j8l6to-extension                 Active   540d   kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-extension
+vlp-tenantfmxjcjj-ws1j8l6to-ingestion                 Active   589d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-ingestion
+vlp-tenantfmxjcjj-ws1j8l6to-team0kke9qq               Active   572d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-team0kke9qq
+vlp-tenantfmxjcjj-ws1j8l6to-team20ejwnu               Active   483d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-team20ejwnu
+vlp-tenantfmxjcjj-ws1j8l6to-team50vsb7d               Active   483d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-team50vsb7d
+vlp-tenantfmxjcjj-ws1j8l6to-team5rl5c8q               Active   531d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-team5rl5c8q
+vlp-tenantfmxjcjj-ws1j8l6to-team8necues               Active   566d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-team8necues
+vlp-tenantfmxjcjj-ws1j8l6to-team8rfchaf               Active   572d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-team8rfchaf
+vlp-tenantfmxjcjj-ws1j8l6to-teambkgjgyt               Active   572d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-teambkgjgyt
+vlp-tenantfmxjcjj-ws1j8l6to-teamcgorrsh               Active   86d    field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-teamcgorrsh
+vlp-tenantfmxjcjj-ws1j8l6to-teamdyczzwt               Active   572d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-teamdyczzwt
+vlp-tenantfmxjcjj-ws1j8l6to-teamewytbuj               Active   572d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-teamewytbuj
+vlp-tenantfmxjcjj-ws1j8l6to-teamf4tdmku               Active   586d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-teamf4tdmku
+vlp-tenantfmxjcjj-ws1j8l6to-teamizztkob               Active   545d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-teamizztkob
+vlp-tenantfmxjcjj-ws1j8l6to-teamjgvxpxa               Active   546d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-teamjgvxpxa
+vlp-tenantfmxjcjj-ws1j8l6to-teamkzpxq5c               Active   534d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-teamkzpxq5c
+vlp-tenantfmxjcjj-ws1j8l6to-teamlajya0e               Active   546d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-teamlajya0e
+vlp-tenantfmxjcjj-ws1j8l6to-teammpuidc2               Active   572d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-teammpuidc2
+vlp-tenantfmxjcjj-ws1j8l6to-teamn7duy9j               Active   572d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-teamn7duy9j
+vlp-tenantfmxjcjj-ws1j8l6to-teamncfiinf               Active   572d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-teamncfiinf
+vlp-tenantfmxjcjj-ws1j8l6to-teamotkqd7t               Active   420d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-teamotkqd7t
+vlp-tenantfmxjcjj-ws1j8l6to-teamqrcyley               Active   572d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-teamqrcyley
+vlp-tenantfmxjcjj-ws1j8l6to-teamrklefhx               Active   572d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-teamrklefhx
+vlp-tenantfmxjcjj-ws1j8l6to-teamsqhdvm3               Active   572d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-teamsqhdvm3
+vlp-tenantfmxjcjj-ws1j8l6to-teamzjxsf22               Active   572d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-teamzjxsf22
+vlp-tenantfmxjcjj-ws1j8l6to-teamzxxezox               Active   572d   field.cattle.io/projectId=p-tprh9,kubernetes.io/metadata.name=vlp-tenantfmxjcjj-ws1j8l6to-teamzxxezox
+vlp-tenantxsykecl-core                                Active   477d   field.cattle.io/projectId=p-4lhvr,kubernetes.io/metadata.name=vlp-tenantxsykecl-core
+vlp-tenantxsykecl-wsbo9nzbf-data                      Active   415d   field.cattle.io/projectId=p-lpx9m,kubernetes.io/metadata.name=vlp-tenantxsykecl-wsbo9nzbf-data
+vlp-tenantxsykecl-wsbo9nzbf-ingestion                 Active   415d   field.cattle.io/projectId=p-lpx9m,kubernetes.io/metadata.name=vlp-tenantxsykecl-wsbo9nzbf-ingestion
+vlp-tenantxsykecl-wsbo9nzbf-teambwlriyw               Active   415d   field.cattle.io/projectId=p-lpx9m,kubernetes.io/metadata.name=vlp-tenantxsykecl-wsbo9nzbf-teambwlriyw
+vlp-tenantxsykecl-wsbo9nzbf-teamrutpmth               Active   415d   field.cattle.io/projectId=p-lpx9m,kubernetes.io/metadata.name=vlp-tenantxsykecl-wsbo9nzbf-teamrutpmth
+vmlp-db                                               Active   114d   field.cattle.io/projectId=p-7dvxk,kubernetes.io/metadata.name=vmlp-db
+vmlp-operator                                         Active   107d   field.cattle.io/projectId=p-7dvxk,kubernetes.io/metadata.name=vmlp-operator
+vtt-core-2-157                                        Active   23d    kubernetes.io/metadata.name=vtt-core-2-157
+vtt-core-3-158                                        Active   23d    kubernetes.io/metadata.name=vtt-core-3-158
+vtt-core-4-159                                        Active   22d    kubernetes.io/metadata.name=vtt-core-4-159
+vtt-gboc-162                                          Active   9d     kubernetes.io/metadata.name=vtt-gboc-162
+vtt-test-156                                          Active   33d    kubernetes.io/metadata.name=vtt-test-156
+zeppelin-s3                                           Active   113d   kubernetes.io/metadata.name=zeppelin-s3
+
+> kubectl get resourcequota,limitrange -A
+NAMESPACE                                      NAME                          AGE    REQUEST   LIMIT
+vlp-tenantfmxjcjj-ws1j8l6to-data              resourcequota/default-dmmwb   152d             limits.cpu: 202950m/210, limits.memory: 423418579Ki/420Gi
+vlp-tenantfmxjcjj-ws1j8l6to-ingestion         resourcequota/default-pz62w   152d             limits.cpu: 0/60, limits.memory: 0/120Gi
+vlp-tenantfmxjcjj-ws1j8l6to-team0kke9qq       resourcequota/default-mf3fl   152d             limits.cpu: 1/10, limits.memory: 2Gi/20Gi
+vlp-tenantfmxjcjj-ws1j8l6to-team20ejwnu       resourcequota/default-t6n5c   152d             limits.cpu: 36/125, limits.memory: 93689Mi/500Gi
+vlp-tenantfmxjcjj-ws1j8l6to-team50vsb7d       resourcequota/default-7qcw7   152d             limits.cpu: 969/1400, limits.memory: 2980129Mi/3000Gi
+vlp-tenantfmxjcjj-ws1j8l6to-team5rl5c8q       resourcequota/default-ccwjn   152d             limits.cpu: 17/600, limits.memory: 29056Mi/950Gi
+vlp-tenantfmxjcjj-ws1j8l6to-team8necues       resourcequota/default-sxfbd   152d             limits.cpu: 0/10, limits.memory: 0/10Gi
+vlp-tenantfmxjcjj-ws1j8l6to-team8rfchaf       resourcequota/default-zx7zc   152d             limits.cpu: 56500m/500, limits.memory: 525772Mi/1000Gi
+vlp-tenantfmxjcjj-ws1j8l6to-teambkgjgyt       resourcequota/default-7q5rb   152d             limits.cpu: 14/80, limits.memory: 36Gi/330Gi
+vlp-tenantfmxjcjj-ws1j8l6to-teamcgorrsh       resourcequota/default-wzkh6   86d              limits.cpu: 36/50, limits.memory: 34784Mi/200Gi
+vlp-tenantfmxjcjj-ws1j8l6to-teamdyczzwt       resourcequota/default-d57b2   152d             limits.cpu: 8/160, limits.memory: 20Gi/512Gi
+vlp-tenantfmxjcjj-ws1j8l6to-teamewytbuj       resourcequota/default-54xbx   152d             limits.cpu: 1/10, limits.memory: 2Gi/20Gi
+vlp-tenantfmxjcjj-ws1j8l6to-teamf4tdmku       resourcequota/default-8r5fd   152d             limits.cpu: 1/10, limits.memory: 2Gi/20Gi
+vlp-tenantfmxjcjj-ws1j8l6to-teamizztkob       resourcequota/default-b7plh   152d             limits.cpu: 1/10, limits.memory: 2Gi/20Gi
+vlp-tenantfmxjcjj-ws1j8l6to-teamjgvxpxa       resourcequota/default-msktr   152d             limits.cpu: 208/250, limits.memory: 725Gi/1000Gi
+vlp-tenantfmxjcjj-ws1j8l6to-teamkzpxq5c       resourcequota/default-ww7wf   152d             limits.cpu: 1722968m/2500, limits.memory: 7279904Mi/9000Gi
+vlp-tenantfmxjcjj-ws1j8l6to-teamlajya0e       resourcequota/default-jm65t   152d             limits.cpu: 204/250, limits.memory: 244112Mi/1000Gi
+vlp-tenantfmxjcjj-ws1j8l6to-teammpuidc2       resourcequota/default-n82m7   152d             limits.cpu: 263/300, limits.memory: 1529712Mi/1587Gi
+vlp-tenantfmxjcjj-ws1j8l6to-teamn7duy9j       resourcequota/default-vrtgk   152d             limits.cpu: 193/250, limits.memory: 57797Mi/1000Gi
+vlp-tenantfmxjcjj-ws1j8l6to-teamncfiinf       resourcequota/default-qh69q   152d             limits.cpu: 496/500, limits.memory: 1816504Mi/2000Gi
+vlp-tenantfmxjcjj-ws1j8l6to-teamotkqd7t       resourcequota/default-frql6   152d             limits.cpu: 0/10, limits.memory: 0/20Gi
+vlp-tenantfmxjcjj-ws1j8l6to-teamqrcyley       resourcequota/default-pnq34   152d             limits.cpu: 67/80, limits.memory: 305140Mi/300Gi
+vlp-tenantfmxjcjj-ws1j8l6to-teamrklefhx       resourcequota/default-mm2gn   152d             limits.cpu: 104500m/250, limits.memory: 539642Mi/1000Gi
+vlp-tenantfmxjcjj-ws1j8l6to-teamsqhdvm3       resourcequota/default-ltjj9   152d             limits.cpu: 10/10, limits.memory: 15920Mi/20Gi
+vlp-tenantfmxjcjj-ws1j8l6to-teamzjxsf22       resourcequota/default-d3gc9   152d             limits.cpu: 1/10, limits.memory: 2Gi/20Gi
+vlp-tenantfmxjcjj-ws1j8l6to-teamzxxezox       resourcequota/default-446kh   152d             limits.cpu: 1/10, limits.memory: 2Gi/20Gi
+
+NAMESPACE          NAME                         CREATED AT
+cert-manager       limitrange/default-tmsft    2025-03-24T04:24:58Z
+dev-data-transfer  limitrange/default-4rpks     2026-05-08T03:09:38Z
+>

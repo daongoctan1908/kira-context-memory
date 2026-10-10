@@ -1,4 +1,4 @@
-"""Application correlation, tracing, and dual-read Phase 5 metric facade."""
+"""Application correlation, tracing, and OpenTelemetry metric facade."""
 
 import asyncio
 import logging
@@ -10,7 +10,6 @@ from time import perf_counter
 from opentelemetry import trace
 from opentelemetry.metrics import Meter
 from opentelemetry.trace import Span, SpanKind, Status, StatusCode, Tracer
-from prometheus_client import CollectorRegistry, Counter, Histogram
 
 from app.domain.models.telemetry_context import TelemetryContext
 from app.domain.ports.context_observer import (
@@ -136,95 +135,6 @@ class ContextTelemetry:
     def __init__(self, *, tracer: Tracer | None = None, meter: Meter | None = None) -> None:
         self._tracer = tracer or trace.NoOpTracerProvider().get_tracer("app.application.context")
         self._otel = GatewayMetrics(meter)
-        self.registry = CollectorRegistry()
-        self.recent_messages = Histogram(
-            "kira_context_recent_messages",
-            "Messages retained after context trimming",
-            buckets=(0, 2, 4, 6, 8, 10, 20),
-            registry=self.registry,
-        )
-        self.recent_tokens = Histogram(
-            "kira_context_estimated_recent_tokens",
-            "Estimated tokens, not exact Qwen tokens",
-            buckets=(0, 100, 500, 1000, 2000, 3000, 6000),
-            registry=self.registry,
-        )
-        self.memory_searches = Counter(
-            "kira_memory_search_total",
-            "Long-term-memory search outcomes",
-            ["outcome"],
-            registry=self.registry,
-        )
-        self.memory_search_latency = Histogram(
-            "kira_memory_search_duration_seconds",
-            "Attempted long-term-memory search latency",
-            ["outcome"],
-            buckets=(0.01, 0.05, 0.1, 0.5, 1, 2, 3, 5),
-            registry=self.registry,
-        )
-        self.memory_search_results = Histogram(
-            "kira_memory_search_results",
-            "Ranked memories returned by successful searches",
-            buckets=(0, 1, 2, 3, 5, 10),
-            registry=self.registry,
-        )
-        self.memory_branches = Counter(
-            "kira_memory_branch_total",
-            "Scoped retrieval branch outcomes",
-            ["branch", "outcome"],
-            registry=self.registry,
-        )
-        self.memory_branch_latency = Histogram(
-            "kira_memory_branch_duration_seconds",
-            "Scoped retrieval branch latency",
-            ["branch", "outcome"],
-            buckets=(0.01, 0.05, 0.1, 0.5, 1, 2, 3, 5),
-            registry=self.registry,
-        )
-        self.memory_branch_results = Histogram(
-            "kira_memory_branch_results",
-            "Memories returned by one scoped retrieval branch",
-            ["branch"],
-            buckets=(0, 1, 2, 3, 5, 10),
-            registry=self.registry,
-        )
-        self.memory_scopes = Counter(
-            "kira_memory_scope_total",
-            "Formation scope classification outcomes per extracted candidate",
-            ["scope", "origin"],
-            registry=self.registry,
-        )
-        self.memory_job_schedules = Counter(
-            "kira_memory_job_schedule_total",
-            "Gateway memory-job scheduling outcomes for eligible completed turns",
-            ["outcome"],
-            registry=self.registry,
-        )
-        self.rewrites = Counter(
-            "kira_context_rewrite_total",
-            "Rewrite outcomes",
-            ["outcome"],
-            registry=self.registry,
-        )
-        self.rewrite_latency = Histogram(
-            "kira_context_rewrite_duration_seconds",
-            "Attempted rewrite latency",
-            ["outcome"],
-            buckets=(0.05, 0.1, 0.5, 1, 2, 4, 8, 10),
-            registry=self.registry,
-        )
-        self.degradations = Counter(
-            "kira_context_degraded_total",
-            "Contextual dependency failures",
-            ["dependency", "operation"],
-            registry=self.registry,
-        )
-        self.writes = Counter(
-            "kira_conversation_write_total",
-            "Completed turn write outcomes",
-            ["outcome"],
-            registry=self.registry,
-        )
 
     def request_attribute(self, key: str, value: object) -> None:
         set_request_span_attribute(key, value)
@@ -267,8 +177,6 @@ class ContextTelemetry:
                 )
 
     def context_observed(self, message_count: int, estimated_tokens: int) -> None:
-        self.recent_messages.observe(message_count)
-        self.recent_tokens.observe(estimated_tokens)
         self._otel.context_observed(message_count, estimated_tokens)
 
     def memory_search_observed(
@@ -277,11 +185,6 @@ class ContextTelemetry:
         result_count: int | None,
         seconds: float | None,
     ) -> None:
-        self.memory_searches.labels(outcome).inc()
-        if seconds is not None:
-            self.memory_search_latency.labels(outcome).observe(seconds)
-        if result_count is not None:
-            self.memory_search_results.observe(result_count)
         self._otel.memory_search_observed(outcome, result_count, seconds)
 
     def memory_branch_observed(
@@ -291,10 +194,6 @@ class ContextTelemetry:
         result_count: int,
         seconds: float,
     ) -> None:
-        self.memory_branches.labels(branch, outcome).inc()
-        self.memory_branch_latency.labels(branch, outcome).observe(max(seconds, 0.0))
-        if outcome != "error":
-            self.memory_branch_results.labels(branch).observe(result_count)
         self._otel.memory_branch_observed(branch, outcome, result_count, max(seconds, 0.0))
 
     def formation_scope_observed(
@@ -306,30 +205,22 @@ class ContextTelemetry:
         invalid: int,
     ) -> None:
         if conversation:
-            self.memory_scopes.labels("CONVERSATION", "valid").inc(conversation)
             self._otel.formation_scope_observed(
                 scope="CONVERSATION", origin="valid", count=conversation
             )
         if global_count:
-            self.memory_scopes.labels("GLOBAL", "valid").inc(global_count)
             self._otel.formation_scope_observed(scope="GLOBAL", origin="valid", count=global_count)
         if fallback:
-            self.memory_scopes.labels("CONVERSATION", "fallback").inc(fallback)
             self._otel.formation_scope_observed(
                 scope="CONVERSATION", origin="fallback", count=fallback
             )
         if invalid:
-            self.memory_scopes.labels("unknown", "invalid").inc(invalid)
             self._otel.formation_scope_observed(scope="unknown", origin="invalid", count=invalid)
 
     def rewrite_observed(self, outcome: RewriteOutcome, seconds: float | None) -> None:
-        self.rewrites.labels(outcome).inc()
-        if seconds is not None:
-            self.rewrite_latency.labels(outcome).observe(seconds)
         self._otel.rewrite_observed(outcome, seconds)
 
     def memory_job_schedule_observed(self, outcome: MemoryJobScheduleOutcome) -> None:
-        self.memory_job_schedules.labels(outcome).inc()
         self._otel.memory_job_schedule_observed(outcome)
 
     def degraded(
@@ -348,7 +239,6 @@ class ContextTelemetry:
             "memory_search": "mem0",
             "rewriter": "vllm",
         }.get(operation, "postgresql")
-        self.degradations.labels(dependency, operation).inc()
         self._otel.degraded(dependency, operation)
         logger.warning(
             "Context capability degraded",
@@ -363,7 +253,6 @@ class ContextTelemetry:
         )
 
     def conversation_write_observed(self, outcome: WriteOutcome) -> None:
-        self.writes.labels(outcome).inc()
         self._otel.conversation_write_observed(outcome)
 
     def request_observed(self, outcome: str, seconds: float) -> None:

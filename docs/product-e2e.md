@@ -134,6 +134,18 @@ uv run --frozen python -m scripts.local.openai_stack config
 uv run --frozen python -m scripts.local.openai_stack up
 ```
 
+Để kiểm tra metrics trong smoke này, bật thêm Collector overlay trước khi gửi các lượt chat:
+
+```powershell
+docker compose --env-file .env.openai.local `
+  -f compose.openai.yaml -f compose.observability.yaml `
+  up -d --wait gateway worker otel-collector
+```
+
+Overlay bật `OTEL_ENABLED=true` và đưa Gateway/Worker về cùng Collector endpoint. Dùng cùng
+file cấu hình OpenAI và cùng giá trị biến môi trường như bước khởi động; Compose ưu tiên biến
+trong shell nếu chúng được đặt. Prometheus/Grafana không cần chạy để đọc endpoint Collector.
+
 File cần tối thiểu `OPENAI_API_KEY`, `OPENAI_CHAT_MODEL`, `OPENAI_EMBEDDING_MODEL`; base URL mặc định
 là `https://api.openai.com/v1` và embedding dimension mặc định là `1536`. File local bị Git và
 Docker build context ignore. Không commit, log hoặc chụp key; người có Docker access trên máy vẫn
@@ -166,10 +178,21 @@ Kiểm tra evidence không chứa prompt/output:
 
 ```powershell
 docker exec kira-context-openai-worker-1 kira-memory-jobs stats
-(Invoke-WebRequest http://127.0.0.1:18000/metrics).Content | `
-  Select-String 'kira_context_rewrite_total|kira_memory_search_total|kira_memory_job_schedule_total'
+(Invoke-WebRequest http://127.0.0.1:18889/metrics).Content | `
+  Select-String 'kira_context_rewrite_count_total|kira_memory_search_count_total|kira_memory_job_schedule_count_total'
 ```
 
-Cần ít nhất một job `completed` và rewrite outcome `success`. Dừng stack bằng
-`uv run --frozen python -m scripts.local.openai_stack down`; thêm `--volumes` khi muốn xóa database
-synthetic.
+Cần ít nhất một job `completed` và rewrite outcome `success`. Metrics xuất theo chu kỳ mặc định
+15 giây; nếu chưa thấy lượt vừa chạy, chờ một chu kỳ rồi đọc lại Collector. Gateway và Worker
+không còn cung cấp `/metrics`; numeric metrics chỉ đi qua OTel. Đây vẫn là runtime smoke với
+provider theo cấu hình, không phải kết luận về chất lượng semantic hoặc Langfuse acceptance.
+
+Khi đã dùng overlay, dừng toàn bộ stack, gồm Collector, bằng cùng cặp Compose files:
+
+```powershell
+docker compose --env-file .env.openai.local `
+  -f compose.openai.yaml -f compose.observability.yaml down
+```
+
+Thêm `-v` chỉ khi muốn xóa database synthetic. Nếu không bật overlay, dùng
+`uv run --frozen python -m scripts.local.openai_stack down` như trước.

@@ -1,0 +1,587 @@
+# Complements core default-deny/DNS policy; no internet egress or external UI ingress granted.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: app-to-otel
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: app-to-otel
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - gateway
+      - worker
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - otel-collector
+    ports:
+    - protocol: TCP
+      port: 4318
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: otel-ingestion
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: otel-ingestion
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - otel-collector
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - gateway
+          - worker
+          - ops
+    ports:
+    - protocol: TCP
+      port: 4318
+    - protocol: TCP
+      port: 13133
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - prometheus
+          - ops
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: cattle-monitoring-system
+    ports:
+    - protocol: TCP
+      port: 8888
+    - protocol: TCP
+      port: 8889
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - langfuse-web
+    ports:
+    - protocol: TCP
+      port: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: langfuse-http
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-http
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - langfuse-web
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - otel-collector
+          - ops
+    ports:
+    - protocol: TCP
+      port: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: langfuse-worker-health
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-worker-health
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - langfuse-worker
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - ops
+    ports:
+    - protocol: TCP
+      port: 3030
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: langfuse-datastore-egress
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-datastore-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - langfuse-web
+      - langfuse-worker
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - langfuse-postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - langfuse-clickhouse
+    ports:
+    - protocol: TCP
+      port: 8123
+    - protocol: TCP
+      port: 9000
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - langfuse-redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - langfuse-minio
+    ports:
+    - protocol: TCP
+      port: 9000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: langfuse-postgres-ingress
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-postgres-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - langfuse-postgres
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - langfuse-web
+          - langfuse-worker
+    ports:
+    - protocol: TCP
+      port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: langfuse-clickhouse-ingress
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-clickhouse-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - langfuse-clickhouse
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - langfuse-web
+          - langfuse-worker
+    ports:
+    - protocol: TCP
+      port: 8123
+    - protocol: TCP
+      port: 9000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: langfuse-redis-ingress
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-redis-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - langfuse-redis
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - langfuse-web
+          - langfuse-worker
+    ports:
+    - protocol: TCP
+      port: 6379
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: langfuse-minio-ingress
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-minio-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - langfuse-minio
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - langfuse-web
+          - langfuse-worker
+          - langfuse-s3-init
+    ports:
+    - protocol: TCP
+      port: 9000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: langfuse-s3-init-egress
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-s3-init-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - langfuse-s3-init
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - langfuse-minio
+    ports:
+    - protocol: TCP
+      port: 9000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: prometheus-internal
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: prometheus-internal
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - prometheus
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - grafana
+          - ops
+    ports:
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - otel-collector
+    ports:
+    - protocol: TCP
+      port: 8888
+    - protocol: TCP
+      port: 8889
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: grafana-internal
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: grafana-internal
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - grafana
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - ops
+    ports:
+    - protocol: TCP
+      port: 3000
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - prometheus
+    ports:
+    - protocol: TCP
+      port: 9090
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ops-observability-http
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: ops-observability-http
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: kira-context-memory
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - ops
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - otel-collector
+    ports:
+    - protocol: TCP
+      port: 4318
+    - protocol: TCP
+      port: 13133
+    - protocol: TCP
+      port: 8888
+    - protocol: TCP
+      port: 8889
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - langfuse-web
+          - grafana
+    ports:
+    - protocol: TCP
+      port: 3000
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - langfuse-worker
+    ports:
+    - protocol: TCP
+      port: 3030
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: kira-context-memory
+        matchExpressions:
+        - key: app.kubernetes.io/component
+          operator: In
+          values:
+          - prometheus
+    ports:
+    - protocol: TCP
+      port: 9090

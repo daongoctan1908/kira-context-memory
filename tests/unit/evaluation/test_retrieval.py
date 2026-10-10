@@ -9,6 +9,7 @@ from app.domain.errors.memory import (
     LongTermMemoryConnectionError,
     LongTermMemoryProtocolError,
 )
+from app.domain.models.conversation import AppendTurnResult, CompletedTurnReference
 from app.domain.models.memory import LongTermMemory
 from evaluation.artifacts import (
     ArtifactRunIdentity,
@@ -36,6 +37,7 @@ from evaluation.retrieval import (
     FormedFixtureMemory,
     GoldFixtureMemory,
     GoldRetrievalFixture,
+    GoldRetrievalFixtureManager,
     RetrievalEvaluator,
     RetrievalFixtureUserScope,
     build_retrieval_report,
@@ -95,6 +97,76 @@ class RecordingFixtureClient:
     async def delete(self, memory_id: str) -> object:
         self.deleted.append(memory_id)
         return {"message": "deleted"}
+
+
+@pytest.mark.asyncio
+async def test_gold_fixture_reuses_one_valid_turn_owner_and_retires_only_its_conversation():
+    unrelated = ("unrelated-user", "unrelated-session")
+
+    class StrictConversationStore:
+        def __init__(self):
+            self.turns = []
+            self.active = {unrelated}
+            self.marked = []
+            self.purged = []
+
+        async def append_turn(self, user_id, user, assistant, *, schedule_memory=False):
+            assert user.session_id == assistant.session_id
+            assert user.turn_id == assistant.turn_id
+            assert schedule_memory is False
+            reference = CompletedTurnReference(user_id, user.session_id, uuid4(), user.turn_id, 2)
+            self.turns.append(reference)
+            self.active.add((user_id, user.session_id))
+            return AppendTurnResult(True, reference)
+
+        async def mark_deletion_pending(self, user_id, session_id):
+            owner = (user_id, session_id)
+            self.marked.append(owner)
+            return owner in self.active
+
+        async def purge_deletion_pending(self, user_id, session_id):
+            owner = (user_id, session_id)
+            self.purged.append(owner)
+            self.active.remove(owner)
+            return True
+
+    case = _case()
+    case = case.model_copy(
+        update={"inputs": case.inputs.model_copy(update={"memories": case.inputs.memories[:2]})}
+    )
+    plan = create_isolation_plan(
+        run_id=uuid4(),
+        owner_token=uuid4(),
+        conversation_database_url="postgresql://eval:pw@localhost:15433/eval",
+        memory_database_url="postgresql://eval:pw@localhost:15433/eval",
+    )
+    client = RecordingFixtureClient()
+    store = StrictConversationStore()
+    manager = GoldRetrievalFixtureManager(client, plan, store)
+    fixture = await manager.setup((case,))
+
+    assert len(store.turns) == 1
+    owner = store.turns[0]
+    assert [call["metadata"]["conversation_id"] for call in client.add_calls] == [
+        str(owner.conversation_id),
+        str(owner.conversation_id),
+    ]
+    assert all(call["user_id"] == owner.user_id for call in client.add_calls)
+    await manager.cleanup(fixture)
+    assert client.deleted == [str(memory.memory_id) for memory in reversed(fixture.memories)]
+    assert store.marked == store.purged == [(owner.user_id, owner.session_id)]
+    assert store.active == {unrelated}
+
+    # Reusing the manager after cleanup creates a fresh owner, never a retired cached UUID.
+    second = await manager.setup((case,))
+    assert len(store.turns) == 2
+    assert store.turns[1].conversation_id != owner.conversation_id
+    assert [call["metadata"]["conversation_id"] for call in client.add_calls[-2:]] == [
+        str(store.turns[1].conversation_id),
+        str(store.turns[1].conversation_id),
+    ]
+    await manager.cleanup(second)
+    assert store.active == {unrelated}
 
 
 def _case(*, relevant: tuple[str, ...] = ("gold-1",)) -> EvalCase:

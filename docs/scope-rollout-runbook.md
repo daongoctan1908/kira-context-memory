@@ -124,11 +124,27 @@ Exit code 1 nếu có unresolved rows.
 
 ## Phase H — Smoke tests (theo thứ tự, mỗi bước PASS mới đi tiếp)
 
+Trước các bước có metric evidence, bật OTel trong Gateway/Worker và cấu hình Collector/backend
+theo `docs/production-deployment.md`. `OTEL_ENABLED=true` cần đi cùng endpoint và đường mạng
+đã hoạt động. Dùng endpoint `/metrics` của Collector ở port `8889` hoặc Prometheus đã scrape
+endpoint đó; Gateway/Worker không còn scrape endpoint riêng. Với stack local, bật overlay trước
+smoke:
+
+```powershell
+docker compose -f compose.product.yaml -f compose.observability.yaml up -d --build --wait
+(Invoke-WebRequest http://127.0.0.1:18889/metrics).Content | `
+  Select-String 'kira_memory_branch_count_total|kira_memory_scope_count_total'
+```
+
+Prometheus/Grafana chỉ cần profile `metrics` khi muốn query lịch sử/dashboard. Xác nhận một
+metric đã biết thay đổi sau lượt thử nghiệm để chứng minh export hoạt động; không coi mọi
+metric vắng mặt là zero khi chưa kiểm tra đường telemetry.
+
 Thực hiện bằng 2 user thử nghiệm (`user-a`, `user-b`), mỗi user 1 conversation:
 
 1. **Current-branch recall**: user-a nói 1 fact conversation-local trong conv A
    → hỏi lại trong conv A → phải trả lời đúng. Kiểm tra span/metric:
-   `kira_memory_branch_total{branch="conversation",outcome="success"}` tăng.
+   `kira_memory_branch_count_total{branch="conversation",outcome="success"}` tăng.
 2. **Global cross-conversation**: user-a nói 1 preference bền vững (LLM phải
    classify GLOBAL — kiểm tra persisted payload có `memory_scope="GLOBAL"`) →
    conversation B mới của user-a hỏi cùng chủ đề → phải trả lời được từ
@@ -138,23 +154,24 @@ Thực hiện bằng 2 user thử nghiệm (`user-a`, `user-b`), mỗi user 1 co
 4. **Partial failure**: dừng embedding/LLM provider của Worker trong khi chạy
    formation → job phải retry, không mất message; Gateway search với 1 branch
    lỗi phải fail-open dùng branch còn lại
-   (`kira_memory_branch_total{...,outcome="error"}` tăng nhưng chat vẫn đáp).
+   (`kira_memory_branch_count_total{...,outcome="error"}` tăng nhưng chat vẫn đáp).
 5. **Deletion**: user-a xóa conversation A → memory local của A biến mất khỏi
    cả 2 branch (global memory gắn conversation nguồn cũng bị xóa cùng —
    `_delete_owned_memory` theo `user_id + conversation_id`).
-6. **Scope distribution**: scrape Worker `/metrics` —
-   `kira_memory_scope_total{scope="CONVERSATION",origin="fallback"}` tăng khi
+6. **Scope distribution**: đọc metrics Worker đã export qua Collector —
+   `kira_memory_scope_count_total{scope="CONVERSATION",origin="fallback"}` tăng khi
    LLM bỏ qua scope, `origin="invalid"` tăng khi candidate bị drop; cả hai
-   phải = 0 trong smoke có prompt v6 hoạt động đúng.
+   không được tăng trong smoke có prompt v6 hoạt động đúng. OTel counter chưa từng được ghi
+   có thể chưa xuất hiện; chỉ coi là zero sau khi đã xác nhận export hoạt động như trên.
 
 ## Phase I — Mở traffic
 
 Gỡ maintenance/chặn, scale Worker + Gateway về mức thường. Theo dõi 24h đầu:
 
-- `kira_memory_branch_total{outcome="error"}` rate — phải ~0;
-- `kira_memory_scope_total{origin="invalid"}` — tăng liên tục nghĩa là prompt
+- `kira_memory_branch_count_total{outcome="error"}` rate — phải ~0;
+- `kira_memory_scope_count_total{origin="invalid"}` — tăng liên tục nghĩa là prompt
   scope đang sai enum, cần review extraction prompt;
-- `kira_context_degraded_total{operation="memory_search"}` — tăng bất thường
+- `kira_context_degraded_count_total{operation="memory_search"}` — tăng bất thường
   nghĩa là cả hai branch lỗi thường xuyên.
 
 ## Rollback

@@ -1,0 +1,111 @@
+Source: terminal transcription supplied in the user's message on 2026-10-08.
+Commands/results retain the supplied order, including repeated probes/outputs. Markdown
+escapes and presentation line wrapping are normalized. No credential values were supplied.
+These commands were executed by the user in VDI, not by the current laptop session.
+
+> kubectl get pods -n vmlp-db -o custom-columns='POD:.metadata.name,IMAGE:.spec.containers[*].image'
+
+POD                    IMAGE
+vmlp-db-postgresql-0    registry.vlp.vn/vtt-common/bitnamilegacy/postgresql:16.4.0-debian-12-r7
+
+> kubectl get pods -n vlp-database-core -o custom-columns='POD:.metadata.name,IMAGE:.spec.containers[*].image'
+
+POD                                     IMAGE
+orc-database-oracle-db-6c6b373c4c-2btcz    registry.vlp.vn/vlp/oracle-db-stm:19.3.0.0
+postgresdb-0                            registry.vlp.vn/vlp/postgres:15.4
+
+kubectl exec -n vmlp-db vmlp-db-postgresql-0 -- \
+  psql -X -w -U postgres -d postgres \
+  -c "SHOW server_version;" \
+  -c "SELECT name,default_version,installed_version FROM pg_available_extensions WHERE name='vector';"
+
+psql: error: connection to server on socket "/tmp/.s.PGSQL.5432" failed: fe_sendauth: no password supplied
+command terminated with exit code 2
+
+kubectl get pod -n vmlp-db vmlp-db-postgresql-0 \
+  -o jsonpath='{range .spec.containers[*].env[*]}{.name}{" -> "}{.valueFrom.secretKeyRef.name}{"/"}{.valueFrom.secretKeyRef.key}{"\n"}{end}'
+
+BITNAMI_DEBUG -> /
+POSTGRESQL_PORT_NUMBER -> /
+POSTGRESQL_VOLUME_DIR -> /
+PGDATA -> /
+POSTGRES_USER -> /
+POSTGRES_PASSWORD -> vmlp-db-postgresql/password
+POSTGRES_POSTGRES_PASSWORD -> vmlp-db-postgresql/postgres-password
+POSTGRES_DATABASE -> /
+POSTGRESQL_ENABLE_LDAP -> /
+POSTGRESQL_ENABLE_TLS -> /
+POSTGRESQL_LOG_HOSTNAME -> /
+POSTGRESQL_LOG_CONNECTIONS -> /
+POSTGRESQL_LOG_DISCONNECTIONS -> /
+POSTGRESQL_PGAUDIT_LOG_CATALOG -> /
+POSTGRESQL_CLIENT_MIN_MESSAGES -> /
+POSTGRESQL_SHARED_PRELOAD_LIBRARIES -> /
+POSTGRESQL_MAX_CONNECTIONS -> /
+
+kubectl exec -i -n vmlp-db vmlp-db-postgresql-0 -- sh <<'SH'
+set +x
+set -eu
+export PGPASSWORD="$POSTGRES_POSTGRES_PASSWORD"
+exec psql -X -w -U postgres -d postgres \
+  -c "SHOW server_version;" \
+  -c "SELECT name,default_version,installed_version FROM pg_available_extensions WHERE name='vector';"
+SH
+
+ server_version
+----------------
+ 16.4
+(1 row)
+
+ name | default_version | installed_version
+------+-----------------+-------------------
+(0 rows)
+
+> kubectl get pod -n vlp-database-core postgresdb-0 \
+  -o jsonpath='{range .spec.containers[*].env[*]}{.name}{" -> "}{.valueFrom.secretKeyRef.name}{"/"}{.valueFrom.secretKeyRef.key}{"\n"}{end}'
+
+[No output shown in the supplied transcription.]
+
+> kubectl get pod -n vlp-database-core postgresdb-0 \
+  -o jsonpath='{range .spec.containers[*].env[*]}{.name}{" -> "}{.valueFrom.secretKeyRef.name}{"/"}{.valueFrom.secretKeyRef.key}{"\n"}{end}'
+
+[No output shown in the supplied transcription.]
+
+kubectl exec -n vlp-database-core postgresdb-0 -- \
+  psql -X -w -U postgres -d postgres \
+  -c "SHOW server_version;" \
+  -c "SELECT name,default_version,installed_version FROM pg_available_extensions WHERE name='vector';"
+
+ server_version
+----------------------------------------
+ 15.4 (Debian 15.4-1.pgdg120+1)
+(1 row)
+
+ name | default_version | installed_version
+------+-----------------+-------------------
+(0 rows)
+
+ server_version
+----------------------------------------
+ 15.4 (Debian 15.4-1.pgdg120+1)
+(1 row)
+
+ name | default_version | installed_version
+------+-----------------+-------------------
+(0 rows)
+
+> kubectl get storageclass
+
+NAME                                     PROVISIONER                    RECLAIMPOLICY   VOLUMEBINDINGMODE       ALLOWVOLUMEEXPANSION   AGE
+clickhouse-local                         kubernetes.io/no-provisioner   Retain          WaitForFirstConsumer    false                  8d
+clickhouse-test-local                    kubernetes.io/no-provisioner   Retain          WaitForFirstConsumer    false                  6d20h
+kafka-local-storage-broker               kubernetes.io/no-provisioner   Retain          WaitForFirstConsumer    false                  42d
+kafka-local-storage-controller           kubernetes.io/no-provisioner   Retain          WaitForFirstConsumer    false                  42d
+keeper-local                             kubernetes.io/no-provisioner   Retain          WaitForFirstConsumer    false                  8d
+keeper-test-local                        kubernetes.io/no-provisioner   Retain          WaitForFirstConsumer    false                  6d20h
+longhorn                                 driver.longhorn.io             Delete          Immediate               true                   715d
+longhorn-static                          driver.longhorn.io             Delete          Immediate               true                   0s
+longhorn-storage-2-delete                driver.longhorn.io             Delete          Immediate               true                   571d
+longhorn-storage-2-retain (default)       driver.longhorn.io             Retain          Immediate               true                   571d
+longhorn-storage-delete                  driver.longhorn.io             Delete          Immediate               true                   714d
+longhorn-storage-retain                  driver.longhorn.io             Retain          Immediate               true                   714d

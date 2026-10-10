@@ -1,0 +1,108 @@
+# Review templates first; bind REPLACE_*_IMAGE before apply.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kira-runtime
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: kira-runtime
+automountServiceAccountToken: false
+imagePullSecrets:
+- name: registry-vlp
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kira-runtime-config
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: kira-runtime-config
+data:
+  APP_ENVIRONMENT: test
+  APP_VERSION: 0.4.1
+  DEV_STATIC_IDENTITY_ENABLED: 'false'
+  LTM_ENABLED: 'true'
+  MEMORY_FORMATION_ENABLED: 'true'
+  OTEL_ENABLED: 'false'
+  OTEL_CAPTURE_CONTENT_ENABLED: 'false'
+  POSTGRES_POOL_SIZE: '5'
+  POSTGRES_MAX_OVERFLOW: '2'
+  MEMORY_POSTGRES_MIN_CONNECTIONS: '1'
+  MEMORY_POSTGRES_MAX_CONNECTIONS: '3'
+  MEMORY_JOB_CONCURRENCY: '2'
+  APP_LOG_LEVEL: INFO
+  WORKER_LOG_LEVEL: INFO
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kira-gateway-config
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: kira-gateway-config
+data:
+  AUTH_ENABLED: 'true'
+  AUTH_ALLOWED_ORIGIN: http://frontend:8080
+  AUTH_COOKIE_SECURE: 'false'
+  KIRA_BASE_URL: http://10.255.62.64:8122
+  KIRA_DOMAIN: VBI
+  KIRA_SERVICE_ID: '5'
+  KIRA_DEVICE: Browser
+  KIRA_MESSAGE_TYPE: text
+  VLLM_BASE_URL: http://10.254.135.40:8080/v1
+  VLLM_MODEL: /models/Qwen3_14B
+  KIRA_READ_TIMEOUT_SECONDS: '300'
+  HEALTH_PORT: '8000'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kira-memory-config
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: kira-memory-config
+data:
+  MEMORY_SCHEMA: memory
+  MEMORY_COLLECTION_NAME: memories
+  MEMORY_EMBEDDING_BASE_URL: http://10.254.135.40:8001/v1
+  MEMORY_EMBEDDING_MODEL: Qwen3-Embedding-0.6B
+  MEMORY_EMBEDDING_DIMS: '1024'
+  MEMORY_LLM_BASE_URL: http://10.254.135.40:8080/v1
+  MEMORY_LLM_MODEL: /models/Qwen3_14B
+  MEMORY_LLM_TEMPERATURE: '0'
+  MEMORY_LLM_MAX_TOKENS: '1000'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: postgres
+data:
+  10-create-runtime-roles.sh: |
+    #!/bin/sh
+    set -eu
+    # Initial database only. Passwords stay in environment/psql variables, not command arguments.
+    psql -X -v ON_ERROR_STOP=1 --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" <<'SQL'
+    \getenv app_password KIRA_APP_DB_PASSWORD
+    \getenv memory_password KIRA_MEMORY_DB_PASSWORD
+    \getenv database POSTGRES_DB
+    CREATE ROLE kira_app LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD :'app_password';
+    CREATE ROLE kira_memory LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD :'memory_password';
+    REVOKE CONNECT ON DATABASE :"database" FROM PUBLIC;
+    GRANT CONNECT ON DATABASE :"database" TO kira_app, kira_memory;
+    REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+    GRANT USAGE ON SCHEMA public TO kira_app, kira_memory;
+    CREATE SCHEMA IF NOT EXISTS memory AUTHORIZATION postgres;
+    GRANT USAGE ON SCHEMA memory TO kira_app, kira_memory;
+    ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public, memory
+      GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO kira_app, kira_memory;
+    ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public, memory
+      GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO kira_app, kira_memory;
+    SQL

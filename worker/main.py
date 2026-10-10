@@ -5,9 +5,8 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.domain.ports.long_term_memory import LongTermMemoryPort
@@ -134,17 +133,6 @@ def create_app(
         return JSONResponse(
             status_code=200 if is_ready else 503,
             content={"status": "ready" if is_ready else "not_ready"},
-        )
-
-    @application.get("/metrics", response_class=Response, tags=["metrics"])
-    async def metrics(request: Request) -> Response:
-        """Render cached process metrics without querying dependencies."""
-        runtime = request.app.state.runtime
-        if runtime is not None:
-            runtime.observe_runtime()
-        return Response(
-            generate_latest(request.app.state.telemetry.registry),
-            headers={"Content-Type": CONTENT_TYPE_LATEST},
         )
 
     return application

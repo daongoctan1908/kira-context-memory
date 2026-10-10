@@ -1,0 +1,56 @@
+{
+  "recorded_date": "2026-10-09",
+  "source": "kubectl output supplied directly by the user from the cluster terminal",
+  "execution_timestamp": "not supplied",
+  "laptop_cluster_access": "NOT_RUN",
+  "nodes": [
+    {
+      "name": "hkh9104-10-221-248-16",
+      "cpu_requests_millicores": 12120,
+      "cpu_limits_millicores": 2000,
+      "memory_requests_mib": 346,
+      "memory_limits_mib": 1024,
+      "observed_cpu_usage_millicores": 2131,
+      "observed_memory_usage_mib": 5847,
+      "longhorn_allow_scheduling": true,
+      "longhorn_disk_max_gib": 1602.1,
+      "longhorn_disk_free_gib": 239.4,
+      "longhorn_disk_scheduled_gib": 900.0
+    },
+    {
+      "name": "hkh9104-10-221-248-17",
+      "cpu_requests_millicores": 12120,
+      "cpu_limits_millicores": 2000,
+      "memory_requests_mib": 346,
+      "memory_limits_mib": 1024,
+      "observed_cpu_usage_millicores": 1554,
+      "observed_memory_usage_mib": 6023,
+      "longhorn_allow_scheduling": true,
+      "longhorn_disk_max_gib": 1602.1,
+      "longhorn_disk_free_gib": 148.6,
+      "longhorn_disk_scheduled_gib": 1000.0
+    },
+    {
+      "name": "hkh9104-10-221-248-18",
+      "cpu_requests_millicores": 12120,
+      "cpu_limits_millicores": 2000,
+      "memory_requests_mib": 346,
+      "memory_limits_mib": 1024,
+      "observed_cpu_usage_millicores": 1933,
+      "observed_memory_usage_mib": 5736,
+      "longhorn_allow_scheduling": true,
+      "longhorn_disk_max_gib": 1602.1,
+      "longhorn_disk_free_gib": 793.0,
+      "longhorn_disk_scheduled_gib": 720.0
+    }
+  ],
+  "ephemeral_requests_and_limits": "zero on all three nodes in the supplied output",
+  "interpretation": {
+    "usage_is_point_in_time": true,
+    "existing_unlimited_or_underrequested_memory": "possible; requests total less than observed node usage",
+    "longhorn_node_allow_does_not_prove_disk_schedulable": true,
+    "longhorn_free_does_not_establish_replica_placement_or_minimum_free_policy": true,
+    "longhorn_capacity_is_separate_from_node_ephemeral_storage": true,
+    "node_16_image_garbage_collection_warning_resolved": "not established by these commands"
+  }
+}

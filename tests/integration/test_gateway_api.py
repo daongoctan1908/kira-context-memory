@@ -445,7 +445,9 @@ async def test_gateway_wires_memory_formation_independently_from_ltm(monkeypatch
     assert mem0_construction_attempts == []
 
 
-async def test_gateway_schedules_reference_only_and_never_executes_memory_formation() -> None:
+async def test_gateway_schedules_reference_only_and_never_executes_memory_formation(
+    otel_capture,
+) -> None:
     store = FakeConversationStore()
     memory = FormationTrapLongTermMemory()
     settings = make_settings().model_copy(update={"memory_formation_enabled": True})
@@ -464,7 +466,7 @@ async def test_gateway_schedules_reference_only_and_never_executes_memory_format
                 "/chat",
                 json={"session_id": "session-1", "message": "question"},
             )
-            metrics = await client.get("/metrics")
+            metrics = otel_capture.snapshot()
 
     assert response.status_code == 200
     assert store.schedule_requests == [True]
@@ -474,9 +476,9 @@ async def test_gateway_schedules_reference_only_and_never_executes_memory_format
         ("test-user", "question", 10, 0.1),
     ]
     assert memory.process_calls == 0
-    assert 'kira_memory_job_schedule_total{outcome="scheduled"} 1.0' in metrics.text
+    assert metrics.value("kira.memory.job.schedule.count", {"outcome": "scheduled"}) == 1.0
     for forbidden in ("test-user", "session-1", "question"):
-        assert forbidden not in metrics.text
+        assert forbidden not in repr(metrics)
 
 
 async def test_chat_rejects_client_supplied_user_id() -> None:

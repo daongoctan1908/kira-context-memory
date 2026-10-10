@@ -698,8 +698,7 @@ async def test_gateway_completed_stream_persists_and_schedules_atomically(
 
 
 async def test_gateway_formation_disabled_persists_turn_without_job(
-    engine: AsyncEngine,
-    session_id: str,
+    engine: AsyncEngine, session_id: str, otel_capture
 ) -> None:
     settings = make_settings().model_copy(
         update={
@@ -724,17 +723,16 @@ async def test_gateway_formation_disabled_persists_turn_without_job(
                 "/chat",
                 json={"session_id": session_id, "message": "completed without formation"},
             )
-            metrics = await client.get("/metrics")
+            metrics = otel_capture.snapshot()
 
     assert response.status_code == 200
     assert "gateway_error" not in response.text
     assert await _session_persistence_counts(engine, session_id) == (1, 2, 0)
-    assert 'kira_memory_job_schedule_total{outcome="disabled"} 1.0' in metrics.text
+    assert metrics.value("kira.memory.job.schedule.count", {"outcome": "disabled"}) == 1.0
 
 
 async def test_gateway_midstream_failure_persists_neither_turn_nor_job(
-    engine: AsyncEngine,
-    session_id: str,
+    engine: AsyncEngine, session_id: str, otel_capture
 ) -> None:
     kira_client = FakeKiraClient(
         events=[kira_event('{"text":"partial"}', "partial")],
@@ -756,17 +754,16 @@ async def test_gateway_midstream_failure_persists_neither_turn_nor_job(
             "/chat",
             json={"session_id": session_id, "message": "failing stream"},
         )
-        metrics = await client.get("/metrics")
+        metrics = otel_capture.snapshot()
 
     assert response.status_code == 200
     assert "gateway_error" in response.text
     assert await _session_persistence_counts(engine, session_id) == (0, 0, 0)
-    assert "kira_memory_job_schedule_total{" not in metrics.text
+    assert "kira_memory_job_schedule_total{" not in repr(metrics)
 
 
 async def test_gateway_missing_identity_persists_neither_turn_nor_job(
-    engine: AsyncEngine,
-    session_id: str,
+    engine: AsyncEngine, session_id: str, otel_capture
 ) -> None:
     settings = make_settings().model_copy(
         update={
@@ -793,18 +790,16 @@ async def test_gateway_missing_identity_persists_neither_turn_nor_job(
                 "/chat",
                 json={"session_id": session_id, "message": "anonymous completion"},
             )
-            metrics = await client.get("/metrics")
+            metrics = otel_capture.snapshot()
 
     assert response.status_code == 200
     assert "gateway_error" not in response.text
     assert await _session_persistence_counts(engine, session_id) == (0, 0, 0)
-    assert "kira_memory_job_schedule_total{" not in metrics.text
+    assert "kira_memory_job_schedule_total{" not in repr(metrics)
 
 
 async def test_gateway_job_insert_failure_rolls_back_without_mutating_sse(
-    engine: AsyncEngine,
-    session_id: str,
-    monkeypatch: pytest.MonkeyPatch,
+    engine: AsyncEngine, session_id: str, monkeypatch: pytest.MonkeyPatch, otel_capture
 ) -> None:
     seed_session = f"{session_id}-seed"
     seed_turn_id = f"seed-{uuid4()}"
@@ -838,12 +833,12 @@ async def test_gateway_job_insert_failure_rolls_back_without_mutating_sse(
                 "/chat",
                 json={"session_id": session_id, "message": "must roll back"},
             )
-            metrics = await client.get("/metrics")
+            metrics = otel_capture.snapshot()
 
         assert response.content == b'data: {"text":"answer"}\n\n'
         assert await _session_persistence_counts(engine, session_id) == (0, 0, 0)
-        assert 'kira_conversation_write_total{outcome="error"} 1.0' in metrics.text
-        assert 'kira_memory_job_schedule_total{outcome="error"} 1.0' in metrics.text
+        assert metrics.value("kira.conversation.write.count", {"outcome": "error"}) == 1.0
+        assert metrics.value("kira.memory.job.schedule.count", {"outcome": "error"}) == 1.0
     finally:
         async with engine.begin() as connection:
             await connection.execute(
@@ -966,7 +961,9 @@ async def test_malformed_persisted_schema_maps_to_protocol_error(
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case.name)
-async def test_full_flow_with_real_postgres_and_mock_http_adapters(engine, session_id, case):
+async def test_full_flow_with_real_postgres_and_mock_http_adapters(
+    engine, session_id, case, otel_capture
+):
     """Fixture-driven plumbing gate, not an evaluation of real Qwen semantics."""
     from hashlib import sha256
 
@@ -1001,8 +998,8 @@ async def test_full_flow_with_real_postgres_and_mock_http_adapters(engine, sessi
                 assert response.status_code == 200
                 assert "gateway_error" not in response.text
                 assert (await client.get("/ready")).status_code == 200
-                metrics = (await client.get("/metrics")).text
-        assert 'kira_context_rewrite_total{outcome="success"} 1.0' in metrics
+                metrics = otel_capture.snapshot()
+        assert metrics.value("kira.context.rewrite.count", {"outcome": "success"}) == 1.0
         assert query_hashes[-1] == sha256(case.expected.encode()).hexdigest()
     recent = await PostgresConversationStoreAdapter(engine).read_recent(USER_ID, session_id, 10)
     assert [message.content for message in recent] == [

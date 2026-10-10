@@ -1,0 +1,123 @@
+# Review templates first; bind internal image digests before apply.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: langfuse-s3-init
+  namespace: kira-context-memory
+  labels:
+    app.kubernetes.io/part-of: kira-context-memory
+    app.kubernetes.io/component: langfuse-s3-init
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: kira-context-memory
+        app.kubernetes.io/component: langfuse-s3-init
+    spec:
+      serviceAccountName: kira-runtime
+      automountServiceAccountToken: false
+      nodeSelector:
+        infra/zone: compute
+        project: lhvtt
+        kubernetes.io/arch: amd64
+        kubernetes.io/os: linux
+      tolerations:
+      - key: project
+        operator: Equal
+        value: lhvtt
+        effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-16
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-17
+            - matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-18
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            preference:
+              matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-17
+          - weight: 50
+            preference:
+              matchFields:
+              - key: metadata.name
+                operator: In
+                values:
+                - hkh9104-10-221-248-18
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: langfuse-s3-init
+        image: REPLACE_LANGFUSE_MINIO_IMAGE
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: false
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+            ephemeral-storage: 128Mi
+          limits:
+            cpu: '1'
+            memory: 512Mi
+            ephemeral-storage: 1Gi
+        command:
+        - sh
+        - -ec
+        args:
+        - |
+          set -eu
+          umask 077
+          if ! mc alias set --quiet local http://langfuse-minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null 2>&1; then
+            echo 'S3 authentication failed' >&2; exit 1
+          fi
+          if ! mc mb --ignore-existing local/langfuse >/dev/null 2>&1; then
+            echo 'S3 bucket creation failed' >&2; exit 1
+          fi
+          if ! mc stat local/langfuse >/dev/null 2>&1; then
+            echo 'S3 bucket validation failed' >&2; exit 1
+          fi
+          echo 'Langfuse S3 bucket ready'
+        env:
+        - name: MINIO_ROOT_USER
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LF_S3_ACCESS_KEY
+        - name: MINIO_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kira-observability
+              key: LF_S3_SECRET_KEY
+        - name: MC_CONFIG_DIR
+          value: /tmp/kira-mc
+      restartPolicy: Never

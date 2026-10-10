@@ -1,0 +1,1133 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-10-09T11:01:45.174744+00:00",
+  "status": "LOCAL_GENEROUS_SIZING_VERIFICATION_PASS",
+  "inputs": "User-supplied node/Longhorn snapshot; public repo templates",
+  "kubernetes_validation": {
+    "tool": "kubeconform 0.7.0",
+    "kubernetes_version": "1.30.5",
+    "strict": true,
+    "file_count": 20,
+    "result": {
+      "resources": [],
+      "summary": {
+        "valid": 85,
+        "invalid": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    }
+  },
+  "public_yaml_sha256": {
+    "deploy/k8s/config.yaml": "8426f4e8729a4abf9d244745e2c2a2a7fa2320eae18b4757377aca675074fd1e",
+    "deploy/k8s/jobs/memory-init.yaml": "e38c925a4c9ac444e551da93a59c26b6ea0f60cdcedf212662a1542d32e4607a",
+    "deploy/k8s/jobs/memory-validate.yaml": "6c65f8e9c7b5aef26f82f74aeb7a292204c42ed6827860c68cbf7303d229427c",
+    "deploy/k8s/jobs/migrate.yaml": "707d50524663a4273c209064a587aaded908a9eb0baed4d049174fc3b8118fb3",
+    "deploy/k8s/namespace.yaml": "0d0e22a5747d0367075eeddd32a84f208e4b87d0943bebb2793f34f12e355604",
+    "deploy/k8s/networkpolicy.yaml": "8488f464a95fb49049373661afc4696624a534e3574f00d7b8faf300206ae4cb",
+    "deploy/k8s/observability/collector.yaml": "1ef593fead175cb3e17ecdda9a59dd926803aab1a52bfcda2195eb252e8dd4fc",
+    "deploy/k8s/observability/config.yaml": "05539abebec899b16375edb62ac0b484840c30061849696deaef9c337c10e2e4",
+    "deploy/k8s/observability/datastores.yaml": "cd69ea511c908c9df4fadcb97a602b7dfb3374d662ae27734c8228903c974532",
+    "deploy/k8s/observability/langfuse.yaml": "aa29eda2859c9c19e4dd880e4a2a687b2c346a301f2d66fe3d8016aad98ef05f",
+    "deploy/k8s/observability/metrics.yaml": "1d5681dc878698d18ee7725d2aadbbcec4b7836ff8b31af0ae53825c4286a29e",
+    "deploy/k8s/observability/networkpolicy.yaml": "c4bc9bd54967b45c9710477441a7b2a0b2a30d3770409d9c8cdb7f2a4d6977cc",
+    "deploy/k8s/observability/s3-init.yaml": "5f74c417f7b8b07e95aec73b0463a4d92abc42494bf65361dfead7699562f613",
+    "deploy/k8s/observability/secrets.example.yaml": "aa4e98ea16de809145bfee65bd1cac1cb7c69f8db6ab3af4d4e74d8601ff041b",
+    "deploy/k8s/optional/frontend-nodeport.yaml": "d6c63464deaf31e1b5ea82e2eec84f342736f45ef0d5f51bc4202c8b8561aba4",
+    "deploy/k8s/optional/operator.yaml": "e7dd95ce57b3af24676e2230f072bdb342ddb13a1e2b3dd9186a5f6b196e37c0",
+    "deploy/k8s/postgres-pvc.yaml": "40ad6ce05dae7b7048ba1f57c4cd999461184a0d82290bed6a926ac7b235e1f9",
+    "deploy/k8s/postgres.yaml": "2d446f38d7c19cd0df896b273cd6dfa9d1fdfb74a428bacc5ea490fc9fd560c7",
+    "deploy/k8s/runtime.yaml": "b9ee767e6c150eb2d48c4f4048664778db5440e19c18bdd275185b466268f015",
+    "deploy/k8s/secrets.example.yaml": "afad91893b22bb6df382f2dca6f5719baca67b723480fb40526ca41da35f96cf"
+  },
+  "capacity": {
+    "none": {
+      "observability_mode": "none",
+      "steady": {
+        "pods": 9,
+        "requests": {
+          "cpu_cores": 29.5,
+          "memory_gib": 61.5,
+          "ephemeral_storage_gib": 1.125
+        },
+        "limits": {
+          "cpu_cores": 78.0,
+          "memory_gib": 139.0,
+          "ephemeral_storage_gib": 9.0
+        }
+      },
+      "rollout": {
+        "pods": 12,
+        "requests": {
+          "cpu_cores": 38.0,
+          "memory_gib": 74.0,
+          "ephemeral_storage_gib": 1.5
+        },
+        "limits": {
+          "cpu_cores": 100.0,
+          "memory_gib": 172.0,
+          "ephemeral_storage_gib": 12.0
+        }
+      },
+      "workloads": [
+        {
+          "name": "gateway",
+          "kind": "Deployment",
+          "replicas": 3,
+          "surge_replicas": 1,
+          "resources": {
+            "requests": {
+              "cpu_cores": 4.0,
+              "memory_gib": 4.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 8.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "worker",
+          "kind": "Deployment",
+          "replicas": 2,
+          "surge_replicas": 1,
+          "resources": {
+            "requests": {
+              "cpu_cores": 4.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 12.0,
+              "memory_gib": 24.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "frontend",
+          "kind": "Deployment",
+          "replicas": 3,
+          "surge_replicas": 1,
+          "resources": {
+            "requests": {
+              "cpu_cores": 0.5,
+              "memory_gib": 0.5,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 2.0,
+              "memory_gib": 1.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "postgres",
+          "kind": "StatefulSet",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 8.0,
+              "memory_gib": 32.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 24.0,
+              "memory_gib": 64.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        }
+      ],
+      "transient_workloads": [
+        {
+          "name": "migrate",
+          "kind": "Job",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 2.0,
+              "memory_gib": 2.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 8.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "memory-init",
+          "kind": "Job",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 2.0,
+              "memory_gib": 2.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 8.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "memory-validate",
+          "kind": "Job",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 2.0,
+              "memory_gib": 2.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 8.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "kira-operator",
+          "kind": "Pod",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 0.1,
+              "memory_gib": 0.25,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 1.0,
+              "memory_gib": 0.5,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        }
+      ],
+      "persistent_storage": {
+        "claims": [
+          {
+            "name": "postgres-data",
+            "gib": 20.0
+          }
+        ],
+        "logical_gib": 20.0,
+        "longhorn_data_copies": 2,
+        "replicated_data_gib": 40.0
+      },
+      "connection_budgets": {
+        "application": {
+          "steady_connections": 65,
+          "rollout_connections": 91,
+          "max_connections": 200,
+          "superuser_reserved_connections": 3,
+          "remaining_non_superuser_connections": 106,
+          "pools": {
+            "gateway": {
+              "async_pool": 7,
+              "memory_pool_per_store": 3,
+              "memory_stores": 2,
+              "per_pod": 13
+            },
+            "worker": {
+              "async_pool": 7,
+              "memory_pool_per_store": 3,
+              "memory_stores": 2,
+              "per_pod": 13
+            }
+          }
+        }
+      },
+      "worker_jobs": {
+        "per_pod": 2,
+        "steady": 4,
+        "rollout": 6
+      },
+      "assumptions": [
+        "Rollout adds every RollingUpdate Deployment's maxSurge concurrently; terminating Pods can temporarily add further usage.",
+        "Jobs run in ordered bootstrap phases, and the optional operator is separate from steady/rollout totals.",
+        "Connection estimates assume one application process and one Prisma pool per Pod; both memory stores initialized.",
+        "Langfuse pool limits describe the public Secret template; preserve its URL query when generating private credentials.",
+        "Longhorn copy count is supplied, not a cluster verification; replicated data excludes snapshots, metadata and free-space headroom.",
+        "PVC capacity is separate from node ephemeral storage; workload requests exclude image cache and existing cluster usage.",
+        "Datastores remain single-primary services; multiple storage copies do not provide database failover."
+      ]
+    },
+    "shared": {
+      "observability_mode": "shared",
+      "steady": {
+        "pods": 18,
+        "requests": {
+          "cpu_cores": 59.5,
+          "memory_gib": 137.5,
+          "ephemeral_storage_gib": 2.25
+        },
+        "limits": {
+          "cpu_cores": 170.0,
+          "memory_gib": 299.0,
+          "ephemeral_storage_gib": 18.0
+        }
+      },
+      "rollout": {
+        "pods": 23,
+        "requests": {
+          "cpu_cores": 74.0,
+          "memory_gib": 162.0,
+          "ephemeral_storage_gib": 2.875
+        },
+        "limits": {
+          "cpu_cores": 210.0,
+          "memory_gib": 356.0,
+          "ephemeral_storage_gib": 23.0
+        }
+      },
+      "workloads": [
+        {
+          "name": "gateway",
+          "kind": "Deployment",
+          "replicas": 3,
+          "surge_replicas": 1,
+          "resources": {
+            "requests": {
+              "cpu_cores": 4.0,
+              "memory_gib": 4.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 8.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "worker",
+          "kind": "Deployment",
+          "replicas": 2,
+          "surge_replicas": 1,
+          "resources": {
+            "requests": {
+              "cpu_cores": 4.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 12.0,
+              "memory_gib": 24.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "frontend",
+          "kind": "Deployment",
+          "replicas": 3,
+          "surge_replicas": 1,
+          "resources": {
+            "requests": {
+              "cpu_cores": 0.5,
+              "memory_gib": 0.5,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 2.0,
+              "memory_gib": 1.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "postgres",
+          "kind": "StatefulSet",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 8.0,
+              "memory_gib": 32.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 24.0,
+              "memory_gib": 64.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "langfuse-web",
+          "kind": "Deployment",
+          "replicas": 2,
+          "surge_replicas": 1,
+          "resources": {
+            "requests": {
+              "cpu_cores": 2.0,
+              "memory_gib": 4.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 6.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "langfuse-worker",
+          "kind": "Deployment",
+          "replicas": 2,
+          "surge_replicas": 1,
+          "resources": {
+            "requests": {
+              "cpu_cores": 4.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 12.0,
+              "memory_gib": 16.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "langfuse-postgres",
+          "kind": "StatefulSet",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 4.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 12.0,
+              "memory_gib": 16.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "langfuse-clickhouse",
+          "kind": "StatefulSet",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 8.0,
+              "memory_gib": 32.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 24.0,
+              "memory_gib": 64.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "langfuse-redis",
+          "kind": "StatefulSet",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 2.0,
+              "memory_gib": 4.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 4.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "langfuse-minio",
+          "kind": "StatefulSet",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 2.0,
+              "memory_gib": 4.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 8.0,
+              "memory_gib": 16.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "otel-collector",
+          "kind": "Deployment",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 2.0,
+              "memory_gib": 4.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 8.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        }
+      ],
+      "transient_workloads": [
+        {
+          "name": "migrate",
+          "kind": "Job",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 2.0,
+              "memory_gib": 2.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 8.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "memory-init",
+          "kind": "Job",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 2.0,
+              "memory_gib": 2.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 8.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "memory-validate",
+          "kind": "Job",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 2.0,
+              "memory_gib": 2.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 8.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "kira-operator",
+          "kind": "Pod",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 0.1,
+              "memory_gib": 0.25,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 1.0,
+              "memory_gib": 0.5,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "langfuse-s3-init",
+          "kind": "Job",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 0.1,
+              "memory_gib": 0.125,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 1.0,
+              "memory_gib": 0.5,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        }
+      ],
+      "persistent_storage": {
+        "claims": [
+          {
+            "name": "postgres-data",
+            "gib": 20.0
+          },
+          {
+            "name": "langfuse-postgres-data",
+            "gib": 10.0
+          },
+          {
+            "name": "langfuse-clickhouse-data",
+            "gib": 20.0
+          },
+          {
+            "name": "langfuse-redis-data",
+            "gib": 2.0
+          },
+          {
+            "name": "langfuse-minio-data",
+            "gib": 20.0
+          }
+        ],
+        "logical_gib": 72.0,
+        "longhorn_data_copies": 2,
+        "replicated_data_gib": 144.0
+      },
+      "connection_budgets": {
+        "application": {
+          "steady_connections": 65,
+          "rollout_connections": 91,
+          "max_connections": 200,
+          "superuser_reserved_connections": 3,
+          "remaining_non_superuser_connections": 106,
+          "pools": {
+            "gateway": {
+              "async_pool": 7,
+              "memory_pool_per_store": 3,
+              "memory_stores": 2,
+              "per_pod": 13
+            },
+            "worker": {
+              "async_pool": 7,
+              "memory_pool_per_store": 3,
+              "memory_stores": 2,
+              "per_pod": 13
+            }
+          }
+        },
+        "langfuse": {
+          "steady_connections": 60,
+          "rollout_connections": 90,
+          "max_connections": 200,
+          "superuser_reserved_connections": 3,
+          "remaining_non_superuser_connections": 107,
+          "pool_limit": 15,
+          "pool_timeout_seconds": 10,
+          "steady_pools": 4,
+          "rollout_pools": 6
+        }
+      },
+      "worker_jobs": {
+        "per_pod": 2,
+        "steady": 4,
+        "rollout": 6
+      },
+      "assumptions": [
+        "Rollout adds every RollingUpdate Deployment's maxSurge concurrently; terminating Pods can temporarily add further usage.",
+        "Jobs run in ordered bootstrap phases, and the optional operator is separate from steady/rollout totals.",
+        "Connection estimates assume one application process and one Prisma pool per Pod; both memory stores initialized.",
+        "Langfuse pool limits describe the public Secret template; preserve its URL query when generating private credentials.",
+        "Longhorn copy count is supplied, not a cluster verification; replicated data excludes snapshots, metadata and free-space headroom.",
+        "PVC capacity is separate from node ephemeral storage; workload requests exclude image cache and existing cluster usage.",
+        "Datastores remain single-primary services; multiple storage copies do not provide database failover."
+      ]
+    },
+    "standalone": {
+      "observability_mode": "standalone",
+      "steady": {
+        "pods": 20,
+        "requests": {
+          "cpu_cores": 64.5,
+          "memory_gib": 146.5,
+          "ephemeral_storage_gib": 2.5
+        },
+        "limits": {
+          "cpu_cores": 186.0,
+          "memory_gib": 327.0,
+          "ephemeral_storage_gib": 20.0
+        }
+      },
+      "rollout": {
+        "pods": 25,
+        "requests": {
+          "cpu_cores": 79.0,
+          "memory_gib": 171.0,
+          "ephemeral_storage_gib": 3.125
+        },
+        "limits": {
+          "cpu_cores": 226.0,
+          "memory_gib": 384.0,
+          "ephemeral_storage_gib": 25.0
+        }
+      },
+      "workloads": [
+        {
+          "name": "gateway",
+          "kind": "Deployment",
+          "replicas": 3,
+          "surge_replicas": 1,
+          "resources": {
+            "requests": {
+              "cpu_cores": 4.0,
+              "memory_gib": 4.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 8.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "worker",
+          "kind": "Deployment",
+          "replicas": 2,
+          "surge_replicas": 1,
+          "resources": {
+            "requests": {
+              "cpu_cores": 4.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 12.0,
+              "memory_gib": 24.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "frontend",
+          "kind": "Deployment",
+          "replicas": 3,
+          "surge_replicas": 1,
+          "resources": {
+            "requests": {
+              "cpu_cores": 0.5,
+              "memory_gib": 0.5,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 2.0,
+              "memory_gib": 1.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "postgres",
+          "kind": "StatefulSet",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 8.0,
+              "memory_gib": 32.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 24.0,
+              "memory_gib": 64.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "langfuse-web",
+          "kind": "Deployment",
+          "replicas": 2,
+          "surge_replicas": 1,
+          "resources": {
+            "requests": {
+              "cpu_cores": 2.0,
+              "memory_gib": 4.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 6.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "langfuse-worker",
+          "kind": "Deployment",
+          "replicas": 2,
+          "surge_replicas": 1,
+          "resources": {
+            "requests": {
+              "cpu_cores": 4.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 12.0,
+              "memory_gib": 16.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "langfuse-postgres",
+          "kind": "StatefulSet",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 4.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 12.0,
+              "memory_gib": 16.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "langfuse-clickhouse",
+          "kind": "StatefulSet",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 8.0,
+              "memory_gib": 32.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 24.0,
+              "memory_gib": 64.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "langfuse-redis",
+          "kind": "StatefulSet",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 2.0,
+              "memory_gib": 4.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 4.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "langfuse-minio",
+          "kind": "StatefulSet",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 2.0,
+              "memory_gib": 4.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 8.0,
+              "memory_gib": 16.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "otel-collector",
+          "kind": "Deployment",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 2.0,
+              "memory_gib": 4.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 8.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "prometheus",
+          "kind": "StatefulSet",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 4.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 12.0,
+              "memory_gib": 24.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "grafana",
+          "kind": "StatefulSet",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 1.0,
+              "memory_gib": 1.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 4.0,
+              "memory_gib": 4.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        }
+      ],
+      "transient_workloads": [
+        {
+          "name": "migrate",
+          "kind": "Job",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 2.0,
+              "memory_gib": 2.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 8.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "memory-init",
+          "kind": "Job",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 2.0,
+              "memory_gib": 2.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 8.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "memory-validate",
+          "kind": "Job",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 2.0,
+              "memory_gib": 2.0,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 8.0,
+              "memory_gib": 8.0,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "kira-operator",
+          "kind": "Pod",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 0.1,
+              "memory_gib": 0.25,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 1.0,
+              "memory_gib": 0.5,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        },
+        {
+          "name": "langfuse-s3-init",
+          "kind": "Job",
+          "replicas": 1,
+          "surge_replicas": 0,
+          "resources": {
+            "requests": {
+              "cpu_cores": 0.1,
+              "memory_gib": 0.125,
+              "ephemeral_storage_gib": 0.125
+            },
+            "limits": {
+              "cpu_cores": 1.0,
+              "memory_gib": 0.5,
+              "ephemeral_storage_gib": 1.0
+            }
+          }
+        }
+      ],
+      "persistent_storage": {
+        "claims": [
+          {
+            "name": "postgres-data",
+            "gib": 20.0
+          },
+          {
+            "name": "langfuse-postgres-data",
+            "gib": 10.0
+          },
+          {
+            "name": "langfuse-clickhouse-data",
+            "gib": 20.0
+          },
+          {
+            "name": "langfuse-redis-data",
+            "gib": 2.0
+          },
+          {
+            "name": "langfuse-minio-data",
+            "gib": 20.0
+          },
+          {
+            "name": "prometheus-data",
+            "gib": 10.0
+          },
+          {
+            "name": "grafana-data",
+            "gib": 1.0
+          }
+        ],
+        "logical_gib": 83.0,
+        "longhorn_data_copies": 2,
+        "replicated_data_gib": 166.0
+      },
+      "connection_budgets": {
+        "application": {
+          "steady_connections": 65,
+          "rollout_connections": 91,
+          "max_connections": 200,
+          "superuser_reserved_connections": 3,
+          "remaining_non_superuser_connections": 106,
+          "pools": {
+            "gateway": {
+              "async_pool": 7,
+              "memory_pool_per_store": 3,
+              "memory_stores": 2,
+              "per_pod": 13
+            },
+            "worker": {
+              "async_pool": 7,
+              "memory_pool_per_store": 3,
+              "memory_stores": 2,
+              "per_pod": 13
+            }
+          }
+        },
+        "langfuse": {
+          "steady_connections": 60,
+          "rollout_connections": 90,
+          "max_connections": 200,
+          "superuser_reserved_connections": 3,
+          "remaining_non_superuser_connections": 107,
+          "pool_limit": 15,
+          "pool_timeout_seconds": 10,
+          "steady_pools": 4,
+          "rollout_pools": 6
+        }
+      },
+      "worker_jobs": {
+        "per_pod": 2,
+        "steady": 4,
+        "rollout": 6
+      },
+      "assumptions": [
+        "Rollout adds every RollingUpdate Deployment's maxSurge concurrently; terminating Pods can temporarily add further usage.",
+        "Jobs run in ordered bootstrap phases, and the optional operator is separate from steady/rollout totals.",
+        "Connection estimates assume one application process and one Prisma pool per Pod; both memory stores initialized.",
+        "Langfuse pool limits describe the public Secret template; preserve its URL query when generating private credentials.",
+        "Longhorn copy count is supplied, not a cluster verification; replicated data excludes snapshots, metadata and free-space headroom.",
+        "PVC capacity is separate from node ephemeral storage; workload requests exclude image cache and existing cluster usage.",
+        "Datastores remain single-primary services; multiple storage copies do not provide database failover."
+      ]
+    }
+  },
+  "helper_tests": [
+    {
+      "command": "pytest tests/unit/scripts/test_k8s_deployment.py tests/unit/scripts/test_observability_deployment.py tests/unit/scripts/test_product_image_handoff.py tests/unit/scripts/test_observability_images.py --no-cov -q",
+      "passed": 35
+    },
+    {
+      "command": "pytest tests/unit/scripts/test_k8s_capacity.py --no-cov -q",
+      "passed": 10
+    }
+  ],
+  "ruff": "scripts/deploy tests/unit/scripts: PASS",
+  "related_evidence": [
+    "kubernetes-capacity-2026-10-09.json",
+    "product-dockerfile-rebuild-2026-10-09.json",
+    "postgres-generous-config-2026-10-09.json",
+    "observability-generous-yaml-local-verification-2026-10-09.json"
+  ],
+  "cluster_apply": "NOT_RUN",
+  "registry_publish": "NOT_RUN",
+  "archive_export": "NOT_RUN",
+  "private_credentials_used": false,
+  "limitations": [
+    "Schema validation is not API admission, NetworkPolicy, PVC binding or Pod placement.",
+    "Capacity math is not a provider or memory-load benchmark.",
+    "Rollout budget excludes terminating Pods and temporary Jobs/operator workloads.",
+    "Longhorn disk eligibility/free-space policy and backup/restore remain unverified."
+  ]
+}

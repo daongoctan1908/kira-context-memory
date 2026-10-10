@@ -1,18 +1,14 @@
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from opentelemetry.sdk.metrics import MeterProvider
-from opentelemetry.sdk.metrics.export import InMemoryMetricReader
-from prometheus_client import generate_latest
-
 from app.application.use_cases.process_memory_job import (
     MemoryJobProcessOutcome,
     ProcessMemoryJobResult,
 )
 from app.domain.models.conversation import CompletedTurnReference
 from app.domain.models.memory_job import MemoryJob, MemoryJobPurgeResult, MemoryJobStats
+from tests.support.otel_metrics import worker_telemetry
 from worker.runner import MemoryJobRunnerSnapshot
-from worker.telemetry import MemoryJobTelemetry
 
 NOW = datetime(2026, 9, 9, 15, 0, tzinfo=UTC)
 
@@ -35,7 +31,7 @@ def make_job(*, reclaimed: bool = False, attempt_count: int = 1) -> MemoryJob:
 
 
 def test_worker_metrics_cover_bounded_queue_and_processing_dimensions() -> None:
-    telemetry = MemoryJobTelemetry()
+    telemetry, metrics = worker_telemetry()
     new_job = make_job()
     reclaimed_job = make_job(reclaimed=True, attempt_count=3)
     telemetry.jobs_claimed((new_job, reclaimed_job))
@@ -61,22 +57,21 @@ def test_worker_metrics_cover_bounded_queue_and_processing_dimensions() -> None:
         queue_database_available=True,
     )
 
-    payload = generate_latest(telemetry.registry).decode()
+    payload = repr(metrics.snapshot())
 
     for status, count in (("pending", 4), ("processing", 3), ("completed", 2), ("dead", 1)):
-        assert f'kira_memory_job_queue_depth{{status="{status}"}} {count}.0' in payload
-    assert 'kira_memory_job_claim_total{kind="new"} 1.0' in payload
-    assert 'kira_memory_job_claim_total{kind="reclaimed"} 1.0' in payload
-    assert 'kira_memory_job_processing_total{outcome="success"} 1.0' in payload
-    assert 'kira_memory_job_processing_total{outcome="retry"} 1.0' in payload
-    assert 'kira_memory_job_processing_total{outcome="dead"} 1.0' in payload
-    assert "kira_memory_job_processing_duration_seconds_count" in payload
-    assert "kira_memory_job_attempt_count_sum 9.0" in payload
-    assert "kira_memory_job_lifecycle_event_count_sum 2.0" in payload
-    assert 'kira_memory_job_cleanup_total{status="completed"} 2.0' in payload
-    assert 'kira_memory_job_cleanup_total{status="dead"} 1.0' in payload
-    assert "kira_memory_worker_runner_active 1.0" in payload
-    assert "kira_memory_job_queue_database_available 1.0" in payload
+        assert metrics.value("kira.memory.job.queue.depth", {"status": status}) == count
+    assert metrics.value("kira.memory.job.claim.count", {"kind": "new"}) == 1
+    assert metrics.value("kira.memory.job.claim.count", {"kind": "reclaimed"}) == 1
+    for outcome in ("completed", "retry", "dead"):
+        assert metrics.value("kira.memory.job.process.count", {"outcome": outcome}) == 1
+    assert metrics.value("kira.memory.job.process.duration", field="count") == 3
+    assert metrics.value("kira.memory.job.attempt.number", field="sum") == 9
+    assert metrics.value("kira.memory.lifecycle_event.count", field="sum") == 2
+    assert metrics.value("kira.memory.job.cleanup.count", {"status": "completed"}) == 2
+    assert metrics.value("kira.memory.job.cleanup.count", {"status": "dead"}) == 1
+    assert metrics.value("kira.memory.worker.runner.active") == 1
+    assert metrics.value("kira.memory.job.queue.database.available") == 1
 
     for forbidden in (
         "private-user",
@@ -89,21 +84,18 @@ def test_worker_metrics_cover_bounded_queue_and_processing_dimensions() -> None:
         assert forbidden not in payload
 
 
-def test_worker_telemetry_uses_one_isolated_registry_per_process_instance() -> None:
-    first = MemoryJobTelemetry()
-    second = MemoryJobTelemetry()
+def test_worker_telemetry_uses_isolated_application_meters() -> None:
+    first, first_metrics = worker_telemetry()
+    _, second_metrics = worker_telemetry()
 
     first.jobs_claimed((make_job(),))
 
-    assert first.registry is not second.registry
-    assert 'kira_memory_job_claim_total{kind="new"} 1.0' in generate_latest(first.registry).decode()
-    assert (
-        'kira_memory_job_claim_total{kind="new"} 0.0' in generate_latest(second.registry).decode()
-    )
+    assert first_metrics.value("kira.memory.job.claim.count", {"kind": "new"}) == 1
+    assert second_metrics.value("kira.memory.job.claim.count", {"kind": "new"}) is None
 
 
 def test_skipped_deleted_source_has_bounded_metric_without_lifecycle_sample() -> None:
-    telemetry = MemoryJobTelemetry()
+    telemetry, metrics = worker_telemetry()
 
     telemetry.job_processed(
         make_job(),
@@ -111,15 +103,12 @@ def test_skipped_deleted_source_has_bounded_metric_without_lifecycle_sample() ->
         0.01,
     )
 
-    payload = generate_latest(telemetry.registry).decode()
-    assert 'kira_memory_job_processing_total{outcome="skipped"} 1.0' in payload
-    assert "kira_memory_job_lifecycle_event_count_count 0.0" in payload
+    assert metrics.value("kira.memory.job.process.count", {"outcome": "skipped"}) == 1
+    assert metrics.value("kira.memory.lifecycle_event.count", field="count") is None
 
 
-def test_phase5_maps_legacy_success_to_otel_completed_without_changing_old_scrape() -> None:
-    reader = InMemoryMetricReader()
-    provider = MeterProvider(metric_readers=[reader])
-    telemetry = MemoryJobTelemetry(meter=provider.get_meter("worker-test"))
+def test_completed_job_emits_one_otel_completed_outcome() -> None:
+    telemetry, metrics = worker_telemetry()
 
     telemetry.job_processed(
         make_job(),
@@ -127,50 +116,20 @@ def test_phase5_maps_legacy_success_to_otel_completed_without_changing_old_scrap
         0.25,
     )
 
-    legacy = generate_latest(telemetry.registry).decode()
-    data = reader.get_metrics_data()
-    assert data is not None
-    metrics = [
-        metric
-        for resource in data.resource_metrics
-        for scope in resource.scope_metrics
-        for metric in scope.metrics
-    ]
-    otel_count = next(
-        metric for metric in metrics if metric.name == "kira.memory.job.process.count"
-    )
-
-    assert 'kira_memory_job_processing_total{outcome="success"} 1.0' in legacy
-    assert otel_count.data.data_points[0].attributes == {"outcome": "completed"}
-    assert otel_count.data.data_points[0].value == 1
-    provider.shutdown()
+    points = metrics.snapshot().points["kira.memory.job.process.count"]
+    assert len(points) == 1
+    assert points[0].attributes == {"outcome": "completed"}
+    assert points[0].value == 1
 
 
 def test_formation_scope_metrics_record_valid_fallback_and_invalid_counts() -> None:
-    reader = InMemoryMetricReader()
-    provider = MeterProvider(metric_readers=[reader])
-    telemetry = MemoryJobTelemetry(meter=provider.get_meter("worker-test"))
+    telemetry, metrics = worker_telemetry()
 
     telemetry.formation_scope_observed(conversation=2, global_count=1, fallback=1, invalid=1)
 
-    payload = generate_latest(telemetry.registry).decode()
-    assert 'kira_memory_scope_total{origin="valid",scope="CONVERSATION"} 2.0' in payload
-    assert 'kira_memory_scope_total{origin="valid",scope="GLOBAL"} 1.0' in payload
-    assert 'kira_memory_scope_total{origin="fallback",scope="CONVERSATION"} 1.0' in payload
-    assert 'kira_memory_scope_total{origin="invalid",scope="unknown"} 1.0' in payload
-
-    data = reader.get_metrics_data()
-    assert data is not None
-    metrics = [
-        metric
-        for resource in data.resource_metrics
-        for scope in resource.scope_metrics
-        for metric in scope.metrics
-    ]
-    otel_scope = next(metric for metric in metrics if metric.name == "kira.memory.scope.count")
     points = {
         tuple(sorted(point.attributes.items())): point.value
-        for point in otel_scope.data.data_points
+        for point in metrics.snapshot().points["kira.memory.scope.count"]
     }
     assert points == {
         (("origin", "valid"), ("scope", "CONVERSATION")): 2,
@@ -178,16 +137,14 @@ def test_formation_scope_metrics_record_valid_fallback_and_invalid_counts() -> N
         (("origin", "fallback"), ("scope", "CONVERSATION")): 1,
         (("origin", "invalid"), ("scope", "unknown")): 1,
     }
-    provider.shutdown()
 
 
 def test_formation_scope_metrics_skip_zero_counts() -> None:
-    telemetry = MemoryJobTelemetry()
+    telemetry, metrics = worker_telemetry()
 
     telemetry.formation_scope_observed(conversation=3, global_count=0, fallback=0, invalid=0)
 
-    payload = generate_latest(telemetry.registry).decode()
-    assert 'kira_memory_scope_total{origin="valid",scope="CONVERSATION"} 3.0' in payload
-    assert 'kira_memory_scope_total{origin="valid",scope="GLOBAL"} 0.0' in payload
-    assert 'kira_memory_scope_total{origin="fallback",scope="CONVERSATION"} 0.0' in payload
-    assert 'kira_memory_scope_total{origin="invalid",scope="unknown"} 0.0' in payload
+    points = metrics.snapshot().points["kira.memory.scope.count"]
+    assert len(points) == 1
+    assert points[0].attributes == {"scope": "CONVERSATION", "origin": "valid"}
+    assert points[0].value == 3
